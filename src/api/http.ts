@@ -1,5 +1,6 @@
 // Cliente HTTP tipado para la API e-CF.
 import { API_BASE_URL, API_KEY } from './config'
+import { getToken, clearSession } from '@/auth/session'
 
 /** Error normalizado de la API (con código HTTP cuando aplica). */
 export class ApiError extends Error {
@@ -13,9 +14,19 @@ export class ApiError extends Error {
 
 function buildHeaders(extra?: HeadersInit): HeadersInit {
   const headers: Record<string, string> = { Accept: 'application/json' }
-  // En dev la clave la inyecta el proxy; en prod sin proxy se manda aquí.
-  if (API_KEY) headers['X-API-KEY'] = API_KEY
+  // Auth de app: token de sesión del usuario (POST /api/auth/login) como Bearer.
+  // Si no hay sesión, se cae a VITE_API_KEY (solo prod sin proxy / integración).
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  else if (API_KEY) headers['X-API-KEY'] = API_KEY
   return { ...headers, ...(extra as Record<string, string>) }
+}
+
+/** 401 => el token venció o es inválido: cerramos sesión para volver al login. */
+function handleUnauthorized(body: unknown, status: number): never {
+  clearSession()
+  const msg = (body as { error?: string } | null)?.error || 'Tu sesión expiró. Vuelve a iniciar sesión.'
+  throw new ApiError(msg, status)
 }
 
 /**
@@ -40,6 +51,7 @@ async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown>
     }
   }
 
+  if (res.status === 401) handleUnauthorized(body, res.status)
   if (body && typeof body === 'object' && 'status' in body && (body as { status: unknown }).status === false) {
     throw new ApiError((body as { error?: string }).error || `Error HTTP ${res.status}.`, res.status)
   }
@@ -108,12 +120,14 @@ export async function getBlob(path: string): Promise<{ blob: Blob; filename: str
   }
   if (!res.ok) {
     let msg = `Error HTTP ${res.status}.`
+    let errBody: { error?: string } | null = null
     try {
-      const j = (await res.json()) as { error?: string }
-      if (j?.error) msg = j.error
+      errBody = (await res.json()) as { error?: string }
+      if (errBody?.error) msg = errBody.error
     } catch {
       /* respuesta no-JSON */
     }
+    if (res.status === 401) handleUnauthorized(errBody, res.status)
     throw new ApiError(msg, res.status)
   }
   const blob = await res.blob()

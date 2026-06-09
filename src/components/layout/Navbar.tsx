@@ -1,6 +1,9 @@
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
 import { NotifPopover } from './NotifPopover'
 import { DATA } from '@/data/mockData'
+import { useSession } from '@/auth/useSession'
+import { clearSession } from '@/auth/session'
+import { logout } from '@/api/auth'
 import type { Nav } from '@/app/navigation'
 
 export interface NavbarProps {
@@ -18,6 +21,18 @@ export function Navbar({
   nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav, notifOpen, onToggleNotif, onCloseNotif,
 }: NavbarProps) {
   const D = DATA
+  const { user } = useSession()
+  const userName = user?.name || D.usuario.nombre
+  const userEmail = user?.email || D.usuario.email
+  const userRole = user?.role || D.usuario.rol
+
+  // Logout: revoca el token en el backend (best-effort) y limpia la sesión local.
+  // clearSession() notifica a App, que vuelve a mostrar el login.
+  const handleLogout = async () => {
+    await logout()
+    clearSession()
+  }
+
   return (
     <header className="navbar">
       <button className="icon-btn mobile-only" onClick={onOpenMobileNav}><Icon name="menu" /></button>
@@ -43,14 +58,14 @@ export function Navbar({
         </div>
         <span className="navbar-divider"></span>
         <Dropdown align="right" width={220} trigger={
-          <div className="user-chip"><Avatar name={D.usuario.nombre} color={D.usuario.color} size={30} /><div className="desktop-only col"><span className="nm">{D.usuario.nombre}</span><span className="rl">{D.usuario.rol}</span></div></div>
+          <div className="user-chip"><Avatar name={userName} color={user ? undefined : D.usuario.color} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
         }>
-          <div className="menu-label">{D.usuario.email}</div>
+          <div className="menu-label">{userEmail}</div>
           <MenuItem icon="user">Mi perfil</MenuItem>
           <MenuItem icon="building-2">Datos de empresa</MenuItem>
           <MenuItem icon="settings" onClick={() => nav('configuracion')}>Configuración</MenuItem>
           <div className="menu-sep"></div>
-          <MenuItem icon="log-out" danger>Cerrar sesión</MenuItem>
+          <MenuItem icon="log-out" danger onClick={handleLogout}>Cerrar sesión</MenuItem>
         </Dropdown>
       </div>
     </header>

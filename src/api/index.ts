@@ -14,6 +14,7 @@ export {
 export { listClients } from './clients'
 export { listUsers } from './users'
 export { getStats } from './stats'
+export { login, logout, type LoginResult } from './auth'
 export {
   listGastos,
   getGasto,

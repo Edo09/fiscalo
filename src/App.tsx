@@ -20,6 +20,8 @@ import { TreasuryView } from '@/features/treasury/TreasuryView'
 import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
+import { LoginView } from '@/features/auth/LoginView'
+import { useSession } from '@/auth/useSession'
 import type { Nav, NavPayload, ViewId } from '@/app/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -34,6 +36,12 @@ const THEME = { accent: 'blue', sidebarStyle: 'espaciado', dashLayout: 'completo
 type ThemeMode = 'light' | 'dark'
 
 function App() {
+  // Puerta de autenticación: sin sesión se muestra el login; con sesión, el shell.
+  const { authenticated } = useSession()
+  return authenticated ? <AppShell /> : <LoginView />
+}
+
+function AppShell() {
   const [view, setView] = useState<ViewId>(() => (localStorage.getItem('fiscalo.view') as ViewId) || 'dashboard')
   const [payload, setPayload] = useState<NavPayload>(null)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')

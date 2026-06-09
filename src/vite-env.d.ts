@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_API_KEY?: string
   /** user_id por defecto para POST /api/facturas. */
   readonly VITE_DEFAULT_USER_ID?: string
+  /** tenant_id (código de empresa) que se envía en el login multi-tenant. */
+  readonly VITE_TENANT_ID?: string
 }
 
 interface ImportMeta {

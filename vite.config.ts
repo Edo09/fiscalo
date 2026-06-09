@@ -19,15 +19,29 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       open: true,
-      // Dev-proxy: el navegador llama a /api (mismo origen) y Vite reenvía
-      // al backend real inyectando la clave. Así X-API-KEY no llega al cliente.
+      // Dev-proxy: el navegador llama a /api (mismo origen) y Vite lo reenvía al
+      // backend real. Reenvía tal cual las cabeceras del cliente, incluido el
+      // `Authorization: Bearer <token>` de la sesión (POST /api/auth/login).
+      //
+      // NO se inyecta X-API-KEY: el backend prioriza X-API-KEY sobre el Bearer,
+      // así que un X-API-KEY fijo del proxy anularía el login por usuario. Si se
+      // define API_KEY se manda solo como respaldo cuando el cliente no envía
+      // Authorization (p. ej. integración o pruebas sin sesión).
       proxy: proxyTarget
         ? {
             '/api': {
               target: proxyTarget,
               changeOrigin: true,
               secure: false,
-              headers: env.API_KEY ? { 'X-API-KEY': env.API_KEY } : undefined,
+              configure: env.API_KEY
+                ? (proxy) => {
+                    proxy.on('proxyReq', (proxyReq) => {
+                      if (!proxyReq.getHeader('authorization')) {
+                        proxyReq.setHeader('X-API-KEY', env.API_KEY)
+                      }
+                    })
+                  }
+                : undefined,
             },
           }
         : undefined,
