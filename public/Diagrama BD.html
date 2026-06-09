@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fiscalo — Diagrama de base de datos</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; overflow: hidden; background: var(--bg); }
+  .erd-app { display: flex; flex-direction: column; height: 100%; }
+
+  /* ---- Topbar ---- */
+  .erd-top {
+    height: 56px; flex-shrink: 0; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px; padding: 0 18px; z-index: 20;
+  }
+  .erd-brand { display: flex; align-items: center; gap: 10px; }
+  .erd-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; box-shadow: var(--sh-sm); }
+  .erd-title { font-weight: 650; font-size: 15px; letter-spacing: -0.01em; }
+  .erd-title small { display: block; font-weight: 500; font-size: 11.5px; color: var(--text-3); letter-spacing: 0; }
+  .erd-top-spacer { flex: 1; }
+  .erd-stat { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+  .erd-stat b { color: var(--text); font-weight: 650; }
+
+  .erd-toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); cursor: pointer; user-select: none; }
+  .erd-sw { width: 34px; height: 20px; border-radius: 99px; background: var(--border-strong); position: relative; transition: background .15s; }
+  .erd-sw.on { background: var(--accent); }
+  .erd-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 99px; background: #fff; transition: transform .15s; box-shadow: var(--sh-sm); }
+  .erd-sw.on::after { transform: translateX(14px); }
+
+  .erd-btn { width: 32px; height: 32px; border-radius: var(--r-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); display: grid; place-items: center; font-size: 16px; font-weight: 600; transition: all .12s; }
+  .erd-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--text-3); }
+
+  /* ---- Body ---- */
+  .erd-body { flex: 1; display: flex; min-height: 0; }
+
+  /* legend rail */
+  .erd-rail { width: 210px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 16px 14px; overflow-y: auto; }
+  .erd-rail h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin: 0 0 10px; font-weight: 600; }
+  .erd-leg-item { display: flex; align-items: center; gap: 9px; padding: 5px 6px; border-radius: var(--r-xs); font-size: 12.5px; color: var(--text-2); cursor: pointer; transition: background .1s; }
+  .erd-leg-item:hover { background: var(--surface-hover); color: var(--text); }
+  .erd-leg-item.dim { opacity: .4; }
+  .erd-leg-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+  .erd-leg-count { margin-left: auto; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .erd-rail-sep { height: 1px; background: var(--border); margin: 14px 0; }
+  .erd-key-row { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--text-2); margin-bottom: 9px; }
+  .erd-kb { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; padding: 1px 4px; border-radius: 4px; letter-spacing: .02em; }
+  .erd-kb.pk { background: #fbf1dd; color: #9a6610; }
+  .erd-kb.fk { background: var(--accent-soft); color: var(--accent-text); }
+  [data-theme="dark"] .erd-kb.pk { background: #3a2f15; color: #e0b052; }
+
+  /* viewport / canvas */
+  .erd-viewport { flex: 1; position: relative; overflow: hidden; cursor: grab; background:
+    radial-gradient(circle at center, var(--border) 0.9px, transparent 0.9px);
+    background-size: 22px 22px; background-position: 0 0; }
+  [data-theme="dark"] .erd-viewport { background-image: radial-gradient(circle at center, #23262e 0.9px, transparent 0.9px); }
+  .erd-viewport.grabbing { cursor: grabbing; }
+  .erd-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+
+  .erd-svg { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+  .erd-link { fill: none; stroke: var(--border-strong); stroke-width: 1.6; transition: stroke .15s, opacity .15s, stroke-width .15s; }
+  .erd-link.tenant { stroke-dasharray: 4 4; stroke: var(--border-strong); opacity: .55; }
+  .erd-link.hot { stroke: var(--accent); stroke-width: 2.2; opacity: 1; }
+  .erd-link.faded { opacity: .12; }
+  .erd-marker { fill: none; stroke: var(--border-strong); stroke-width: 1.6; transition: stroke .15s; }
+  .erd-marker.hot { stroke: var(--accent); stroke-width: 2.2; }
+
+  /* table card */
+  .erd-tbl { position: absolute; width: 248px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--sh-sm); overflow: hidden; transition: box-shadow .15s, opacity .15s, transform .1s; }
+  .erd-tbl.faded { opacity: .32; }
+  .erd-tbl.hot { box-shadow: var(--sh-lg); border-color: var(--accent); z-index: 5; }
+  .erd-tbl-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); border-left: 3px solid var(--mc); cursor: pointer; }
+  .erd-tbl-head .nm { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+  .erd-tbl-head .ic { width: 9px; height: 9px; border-radius: 3px; background: var(--mc); flex-shrink: 0; }
+  .erd-tbl-head .cnt { margin-left: auto; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .erd-row { display: flex; align-items: center; gap: 7px; padding: 4px 12px; font-size: 12px; border-bottom: 1px solid var(--surface-2); min-height: 26px; }
+  .erd-row:last-child { border-bottom: none; }
+  .erd-row.pk { background: linear-gradient(90deg, #fbf1dd55, transparent); }
+  [data-theme="dark"] .erd-row.pk { background: linear-gradient(90deg, #3a2f1533, transparent); }
+  .erd-row .badge-k { font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; width: 19px; text-align: center; padding: 1px 0; border-radius: 3px; flex-shrink: 0; }
+  .erd-row .badge-k.pk { background: #fbf1dd; color: #9a6610; }
+  .erd-row .badge-k.fk { background: var(--accent-soft); color: var(--accent-text); }
+  .erd-row .badge-k.none { background: transparent; }
+  [data-theme="dark"] .erd-row .badge-k.pk { background: #3a2f15; color: #e0b052; }
+  .erd-row .cn { font-family: var(--font-mono); color: var(--text); font-weight: 500; }
+  .erd-row.pk .cn { font-weight: 700; }
+  .erd-row .cn .nn { color: var(--danger); font-size: 9px; vertical-align: super; }
+  .erd-row .ct { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
+  .erd-row .uq { font-size: 8.5px; font-family: var(--font-mono); color: var(--accent-text); background: var(--accent-soft); border-radius: 3px; padding: 0 3px; margin-left: 4px; }
+
+  .erd-grouplabel { position: absolute; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 9px; border-radius: 6px; color: #fff; }
+
+  /* zoom controls */
+  .erd-zoom { position: absolute; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 6px; z-index: 10; }
+  .erd-zoom .erd-btn { width: 36px; height: 36px; box-shadow: var(--sh-md); }
+  .erd-zoom .zlabel { text-align: center; font-size: 10.5px; color: var(--text-2); font-variant-numeric: tabular-nums; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 0; box-shadow: var(--sh-sm); }
+  .erd-hint { position: absolute; bottom: 20px; left: 18px; font-size: 11.5px; color: var(--text-3); background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 5px 12px; box-shadow: var(--sh-sm); display: flex; align-items: center; gap: 6px; z-index: 10; }
+
+  @media (max-width: 760px) { .erd-rail { display: none; } .erd-title small { display: none; } }
+</style>
+</head>
+<body>
+<div class="erd-app">
+  <div class="erd-top">
+    <div class="erd-brand">
+      <div class="erd-mark">F</div>
+      <div class="erd-title">Modelo de datos · Fiscalo<small>Facturación electrónica RD · e-CF / DGII</small></div>
+    </div>
+    <div class="erd-top-spacer"></div>
+    <div class="erd-stat"><b id="stat-tbl">0</b> tablas</div>
+    <div class="erd-stat"><b id="stat-rel">0</b> relaciones</div>
+    <div style="width:1px;height:24px;background:var(--border);margin:0 4px"></div>
+    <div class="erd-toggle" id="tenant-toggle"><span class="erd-sw"></span> Mostrar <code style="font-family:var(--font-mono);font-size:11px">empresa_id</code></div>
+    <div style="width:1px;height:24px;background:var(--border);margin:0 4px"></div>
+    <button class="erd-btn" id="btn-theme" title="Tema">◐</button>
+  </div>
+
+  <div class="erd-body">
+    <div class="erd-rail">
+      <h4>Módulos</h4>
+      <div id="legend"></div>
+      <div class="erd-rail-sep"></div>
+      <h4>Leyenda</h4>
+      <div class="erd-key-row"><span class="erd-kb pk">PK</span> Clave primaria</div>
+      <div class="erd-key-row"><span class="erd-kb fk">FK</span> Clave foránea</div>
+      <div class="erd-key-row"><span style="font-family:var(--font-mono);font-size:11px">abc <span style="color:var(--danger)">∗</span></span> Permite nulos</div>
+      <div class="erd-key-row"><svg width="34" height="14"><line x1="2" y1="7" x2="20" y2="7" stroke="var(--border-strong)" stroke-width="1.6"/><path d="M20,2 L32,7 L20,12 M32,7 L24,7" fill="none" stroke="var(--border-strong)" stroke-width="1.6"/></svg> 1 → muchos</div>
+      <div class="erd-key-row"><svg width="34" height="14"><line x1="2" y1="7" x2="32" y2="7" stroke="var(--border-strong)" stroke-width="1.6" stroke-dasharray="4 4"/></svg> multi-empresa</div>
+      <div class="erd-rail-sep"></div>
+      <div style="font-size:11.5px;color:var(--text-3);line-height:1.6">Pasa el cursor sobre una tabla para ver sus relaciones. Arrastra el lienzo para moverte; usa la rueda o los botones para acercar.</div>
+    </div>
+
+    <div class="erd-viewport" id="viewport">
+      <div class="erd-canvas" id="canvas">
+        <svg class="erd-svg" id="svg">
+          <defs>
+            <g id="defs-markers"></g>
+          </defs>
+          <g id="links"></g>
+        </svg>
+      </div>
+      <div class="erd-zoom">
+        <button class="erd-btn" id="zin">+</button>
+        <div class="zlabel" id="zlabel">100%</div>
+        <button class="erd-btn" id="zout">−</button>
+        <button class="erd-btn" id="zfit" title="Ajustar" style="font-size:13px">⤢</button>
+      </div>
+      <div class="erd-hint">Arrastra para mover · rueda para zoom · hover en tabla para relaciones</div>
+    </div>
+  </div>
+</div>
+
+<script src="db_schema.js"></script>
+<script>
+(function () {
+  const S = window.SCHEMA;
+  const canvas = document.getElementById("canvas");
+  const svg = document.getElementById("svg");
+  const linksG = document.getElementById("links");
+  const viewport = document.getElementById("viewport");
+  const ROWH = 26, HEADH = 39;
+
+  // ---- Build relationships from FK refs ----
+  const rels = [];
+  S.tables.forEach(t => t.cols.forEach((c, i) => {
+    if (c.ref) rels.push({ from: t.id, fromCol: c.n, fromIdx: i, to: c.ref, tenant: !!c.tenant });
+  }));
+
+  document.getElementById("stat-tbl").textContent = S.tables.length;
+  document.getElementById("stat-rel").textContent = rels.length;
+
+  // ---- Module group labels (top of each column cluster) ----
+  const tablesById = {};
+  S.tables.forEach(t => tablesById[t.id] = t);
+
+  // ---- Render tables ----
+  S.tables.forEach(t => {
+    const mc = S.modules[t.module].color;
+    const el = document.createElement("div");
+    el.className = "erd-tbl";
+    el.id = "tbl-" + t.id;
+    el.style.left = t.x + "px";
+    el.style.top = t.y + "px";
+    el.style.setProperty("--mc", mc);
+    let rows = "";
+    t.cols.forEach(c => {
+      const isPk = (c.k || "").includes("pk");
+      const isFk = (c.k || "").includes("fk");
+      const kClass = isPk ? "pk" : isFk ? "fk" : "none";
+      const kLabel = isPk && isFk ? "PK" : isPk ? "PK" : isFk ? "FK" : "";
+      rows += `<div class="erd-row ${isPk ? "pk" : ""}" data-col="${c.n}">
+        <span class="badge-k ${kClass}">${kLabel}</span>
+        <span class="cn">${c.n}${c.nullable ? '<span class="nn">∗</span>' : ""}${c.u ? '<span class="uq">U</span>' : ""}</span>
+        <span class="ct">${c.t}</span>
+      </div>`;
+    });
+    el.innerHTML = `<div class="erd-tbl-head"><span class="ic"></span><span class="nm">${t.id}</span><span class="cnt">${t.cols.length}</span></div>${rows}`;
+    canvas.appendChild(el);
+
+    el.addEventListener("mouseenter", () => highlight(t.id));
+    el.addEventListener("mouseleave", clearHighlight);
+  });
+
+  // ---- Group labels ----
+  const groupCols = {};
+  S.tables.forEach(t => {
+    const key = t.x;
+    if (!groupCols[key] || t.y < groupCols[key].y) groupCols[key] = { y: t.y, module: t.module };
+  });
+
+  // ---- Markers (defs) ----
+  // many = crow's foot ; one = single bar. We draw per-link via small paths instead of <marker> for full control.
+
+  // ---- Layout links ----
+  const linkEls = [];
+  function pt(tableId, side, y) {
+    const t = tablesById[tableId];
+    const x = side === "right" ? t.x + 248 : t.x;
+    return { x, y };
+  }
+  function buildLinks() {
+    linksG.innerHTML = "";
+    linkEls.length = 0;
+    rels.forEach((r, idx) => {
+      const fromT = tablesById[r.from], toT = tablesById[r.to];
+      const fromRowY = fromT.y + HEADH + r.fromIdx * ROWH + ROWH / 2;
+      const toHeadY = toT.y + HEADH / 2;
+      const fromCx = fromT.x + 124, toCx = toT.x + 124;
+      const fromSide = toCx >= fromCx ? "right" : "left";
+      const toSide = toCx >= fromCx ? "left" : "right";
+      const a = pt(r.from, fromSide, fromRowY);
+      const b = pt(r.to, toSide, toHeadY);
+      const dx = Math.max(50, Math.abs(b.x - a.x) * 0.4);
+      const c1x = a.x + (fromSide === "right" ? dx : -dx);
+      const c2x = b.x + (toSide === "right" ? dx : -dx);
+      const d = `M ${a.x} ${a.y} C ${c1x} ${a.y}, ${c2x} ${b.y}, ${b.x} ${b.y}`;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      path.setAttribute("class", "erd-link" + (r.tenant ? " tenant" : ""));
+      linksG.appendChild(path);
+
+      // crow's foot at "from" (many) end
+      const dir = fromSide === "right" ? 1 : -1;
+      const foot = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const fx = a.x, fy = a.y, sp = 9, len = 12;
+      foot.setAttribute("d", `M ${fx + dir*len} ${fy-6} L ${fx} ${fy} L ${fx + dir*len} ${fy+6} M ${fx + dir*len} ${fy} L ${fx} ${fy}`);
+      foot.setAttribute("class", "erd-marker" + (r.tenant ? "" : ""));
+      if (r.tenant) foot.style.opacity = ".55";
+      linksG.appendChild(foot);
+
+      // single bar at "to" (one) end
+      const dir2 = toSide === "right" ? 1 : -1;
+      const bar = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      bar.setAttribute("d", `M ${b.x + dir2*7} ${b.y-6} L ${b.x + dir2*7} ${b.y+6}`);
+      bar.setAttribute("class", "erd-marker");
+      if (r.tenant) bar.style.opacity = ".55";
+      linksG.appendChild(bar);
+
+      linkEls.push({ rel: r, path, foot, bar });
+    });
+  }
+
+  // ---- SVG size ----
+  let maxX = 0, maxY = 0;
+  S.tables.forEach(t => { maxX = Math.max(maxX, t.x + 248); maxY = Math.max(maxY, t.y + HEADH + t.cols.length * ROWH); });
+  const CW = maxX + 80, CH = maxY + 80;
+  svg.setAttribute("width", CW); svg.setAttribute("height", CH);
+  svg.setAttribute("viewBox", `0 0 ${CW} ${CH}`);
+  canvas.style.width = CW + "px"; canvas.style.height = CH + "px";
+  buildLinks();
+
+  // ---- Highlight ----
+  function highlight(id) {
+    const connected = new Set([id]);
+    linkEls.forEach(l => { if (l.rel.from === id || l.rel.to === id) { connected.add(l.rel.from); connected.add(l.rel.to); } });
+    S.tables.forEach(t => {
+      const el = document.getElementById("tbl-" + t.id);
+      el.classList.toggle("hot", t.id === id);
+      el.classList.toggle("faded", !connected.has(t.id));
+    });
+    linkEls.forEach(l => {
+      const hot = l.rel.from === id || l.rel.to === id;
+      l.path.classList.toggle("hot", hot);
+      l.path.classList.toggle("faded", !hot);
+      l.foot.classList.toggle("hot", hot);
+      l.bar.classList.toggle("hot", hot);
+      if (hot) { l.foot.style.opacity = 1; l.bar.style.opacity = 1; }
+    });
+  }
+  function clearHighlight() {
+    S.tables.forEach(t => { const el = document.getElementById("tbl-" + t.id); el.classList.remove("hot", "faded"); });
+    linkEls.forEach(l => {
+      l.path.classList.remove("hot", "faded");
+      l.foot.classList.remove("hot"); l.bar.classList.remove("hot");
+      const o = l.rel.tenant ? .55 : 1; l.foot.style.opacity = l.rel.tenant ? .55 : ""; l.bar.style.opacity = l.rel.tenant ? .55 : "";
+    });
+  }
+
+  // ---- Legend ----
+  const legend = document.getElementById("legend");
+  const counts = {};
+  S.tables.forEach(t => counts[t.module] = (counts[t.module] || 0) + 1);
+  Object.entries(S.modules).forEach(([k, m]) => {
+    if (!counts[k]) return;
+    const row = document.createElement("div");
+    row.className = "erd-leg-item";
+    row.innerHTML = `<span class="erd-leg-dot" style="background:${m.color}"></span>${m.label}<span class="erd-leg-count">${counts[k]}</span>`;
+    row.addEventListener("mouseenter", () => {
+      S.tables.forEach(t => document.getElementById("tbl-" + t.id).classList.toggle("faded", t.module !== k));
+    });
+    row.addEventListener("mouseleave", () => S.tables.forEach(t => document.getElementById("tbl-" + t.id).classList.remove("faded")));
+    legend.appendChild(row);
+  });
+
+  // ---- Tenant toggle ----
+  let showTenant = false;
+  const tenantToggle = document.getElementById("tenant-toggle");
+  const tenantSw = tenantToggle.querySelector(".erd-sw");
+  function applyTenant() {
+    tenantSw.classList.toggle("on", showTenant);
+    linkEls.forEach(l => { if (l.rel.tenant) { const disp = showTenant ? "" : "none"; l.path.style.display = disp; l.foot.style.display = disp; l.bar.style.display = disp; } });
+  }
+  tenantToggle.addEventListener("click", () => { showTenant = !showTenant; applyTenant(); });
+  applyTenant();
+
+  // ---- Pan & zoom ----
+  let zoom = 0.75, panX = 40, panY = 20;
+  function apply() {
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    document.getElementById("zlabel").textContent = Math.round(zoom * 100) + "%";
+  }
+  function fit() {
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    const z = Math.min(vw / CW, vh / CH) * 0.96;
+    zoom = Math.max(0.2, Math.min(1.5, z));
+    panX = (vw - CW * zoom) / 2; panY = (vh - CH * zoom) / 2;
+    apply();
+  }
+  document.getElementById("zin").onclick = () => { zoom = Math.min(1.8, zoom * 1.2); apply(); };
+  document.getElementById("zout").onclick = () => { zoom = Math.max(0.2, zoom / 1.2); apply(); };
+  document.getElementById("zfit").onclick = fit;
+
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    const nz = Math.max(0.2, Math.min(1.8, zoom * factor));
+    panX = mx - (mx - panX) * (nz / zoom);
+    panY = my - (my - panY) * (nz / zoom);
+    zoom = nz; apply();
+  }, { passive: false });
+
+  let dragging = false, sx = 0, sy = 0, spx = 0, spy = 0;
+  viewport.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".erd-tbl") && e.target.closest(".erd-tbl-head") == null && e.target.closest(".erd-row")) { /* still allow pan from rows */ }
+    dragging = true; sx = e.clientX; sy = e.clientY; spx = panX; spy = panY;
+    viewport.classList.add("grabbing"); viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    panX = spx + (e.clientX - sx); panY = spy + (e.clientY - sy); apply();
+  });
+  viewport.addEventListener("pointerup", (e) => { dragging = false; viewport.classList.remove("grabbing"); });
+  viewport.addEventListener("pointerleave", () => { dragging = false; viewport.classList.remove("grabbing"); });
+
+  // ---- Theme ----
+  document.getElementById("btn-theme").onclick = () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  };
+
+  apply();
+  setTimeout(fit, 60);
+})();
+</script>
+</body>
+</html>

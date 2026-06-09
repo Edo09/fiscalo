@@ -1,0 +1,202 @@
+/* ============================================================
+   FISCALO — Dirección visual "Editorial / Esmeralda" (v2)
+   Capa de OVERRIDE sobre styles.css.
+   Cargar DESPUÉS de styles.css.
+   ADN: marfil cálido · acento esmeralda · serif Newsreader
+        · tarjetas planas · íconos circulares · sidebar con barra
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,500&display=swap');
+
+/* ---------- Tokens (claro) ---------- */
+:root {
+  --accent: #15795b;
+  --accent-hover: #126a50;
+  --accent-active: #0f5a44;
+  --accent-soft: #e4f1eb;
+  --accent-soft-2: #cfe7dc;
+  --accent-text: #0f5a44;
+  --on-accent: #ffffff;
+
+  --bg: #f5f2ea;
+  --surface: #ffffff;
+  --surface-2: #faf8f2;
+  --surface-hover: #f3efe6;
+  --surface-active: #ece7da;
+  --sidebar-bg: #fbf9f3;
+  --border: #e7e1d3;
+  --border-strong: #d8d1bf;
+  --ring: rgba(21, 121, 91, 0.26);
+
+  --text: #1d211c;
+  --text-2: #5c6157;
+  --text-3: #908b7d;
+  --text-inverse: #ffffff;
+
+  --success: #15795b;
+  --success-soft: #e4f1eb;
+  --warning: #b7791f;
+  --warning-soft: #f6edda;
+  --danger: #be3f3f;
+  --danger-soft: #f8e6e3;
+  --info: #15795b;
+  --info-soft: #e4f1eb;
+  --neutral-soft: #efebe0;
+
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  --sh-xs: 0 1px 2px rgba(70, 60, 30, 0.04);
+  --sh-sm: 0 1px 3px rgba(70, 60, 30, 0.06);
+  --sh-md: 0 6px 18px rgba(70, 60, 30, 0.08);
+  --sh-lg: 0 14px 40px rgba(60, 50, 25, 0.13);
+  --sh-pop: 0 18px 52px rgba(50, 42, 20, 0.2);
+
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --sidebar-w: 248px;
+}
+
+[data-theme="dark"] {
+  --accent: #4cbf91;
+  --accent-hover: #5ec99e;
+  --accent-active: #70d2ab;
+  --accent-soft: #11271e;
+  --accent-soft-2: #163528;
+  --accent-text: #6fcea3;
+  --on-accent: #07150f;
+
+  --bg: #14130f;
+  --surface: #1c1b16;
+  --surface-2: #181712;
+  --surface-hover: #24221b;
+  --surface-active: #2c2a21;
+  --sidebar-bg: #181712;
+  --border: #2c2a22;
+  --border-strong: #3a3830;
+  --ring: rgba(76, 191, 145, 0.34);
+
+  --text: #ece9df;
+  --text-2: #a8a497;
+  --text-3: #726e62;
+
+  --success: #4cbf91;
+  --success-soft: #11271e;
+  --warning: #d59b34;
+  --warning-soft: #2a2113;
+  --danger: #d96a6a;
+  --danger-soft: #2c1816;
+  --info: #4cbf91;
+  --info-soft: #11271e;
+  --neutral-soft: #24221b;
+}
+
+/* ---------- Tipografía display (serif) ---------- */
+.page-title { font-family: var(--font-display); font-weight: 600; font-size: 27px; letter-spacing: -0.01em; line-height: 1.15; }
+.kpi-value { font-family: var(--font-display); font-weight: 600; font-size: 23px; letter-spacing: -0.01em; line-height: 1.12; }
+.kpi-value .cur { font-family: var(--font-sans); font-size: 14px; }
+.modal-head h3, .drawer-head h3 { font-family: var(--font-display); font-weight: 600; }
+.state h3 { font-family: var(--font-display); font-size: 18px; }
+
+/* hero / totales grandes mantienen serif cuando son .num grandes */
+.card-pad .num[style*="32"], .card-pad .num[style*="22"] { font-family: var(--font-display); }
+
+/* ---------- Sidebar (barra de acento lateral) ---------- */
+.sidebar { border-right: 1px solid var(--border); }
+.sidebar-brand { border-bottom: 1px solid var(--border); }
+.brand-mark {
+  border-radius: 50%;
+  background: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(21,121,91,0.3);
+}
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.brand-name b { color: var(--accent); }
+
+.nav-group-label { font-size: 10px; letter-spacing: 0.1em; color: var(--text-3); }
+.nav-item { border-radius: 0 var(--r-sm) var(--r-sm) 0; margin-right: 4px; font-weight: 500; }
+.nav-item > span:not([class]) { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+.nav-item .lucide { stroke-width: 1.75; }
+
+/* ---------- Navbar ---------- */
+.navbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+.co-switch { border-radius: var(--r-md); }
+.co-logo { border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); font-family: var(--font-display); }
+.navbar-search { border-radius: var(--r-md); background: var(--surface-2); }
+
+/* ---------- KPIs (planos, ícono circular, número serif) ---------- */
+.kpi {
+  border-radius: var(--r-lg);
+  box-shadow: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px 18px 16px;
+}
+.kpi:hover { box-shadow: var(--sh-md); border-color: var(--border); transform: translateY(-1px); transition: all .16s; }
+.kpi-top { margin-bottom: 12px; }
+.kpi-label { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 550; color: var(--text-2); }
+.kpi-ic { border-radius: 50%; width: 32px; height: 32px; }
+.kpi-value { font-size: 23px; white-space: nowrap; }
+.kpi-value .cur { font-size: 12.5px; margin-right: 2px; }
+.kpi-foot { margin-top: 10px; }
+
+/* ---------- Tarjetas (planas, hairline, radio amplio) ---------- */
+.card { border-radius: var(--r-lg); box-shadow: none; border: 1px solid var(--border); }
+.card:hover { } /* sin lift global */
+.card-head { border-bottom: 1px solid var(--border); padding: 16px 20px; }
+.card-head h3 { font-weight: 600; font-size: 15px; }
+.card-pad { padding: 18px; }
+
+/* ---------- Botones (más suaves) ---------- */
+.btn { border-radius: var(--r-sm); font-weight: 600; }
+.btn-primary { box-shadow: 0 1px 2px rgba(21,121,91,0.25); }
+.btn-secondary { background: var(--surface); border-color: var(--border-strong); }
+
+/* ---------- Badges / tags ---------- */
+.badge { border-radius: var(--r-full); font-weight: 600; }
+.ecf-tag { border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); }
+
+/* ---------- Tablas (más aireadas) ---------- */
+.tbl thead th {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface-2);
+  padding: 11px 16px;
+}
+.tbl tbody td { padding: 13px 16px; }
+.tbl tbody tr:hover { background: var(--surface-hover); }
+
+/* ---------- Segmented / tabs ---------- */
+.seg { border-radius: var(--r-md); background: var(--surface-2); }
+.seg button.on { box-shadow: var(--sh-sm); }
+.tab.on { border-bottom-color: var(--accent); color: var(--accent-text); }
+
+/* ---------- Inputs ---------- */
+.input, .select, .textarea { border-radius: var(--r-sm); }
+
+/* ---------- Modal / drawer ---------- */
+.modal { border-radius: var(--r-xl); }
+
+/* ---------- Donut/legend dots circulares ya; barras esmeralda por token ---------- */
+.legend-dot { border-radius: 50%; }
+
+/* ---------- Progress ---------- */
+.progress { height: 8px; }
+
+/* ---------- Avatares: cuadrados redondeados para contraste con v1 ---------- */
+.avatar { border-radius: 10px; }
+.avatar-sm { border-radius: 7px; }
+
+/* ---------- Selección ---------- */
+::selection { background: var(--accent-soft-2); color: var(--accent-text); }
