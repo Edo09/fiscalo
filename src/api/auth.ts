@@ -5,7 +5,7 @@
 // por eso este módulo no reutiliza request()/fetchBody() de http.ts: necesita
 // leer `success`/`error` para mostrar el mensaje real (ej. "Invalid email or password").
 import { API_BASE_URL } from './config'
-import { ApiError } from './http'
+import { ApiError, networkError } from './http'
 import { getToken, type SessionUser } from '@/auth/session'
 
 export interface LoginResult {
@@ -32,9 +32,14 @@ async function authPost<T>(path: string, payload: unknown, withAuth = false): Pr
 
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(payload) })
-  } catch {
-    throw new ApiError('No se pudo conectar con el servidor. ¿Está configurada la API?', 0)
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(30_000),
+      headers,
+      body: JSON.stringify(payload),
+    })
+  } catch (e) {
+    throw networkError(e)
   }
 
   const raw = await res.text()

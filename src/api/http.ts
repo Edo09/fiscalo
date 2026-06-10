@@ -12,6 +12,24 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Timeouts por tipo de petición. Lecturas cortas; escrituras generosas porque
+ * emitir un e-CF hace un viaje síncrono a DGII (firma + envío) y un timeout
+ * falso en una escritura es peor que una respuesta lenta (la factura podría
+ * quedar emitida en el servidor aunque el cliente ya se haya rendido).
+ */
+const TIMEOUT_READ_MS = 30_000
+const TIMEOUT_WRITE_MS = 90_000
+const TIMEOUT_BLOB_MS = 60_000
+
+/** Normaliza fallos de red/timeout de fetch a un ApiError con mensaje claro. */
+export function networkError(e: unknown): ApiError {
+  if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+    return new ApiError('El servidor tardó demasiado en responder. Inténtalo de nuevo.', 0)
+  }
+  return new ApiError('No se pudo conectar con el servidor. ¿Está configurada la API?', 0)
+}
+
 function buildHeaders(extra?: HeadersInit): HeadersInit {
   const headers: Record<string, string> = { Accept: 'application/json' }
   // Auth de app: token de sesión del usuario (POST /api/auth/login) como Bearer.
@@ -36,9 +54,14 @@ function handleUnauthorized(body: unknown, status: number): never {
 async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers: buildHeaders(init.headers) })
-  } catch {
-    throw new ApiError('No se pudo conectar con el servidor. ¿Está configurada la API?', 0)
+    const timeout = (init.method ?? 'GET') === 'GET' ? TIMEOUT_READ_MS : TIMEOUT_WRITE_MS
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(timeout),
+      headers: buildHeaders(init.headers),
+    })
+  } catch (e) {
+    throw networkError(e)
   }
 
   const raw = await res.text()
@@ -114,9 +137,13 @@ export async function getList<T>(path: string): Promise<{ items: T[]; total: num
 export async function getBlob(path: string): Promise<{ blob: Blob; filename: string }> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { headers: buildHeaders() })
-  } catch {
-    throw new ApiError('No se pudo conectar con el servidor. ¿Está configurada la API?', 0)
+    // PDFs/XML pueden tardar más que un GET normal (el backend genera el documento).
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      signal: AbortSignal.timeout(TIMEOUT_BLOB_MS),
+      headers: buildHeaders(),
+    })
+  } catch (e) {
+    throw networkError(e)
   }
   if (!res.ok) {
     let msg = `Error HTTP ${res.status}.`
