@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, Btn, Money, EstadoBadge, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/app/navigation'
 
 const PAGE_SIZE = 10
@@ -13,9 +13,10 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
   const [input, setInput] = useState('')
   const [tab, setTab] = useState('todas')
 
-  const { data, error, loading, reload } = useAsync(
+  const { data, error, loading, reload } = useApiQuery(
+    ['facturas', 'list', { page, pageSize: PAGE_SIZE, query }],
     () => listFacturas({ page, pageSize: PAGE_SIZE, query }),
-    [page, query],
+    { keepPrevious: true },
   )
 
   const rows = (data?.items ?? []).map(mapFacturaRow)

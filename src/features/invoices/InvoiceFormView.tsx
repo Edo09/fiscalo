@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, Card, Modal, PageHead, Switch, Spinner } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats,
@@ -9,7 +10,7 @@ import type {
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { presentDocument } from '@/lib/file'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/auth/useSession'
 import type { Nav } from '@/app/navigation'
 import type { Cliente, Producto, Factura } from '@/types/domain'
@@ -53,6 +54,7 @@ function nextENcf(tipo: TipoEcf, secuencias?: StatsSecuencia[]): string | null {
 
 /* FISCALO — Crear factura (emite contra POST /api/facturas) */
 export function InvoiceFormView({ nav }: { nav: Nav }) {
+  const queryClient = useQueryClient()
   const { user } = useSession()
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [tipo, setTipo] = useState<TipoEcf>('32')
@@ -67,11 +69,12 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   const [previewing, setPreviewing] = useState(false)
 
   // Secuencias e-CF del ambiente activo, para mostrar el próximo e-NCF a usar.
-  const stats = useAsync(getStats, [])
+  const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const proximoNcf = nextENcf(tipo, stats.data?.secuencias)
 
   // Catálogo de productos (GET /api/products) para el selector de líneas.
-  const productos = useAsync(() => listProducts({ pageSize: 100 }), [])
+  // Misma clave que ProductsView => caché compartida, una sola petición.
+  const productos = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
   const [prodQuery, setProdQuery] = useState('')
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
   const catalogoFiltrado = catalogo.filter((p) =>
@@ -151,6 +154,8 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
     setToast(null)
     try {
       const res = await createFactura(payload)
+      // Invalida listados y stats de facturas (la secuencia e-NCF avanzó).
+      void queryClient.invalidateQueries({ queryKey: ['facturas'] })
       setToast({ type: 'ok', msg: `e-CF ${res.e_ncf} emitido (${dgiiLabel(res.estado_dgii)}).` })
       const created: Factura = {
         id: String(res.factura_id),

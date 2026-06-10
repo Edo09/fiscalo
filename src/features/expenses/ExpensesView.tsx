@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, Badge, EstadoBadge, Card, KPI, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listGastos, getGastoStats } from '@/api'
 import type { GastoCategoria, GastoRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { CATEGORIA_LABEL, categoriaLabel, gastoEstadoLabel, tipoLabel } from '@/app/gastos'
 import { GastoFormModal } from './GastoFormModal'
 import { GastoDetailDrawer } from './GastoDetailDrawer'
@@ -11,6 +12,7 @@ const PAGE_SIZE = 10
 
 /* FISCALO — Gastos (GET /api/gastos + /stats, POST /api/gastos) */
 export function ExpensesView() {
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState<'todos' | GastoCategoria>('todos')
   const [page, setPage] = useState(1)
   const [input, setInput] = useState('')
@@ -20,10 +22,11 @@ export function ExpensesView() {
 
   const categoria = tab === 'todos' ? undefined : tab
 
-  const stats = useAsync(() => getGastoStats(), [])
-  const list = useAsync(
+  const stats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
+  const list = useApiQuery(
+    ['gastos', 'list', { page, pageSize: PAGE_SIZE, query, categoria }],
     () => listGastos({ page, pageSize: PAGE_SIZE, query, categoria }),
-    [page, query, categoria],
+    { keepPrevious: true },
   )
 
   const rows = list.data?.items ?? []
@@ -43,8 +46,8 @@ export function ExpensesView() {
 
   const onCreated = () => {
     setFormOpen(false)
-    list.reload()
-    stats.reload()
+    // Invalida TODAS las queries de gastos (listas de otras páginas/tabs y stats).
+    void queryClient.invalidateQueries({ queryKey: ['gastos'] })
   }
 
   return (

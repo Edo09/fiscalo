@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, Btn, Money, EstadoBadge, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/app/navigation'
 
 const PAGE_SIZE = 25
@@ -9,7 +9,7 @@ const PAGE_SIZE = 25
 /* FISCALO — Bandeja DGII (facturas filtradas por estado DGII) */
 export function DgiiInboxView({ nav }: { nav: Nav }) {
   const [tab, setTab] = useState('todos')
-  const { data, error, loading, reload } = useAsync(() => listFacturas({ page: 1, pageSize: PAGE_SIZE }), [])
+  const { data, error, loading, reload } = useApiQuery(['facturas', 'list', { page: 1, pageSize: PAGE_SIZE }], () => listFacturas({ page: 1, pageSize: PAGE_SIZE }))
 
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const estados = ['Aceptado', 'En proceso', 'Rechazado', 'Pendiente']

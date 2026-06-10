@@ -6,7 +6,7 @@ import {
 } from '@/api'
 import type { DocKind } from '@/api'
 import { presentDocument } from '@/lib/file'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/app/navigation'
 import type { Factura } from '@/types/domain'
 
@@ -16,8 +16,8 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const f = factura
   const id = f?.facturaId ?? null
 
-  const estado = useAsync(() => (id != null ? getEstado(id) : Promise.resolve(null)), [id])
-  const detalle = useAsync(() => (id != null ? getFactura(id) : Promise.resolve(null)), [id])
+  const estado = useApiQuery(['facturas', 'estado', id], () => (id != null ? getEstado(id) : Promise.resolve(null)))
+  const detalle = useApiQuery(['facturas', 'detail', id], () => (id != null ? getFactura(id) : Promise.resolve(null)))
 
   const [docBusy, setDocBusy] = useState<DocKind | null>(null)
   const [docError, setDocError] = useState<string | null>(null)

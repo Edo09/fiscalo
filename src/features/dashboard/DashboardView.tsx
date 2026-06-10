@@ -1,12 +1,12 @@
 import { Btn, Money, EstadoBadge, Card, KPI, BarChart, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
 import { getStats, listFacturas, mapFacturaRow, formatMonthKey, dgiiLabel } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/app/navigation'
 
 /* FISCALO — Dashboard (GET /api/facturas/stats + últimas facturas) */
 export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus' }) {
-  const stats = useAsync(() => getStats(), [])
-  const ultimasReq = useAsync(() => listFacturas({ page: 1, pageSize: 6 }), [])
+  const stats = useApiQuery(['facturas', 'stats'], () => getStats())
+  const ultimasReq = useApiQuery(['facturas', 'list', { page: 1, pageSize: 6 }], () => listFacturas({ page: 1, pageSize: 6 }))
   const ultimas = (ultimasReq.data?.items ?? []).map(mapFacturaRow)
 
   const d = stats.data

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Btn, Badge, EstadoBadge, Avatar, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listUsers, mapUserRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 
 /* FISCALO — Usuarios y roles (GET /api/users) */
 export function UsersView() {
   const [tab, setTab] = useState('usuarios')
-  const { data, error, loading, reload } = useAsync(() => listUsers({ pageSize: 100 }), [])
+  const { data, error, loading, reload } = useApiQuery(['users', 'list'], () => listUsers({ pageSize: 100 }))
   const usuarios = (data?.items ?? []).map(mapUserRow)
 
   // Roles derivados de los usuarios (la API no expone un endpoint de roles).

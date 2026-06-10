@@ -1,5 +1,6 @@
 // FISCALO — Alta/edición/eliminación de un producto (CRUD contra /api/products).
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { ApiError, createProduct, updateProduct, deleteProduct } from '@/api'
 import type { Producto } from '@/types/domain'
@@ -13,6 +14,7 @@ interface ProductFormModalProps {
 }
 
 export function ProductFormModal({ product, onClose, onSaved }: ProductFormModalProps) {
+  const queryClient = useQueryClient()
   const editing = product !== null
   const [nombre, setNombre] = useState(product && product.nombre !== '—' ? product.nombre : '')
   const [sku, setSku] = useState(product?.sku ?? '')
@@ -49,6 +51,8 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
     try {
       if (editing && product) await updateProduct({ id: product.id, ...payload })
       else await createProduct(payload)
+      // Invalida la caché de productos en TODAS las vistas (lista y picker de factura).
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
       onSaved()
       onClose()
     } catch (e) {
@@ -63,6 +67,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
     setDeleting(true)
     try {
       await deleteProduct(product.id)
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
       onSaved()
       onClose()
     } catch (e) {

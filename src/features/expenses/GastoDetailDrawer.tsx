@@ -3,12 +3,12 @@ import { Icon, Btn, Money, EstadoBadge, Drawer, Spinner } from '@/components/ui'
 import { ApiError, getGasto, getGastoEstado, getGastoXml } from '@/api'
 import type { GastoRow } from '@/api'
 import { downloadBlob } from '@/lib/file'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/app/gastos'
 
 /* FISCALO — Detalle de un gasto (líneas + estado DGII + XML) */
 export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose: () => void }) {
-  const { data, loading, reload } = useAsync(() => getGasto(gasto.id), [gasto.id])
+  const { data, loading, reload } = useApiQuery(['gastos', 'detail', gasto.id], () => getGasto(gasto.id))
   const g = data ?? gasto
   const items = g.items ?? []
   const auto = typeof g.es_auto_emision === 'number'

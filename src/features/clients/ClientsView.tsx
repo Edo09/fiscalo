@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, Btn, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listClients, mapClientRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/app/navigation'
 import type { Cliente } from '@/types/domain'
 
@@ -14,9 +14,10 @@ export function ClientsView({ nav }: { nav: Nav }) {
   const [query, setQuery] = useState('')
   const [perfil, setPerfil] = useState<Cliente | null>(null)
 
-  const { data, error, loading, reload } = useAsync(
+  const { data, error, loading, reload } = useApiQuery(
+    ['clients', 'list', { page, pageSize: PAGE_SIZE, query }],
     () => listClients({ page, pageSize: PAGE_SIZE, query }),
-    [page, query],
+    { keepPrevious: true },
   )
 
   const rows = (data?.items ?? []).map(mapClientRow)

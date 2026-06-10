@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon, Avatar, Spinner } from '@/components/ui'
 import { listClients, mapClientRow } from '@/api'
 import type { ClientRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Cliente } from '@/types/domain'
 
 interface ClientComboboxProps {
@@ -42,8 +42,13 @@ export function ClientCombobox({ value, onChange, debounceMs = 250 }: ClientComb
     return () => clearTimeout(t)
   }, [input, debounceMs])
 
-  // GET /api/clients?query=...  (useAsync ignora respuestas obsoletas en carreras)
-  const { data, loading, error } = useAsync(() => listClients({ query, pageSize: 8 }), [query])
+  // GET /api/clients?query=... — cacheado por término; keepPrevious evita el
+  // parpadeo mientras llega el resultado del nuevo término tecleado.
+  const { data, loading, error, fetching } = useApiQuery(
+    ['clients', 'search', query],
+    () => listClients({ query, pageSize: 8 }),
+    { keepPrevious: true },
+  )
   const rows = data?.items ?? []
 
   // Cerrar el desplegable al hacer click fuera del componente.
@@ -101,7 +106,7 @@ export function ClientCombobox({ value, onChange, debounceMs = 250 }: ClientComb
           onChange={(e) => { setInput(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
         />
-        {loading && <Spinner />}
+        {fetching && <Spinner />}
       </div>
 
       {open && (

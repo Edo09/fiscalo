@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon, Btn, Money, EstadoBadge, Card, PageHead, LoadingState, ErrorState, EmptyState } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { ProductFormModal } from './ProductFormModal'
 import type { Producto } from '@/types/domain'
 
@@ -10,7 +10,7 @@ export function ProductsView() {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('Todas')
   const [modal, setModal] = useState<{ product: Producto | null } | null>(null)
-  const { data, error, loading, reload } = useAsync(() => listProducts({ pageSize: 100 }), [])
+  const { data, error, loading, reload } = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
 
   const productos = (data?.items ?? []).map(mapProductRow)
   const cats = ['Todas', ...new Set(productos.map((p) => p.cat))]

@@ -1,6 +1,6 @@
 import { Icon, Btn, Money, EstadoBadge, Card, KPI, LoadingState, ErrorState, EmptyState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
-import { useAsync } from '@/hooks/useAsync'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/app/ecf'
 import type { Nav } from '@/app/navigation'
 import type { EcfTipo } from '@/types/domain'
@@ -12,7 +12,7 @@ export function EcfTypeView({ tipo, nav }: { tipo: EcfTipo | null; nav: Nav }) {
   const nombre = tipo?.nombre || def?.nombre || `Tipo ${code}`
   const desc = tipo?.desc || def?.desc || ''
 
-  const { data, error, loading, reload } = useAsync(() => listFacturas({ page: 1, pageSize: 100 }), [])
+  const { data, error, loading, reload } = useApiQuery(['facturas', 'list', { page: 1, pageSize: 100 }], () => listFacturas({ page: 1, pageSize: 100 }))
   const all = (data?.items ?? []).map(mapFacturaRow)
   const rows = all.filter((f) => f.tipo === code)
 
