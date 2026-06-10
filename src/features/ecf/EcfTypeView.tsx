@@ -1,8 +1,8 @@
 import { Icon, Btn, Money, EstadoBadge, Card, KPI, LoadingState, ErrorState, EmptyState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { ECF_TIPOS } from '@/app/ecf'
-import type { Nav } from '@/app/navigation'
+import { ECF_TIPOS } from '@/config/ecf'
+import type { Nav } from '@/config/navigation'
 import type { EcfTipo } from '@/types/domain'
 
 /* FISCALO — Detalle de un tipo e-CF (facturas reales filtradas por tipo) */

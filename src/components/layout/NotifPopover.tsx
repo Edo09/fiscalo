@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Icon, Btn } from '@/components/ui'
 import { DATA } from '@/data/mockData'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 import type { NotifTipo } from '@/types/domain'
 
 export function NotifPopover({ onClose, nav }: { onClose: () => void; nav: Nav }) {

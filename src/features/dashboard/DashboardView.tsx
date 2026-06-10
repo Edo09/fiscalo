@@ -1,7 +1,7 @@
 import { Btn, Money, EstadoBadge, Card, KPI, BarChart, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
 import { getStats, listFacturas, mapFacturaRow, formatMonthKey, dgiiLabel } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Dashboard (GET /api/facturas/stats + últimas facturas) */
 export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus' }) {

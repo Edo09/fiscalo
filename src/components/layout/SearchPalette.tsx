@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
-import { NAV, type Nav } from '@/app/navigation'
+import { NAV, type Nav } from '@/config/navigation'
 import { DATA } from '@/data/mockData'
 
 interface Result {

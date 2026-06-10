@@ -21,8 +21,8 @@ import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
-import { useSession } from '@/auth/useSession'
-import type { Nav, NavPayload, ViewId } from '@/app/navigation'
+import { useSession } from '@/stores/auth'
+import type { Nav, NavPayload, ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================

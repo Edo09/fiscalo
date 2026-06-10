@@ -123,6 +123,25 @@ export interface FacturaRow {
   fecha_emision_dgii?: string | null
   secuencia_utilizada?: boolean | null
   items?: FacturaItemRow[]
+  /** Solo en GET /api/facturas?id=: registro completo del cliente. */
+  cliente?: ClientRow | null
+  /** Solo en GET /api/facturas?id=: configuración del emisor (emisor_config). */
+  emisor?: EmisorRow | null
+}
+
+/** Configuración del emisor (tabla emisor_config, adjunta al detalle de factura). */
+export interface EmisorRow {
+  id?: number
+  rnc?: string | null
+  razon_social?: string | null
+  nombre_comercial?: string | null
+  sucursal?: string | null
+  direccion?: string | null
+  municipio?: string | null
+  provincia?: string | null
+  telefono?: string | null
+  correo?: string | null
+  website?: string | null
 }
 
 /** esquema gratexdb.factura_items */

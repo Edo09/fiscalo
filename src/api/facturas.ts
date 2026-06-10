@@ -15,8 +15,14 @@ export function listFacturas(params: ListParams = {}): Promise<ListResult<Factur
   return getList<FacturaRow>(`/api/facturas${query}`)
 }
 
-export function getFactura(id: number): Promise<FacturaRow> {
-  return getJson<FacturaRow>(`/api/facturas${qs({ id })}`)
+/**
+ * Detalle de una factura. El backend responde `data: [factura]` (array por
+ * compatibilidad), enriquecida con `items`, `cliente` y `emisor`.
+ */
+export async function getFactura(id: number): Promise<FacturaRow | null> {
+  const data = await getJson<FacturaRow[] | FacturaRow>(`/api/facturas${qs({ id })}`)
+  if (Array.isArray(data)) return data[0] ?? null
+  return data ?? null
 }
 
 export function createFactura(input: CreateFacturaInput): Promise<CreateFacturaResponse> {

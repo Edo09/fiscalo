@@ -6,7 +6,7 @@
 // leer `success`/`error` para mostrar el mensaje real (ej. "Invalid email or password").
 import { API_BASE_URL } from './config'
 import { ApiError, networkError } from './http'
-import { getToken, type SessionUser } from '@/auth/session'
+import { getToken, type SessionUser } from '@/stores/auth'
 
 export interface LoginResult {
   token: string

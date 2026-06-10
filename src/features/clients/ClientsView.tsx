@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Icon, Btn, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listClients, mapClientRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 import type { Cliente } from '@/types/domain'
 
 const PAGE_SIZE = 20

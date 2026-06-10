@@ -1,5 +1,5 @@
 import { Icon } from '@/components/ui'
-import { NAV, type Nav } from '@/app/navigation'
+import { NAV, type Nav } from '@/config/navigation'
 
 export interface SidebarProps {
   nav: Nav

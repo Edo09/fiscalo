@@ -1,8 +1,8 @@
 import { Icon, Btn, Money, Card, Progress, Spinner, ErrorState, PageHead } from '@/components/ui'
 import { getStats } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { ECF_TIPOS } from '@/app/ecf'
-import type { Nav } from '@/app/navigation'
+import { ECF_TIPOS } from '@/config/ecf'
+import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Dashboard e-CF (GET /api/facturas/stats) */
 export function EcfDashboardView({ nav }: { nav: Nav }) {

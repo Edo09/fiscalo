@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Icon, Btn, Money, Modal, Badge } from '@/components/ui'
-import { ApiError, createGasto } from '@/api'
+import { Icon, Btn, Money, Modal, Badge, Checkbox } from '@/components/ui'
+import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
-import {
-  CATEGORIA_TIPOS, CATEGORIA_LABEL, GASTO_CATEGORIAS, GASTO_TIPOS, isAutoEmision,
-} from '@/app/gastos'
+import { useApiQuery } from '@/hooks/useApiQuery'
+import { CATEGORIA_TIPOS, CATEGORIA_LABEL, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
 
 interface Linea {
   id: number
@@ -16,25 +15,34 @@ interface Linea {
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
-/* FISCALO — Registrar gasto (POST /api/gastos) */
-export function GastoFormModal({ onClose, onCreated }: { onClose: () => void; onCreated: (g: GastoRow) => void }) {
-  const [categoria, setCategoria] = useState<GastoCategoria>('gastos_menores')
-  const [tipo, setTipo] = useState<GastoTipo>('E43')
+/* FISCALO — Registrar gasto/compra (POST /api/gastos).
+   La categoría la fija la página que abre el modal:
+   Gastos -> gastos_menores · Compras -> facturas_proveedores */
+export function GastoFormModal({ categoria, onClose, onCreated }: {
+  categoria: GastoCategoria
+  onClose: () => void
+  onCreated: (g: GastoRow) => void
+}) {
+  const [tipo, setTipo] = useState<GastoTipo>(CATEGORIA_TIPOS[categoria][0])
   const [rnc, setRnc] = useState('')
   const [nombre, setNombre] = useState('')
   const [ncf, setNcf] = useState('')
   const [fecha, setFecha] = useState(hoy())
+  const [conProveedor, setConProveedor] = useState(false)
   const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0 }])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const tiposPermitidos = CATEGORIA_TIPOS[categoria]
   const recibido = !isAutoEmision(tipo)
+  const esCompra = categoria === 'facturas_proveedores'
+  const esGastoMenor = !esCompra
 
-  const onCategoria = (c: GastoCategoria) => {
-    setCategoria(c)
-    setTipo(CATEGORIA_TIPOS[c][0]) // primer tipo válido de la categoría
-  }
+  // Próximo NCF E43 (informativo): misma query cacheada que la página de Gastos;
+  // se invalida al crear, así que siempre refleja la secuencia vigente.
+  const stats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
+  const seqE43 = stats.data?.secuencias.find((s) => s.type === 'E43')
+  const proximoNcf = seqE43 != null ? `E43${String(seqE43.secuencia_actual + 1).padStart(10, '0')}` : null
 
   const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0 }])
   const delLinea = (id: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
@@ -49,18 +57,23 @@ export function GastoFormModal({ onClose, onCreated }: { onClose: () => void; on
 
   const submit = async () => {
     setError(null)
-    if (!nombre.trim()) { setError('Indica el nombre del proveedor.'); return }
-    if (!rnc.trim()) { setError('Indica el RNC/Cédula del proveedor.'); return }
-    if (recibido && !ncf.trim()) { setError(`El tipo ${tipo} es recibido: digita el NCF que entregó el proveedor.`); return }
+    // Gastos menores (E43): proveedor enteramente opcional (el e-CF 43 se emite
+    // sin comprador y el backend pone fecha y etiqueta por defecto).
+    if (esCompra) {
+      if (!nombre.trim()) { setError('Indica el nombre del proveedor.'); return }
+      if (!rnc.trim()) { setError('Indica el RNC/Cédula del proveedor.'); return }
+      if (recibido && !ncf.trim()) { setError(`El tipo ${tipo} es recibido: digita el NCF que entregó el proveedor.`); return }
+    }
     const items = lineas.filter((l) => l.description.trim() && l.amount > 0)
     if (items.length === 0) { setError('Agrega al menos una línea con descripción e importe.'); return }
 
+    // En gastos menores el proveedor solo viaja si el usuario activó la sección.
+    const incluirProveedor = esCompra || conProveedor
     const payload: CreateGastoInput = {
       categoria,
       tipo_gasto: tipo,
-      rnc_proveedor: rnc.trim(),
-      nombre_proveedor: nombre.trim(),
-      fecha,
+      rnc_proveedor: incluirProveedor ? rnc.trim() : '',
+      nombre_proveedor: incluirProveedor ? nombre.trim() : '',
       items: items.map<GastoItemInput>((l) => ({
         description: l.description.trim(),
         amount: l.amount,
@@ -68,6 +81,7 @@ export function GastoFormModal({ onClose, onCreated }: { onClose: () => void; on
         itbis_amount: l.itbis_amount,
       })),
     }
+    if (esCompra) payload.fecha = fecha
     if (recibido) payload.ncf = ncf.trim()
 
     setSaving(true)
@@ -83,9 +97,11 @@ export function GastoFormModal({ onClose, onCreated }: { onClose: () => void; on
 
   return (
     <Modal
-      title="Registrar gasto"
-      sub="Gasto menor (auto-emisión) o factura de proveedor (recibida)"
-      icon="receipt"
+      title={esCompra ? 'Registrar compra' : 'Registrar gasto'}
+      sub={esCompra
+        ? 'Factura de proveedor: auto-emisión (E41/E47) o recibida (E31/B01/E33/E34)'
+        : 'Gasto menor (E43, auto-emisión a DGII)'}
+      icon={esCompra ? 'shopping-cart' : 'receipt'}
       width={620}
       onClose={onClose}
       footer={
@@ -106,43 +122,94 @@ export function GastoFormModal({ onClose, onCreated }: { onClose: () => void; on
       <div className="form-grid">
         <div className="field">
           <label>Categoría</label>
-          <select className="select" value={categoria} onChange={(e) => onCategoria(e.target.value as GastoCategoria)}>
-            {GASTO_CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
-          </select>
+          <div className="input row gap-sm" style={{ color: 'var(--text-2)', alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+            <Icon name={esCompra ? 'shopping-cart' : 'receipt'} size={14} />
+            <span className="text-sm">{CATEGORIA_LABEL[categoria]}</span>
+          </div>
         </div>
         <div className="field">
           <label>Tipo de comprobante</label>
-          <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value as GastoTipo)}>
-            {tiposPermitidos.map((t) => <option key={t} value={t}>{t} · {GASTO_TIPOS[t].label}</option>)}
-          </select>
-        </div>
-
-        <div className="field">
-          <label>RNC / Cédula proveedor <span className="req">*</span></label>
-          <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
-        </div>
-        <div className="field">
-          <label>Nombre proveedor <span className="req">*</span></label>
-          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
-        </div>
-
-        {recibido ? (
-          <div className="field">
-            <label>NCF del proveedor <span className="req">*</span></label>
-            <input className="input mono" value={ncf} onChange={(e) => setNcf(e.target.value)} placeholder="E310000000123" />
-          </div>
-        ) : (
-          <div className="field">
-            <label>NCF</label>
-            <div className="input row gap-sm" style={{ color: 'var(--text-3)', alignItems: 'center' }}>
-              <Icon name="shield-check" size={14} /><span className="text-sm">Lo asigna el sistema (auto-emisión)</span>
+          {tiposPermitidos.length === 1 ? (
+            <div className="input row gap-sm" style={{ color: 'var(--text-2)', alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+              <span className="ecf-tag">{tipo}</span>
+              <span className="text-sm">{GASTO_TIPOS[tipo].label} · NCF {GASTO_TIPOS[tipo].ncf}</span>
             </div>
-          </div>
-        )}
-        <div className="field">
-          <label>Fecha</label>
-          <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          ) : (
+            <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value as GastoTipo)}>
+              {tiposPermitidos.map((t) => <option key={t} value={t}>{t} · {GASTO_TIPOS[t].label}</option>)}
+            </select>
+          )}
         </div>
+
+        {esGastoMenor ? (
+          <>
+            <div className="field">
+              <label>NCF a asignar</label>
+              <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+                <Icon name="hash" size={14} style={{ color: 'var(--text-3)' }} />
+                {stats.loading ? (
+                  <span className="text-sm muted">Cargando…</span>
+                ) : proximoNcf ? (
+                  <span className="mono fw6">{proximoNcf}</span>
+                ) : (
+                  <span className="text-sm muted-3">Sin secuencia E43</span>
+                )}
+              </div>
+            </div>
+            <div className="field">
+              <label>Proveedor</label>
+              <div
+                className="input row gap-sm"
+                style={{ alignItems: 'center', cursor: 'pointer' }}
+                onClick={() => setConProveedor(!conProveedor)}
+              >
+                <Checkbox on={conProveedor} onChange={setConProveedor} />
+                <span className="text-sm">Información del proveedor (opcional)</span>
+              </div>
+            </div>
+            {conProveedor && (
+              <>
+                <div className="field">
+                  <label>RNC / Cédula proveedor <span className="opt">(opcional)</span></label>
+                  <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
+                </div>
+                <div className="field">
+                  <label>Nombre proveedor <span className="opt">(opcional)</span></label>
+                  <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="field">
+              <label>RNC / Cédula proveedor <span className="req">*</span></label>
+              <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
+            </div>
+            <div className="field">
+              <label>Nombre proveedor <span className="req">*</span></label>
+              <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
+            </div>
+
+            {recibido ? (
+              <div className="field">
+                <label>NCF del proveedor <span className="req">*</span></label>
+                <input className="input mono" value={ncf} onChange={(e) => setNcf(e.target.value)} placeholder="E310000000123" />
+              </div>
+            ) : (
+              <div className="field">
+                <label>NCF</label>
+                <div className="input row gap-sm" style={{ color: 'var(--text-3)', alignItems: 'center' }}>
+                  <Icon name="shield-check" size={14} /><span className="text-sm">Lo asigna el sistema (auto-emisión)</span>
+                </div>
+              </div>
+            )}
+            <div className="field">
+              <label>Fecha</label>
+              <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="row between mt-md mb-sm" style={{ alignItems: 'center' }}>

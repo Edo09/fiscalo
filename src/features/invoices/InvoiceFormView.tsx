@@ -11,8 +11,8 @@ import type {
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { useSession } from '@/auth/useSession'
-import type { Nav } from '@/app/navigation'
+import { useSession } from '@/stores/auth'
+import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura } from '@/types/domain'
 
 interface Linea {

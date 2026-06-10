@@ -1,6 +1,6 @@
 // Cliente HTTP tipado para la API e-CF.
 import { API_BASE_URL, API_KEY } from './config'
-import { getToken, clearSession } from '@/auth/session'
+import { getToken, clearSession } from '@/stores/auth'
 
 /** Error normalizado de la API (con código HTTP cuando aplica). */
 export class ApiError extends Error {

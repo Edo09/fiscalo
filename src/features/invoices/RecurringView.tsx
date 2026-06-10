@@ -1,5 +1,5 @@
 import { Btn, Money, Badge, Avatar, EstadoBadge, Card, Dropdown, MenuItem, PageHead } from '@/components/ui'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Facturación recurrente */
 export function RecurringView({ nav }: { nav: Nav }) {

@@ -1,9 +1,8 @@
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
 import { DATA } from '@/data/mockData'
-import { useSession } from '@/auth/useSession'
-import { clearSession } from '@/auth/session'
+import { useSession, clearSession } from '@/stores/auth'
 import { logout } from '@/api/auth'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 
 export interface NavbarProps {
   nav: Nav

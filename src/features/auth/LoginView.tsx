@@ -6,7 +6,7 @@ import { useState, type FormEvent } from 'react'
 import { Icon, Btn, Spinner } from '@/components/ui'
 import { login } from '@/api/auth'
 import { TENANT_ID } from '@/api/config'
-import { setSession } from '@/auth/session'
+import { setSession } from '@/stores/auth'
 
 /** Bullets del panel de marca (izquierda). */
 const FEATURES = [

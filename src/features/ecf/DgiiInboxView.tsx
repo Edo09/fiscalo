@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Icon, Btn, Money, EstadoBadge, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 
 const PAGE_SIZE = 25
 

@@ -4,7 +4,7 @@ import { ApiError, getGasto, getGastoEstado, getGastoXml } from '@/api'
 import type { GastoRow } from '@/api'
 import { downloadBlob } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/app/gastos'
+import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/config/gastos'
 
 /* FISCALO — Detalle de un gasto (líneas + estado DGII + XML) */
 export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose: () => void }) {

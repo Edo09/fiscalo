@@ -1,18 +1,17 @@
 import { useState } from 'react'
 import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/components/ui'
-import { DATA } from '@/data/mockData'
 import {
   ApiError, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
 } from '@/api'
 import type { DocKind } from '@/api'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import type { Nav } from '@/app/navigation'
+import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
 
-/* FISCALO — Facturación: ver factura (estado DGII en vivo + PDF/XML) */
+/* FISCALO — Facturación: ver factura (detalle + estado DGII en vivo + PDF/XML).
+   El detalle (GET /api/facturas?id=) trae items, cliente y emisor reales. */
 export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; nav: Nav }) {
-  const D = DATA
   const f = factura
   const id = f?.facturaId ?? null
 
@@ -36,7 +35,19 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
-  const items = detalle.data?.items ?? []
+
+  // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
+  // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.
+  const det = detalle.data
+  const items = det?.items ?? []
+  const emisor = det?.emisor
+  const cliente = det?.cliente
+  const emisorDireccion = [emisor?.direccion, emisor?.municipio, emisor?.provincia].filter(Boolean).join(', ')
+  const clienteNombre = cliente?.razon_social || cliente?.company_name || cliente?.client_name || f.cliente
+  const clienteContacto = cliente?.client_name && cliente.client_name !== clienteNombre ? cliente.client_name : ''
+  const clienteRnc = cliente?.rnc || f.rnc || ''
+  const total = Number(det?.total ?? f.total)
+  const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
 
   const openDoc = async (kind: DocKind, download = false) => {
     if (id == null) return
@@ -100,24 +111,22 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           <div style={{ padding: '32px 36px', background: 'var(--surface)' }}>
             <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 28 }}>
               <div>
-                <div className="brand-mark" style={{ width: 44, height: 44, fontSize: 20, marginBottom: 12 }}>DC</div>
-                <div className="fw6" style={{ fontSize: 15 }}>{D.empresa.nombre}</div>
-                <div className="text-xs muted">RNC: {D.empresa.rnc}</div>
-                <div className="text-xs muted" style={{ maxWidth: 220 }}>{D.empresa.direccion}</div>
+                <div className="ecf-tag" style={{ fontSize: 12, marginBottom: 8, display: 'inline-block' }}>e-CF Tipo {f.tipo}</div>
+                <div className="mono fw6" style={{ fontSize: 16 }}>{f.ncf}</div>
               </div>
               <div className="tar">
-                <div className="ecf-tag" style={{ fontSize: 12, marginBottom: 8, display: 'inline-block' }}>e-CF Tipo {f.tipo}</div>
-                <div className="mono fw6" style={{ fontSize: 14 }}>{f.ncf}</div>
-                <div className="text-xs muted mt-sm">Fecha: {f.fecha}</div>
+                <div className="text-xs muted">Fecha: {fecha}</div>
                 {f.codigoSeguridad && <div className="text-xs muted">Cód. seguridad: {f.codigoSeguridad}</div>}
               </div>
             </div>
 
             <div className="row gap-lg mb-lg" style={{ padding: '14px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
               <div style={{ flex: 1 }}>
-                <div className="text-xs muted-3 fw6" style={{ textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Facturar a</div>
-                <div className="fw6">{f.cliente}</div>
-                {f.rnc && <div className="text-xs muted mono">RNC: {f.rnc}</div>}
+                <div className="text-xs muted-3 fw6" style={{ textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Comprador</div>
+                <div className="fw6">{clienteNombre}</div>
+                {clienteRnc && <div className="text-xs muted mono">RNC: {clienteRnc}</div>}
+                {clienteContacto && <div className="text-xs muted">Contacto: {clienteContacto}</div>}
+                {cliente?.direccion && <div className="text-xs muted">{cliente.direccion}</div>}
               </div>
               <div style={{ flex: 1 }}>
                 <div className="text-xs muted-3 fw6" style={{ textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Condiciones</div>
@@ -150,7 +159,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
 
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 18 }}>
               <div style={{ width: 240 }}>
-                <div className="row between" style={{ fontSize: 17, fontWeight: 700 }}><span>Total</span><Money value={f.total} /></div>
+                <div className="row between" style={{ fontSize: 17, fontWeight: 700 }}><span>Total</span><Money value={total} /></div>
               </div>
             </div>
           </div>
@@ -173,7 +182,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
                 <div className="row between"><span className="text-sm muted">Track ID</span><span className="mono text-xs">{estadoData?.track_id ?? f.trackId ?? '—'}</span></div>
                 {estadoRaw && <div className="row between"><span className="text-sm muted">Estado bruto</span><span className="mono text-xs">{estadoRaw}</span></div>}
                 <div className="divider" style={{ margin: 0 }}></div>
-                <div className="row between"><span className="text-sm muted">Total</span><span className="fw6"><Money value={f.total} /></span></div>
+                <div className="row between"><span className="text-sm muted">Total</span><span className="fw6"><Money value={total} /></span></div>
               </div>
             )}
           </Card>
@@ -190,8 +199,19 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           </Card>
 
           <Card title="Emisor">
-            <div className="text-sm">{formatApiDate(f.fecha)}</div>
-            <div className="text-xs muted">{D.empresa.nombre} · RNC {D.empresa.rnc}</div>
+            {detalle.loading ? (
+              <div className="text-sm muted">Cargando…</div>
+            ) : emisor ? (
+              <div className="col gap-sm">
+                <div className="text-sm fw6">{emisor.razon_social ?? '—'}</div>
+                {emisor.rnc && <div className="text-xs muted mono">RNC {emisor.rnc}</div>}
+                {emisorDireccion && <div className="text-xs muted">{emisorDireccion}</div>}
+                {emisor.correo && <div className="text-xs muted">{emisor.correo}</div>}
+                {emisor.telefono && <div className="text-xs muted">{emisor.telefono}</div>}
+              </div>
+            ) : (
+              <div className="text-sm muted">Sin datos del emisor.</div>
+            )}
           </Card>
         </div>
       </div>

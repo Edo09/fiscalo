@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
-import { useAuthStore } from './auth/session'
+import { useAuthStore } from './stores/auth'
 import './styles/styles.css'
 // Para usar el tema "Editorial / Esmeralda", descomenta la siguiente línea:
 // import './styles/styles-v2.css'
