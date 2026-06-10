@@ -1,6 +1,7 @@
 // Cliente HTTP tipado para la API e-CF.
 import { API_BASE_URL, API_KEY } from './config'
 import { getToken, clearSession } from '@/stores/auth'
+import type { ListResult } from './types'
 
 /** Error normalizado de la API (con código HTTP cuando aplica). */
 export class ApiError extends Error {
@@ -105,11 +106,12 @@ export function getJson<T>(path: string): Promise<T> {
 
 /**
  * GET de un listado paginado. Tolera dos formas reales del backend:
- *   { status, data: [...], pagination: { total } }   (gastos/facturas/clients/users)
+ *   { status, data: [...], pagination: { total, page, pageSize, totalPages } }
  *   { status, data: { items|data|..., total } }       (forma alterna)
- * Devuelve siempre `{ items, total }` con el total tomado de `pagination` si existe.
+ * Devuelve `{ items, total, page, pageSize, totalPages }`; los campos de
+ * paginación se toman del bloque `pagination` cuando existe (null si falta).
  */
-export async function getList<T>(path: string): Promise<{ items: T[]; total: number | null }> {
+export async function getList<T>(path: string): Promise<ListResult<T>> {
   const body = await fetchBody(path, { method: 'GET' })
   const env = isEnvelope(body) ? body : { data: body, pagination: undefined as unknown }
   const data = env.data
@@ -126,11 +128,18 @@ export async function getList<T>(path: string): Promise<{ items: T[]; total: num
     if (typeof o.total === 'number') total = o.total
   }
 
+  let page: number | null = null
+  let pageSize: number | null = null
+  let totalPages: number | null = null
   const pag = (env as { pagination?: unknown }).pagination
-  if (pag && typeof pag === 'object' && typeof (pag as { total?: unknown }).total === 'number') {
-    total = (pag as { total: number }).total
+  if (pag && typeof pag === 'object') {
+    const p = pag as Record<string, unknown>
+    if (typeof p.total === 'number') total = p.total
+    if (typeof p.page === 'number') page = p.page
+    if (typeof p.pageSize === 'number') pageSize = p.pageSize
+    if (typeof p.totalPages === 'number') totalPages = p.totalPages
   }
-  return { items, total }
+  return { items, total, page, pageSize, totalPages }
 }
 
 /** Descarga binaria (PDF/XML directo). Lanza ApiError ante fallos HTTP. */

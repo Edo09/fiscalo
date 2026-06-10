@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Icon, Btn, Money, Card, Modal, PageHead, Switch, Spinner } from '@/components/ui'
+import { Icon, Btn, Money, Card, Modal, PageHead, Spinner } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats,
   listProducts, mapProductRow, formatApiDate, dgiiLabel,
@@ -22,22 +22,29 @@ interface Linea {
   cant: number
   precio: number
   desc: number
-  /** El producto define si el ítem es gravado con ITBIS (true) o no (false). */
-  gravado: boolean
+  /** Indicador de facturación DGII (1=18%, 2=16%, 3=tasa cero, 4=exento). */
+  indFact: IndicadorFacturacion
   tipoItem: 'Bien' | 'Servicio'
 }
 
 type Toast = { type: 'ok' | 'err'; msg: string } | null
 
-/** Tasa de ITBIS aplicada a un ítem gravado (los exentos van a 0%). */
-const ITBIS_RATE = 0.18
+/** Opciones de indicador de facturación DGII (tasa de ITBIS por línea). */
+const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
+  { value: 1, label: '18%' },
+  { value: 2, label: '16%' },
+  { value: 3, label: 'Tasa 0%' },
+  { value: 4, label: 'Exento' },
+]
 
-/**
- * Indicador de facturación DGII según si el ítem es gravado o no:
- * gravado => ITBIS 18% (1); no gravado => Exento (4).
- */
-function indicadorFacturacion(gravado: boolean): IndicadorFacturacion {
-  return gravado ? 1 : 4
+/** Tasa de ITBIS según indicador_facturacion: 1=18%, 2=16%, 3 y 4 = 0%. */
+function itbisRate(ind: IndicadorFacturacion): number {
+  return ind === 1 ? 0.18 : ind === 2 ? 0.16 : 0
+}
+
+/** Deriva el indicador desde la tasa de ITBIS del producto (18→1, 16→2, resto→exento). */
+function indFactFromItbis(itbis: number): IndicadorFacturacion {
+  return itbis === 18 ? 1 : itbis === 16 ? 2 : 4
 }
 
 /**
@@ -60,9 +67,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   const [tipo, setTipo] = useState<TipoEcf>('32')
   const [metodo, setMetodo] = useState('Efectivo')
   const [obs, setObs] = useState('')
-  const [lineas, setLineas] = useState<Linea[]>([
-    { id: 1, prodId: 'p1', nombre: 'Aceite Vegetal 1 Gal', cant: 10, precio: 485.0, desc: 0, gravado: true, tipoItem: 'Bien' },
-  ])
+  const [lineas, setLineas] = useState<Linea[]>([])
   const [prodPicker, setProdPicker] = useState(false)
   const [toast, setToast] = useState<Toast>(null)
   const [emitting, setEmitting] = useState(false)
@@ -84,21 +89,21 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   const addLinea = (p: Producto) => {
     setLineas([...lineas, {
       id: Date.now(), prodId: p.id, nombre: p.nombre, cant: 1,
-      // El producto define el gravamen por defecto (itbis > 0 => gravado).
-      precio: p.precio, desc: 0, gravado: p.itbis > 0,
+      // El producto define el indicador por defecto según su tasa de ITBIS.
+      precio: p.precio, desc: 0, indFact: indFactFromItbis(p.itbis),
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
     setProdPicker(false)
   }
   const updLinea = (id: number, key: keyof Linea, val: number) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
-  const setGravado = (id: number, gravado: boolean) =>
-    setLineas(lineas.map((l) => (l.id === id ? { ...l, gravado } : l)))
+  const setIndFact = (id: number, indFact: IndicadorFacturacion) =>
+    setLineas(lineas.map((l) => (l.id === id ? { ...l, indFact } : l)))
   const delLinea = (id: number) => setLineas(lineas.filter((l) => l.id !== id))
 
   const calc = (l: Linea) => {
     const base = l.cant * l.precio * (1 - l.desc / 100)
-    return { base, itbis: l.gravado ? base * ITBIS_RATE : 0 }
+    return { base, itbis: base * itbisRate(l.indFact) }
   }
   const subtotal = lineas.reduce((a, l) => a + calc(l).base, 0)
   const itbisTotal = lineas.reduce((a, l) => a + calc(l).itbis, 0)
@@ -130,7 +135,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
     const items: FacturaItemInput[] = lineas.map((l, i) => ({
       numero_linea: i + 1,
       nombre_item: l.nombre,
-      indicador_facturacion: indicadorFacturacion(l.gravado),
+      indicador_facturacion: l.indFact,
       indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
       cantidad: l.cant,
       unidad_medida: '43',
@@ -194,7 +199,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
       const items: FacturaItemInput[] = lineas.map((l, i) => ({
         numero_linea: i + 1,
         nombre_item: l.nombre,
-        indicador_facturacion: indicadorFacturacion(l.gravado),
+        indicador_facturacion: l.indFact,
         indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
         cantidad: l.cant,
         unidad_medida: '43',
@@ -277,23 +282,26 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 200 }}>Descripción</th><th className="num" style={{ width: 80 }}>Cant.</th>
-                    <th className="num" style={{ width: 120 }}>Precio</th><th className="num" style={{ width: 80 }}>Desc%</th>
-                    <th style={{ width: 124 }}>ITBIS</th><th className="num" style={{ width: 120 }}>Importe</th><th style={{ width: 40 }}></th>
+                    <th style={{ minWidth: 180 }}>Descripción</th><th className="num" style={{ width: 84 }}>Cant.</th>
+                    <th className="num" style={{ width: 116 }}>Precio</th><th className="num" style={{ width: 84 }}>Desc%</th>
+                    <th style={{ width: 150 }}>ITBIS</th><th className="num" style={{ width: 116 }}>Importe</th><th style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {lineas.map((l) => (
                     <tr key={l.id} style={{ cursor: 'default' }}>
                       <td><span className="cell-main">{l.nombre}</span><div className="cell-sub">{l.tipoItem}</div></td>
-                      <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 64 }} type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
-                      <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
-                      <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 64 }} type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} /></td>
-                      <td>
-                        <div className="row gap-sm" style={{ alignItems: 'center' }}>
-                          <Switch on={l.gravado} onChange={(v) => setGravado(l.id, v)} />
-                          <span className="text-xs muted">{l.gravado ? '18%' : 'Exento'}</span>
-                        </div>
+                      <td className="cell-input"><input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
+                      <td className="cell-input"><input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
+                      <td className="cell-input"><input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} /></td>
+                      <td className="cell-input">
+                        <select
+                          className="select line-input"
+                          value={l.indFact}
+                          onChange={(e) => setIndFact(l.id, Number(e.target.value) as IndicadorFacturacion)}
+                        >
+                          {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
                       </td>
                       <td className="num fw6"><Money value={calc(l).base} cur={false} /></td>
                       <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
@@ -320,7 +328,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
             <div className="col gap-sm">
               <div className="row between text-sm"><span className="muted">Subtotal</span><Money value={subtotal} cur={false} /></div>
               <div className="row between text-sm"><span className="muted">Descuentos</span><span className="num" style={{ color: descTotal > 0 ? 'var(--danger)' : 'inherit' }}>{descTotal > 0 ? '−' : ''}<Money value={descTotal} cur={false} /></span></div>
-              <div className="row between text-sm"><span className="muted">ITBIS (18%)</span><Money value={itbisTotal} cur={false} /></div>
+              <div className="row between text-sm"><span className="muted">ITBIS</span><Money value={itbisTotal} cur={false} /></div>
               <div className="divider" style={{ margin: '6px 0' }}></div>
               <div className="row between" style={{ fontSize: 19, fontWeight: 700 }}><span>Total</span><Money value={total} /></div>
             </div>

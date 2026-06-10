@@ -5,13 +5,19 @@ import type {
   CreateFacturaResponse,
   DocBase64,
   EstadoData,
+  FacturaListParams,
   FacturaRow,
-  ListParams,
   ListResult,
 } from './types'
 
-export function listFacturas(params: ListParams = {}): Promise<ListResult<FacturaRow>> {
-  const query = qs({ page: params.page, pageSize: params.pageSize, query: params.query })
+export function listFacturas(params: FacturaListParams = {}): Promise<ListResult<FacturaRow>> {
+  const query = qs({
+    page: params.page,
+    pageSize: params.pageSize,
+    query: params.query,
+    estado: params.estado,
+    tipo_ecf: params.tipoEcf,
+  })
   return getList<FacturaRow>(`/api/facturas${query}`)
 }
 

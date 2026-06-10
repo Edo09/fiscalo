@@ -65,6 +65,10 @@ export interface Factura {
   ncf: string
   tipo: string
   cliente: string
+  /** Razón social / empresa del comprador (company_name). */
+  empresa?: string
+  /** Descripción del primer ítem (resumen del listado). */
+  descripcion?: string
   clienteId: string
   rnc: string
   fecha: string

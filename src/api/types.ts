@@ -122,6 +122,12 @@ export interface FacturaRow {
   codigo_seguridad?: string | null
   fecha_emision_dgii?: string | null
   secuencia_utilizada?: boolean | null
+  // Presentes en el listado (GET /api/facturas): resumen plano de la factura.
+  company_name?: string | null
+  description?: string | null
+  monto_gravado?: number | string | null
+  monto_exento?: number | string | null
+  total_itbis?: number | string | null
   items?: FacturaItemRow[]
   /** Solo en GET /api/facturas?id=: registro completo del cliente. */
   cliente?: ClientRow | null
@@ -153,6 +159,8 @@ export interface FacturaItemRow {
   quantity?: number | string | null
   subtotal?: number | string | null
   itbis_amount?: number | string | null
+  /** 1=ITBIS 18%, 2=16%, 3=tasa cero, 4=exento. */
+  indicador_facturacion?: number | null
 }
 
 export interface ListParams {
@@ -164,6 +172,25 @@ export interface ListParams {
 export interface ListResult<T> {
   items: T[]
   total: number | null
+  /** Página actual reportada por el backend (bloque `pagination`). */
+  page?: number | null
+  /** Tamaño de página reportado por el backend. */
+  pageSize?: number | null
+  /** Total de páginas reportado por el backend. */
+  totalPages?: number | null
+}
+
+/**
+ * Filtro de estado DGII (server-side, `?estado=`). Minúsculas.
+ * `aprobado` = ACEPTADO/ACEPTADO_CONDICIONAL/RFCE_* aceptados; `rechazado`
+ * incluye RFCE_RECHAZADO. (Ver ecf-api-payloads.md.)
+ */
+export type FacturaEstadoFiltro = 'aprobado' | 'rechazado'
+
+export interface FacturaListParams extends ListParams {
+  estado?: FacturaEstadoFiltro
+  /** Tipo e-CF con prefijo, p.ej. `E31`, `E32` (`?tipo_ecf=`). */
+  tipoEcf?: string
 }
 
 // ---------------------------------------------------------------------------

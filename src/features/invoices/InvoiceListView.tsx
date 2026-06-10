@@ -1,40 +1,79 @@
-import { useState } from 'react'
-import { Icon, Btn, Money, EstadoBadge, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { useEffect } from 'react'
+import { Icon, Btn, Money, EstadoBadge, Card, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { useFacturasList } from '@/stores/facturasList'
+import type { FacturaEstadoUi } from '@/stores/facturasList'
 import type { Nav } from '@/config/navigation'
 
-const PAGE_SIZE = 10
+const PAGE_SIZES = [10, 25, 50]
+const SEARCH_DEBOUNCE_MS = 350
 
-/* FISCALO — Facturación: listado (GET /api/facturas) */
+// Filtros server-side: estado (?estado=) y tipo e-CF (?tipo_ecf=). 'todos' => sin filtro.
+const ESTADO_OPCIONES: { value: FacturaEstadoUi; label: string }[] = [
+  { value: 'aprobado', label: 'Aprobados' },
+  { value: 'rechazado', label: 'Rechazados' },
+  { value: 'todos', label: 'Todos' },
+]
+
+// Tipos e-CF (e-NCF 001). Valor con prefijo E para el backend (?tipo_ecf=E31).
+const TIPO_OPCIONES: { value: string; label: string }[] = [
+  { value: 'todos', label: 'Todos los tipos' },
+  { value: 'E31', label: 'E31 · Crédito Fiscal' },
+  { value: 'E32', label: 'E32 · Consumo' },
+  { value: 'E33', label: 'E33 · Nota de Débito' },
+  { value: 'E34', label: 'E34 · Nota de Crédito' },
+  { value: 'E41', label: 'E41 · Compras' },
+  { value: 'E43', label: 'E43 · Gastos Menores' },
+  { value: 'E44', label: 'E44 · Régimen Especial' },
+  { value: 'E45', label: 'E45 · Gubernamental' },
+  { value: 'E46', label: 'E46 · Exportaciones' },
+  { value: 'E47', label: 'E47 · Pagos al Exterior' },
+]
+
+/* FISCALO — Facturación: listado paginado (GET /api/facturas?query&page&pageSize) */
 export function InvoiceListView({ nav }: { nav: Nav }) {
-  const [page, setPage] = useState(1)
-  const [query, setQuery] = useState('')
-  const [input, setInput] = useState('')
-  const [tab, setTab] = useState('todas')
+  // Estado persistido fuera del componente: al abrir una factura y volver, los
+  // filtros y la página se conservan (el componente se desmonta al navegar).
+  const { page, pageSize, input, query, estado, tipo, patch } = useFacturasList()
+  const setPage = (p: number) => patch({ page: p })
+  const setInput = (v: string) => patch({ input: v })
 
-  const { data, error, loading, reload } = useApiQuery(
-    ['facturas', 'list', { page, pageSize: PAGE_SIZE, query }],
-    () => listFacturas({ page, pageSize: PAGE_SIZE, query }),
+  // Búsqueda servida por el backend: al dejar de teclear (debounce) se fija la
+  // consulta y se vuelve a la página 1. Solo si el texto cambió, para no resetear
+  // la página al re-montar (volver del detalle con la misma búsqueda).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = input.trim()
+      if (q !== query) patch({ query: q, page: 1 })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [input, query, patch])
+
+  const { data, error, loading, fetching, reload } = useApiQuery(
+    ['facturas', 'list', { page, pageSize, query, estado, tipo }],
+    () => listFacturas({
+      page,
+      pageSize,
+      query,
+      estado: estado === 'todos' ? undefined : estado,
+      tipoEcf: tipo === 'todos' ? undefined : tipo,
+    }),
     { keepPrevious: true },
   )
 
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const total = data?.total ?? null
+  const totalPages = data?.totalPages ?? null
+  const totalSum = rows.reduce((a, f) => a + f.total, 0)
+  const itbisSum = rows.reduce((a, f) => a + f.itbis, 0)
 
-  const estados = ['Aceptado', 'En proceso', 'Rechazado', 'Pendiente']
-  const tabs = [
-    { id: 'todas', label: 'Todas', count: rows.length },
-    ...estados
-      .map((e) => ({ id: e, label: e, count: rows.filter((f) => f.dgii === e).length }))
-      .filter((t) => t.count > 0),
-  ]
-  const filtered = tab === 'todas' ? rows : rows.filter((f) => f.dgii === tab)
-  const totalSum = filtered.reduce((a, f) => a + f.total, 0)
-
-  const submitSearch = () => { setQuery(input.trim()); setPage(1); setTab('todas') }
-
-  const hasNext = total != null ? page * PAGE_SIZE < total : rows.length === PAGE_SIZE
+  const submitSearch = () => { patch({ query: input.trim(), page: 1 }) }
+  const clearSearch = () => { patch({ input: '', query: '', page: 1 }) }
+  const changePageSize = (n: number) => { patch({ pageSize: n, page: 1 }) }
+  const changeEstado = (e: FacturaEstadoUi) => { patch({ estado: e, page: 1 }) }
+  const changeTipo = (t: string) => { patch({ tipo: t, page: 1 }) }
+  const searching = fetching && !loading
 
   return (
     <div className="page page-wide">
@@ -49,37 +88,73 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         }
       />
 
-      <Tabs tabs={tabs} active={tab} onChange={setTab} />
-
       <div className="toolbar">
         <form
           className="search-input"
           onSubmit={(e) => { e.preventDefault(); submitSearch() }}
         >
-          <Icon name="search" />
+          <Icon name={searching ? 'loader' : 'search'} className={searching ? 'spin' : undefined} />
           <input placeholder="Buscar por e-NCF, cliente…" value={input} onChange={(e) => setInput(e.target.value)} />
         </form>
         {query && (
-          <button className="filter-chip" onClick={() => { setInput(''); setQuery(''); setPage(1) }}>
+          <button type="button" className="filter-chip" onClick={clearSearch}>
             <Icon name="x" />Limpiar
           </button>
         )}
-        <div className="toolbar-spacer"></div>
-        <Btn variant="secondary" size="sm" icon="search" onClick={submitSearch}>Buscar</Btn>
+        <select
+          className="select"
+          value={estado}
+          onChange={(e) => changeEstado(e.target.value as FacturaEstadoUi)}
+          aria-label="Filtrar por estado DGII"
+          style={{ width: 'auto' }}
+        >
+          {ESTADO_OPCIONES.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <select
+          className="select"
+          value={tipo}
+          onChange={(e) => changeTipo(e.target.value)}
+          aria-label="Filtrar por tipo e-CF"
+          style={{ width: 'auto' }}
+        >
+          {TIPO_OPCIONES.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
+
+      {!loading && !error && rows.length > 0 && (
+        <Pagination
+          compact
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          count={rows.length}
+          onPage={setPage}
+          onPageSize={changePageSize}
+          pageSizeOptions={PAGE_SIZES}
+        />
+      )}
 
       <Card noPad>
         {loading ? (
           <LoadingState rows={7} />
         ) : error ? (
           <ErrorState title="No se pudieron cargar las facturas" onRetry={reload}>{error}</ErrorState>
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             icon="file-text"
             title="No hay facturas aquí"
             action={<Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Crear factura</Btn>}
           >
-            {query ? `Sin resultados para "${query}".` : 'Aún no se han emitido comprobantes.'}
+            {query
+              ? `Sin resultados para "${query}".`
+              : estado !== 'todos' || tipo !== 'todos'
+                ? 'Ninguna factura coincide con los filtros.'
+                : 'Aún no se han emitido comprobantes.'}
           </EmptyState>
         ) : (
           <div className="tbl-wrap">
@@ -87,17 +162,24 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
               <thead>
                 <tr>
                   <th>Comprobante</th><th>Cliente</th><th>Tipo</th><th>Fecha</th><th>Estado DGII</th>
-                  <th className="num">Total</th><th style={{ width: 40 }}></th>
+                  <th className="num">ITBIS</th><th className="num">Total</th><th style={{ width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((f) => (
+                {rows.map((f) => (
                   <tr key={f.id} onClick={() => nav('factura-ver', f)}>
-                    <td><span className="mono text-sm fw6">{f.ncf}</span></td>
-                    <td><span className="cell-main">{f.cliente}</span></td>
-                    <td><span className="ecf-tag">e-CF {f.tipo}</span></td>
+                    <td>
+                      <span className="mono text-sm fw6">{f.ncf}</span>
+                      {f.descripcion && <div className="cell-desc" title={f.descripcion}>{f.descripcion}</div>}
+                    </td>
+                    <td>
+                      <span className="cell-main">{f.cliente}</span>
+                      {f.empresa && <div className="cell-sub">{f.empresa}</div>}
+                    </td>
+                    <td><span className="ecf-tag">E{f.tipo}</span></td>
                     <td className="muted text-sm">{f.fecha}</td>
                     <td>{f.dgii !== '—' ? <EstadoBadge estado={f.dgii} /> : <span className="muted-3">—</span>}</td>
+                    <td className="num text-sm muted"><Money value={f.itbis} cur={false} /></td>
                     <td className="num fw6"><Money value={f.total} cur={false} /></td>
                     <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
                   </tr>
@@ -105,7 +187,8 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--surface-2)' }}>
-                  <td colSpan={5} className="fw6 text-sm" style={{ padding: '11px 14px' }}>Total en esta página ({filtered.length})</td>
+                  <td colSpan={5} className="fw6 text-sm" style={{ padding: '11px 14px' }}>Total en esta página ({rows.length})</td>
+                  <td className="num fw6" style={{ padding: '11px 14px' }}><Money value={itbisSum} cur={false} /></td>
                   <td className="num fw6" style={{ padding: '11px 14px' }}><Money value={totalSum} cur={false} /></td>
                   <td></td>
                 </tr>
@@ -115,14 +198,17 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         )}
       </Card>
 
-      {!loading && !error && (filtered.length > 0 || page > 1) && (
-        <div className="row between mt-md">
-          <span className="text-sm muted-3">Página {page}{total != null ? ` · ${total} en total` : ''}</span>
-          <div className="row gap-sm">
-            <Btn variant="secondary" size="sm" icon="chevron-left" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Btn>
-            <Btn variant="secondary" size="sm" iconRight="chevron-right" disabled={!hasNext} onClick={() => setPage((p) => p + 1)}>Siguiente</Btn>
-          </div>
-        </div>
+      {!loading && !error && (rows.length > 0 || page > 1) && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          count={rows.length}
+          onPage={setPage}
+          onPageSize={changePageSize}
+          pageSizeOptions={PAGE_SIZES}
+        />
       )}
     </div>
   )

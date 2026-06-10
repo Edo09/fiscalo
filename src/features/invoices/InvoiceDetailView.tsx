@@ -9,6 +9,14 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
 
+/** Etiqueta corta de tasa según indicador_facturacion (1=18%, 2=16%, 3=0%, 4=exento). */
+const IND_FACT_LABEL: Record<number, string> = {
+  1: 'ITBIS 18%',
+  2: 'ITBIS 16%',
+  3: 'Tasa 0%',
+  4: 'Exento',
+}
+
 /* FISCALO — Facturación: ver factura (detalle + estado DGII en vivo + PDF/XML).
    El detalle (GET /api/facturas?id=) trae items, cliente y emisor reales. */
 export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; nav: Nav }) {
@@ -47,6 +55,10 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const clienteContacto = cliente?.client_name && cliente.client_name !== clienteNombre ? cliente.client_name : ''
   const clienteRnc = cliente?.rnc || f.rnc || ''
   const total = Number(det?.total ?? f.total)
+  // ITBIS y subtotal son a nivel de factura (el backend no los desglosa por línea).
+  const itbisTotal = Number(det?.total_itbis ?? f.itbis ?? 0)
+  const subtotalGravado = Number(det?.monto_gravado ?? f.subtotal ?? 0)
+  const montoExento = Number(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
 
   const openDoc = async (kind: DocKind, download = false) => {
@@ -71,6 +83,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
         sub={`${f.cliente} · ${f.fecha}`}
         actions={
           <>
+            <Btn variant="ghost" icon="chevron-left" onClick={() => nav('facturas')}>Volver</Btn>
             <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf')} disabled={id == null || docBusy === 'pdf'}>
               {docBusy === 'pdf' ? 'Abriendo…' : 'PDF'}
             </Btn>
@@ -140,13 +153,19 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
             ) : items.length > 0 ? (
               <table className="tbl" style={{ marginBottom: 4 }}>
                 <thead>
-                  <tr><th>Descripción</th><th className="num">Cant.</th><th className="num">ITBIS</th><th className="num">Importe</th></tr>
+                  <tr><th>Descripción</th><th className="num">Cant.</th><th className="num">Precio</th><th className="num">ITBIS</th><th className="num">Importe</th></tr>
                 </thead>
                 <tbody>
                   {items.map((l, i) => (
                     <tr key={i} style={{ cursor: 'default' }}>
-                      <td><span className="cell-main">{l.description ?? '—'}</span></td>
+                      <td>
+                        <span className="cell-main">{l.description || `Línea ${i + 1}`}</span>
+                        {l.indicador_facturacion != null && IND_FACT_LABEL[l.indicador_facturacion] && (
+                          <div className="cell-sub">{IND_FACT_LABEL[l.indicador_facturacion]}</div>
+                        )}
+                      </td>
                       <td className="num">{Number(l.quantity ?? 0)}</td>
+                      <td className="num muted"><Money value={Number(l.amount ?? 0)} cur={false} /></td>
                       <td className="num muted"><Money value={Number(l.itbis_amount ?? 0)} cur={false} /></td>
                       <td className="num fw6"><Money value={Number(l.subtotal ?? l.amount ?? 0)} cur={false} /></td>
                     </tr>
@@ -158,7 +177,11 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
             )}
 
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 18 }}>
-              <div style={{ width: 240 }}>
+              <div className="col gap-sm" style={{ width: 260 }}>
+                <div className="row between text-sm"><span className="muted">Subtotal gravado</span><Money value={subtotalGravado} cur={false} /></div>
+                {montoExento > 0 && <div className="row between text-sm"><span className="muted">Exento</span><Money value={montoExento} cur={false} /></div>}
+                <div className="row between text-sm"><span className="muted">ITBIS</span><Money value={itbisTotal} cur={false} /></div>
+                <div className="divider" style={{ margin: '4px 0' }}></div>
                 <div className="row between" style={{ fontSize: 17, fontWeight: 700 }}><span>Total</span><Money value={total} /></div>
               </div>
             </div>
@@ -182,6 +205,9 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
                 <div className="row between"><span className="text-sm muted">Track ID</span><span className="mono text-xs">{estadoData?.track_id ?? f.trackId ?? '—'}</span></div>
                 {estadoRaw && <div className="row between"><span className="text-sm muted">Estado bruto</span><span className="mono text-xs">{estadoRaw}</span></div>}
                 <div className="divider" style={{ margin: 0 }}></div>
+                <div className="row between"><span className="text-sm muted">Subtotal</span><span className="fw6"><Money value={subtotalGravado} cur={false} /></span></div>
+                {montoExento > 0 && <div className="row between"><span className="text-sm muted">Exento</span><span className="fw6"><Money value={montoExento} cur={false} /></span></div>}
+                <div className="row between"><span className="text-sm muted">ITBIS</span><span className="fw6"><Money value={itbisTotal} cur={false} /></span></div>
                 <div className="row between"><span className="text-sm muted">Total</span><span className="fw6"><Money value={total} /></span></div>
               </div>
             )}
