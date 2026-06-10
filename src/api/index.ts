@@ -11,7 +11,7 @@ export {
   getDocumentBase64,
   type DocKind,
 } from './facturas'
-export { listClients } from './clients'
+export { listClients, updateClient, deleteClient } from './clients'
 export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
 export { listUsers } from './users'
 export { getStats } from './stats'

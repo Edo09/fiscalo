@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Toaster } from 'sonner'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
 import { SearchPalette } from '@/components/layout/SearchPalette'
@@ -128,6 +129,7 @@ function AppShell() {
       </div>
 
       {search && <SearchPalette nav={nav} onClose={() => setSearch(false)} />}
+      <Toaster theme={theme} position="top-right" richColors closeButton />
     </div>
   )
 }

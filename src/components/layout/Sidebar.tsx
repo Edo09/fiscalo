@@ -1,4 +1,4 @@
-import { Icon } from '@/components/ui'
+import { Icon, Image } from '@/components/ui'
 import { NAV, type Nav } from '@/config/navigation'
 
 export interface SidebarProps {
@@ -15,8 +15,8 @@ export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile }: 
       <div className={'sidebar-backdrop' + (mobileOpen ? ' show' : '')} onClick={onCloseMobile}></div>
       <aside className={'sidebar' + sbClass + (mobileOpen ? ' mobile-open' : '')}>
         <div className="sidebar-brand" onClick={() => nav('dashboard')}>
-          <div className="brand-mark">F</div>
-          <span className="brand-name">Fiscalo<b>.</b></span>
+          <Image className="brand-icon" src="/assets/logos/fiscalpoit-notext.png" alt="" />
+          <span className="brand-name">FiscalPoint<b>.</b></span>
         </div>
         <div className="sidebar-scroll">
           {NAV.map((g) => (

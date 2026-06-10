@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/components/ui'
 import {
   ApiError, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
@@ -27,7 +28,6 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const detalle = useApiQuery(['facturas', 'detail', id], () => (id != null ? getFactura(id) : Promise.resolve(null)))
 
   const [docBusy, setDocBusy] = useState<DocKind | null>(null)
-  const [docError, setDocError] = useState<string | null>(null)
 
   if (!f) {
     return (
@@ -64,12 +64,13 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const openDoc = async (kind: DocKind, download = false) => {
     if (id == null) return
     setDocBusy(kind)
-    setDocError(null)
+    const tid = toast.loading(kind === 'pdf' ? 'Generando PDF…' : 'Obteniendo XML…')
     try {
       const doc = await getDocumentBase64(id, kind)
       presentDocument(doc, { download })
+      toast.success(download ? `Descargado ${doc.filename}.` : `Documento ${doc.filename} listo.`, { id: tid })
     } catch (e) {
-      setDocError(e instanceof ApiError ? e.message : 'No se pudo obtener el documento.')
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo obtener el documento.', { id: tid })
     } finally {
       setDocBusy(null)
     }
@@ -94,12 +95,6 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           </>
         }
       />
-
-      {docError && (
-        <div className="card card-pad row gap-sm" style={{ marginBottom: 14, background: 'var(--danger-soft)', borderColor: 'transparent', color: 'var(--danger)' }}>
-          <Icon name="alert-circle" size={16} /><span className="fw6 text-sm">{docError}</span>
-        </div>
-      )}
 
       {rechazado && (
         <div className="card card-pad" style={{ marginBottom: 14, background: 'var(--danger-soft)', borderColor: 'transparent' }}>

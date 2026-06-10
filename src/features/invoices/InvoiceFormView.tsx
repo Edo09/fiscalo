@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Icon, Btn, Money, Card, Modal, PageHead, Spinner } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats,
@@ -26,8 +27,6 @@ interface Linea {
   indFact: IndicadorFacturacion
   tipoItem: 'Bien' | 'Servicio'
 }
-
-type Toast = { type: 'ok' | 'err'; msg: string } | null
 
 /** Opciones de indicador de facturación DGII (tasa de ITBIS por línea). */
 const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
@@ -69,7 +68,6 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   const [obs, setObs] = useState('')
   const [lineas, setLineas] = useState<Linea[]>([])
   const [prodPicker, setProdPicker] = useState(false)
-  const [toast, setToast] = useState<Toast>(null)
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
@@ -121,15 +119,15 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   /** Construye el payload mínimo para POST /api/facturas. */
   function buildPayload(): CreateFacturaInput | null {
     if (!cliente) {
-      setToast({ type: 'err', msg: 'Selecciona un cliente para continuar.' })
+      toast.error('Selecciona un cliente para continuar.')
       return null
     }
     if (lineas.length === 0) {
-      setToast({ type: 'err', msg: 'Agrega al menos un producto o servicio.' })
+      toast.error('Agrega al menos un producto o servicio.')
       return null
     }
     if (tipo === '33' || tipo === '34') {
-      setToast({ type: 'err', msg: `Las notas (e-CF ${tipo}) requieren un comprobante de referencia, aún no soportado en este formulario.` })
+      toast.error(`Las notas (e-CF ${tipo}) requieren un comprobante de referencia, aún no soportado en este formulario.`)
       return null
     }
     const items: FacturaItemInput[] = lineas.map((l, i) => ({
@@ -156,12 +154,13 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
     const payload = buildPayload()
     if (!payload) return
     setEmitting(true)
-    setToast(null)
+    // La emisión hace un viaje síncrono a la DGII: toast de progreso hasta resolver.
+    const tid = toast.loading('Emitiendo e-CF a la DGII…')
     try {
       const res = await createFactura(payload)
       // Invalida listados y stats de facturas (la secuencia e-NCF avanzó).
       void queryClient.invalidateQueries({ queryKey: ['facturas'] })
-      setToast({ type: 'ok', msg: `e-CF ${res.e_ncf} emitido (${dgiiLabel(res.estado_dgii)}).` })
+      toast.success(`e-CF ${res.e_ncf} emitido (${dgiiLabel(res.estado_dgii)}).`, { id: tid })
       const created: Factura = {
         id: String(res.factura_id),
         facturaId: res.factura_id,
@@ -184,17 +183,17 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
       }
       setTimeout(() => nav('factura-ver', created), 1200)
     } catch (e) {
-      setToast({ type: 'err', msg: e instanceof ApiError ? e.message : 'No se pudo emitir la factura.' })
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
     } finally {
       setEmitting(false)
     }
   }
 
   const previsualizar = async () => {
-    if (!cliente) { setToast({ type: 'err', msg: 'Selecciona un cliente para la vista previa.' }); return }
-    if (lineas.length === 0) { setToast({ type: 'err', msg: 'Agrega al menos un ítem.' }); return }
+    if (!cliente) { toast.error('Selecciona un cliente para la vista previa.'); return }
+    if (lineas.length === 0) { toast.error('Agrega al menos un ítem.'); return }
     setPreviewing(true)
-    setToast(null)
+    const tid = toast.loading('Generando vista previa…')
     try {
       const items: FacturaItemInput[] = lineas.map((l, i) => ({
         numero_linea: i + 1,
@@ -207,8 +206,9 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
       }))
       const doc = await previewFactura({ client_id: Number(cliente.id), tipo_ecf: tipo, items })
       presentDocument(doc)
+      toast.success('Vista previa generada.', { id: tid })
     } catch (e) {
-      setToast({ type: 'err', msg: e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.' })
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.', { id: tid })
     } finally {
       setPreviewing(false)
     }
@@ -232,12 +232,6 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
           </>
         }
       />
-
-      {toast && (
-        <div className="card card-pad row gap-sm" style={{ marginBottom: 14, background: toast.type === 'ok' ? 'var(--success-soft)' : 'var(--danger-soft)', borderColor: 'transparent', color: toast.type === 'ok' ? 'var(--success)' : 'var(--danger)' }}>
-          <Icon name={toast.type === 'ok' ? 'check-circle' : 'alert-circle'} size={16} /><span className="fw6 text-sm">{toast.msg}</span>
-        </div>
-      )}
 
       <div className="dash-grid">
         <div className="col gap-md">

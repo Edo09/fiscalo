@@ -2,9 +2,9 @@
 //   Gastos  -> categoria="gastos_menores"      (E43, auto-emisión)
 //   Compras -> categoria="facturas_proveedores" (E41/E47 auto-emisión + E31/B01/E33/E34 recibidos)
 // GET /api/gastos?categoria=... + /api/gastos/stats (KPIs acotados a la categoría).
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Icon, Btn, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Icon, Btn, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { listGastos, getGastoStats } from '@/api'
 import type { GastoCategoria, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -12,7 +12,8 @@ import { CATEGORIA_TIPOS, gastoEstadoLabel, tipoLabel } from '@/config/gastos'
 import { GastoFormModal } from './GastoFormModal'
 import { GastoDetailDrawer } from './GastoDetailDrawer'
 
-const PAGE_SIZE = 10
+const PAGE_SIZES = [10, 25, 50]
+const SEARCH_DEBOUNCE_MS = 350
 
 export interface GastosListadoProps {
   categoria: GastoCategoria
@@ -27,20 +28,34 @@ export interface GastosListadoProps {
 export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosListadoProps) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [detail, setDetail] = useState<GastoRow | null>(null)
 
+  // Búsqueda servida por el backend: al dejar de teclear (debounce) se fija la
+  // consulta y se vuelve a la página 1. Enter la dispara al instante.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = input.trim()
+      if (q !== query) { setQuery(q); setPage(1) }
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [input, query])
+
   const stats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
   const list = useApiQuery(
-    ['gastos', 'list', { page, pageSize: PAGE_SIZE, query, categoria }],
-    () => listGastos({ page, pageSize: PAGE_SIZE, query, categoria }),
+    ['gastos', 'list', { page, pageSize, query, categoria }],
+    () => listGastos({ page, pageSize, query, categoria }),
     { keepPrevious: true },
   )
 
   const rows = list.data?.items ?? []
   const total = list.data?.total ?? null
+  const totalPages = list.data?.totalPages ?? null
+  const totalSum = rows.reduce((a, g) => a + Number(g.total ?? 0), 0)
+  const itbisSum = rows.reduce((a, g) => a + Number(g.itbis ?? 0), 0)
 
   // KPIs acotados a ESTA categoría (los stats globales traen por_categoria/por_tipo).
   const cat = (stats.data?.por_categoria ?? []).find((p) => p.categoria === categoria)
@@ -48,8 +63,10 @@ export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosL
   const tiposDistintos = (stats.data?.por_tipo ?? [])
     .filter((t) => tiposCat.includes(t.tipo_gasto as GastoTipo) && t.total > 0).length
 
-  const hasNext = total != null ? page * PAGE_SIZE < total : rows.length === PAGE_SIZE
   const submitSearch = () => { setQuery(input.trim()); setPage(1) }
+  const clearSearch = () => { setInput(''); setQuery(''); setPage(1) }
+  const changePageSize = (n: number) => { setPageSize(n); setPage(1) }
+  const searching = list.fetching && !list.loading
 
   const onCreated = () => {
     setFormOpen(false)
@@ -76,12 +93,25 @@ export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosL
 
       <div className="toolbar">
         <form className="search-input" onSubmit={(e) => { e.preventDefault(); submitSearch() }}>
-          <Icon name="search" /><input placeholder="Buscar por NCF, RNC o proveedor…" value={input} onChange={(e) => setInput(e.target.value)} />
+          <Icon name={searching ? 'loader' : 'search'} className={searching ? 'spin' : undefined} />
+          <input placeholder="Buscar por NCF, RNC o proveedor…" value={input} onChange={(e) => setInput(e.target.value)} />
         </form>
-        {query && <button className="filter-chip" onClick={() => { setInput(''); setQuery(''); setPage(1) }}><Icon name="x" />Limpiar</button>}
-        <div className="toolbar-spacer"></div>
-        <Btn variant="secondary" size="sm" icon="search" onClick={submitSearch}>Buscar</Btn>
+        {query && <button type="button" className="filter-chip" onClick={clearSearch}><Icon name="x" />Limpiar</button>}
       </div>
+
+      {!list.loading && !list.error && rows.length > 0 && (
+        <Pagination
+          compact
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          count={rows.length}
+          onPage={setPage}
+          onPageSize={changePageSize}
+          pageSizeOptions={PAGE_SIZES}
+        />
+      )}
 
       <Card noPad>
         {list.loading ? (
@@ -115,19 +145,30 @@ export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosL
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ background: 'var(--surface-2)' }}>
+                  <td colSpan={4} className="fw6 text-sm" style={{ padding: '11px 14px' }}>Total en esta página ({rows.length})</td>
+                  <td className="num fw6" style={{ padding: '11px 14px' }}><Money value={itbisSum} cur={false} /></td>
+                  <td className="num fw6" style={{ padding: '11px 14px' }}><Money value={totalSum} cur={false} /></td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
       </Card>
 
       {!list.loading && !list.error && (rows.length > 0 || page > 1) && (
-        <div className="row between mt-md">
-          <span className="text-sm muted-3">Página {page}{total != null ? ` · ${total} en total` : ''}</span>
-          <div className="row gap-sm">
-            <Btn variant="secondary" size="sm" icon="chevron-left" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</Btn>
-            <Btn variant="secondary" size="sm" iconRight="chevron-right" disabled={!hasNext} onClick={() => setPage((p) => p + 1)}>Siguiente</Btn>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={pageSize}
+          count={rows.length}
+          onPage={setPage}
+          onPageSize={changePageSize}
+          pageSizeOptions={PAGE_SIZES}
+        />
       )}
 
       {formOpen && <GastoFormModal categoria={categoria} onClose={() => setFormOpen(false)} onCreated={onCreated} />}

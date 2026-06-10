@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Icon, Btn, Money, EstadoBadge, Card, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
-import { listFacturas, mapFacturaRow } from '@/api'
+import { Icon, Btn, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
+import { listFacturas, mapFacturaRow, getStats } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
@@ -62,6 +62,18 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
     { keepPrevious: true },
   )
 
+  // KPIs globales (GET /api/facturas/stats) — misma clave que el dashboard e-CF
+  // y el formulario de factura: caché compartida.
+  const stats = useApiQuery(['facturas', 'stats'], () => getStats())
+  const resumen = stats.data?.resumen
+  const porEstado = stats.data?.por_estado ?? []
+  const aceptados = porEstado
+    .filter((e) => ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO'].includes(e.estado))
+    .reduce((a, e) => a + e.total, 0)
+  const rechazados = porEstado
+    .filter((e) => ['RECHAZADO', 'RFCE_RECHAZADO'].includes(e.estado))
+    .reduce((a, e) => a + e.total, 0)
+
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const total = data?.total ?? null
   const totalPages = data?.totalPages ?? null
@@ -82,11 +94,18 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         sub={total != null ? `${total} comprobantes emitidos` : 'Comprobantes fiscales electrónicos'}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn>
+            <Btn variant="secondary" icon="refresh-cw" onClick={() => { reload(); stats.reload() }}>Actualizar</Btn>
             <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Nueva factura</Btn>
           </>
         }
       />
+
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <KPI label="Comprobantes" value={resumen?.total_ecf ?? 0} icon="file-text" />
+        <KPI label="Monto total" value={Number(resumen?.monto_total ?? 0)} money icon="trending-up" iconBg="var(--success-soft)" iconColor="var(--success)" />
+        <KPI label="Aceptados" value={aceptados} icon="check-circle" iconBg="var(--success-soft)" iconColor="var(--success)" />
+        <KPI label="Rechazados" value={rechazados} icon="x-circle" iconBg="var(--danger-soft)" iconColor="var(--danger)" />
+      </div>
 
       <div className="toolbar">
         <form

@@ -12,7 +12,7 @@ import {
   MoreHorizontal, Eye, Edit3, Copy, Ban, Printer, PenTool, Loader, Code,
   Archive, Filter, Server, Save, AlertCircle, AlertTriangle, XCircle, Trash2,
   Wrench, Box, MapPin, CircleDot, HandCoins, Tag, Layers, Percent, Sheet,
-  GitCompare, Key, Hash, Pause, Banknote, HelpCircle,
+  GitCompare, Key, Hash, Pause, Banknote, HelpCircle, Zap, EyeOff, LineChart,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -41,7 +41,8 @@ const ICONS: Record<string, LucideIcon> = {
   'trash-2': Trash2, wrench: Wrench, box: Box, 'map-pin': MapPin,
   'circle-dot': CircleDot, 'hand-coins': HandCoins, tag: Tag, layers: Layers,
   percent: Percent, sheet: Sheet, 'git-compare': GitCompare, key: Key, hash: Hash,
-  pause: Pause, banknote: Banknote, 'help-circle': HelpCircle,
+  pause: Pause, banknote: Banknote, 'help-circle': HelpCircle, zap: Zap,
+  'eye-off': EyeOff, 'line-chart': LineChart,
 }
 
 export interface IconProps {

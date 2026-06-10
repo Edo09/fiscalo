@@ -1,0 +1,216 @@
+/* ============================================================
+   FISCALO — CAPA "BOLD" (restyle distintivo)
+   Se carga DESPUÉS de styles.css y sobre-escribe por cascada.
+   Aesthetic: fiscal-grade, ink chrome, display type, acento con cuerpo.
+   ============================================================ */
+
+:root {
+  --font-display: "Space Grotesk", "Helvetica Neue", Helvetica, sans-serif;
+
+  /* Paleta "ink" del panel de marca (login) llevada al shell */
+  --ink: #1a2034;
+  --ink-1: #232a44;
+  --ink-2: #1d2338;
+  --ink-line: rgba(255,255,255,0.08);
+  --ink-line-2: rgba(255,255,255,0.05);
+  --ink-text: #cdd6e6;
+  --ink-text-2: #8a96b3;
+  --ink-text-3: #5d6685;
+
+  /* radios un poco más definidos */
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  /* sombras con más cuerpo */
+  --sh-xs: 0 1px 2px rgba(15, 20, 40, 0.05);
+  --sh-sm: 0 1px 3px rgba(15, 20, 40, 0.07), 0 1px 2px rgba(15, 20, 40, 0.05);
+  --sh-md: 0 6px 16px rgba(15, 20, 40, 0.09), 0 2px 5px rgba(15, 20, 40, 0.05);
+  --sh-lg: 0 16px 40px rgba(15, 20, 40, 0.14), 0 5px 12px rgba(15, 20, 40, 0.06);
+}
+
+/* ---- Tipografía display ---- */
+h1, h2, h3,
+.page-title, .brand-name, .kpi-value, .login-headline, .login-title,
+.modal-head h3, .state h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+.page-title { font-size: 25px; font-weight: 600; }
+.kpi-value { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+.brand-name { font-weight: 600; }
+
+/* ============================================================
+   SHELL — fondo y aire
+   ============================================================ */
+.content { background:
+  radial-gradient(120% 60% at 100% 0%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 60%),
+  var(--bg);
+}
+
+/* ============================================================
+   SIDEBAR — ink por defecto (lleva el panel de marca al shell)
+   ============================================================ */
+.sidebar {
+  background:
+    linear-gradient(180deg, var(--ink-1) 0%, var(--ink-2) 55%, var(--ink) 100%);
+  border-right: 1px solid rgba(0,0,0,0.4);
+  position: relative;
+}
+.sidebar::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--ink-line-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ink-line-2) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: radial-gradient(120% 70% at 50% 0%, #000 10%, transparent 70%);
+  opacity: 0.7;
+}
+.sidebar > * { position: relative; z-index: 1; }
+
+.sidebar-brand { border-bottom: 1px solid var(--ink-line); }
+.sidebar .brand-name { color: #f3f6fc; }
+.sidebar .brand-name b { color: color-mix(in oklab, var(--accent) 65%, #fff); }
+.sidebar .brand-mark { box-shadow: 0 4px 14px rgba(0,0,0,0.45); }
+
+.sidebar .nav-group-label { color: #6f7a96; letter-spacing: 0.09em; }
+.sidebar .nav-item { color: var(--ink-text); font-weight: 500; border-radius: var(--r-sm); }
+.sidebar .nav-item .lucide { color: #6f7a96; }
+.sidebar .nav-item:hover { background: rgba(255,255,255,0.055); color: #fff; }
+.sidebar .nav-item:hover .lucide { color: var(--ink-text); }
+
+.sidebar .nav-item.active {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 26%, transparent), color-mix(in oklab, var(--accent) 10%, transparent));
+  color: #fff; font-weight: 600;
+}
+.sidebar .nav-item.active .lucide { color: color-mix(in oklab, var(--accent) 55%, #fff); }
+.sidebar .nav-item.active::before {
+  content: ""; position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: color-mix(in oklab, var(--accent) 70%, #fff);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+.sidebar .nav-item { position: relative; }
+
+.sidebar-foot { border-top: 1px solid var(--ink-line); }
+.sidebar-foot .nav-item { background: rgba(255,255,255,0.05) !important; }
+.sidebar-foot .nav-item:hover { background: rgba(255,255,255,0.09) !important; }
+
+/* ---- Tweak "compacto" sólo cambia densidad (hereda ink) ---- */
+.sidebar.sb-compact { --sidebar-w: 212px; }
+
+/* ---- Tweak "claro" (sb-contrast): sidebar claro alternativo ---- */
+.sidebar.sb-contrast {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+}
+.sidebar.sb-contrast::before { display: none; }
+.sidebar.sb-contrast .sidebar-brand,
+.sidebar.sb-contrast .sidebar-foot { border-color: var(--border); }
+.sidebar.sb-contrast .brand-name { color: var(--text); }
+.sidebar.sb-contrast .brand-name b { color: var(--accent); }
+.sidebar.sb-contrast .nav-group-label { color: var(--text-3); }
+.sidebar.sb-contrast .nav-item { color: var(--text-2); }
+.sidebar.sb-contrast .nav-item .lucide { color: var(--text-3); }
+.sidebar.sb-contrast .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+.sidebar.sb-contrast .nav-item:hover .lucide { color: var(--text-2); }
+.sidebar.sb-contrast .nav-item.active { background: var(--accent-soft); color: var(--accent-text); }
+.sidebar.sb-contrast .nav-item.active .lucide { color: var(--accent); }
+.sidebar.sb-contrast .nav-item.active::before { background: var(--accent); box-shadow: none; }
+.sidebar.sb-contrast .sidebar-foot .nav-item { background: var(--surface-hover) !important; }
+
+/* ============================================================
+   NAVBAR — refinado
+   ============================================================ */
+.navbar { background: color-mix(in oklab, var(--surface) 88%, transparent); backdrop-filter: saturate(1.1) blur(8px); }
+.co-switch { border-radius: var(--r-md); }
+.co-logo { background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 60%, #000)); color: #fff; font-weight: 700; }
+.navbar-search { border-radius: var(--r-md); }
+
+/* ============================================================
+   PAGE HEADER
+   ============================================================ */
+.page-head .titles { position: relative; }
+.page-title { line-height: 1.1; }
+
+/* ============================================================
+   KPI / STAT CARDS — riel de acento + numerales display
+   ============================================================ */
+.kpi {
+  border-radius: var(--r-lg);
+  border-color: var(--border);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--surface) 100%, transparent), var(--surface));
+  transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s, border-color .16s;
+}
+.kpi::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 35%, transparent));
+  opacity: 0; transition: opacity .16s;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); border-color: var(--border-strong); }
+.kpi:hover::after { opacity: 1; }
+.kpi-value { font-size: 23px; }
+.kpi-ic { border-radius: 9px; }
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card { border-radius: var(--r-lg); box-shadow: var(--sh-sm); }
+.card-head h3 { font-family: var(--font-display); letter-spacing: -0.02em; font-size: 14.5px; white-space: nowrap; }
+
+/* ============================================================
+   BUTTONS — primario con cuerpo
+   ============================================================ */
+.btn { border-radius: var(--r-sm); font-weight: 600; }
+.btn-primary {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 92%, #fff) 0%, var(--accent) 55%, var(--accent-active) 100%);
+  box-shadow: 0 1px 2px rgba(15,20,40,0.18), inset 0 1px 0 rgba(255,255,255,0.22);
+  border-color: color-mix(in oklab, var(--accent-active) 80%, #000);
+}
+.btn-primary:hover { filter: brightness(1.04); }
+.btn-primary:active { filter: brightness(0.96); }
+
+/* ============================================================
+   TABLES — encabezado y hover con acento
+   ============================================================ */
+.tbl thead th { background: var(--surface-2); font-size: 11px; letter-spacing: 0.04em; }
+.tbl tbody tr:hover { background: color-mix(in oklab, var(--accent) 5%, var(--surface)); }
+.tbl tbody tr { position: relative; }
+.cell-main { font-weight: 600; }
+
+/* ============================================================
+   BADGES / PILLS / TAGS
+   ============================================================ */
+.badge { border: 1px solid color-mix(in oklab, currentColor 22%, transparent); }
+.ecf-tag { font-family: var(--font-mono); border: 1px solid var(--border); background: var(--surface-2); }
+
+/* ============================================================
+   SEGMENTED / TABS
+   ============================================================ */
+.seg button.on { box-shadow: var(--sh-sm); }
+.tab.on { border-bottom-width: 2.5px; }
+
+/* ============================================================
+   FILTER CHIPS / SEARCH
+   ============================================================ */
+.filter-chip { border-radius: var(--r-sm); }
+.search-input { border-radius: var(--r-md); }
+
+/* ============================================================
+   AVATAR
+   ============================================================ */
+.avatar, .avatar-sm { box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
+
+/* ============================================================
+   PROGRESS / BARS
+   ============================================================ */
+.progress-fill { background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 70%, #000), var(--accent)); }
+
+/* ============================================================
+   DARK MODE — ajustes finos
+   ============================================================ */
+[data-theme="dark"] .sidebar { background: linear-gradient(180deg, #0e1018 0%, #0b0d14 100%); border-right-color: #000; }
+[data-theme="dark"] .content { background:
+  radial-gradient(120% 60% at 100% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%),
+  var(--bg); }
+[data-theme="dark"] .navbar { background: color-mix(in oklab, var(--surface) 82%, transparent); }

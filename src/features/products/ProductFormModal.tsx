@@ -1,6 +1,7 @@
 // FISCALO — Alta/edición/eliminación de un producto (CRUD contra /api/products).
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { ApiError, createProduct, updateProduct, deleteProduct } from '@/api'
 import type { Producto } from '@/types/domain'
@@ -53,6 +54,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
       else await createProduct(payload)
       // Invalida la caché de productos en TODAS las vistas (lista y picker de factura).
       void queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast.success(editing ? `Producto "${payload.nombre}" actualizado.` : `Producto "${payload.nombre}" creado.`)
       onSaved()
       onClose()
     } catch (e) {
@@ -68,6 +70,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
     try {
       await deleteProduct(product.id)
       void queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast.success(`Producto "${product.nombre}" eliminado.`)
       onSaved()
       onClose()
     } catch (e) {

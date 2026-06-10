@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Icon, Btn, Money, EstadoBadge, Drawer, Spinner } from '@/components/ui'
 import { ApiError, getGasto, getGastoEstado, getGastoXml } from '@/api'
 import type { GastoRow } from '@/api'
@@ -25,12 +26,16 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
   const consultarEstado = async () => {
     setEstadoBusy(true)
     setMsg(null)
+    const tid = toast.loading('Consultando estado en la DGII…')
     try {
       const r = await getGastoEstado(g.id)
       setEstado(r.estado_dgii ?? estado)
       reload()
+      toast.success(`Estado actualizado: ${gastoEstadoLabel(r.estado_dgii ?? '') || r.estado_dgii || '—'}.`, { id: tid })
     } catch (e) {
-      setMsg(e instanceof ApiError ? e.message : 'No se pudo consultar el estado.')
+      const m = e instanceof ApiError ? e.message : 'No se pudo consultar el estado.'
+      setMsg(m)
+      toast.error(m, { id: tid })
     } finally {
       setEstadoBusy(false)
     }
@@ -39,11 +44,15 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
   const descargarXml = async () => {
     setXmlBusy(true)
     setMsg(null)
+    const tid = toast.loading('Descargando XML…')
     try {
       const { blob, filename } = await getGastoXml(g.id)
       downloadBlob(blob, filename)
+      toast.success(`Descargado ${filename}.`, { id: tid })
     } catch (e) {
-      setMsg(e instanceof ApiError ? e.message : 'No se pudo descargar el XML.')
+      const m = e instanceof ApiError ? e.message : 'No se pudo descargar el XML.'
+      setMsg(m)
+      toast.error(m, { id: tid })
     } finally {
       setXmlBusy(false)
     }

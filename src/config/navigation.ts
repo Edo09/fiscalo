@@ -57,19 +57,20 @@ export const NAV: NavGroup[] = [
       { id: 'productos', label: 'Productos y servicios', icon: 'package' },
     ],
   },
-  {
-    group: 'Fiscal · DGII',
-    items: [
-      { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check' },
-      { id: 'bandeja-dgii', label: 'Bandeja DGII', icon: 'inbox', badge: 1, badgeTone: 'warn' },
-    ],
-  },
+
   {
     group: 'Compras',
     items: [
       { id: 'gastos', label: 'Gastos', icon: 'receipt' },
       { id: 'compras', label: 'Compras', icon: 'shopping-cart' },
       { id: 'proveedores', label: 'Proveedores', icon: 'truck' },
+    ],
+  },
+    {
+    group: 'Fiscal · DGII',
+    items: [
+      { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check' },
+      { id: 'bandeja-dgii', label: 'Bandeja DGII', icon: 'inbox' },
     ],
   },
   {

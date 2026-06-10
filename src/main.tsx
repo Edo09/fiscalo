@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { useAuthStore } from './stores/auth'
 import './styles/styles.css'
+// Capa "Bold": restyle global (sidebar ink, tipografía display, KPIs, login).
+// Debe importarse DESPUÉS de styles.css: gana por cascada.
+import './styles/bold.css'
 // Para usar el tema "Editorial / Esmeralda", descomenta la siguiente línea:
 // import './styles/styles-v2.css'
 

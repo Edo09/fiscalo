@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { Icon, Btn, Money, Modal, Badge, Checkbox } from '@/components/ui'
 import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
@@ -87,6 +88,8 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     setSaving(true)
     try {
       const g = await createGasto(payload)
+      toast.success(`${esCompra ? 'Compra registrada' : 'Gasto registrado'}${g.ncf ? ` · ${g.ncf}` : ''}.`)
+      if (g.aviso) toast.warning(g.aviso)
       onCreated(g)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo registrar el gasto.')
