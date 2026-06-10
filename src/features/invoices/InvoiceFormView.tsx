@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { Icon, Btn, Money, Avatar, Card, Modal, PageHead, Spinner } from '@/components/ui'
-import { DATA } from '@/data/mockData'
+import { Icon, Btn, Money, Card, Modal, PageHead, Switch, Spinner } from '@/components/ui'
 import {
-  ApiError, DEFAULT_USER_ID, createFactura, listClients, previewFactura,
-  mapClientRow, formatApiDate, dgiiLabel,
+  ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats,
+  listProducts, mapProductRow, formatApiDate, dgiiLabel,
 } from '@/api'
 import type {
-  CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf,
+  CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
 } from '@/api'
+import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { presentDocument } from '@/lib/file'
 import { useAsync } from '@/hooks/useAsync'
+import { useSession } from '@/auth/useSession'
 import type { Nav } from '@/app/navigation'
 import type { Cliente, Producto, Factura } from '@/types/domain'
 
@@ -20,53 +21,81 @@ interface Linea {
   cant: number
   precio: number
   desc: number
-  itbis: number
+  /** El producto define si el ítem es gravado con ITBIS (true) o no (false). */
+  gravado: boolean
   tipoItem: 'Bien' | 'Servicio'
 }
 
 type Toast = { type: 'ok' | 'err'; msg: string } | null
 
-/** Deriva el indicador de facturación DGII desde la tasa de ITBIS del ítem. */
-function indicadorFacturacion(itbis: number): IndicadorFacturacion {
-  if (itbis === 18) return 1
-  if (itbis === 16) return 2
-  return 4 // 0% u otros -> exento en este formulario
+/** Tasa de ITBIS aplicada a un ítem gravado (los exentos van a 0%). */
+const ITBIS_RATE = 0.18
+
+/**
+ * Indicador de facturación DGII según si el ítem es gravado o no:
+ * gravado => ITBIS 18% (1); no gravado => Exento (4).
+ */
+function indicadorFacturacion(gravado: boolean): IndicadorFacturacion {
+  return gravado ? 1 : 4
+}
+
+/**
+ * e-NCF que el backend asignará a continuación para un tipo, derivado de
+ * /api/facturas/stats. `secuencia_actual` es el ÚLTIMO número asignado, así que
+ * el próximo es +1, con 10 dígitos a la derecha del prefijo (ej. E320000000009).
+ */
+function nextENcf(tipo: TipoEcf, secuencias?: StatsSecuencia[]): string | null {
+  const seq = secuencias?.find((s) => s.type === `E${tipo}`)
+  if (!seq) return null
+  const next = (seq.secuencia_actual ?? 0) + 1
+  return `E${tipo}${String(next).padStart(10, '0')}`
 }
 
 /* FISCALO — Crear factura (emite contra POST /api/facturas) */
 export function InvoiceFormView({ nav }: { nav: Nav }) {
-  const D = DATA
+  const { user } = useSession()
   const [cliente, setCliente] = useState<Cliente | null>(null)
-  const [clienteOpen, setClienteOpen] = useState(false)
   const [tipo, setTipo] = useState<TipoEcf>('32')
   const [metodo, setMetodo] = useState('Efectivo')
   const [obs, setObs] = useState('')
   const [lineas, setLineas] = useState<Linea[]>([
-    { id: 1, prodId: 'p1', nombre: 'Aceite Vegetal 1 Gal', cant: 10, precio: 485.0, desc: 0, itbis: 18, tipoItem: 'Bien' },
+    { id: 1, prodId: 'p1', nombre: 'Aceite Vegetal 1 Gal', cant: 10, precio: 485.0, desc: 0, gravado: true, tipoItem: 'Bien' },
   ])
   const [prodPicker, setProdPicker] = useState(false)
   const [toast, setToast] = useState<Toast>(null)
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
-  const clients = useAsync(() => listClients({ pageSize: 100 }), [])
-  const clientesApi: Cliente[] = (clients.data?.items ?? []).map(mapClientRow)
+  // Secuencias e-CF del ambiente activo, para mostrar el próximo e-NCF a usar.
+  const stats = useAsync(getStats, [])
+  const proximoNcf = nextENcf(tipo, stats.data?.secuencias)
+
+  // Catálogo de productos (GET /api/products) para el selector de líneas.
+  const productos = useAsync(() => listProducts({ pageSize: 100 }), [])
+  const [prodQuery, setProdQuery] = useState('')
+  const catalogo = (productos.data?.items ?? []).map(mapProductRow)
+  const catalogoFiltrado = catalogo.filter((p) =>
+    `${p.nombre} ${p.sku} ${p.cat}`.toLowerCase().includes(prodQuery.trim().toLowerCase()),
+  )
 
   const addLinea = (p: Producto) => {
     setLineas([...lineas, {
       id: Date.now(), prodId: p.id, nombre: p.nombre, cant: 1,
-      precio: p.precio, desc: 0, itbis: p.itbis,
+      // El producto define el gravamen por defecto (itbis > 0 => gravado).
+      precio: p.precio, desc: 0, gravado: p.itbis > 0,
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
     setProdPicker(false)
   }
   const updLinea = (id: number, key: keyof Linea, val: number) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
+  const setGravado = (id: number, gravado: boolean) =>
+    setLineas(lineas.map((l) => (l.id === id ? { ...l, gravado } : l)))
   const delLinea = (id: number) => setLineas(lineas.filter((l) => l.id !== id))
 
   const calc = (l: Linea) => {
     const base = l.cant * l.precio * (1 - l.desc / 100)
-    return { base, itbis: base * (l.itbis / 100) }
+    return { base, itbis: l.gravado ? base * ITBIS_RATE : 0 }
   }
   const subtotal = lineas.reduce((a, l) => a + calc(l).base, 0)
   const itbisTotal = lineas.reduce((a, l) => a + calc(l).itbis, 0)
@@ -98,7 +127,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
     const items: FacturaItemInput[] = lineas.map((l, i) => ({
       numero_linea: i + 1,
       nombre_item: l.nombre,
-      indicador_facturacion: indicadorFacturacion(l.itbis),
+      indicador_facturacion: indicadorFacturacion(l.gravado),
       indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
       cantidad: l.cant,
       unidad_medida: '43',
@@ -106,7 +135,8 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
     }))
     return {
       client_id: Number(cliente.id),
-      user_id: DEFAULT_USER_ID,
+      // Emisor = usuario autenticado (id del login). Fallback al .env por si acaso.
+      user_id: user?.id ?? DEFAULT_USER_ID,
       tipo_ecf: tipo,
       tipo_pago: metodo === 'Efectivo' ? 1 : 2,
       indicador_monto_gravado: '1', // los precios del formulario excluyen ITBIS
@@ -159,7 +189,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
       const items: FacturaItemInput[] = lineas.map((l, i) => ({
         numero_linea: i + 1,
         nombre_item: l.nombre,
-        indicador_facturacion: indicadorFacturacion(l.itbis),
+        indicador_facturacion: indicadorFacturacion(l.gravado),
         indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
         cantidad: l.cant,
         unidad_medida: '43',
@@ -205,23 +235,27 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
             <div className="form-grid">
               <div className="field full">
                 <label>Cliente <span className="req">*</span></label>
-                {!cliente ? (
-                  <div className="input row between" style={{ cursor: 'pointer', color: 'var(--text-3)' }} onClick={() => setClienteOpen(true)}>
-                    <span className="row gap-sm"><Icon name="user-plus" size={15} />Buscar cliente…</span>
-                    <Icon name="chevron-down" size={15} />
-                  </div>
-                ) : (
-                  <div className="input row between" style={{ cursor: 'pointer', height: 'auto', padding: '8px 11px' }} onClick={() => setClienteOpen(true)}>
-                    <span className="row gap-sm"><Avatar name={cliente.nombre} size={28} /><span className="col"><span className="fw6 text-sm">{cliente.nombre}</span><span className="text-xs muted mono">{cliente.doc || 'sin RNC'}</span></span></span>
-                    <Icon name="chevron-down" size={15} />
-                  </div>
-                )}
+                <ClientCombobox value={cliente} onChange={setCliente} />
               </div>
               <div className="field">
                 <label>Tipo de comprobante</label>
                 <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value as TipoEcf)}>
                   {tipos.map((t) => <option key={t.code} value={t.code}>e-CF {t.code} · {t.n}</option>)}
                 </select>
+              </div>
+              <div className="field">
+                <label>e-NCF a asignar</label>
+                <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+                  <Icon name="hash" size={15} style={{ color: 'var(--text-3)' }} />
+                  {stats.loading ? (
+                    <span className="text-sm muted">Cargando…</span>
+                  ) : proximoNcf ? (
+                    <span className="mono fw6">{proximoNcf}</span>
+                  ) : (
+                    <span className="text-sm muted-3">{stats.error ? 'No disponible' : 'Sin secuencia'}</span>
+                  )}
+                </div>
+                <div className="text-xs muted-3" style={{ marginTop: 4 }}>Próximo en la secuencia; el backend lo confirma al emitir.</div>
               </div>
               <div className="field">
                 <label>Método de pago</label>
@@ -240,7 +274,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
                   <tr>
                     <th style={{ minWidth: 200 }}>Descripción</th><th className="num" style={{ width: 80 }}>Cant.</th>
                     <th className="num" style={{ width: 120 }}>Precio</th><th className="num" style={{ width: 80 }}>Desc%</th>
-                    <th className="num" style={{ width: 70 }}>ITBIS</th><th className="num" style={{ width: 120 }}>Importe</th><th style={{ width: 40 }}></th>
+                    <th style={{ width: 124 }}>ITBIS</th><th className="num" style={{ width: 120 }}>Importe</th><th style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,7 +284,12 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
                       <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 64 }} type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
                       <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
                       <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 64 }} type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} /></td>
-                      <td className="num muted">{l.itbis}%</td>
+                      <td>
+                        <div className="row gap-sm" style={{ alignItems: 'center' }}>
+                          <Switch on={l.gravado} onChange={(v) => setGravado(l.id, v)} />
+                          <span className="text-xs muted">{l.gravado ? '18%' : 'Exento'}</span>
+                        </div>
+                      </td>
                       <td className="num fw6"><Money value={calc(l).base} cur={false} /></td>
                       <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
                     </tr>
@@ -296,40 +335,29 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
         </div>
       </div>
 
-      {clienteOpen && (
-        <Modal title="Seleccionar cliente" sub="Clientes registrados en el sistema" icon="users" onClose={() => setClienteOpen(false)}
-          footer={<><Btn variant="ghost" onClick={() => setClienteOpen(false)}>Cancelar</Btn></>}>
-          {clients.loading ? (
+      {prodPicker && (
+        <Modal title="Agregar producto o servicio" icon="package" onClose={() => setProdPicker(false)}>
+          <div className="search-input mb-md" style={{ width: '100%' }}>
+            <Icon name="search" />
+            <input placeholder="Buscar en el catálogo…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
+          </div>
+          {productos.loading ? (
             <div className="row" style={{ justifyContent: 'center', padding: 28 }}><Spinner /></div>
-          ) : clients.error ? (
-            <div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: 'var(--danger)' }}>{clients.error}</span></div>
+          ) : productos.error ? (
+            <div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: 'var(--danger)' }}>{productos.error}</span></div>
+          ) : catalogoFiltrado.length === 0 ? (
+            <div className="state" style={{ padding: 28 }}><span className="text-sm muted">{catalogo.length === 0 ? 'No hay productos en el catálogo.' : 'Sin resultados.'}</span></div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
-              {clientesApi.length === 0 && <div className="state" style={{ padding: 28 }}><span className="text-sm muted">No hay clientes.</span></div>}
-              {clientesApi.map((c) => (
-                <div key={c.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => { setCliente(c); setClienteOpen(false) }}>
-                  <Avatar name={c.nombre} size={30} />
-                  <div style={{ flex: 1 }}><div className="fw6 text-sm">{c.nombre}</div><div className="text-xs muted mono">{c.tipo}: {c.doc || '—'}</div></div>
+              {catalogoFiltrado.map((p) => (
+                <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
+                  <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
+                  <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div></div>
+                  <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
                 </div>
               ))}
             </div>
           )}
-        </Modal>
-      )}
-
-      {prodPicker && (
-        <Modal title="Agregar producto o servicio" icon="package" onClose={() => setProdPicker(false)}>
-          <div className="search-input mb-md" style={{ width: '100%' }}><Icon name="search" /><input placeholder="Buscar en el catálogo…" autoFocus /></div>
-          <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
-            {D.productos.map((p) => (
-              <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
-                <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
-                <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku} · {p.cat}</div></div>
-                <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs muted-3 mt-sm">Catálogo local (sin endpoint de productos en la API).</div>
         </Modal>
       )}
     </div>

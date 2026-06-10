@@ -2,7 +2,7 @@
 // RNC/Cédula en formato · ITBIS 18% · RD$ (DOP). Solo para el prototipo.
 import { fmt, fmt0, colorFor } from '@/lib/format'
 import type {
-  Empresa, EmpresaItem, Usuario, Cliente, Producto, Factura, FacturaLinea,
+  Empresa, EmpresaItem, Usuario, Cliente, Factura, FacturaLinea,
   EcfTipo, DgiiColaItem, Gasto, Proveedor, Actividad, Notificacion, VentaMes,
   TopCliente, Kpis, UsuarioRow, Rol,
 } from '@/types/domain'
@@ -40,16 +40,7 @@ const clientes: Cliente[] = [
   { id: 'cl10', nombre: 'Clínica Dental Sonrisa', contacto: 'Dra. Patricia Vargas', tipo: 'RNC', doc: '1-32-30019-1', email: 'citas@sonrisa.do', tel: '(829) 855-9012', ciudad: 'Santo Domingo', balance: 0, facturas: 15, estado: 'Al día', desde: 'Oct 2023' },
 ]
 
-const productos: Producto[] = [
-  { id: 'p1', sku: 'ALM-0451', nombre: 'Aceite Vegetal 1 Gal', cat: 'Alimentos', tipo: 'Producto', precio: 485.0, costo: 360.0, stock: 240, min: 50, itbis: 18, estado: 'Disponible' },
-  { id: 'p2', sku: 'ALM-0892', nombre: 'Arroz Selecto 25 lb', cat: 'Alimentos', tipo: 'Producto', precio: 1250.0, costo: 980.0, stock: 18, min: 40, itbis: 0, estado: 'Bajo' },
-  { id: 'p3', sku: 'LIM-1120', nombre: 'Detergente Industrial 5 Gal', cat: 'Limpieza', tipo: 'Producto', precio: 1890.0, costo: 1420.0, stock: 76, min: 20, itbis: 18, estado: 'Disponible' },
-  { id: 'p4', sku: 'BEB-0310', nombre: 'Agua Purificada 5 Gal', cat: 'Bebidas', tipo: 'Producto', precio: 95.0, costo: 55.0, stock: 0, min: 100, itbis: 18, estado: 'Agotado' },
-  { id: 'p5', sku: 'SRV-2001', nombre: 'Servicio de Entrega a Domicilio', cat: 'Servicios', tipo: 'Servicio', precio: 350.0, costo: 0, stock: null, min: null, itbis: 18, estado: 'Disponible' },
-  { id: 'p6', sku: 'PAP-0540', nombre: 'Papel Higiénico x12', cat: 'Hogar', tipo: 'Producto', precio: 420.0, costo: 310.0, stock: 156, min: 60, itbis: 18, estado: 'Disponible' },
-  { id: 'p7', sku: 'BEB-0455', nombre: 'Café Molido 1 lb', cat: 'Bebidas', tipo: 'Producto', precio: 580.0, costo: 430.0, stock: 34, min: 50, itbis: 18, estado: 'Bajo' },
-  { id: 'p8', sku: 'SRV-2014', nombre: 'Mantenimiento de Equipos', cat: 'Servicios', tipo: 'Servicio', precio: 2500.0, costo: 0, stock: null, min: null, itbis: 18, estado: 'Disponible' },
-]
+// Catálogo de productos: ahora vive en la API (GET /api/products), ya no en mock.
 
 const facturas: Factura[] = [
   { id: 'f1', ncf: 'E310000000148', tipo: '31', cliente: 'Constructora Del Este', clienteId: 'cl3', rnc: '1-31-02914-7', fecha: '28 May 2026', vence: '27 Jun 2026', subtotal: 476525.42, itbis: 85774.58, total: 562300.0, estado: 'Emitida', dgii: 'Aceptado', metodo: 'Crédito 30 días' },
@@ -184,7 +175,7 @@ const roles: Rol[] = [
 
 export const DATA = {
   fmt, fmt0, colorFor,
-  empresa, empresas, usuario, clientes, productos, facturas, facturaDetalle,
+  empresa, empresas, usuario, clientes, facturas, facturaDetalle,
   ecfTipos, dgiiCola, gastos, proveedores, actividad, notificaciones,
   ventasMes, topClientes, kpis, usuarios, roles,
 }

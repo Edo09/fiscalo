@@ -1,6 +1,6 @@
 // Conversión de filas de la API a los tipos de dominio de la UI.
-import type { ClientRow, EstadoDgii, FacturaRow, UserRow } from './types'
-import type { Cliente, Factura, UsuarioRow } from '@/types/domain'
+import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, UserRow } from './types'
+import type { Cliente, Factura, Producto, UsuarioRow } from '@/types/domain'
 import { colorFor } from '@/lib/format'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
@@ -82,6 +82,38 @@ export function mapUserRow(r: UserRow): UsuarioRow {
   }
 }
 
+/** Mapea una fila de `products` al tipo Producto de la UI. */
+export function mapProductRow(r: ProductRow): Producto {
+  const ind = Number(r.indicador_facturacion ?? 1)
+  // Tasa de ITBIS derivada del indicador: 1=18%, 2=16%, lo demás (3/4/0)=exento.
+  const itbis = ind === 1 ? 18 : ind === 2 ? 16 : 0
+  const tipo = Number(r.indicador_bien_servicio ?? 1) === 2 ? 'Servicio' : 'Producto'
+  const stock = r.stock ?? null
+  const min = r.stock_minimo ?? null
+  const activo = r.activo === undefined || r.activo === null ? true : Boolean(Number(r.activo))
+
+  let estado: string
+  if (!activo) estado = 'Inactivo'
+  else if (stock === null) estado = 'Disponible'
+  else if (stock <= 0) estado = 'Agotado'
+  else if (min != null && stock <= min) estado = 'Bajo'
+  else estado = 'Disponible'
+
+  return {
+    id: String(r.id),
+    sku: r.sku || '',
+    nombre: r.nombre || '—',
+    cat: r.categoria || '—',
+    tipo,
+    precio: Number(r.precio ?? 0),
+    costo: Number(r.costo ?? 0),
+    stock,
+    min,
+    itbis,
+    estado,
+  }
+}
+
 export function mapClientRow(r: ClientRow): Cliente {
   const rnc = (r.rnc ?? '').trim()
   const tipo = rnc.length === 11 ? 'Cédula' : rnc.length === 9 ? 'RNC' : rnc ? 'RNC' : '—'
@@ -89,6 +121,7 @@ export function mapClientRow(r: ClientRow): Cliente {
     id: String(r.id),
     nombre: r.razon_social || r.company_name || r.client_name || '—',
     contacto: r.client_name || '',
+    empresa: r.company_name || r.razon_social || '',
     tipo,
     doc: rnc,
     email: r.email || '',

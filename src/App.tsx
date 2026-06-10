@@ -47,7 +47,6 @@ function AppShell() {
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState(false)
-  const [notif, setNotif] = useState(false)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -124,9 +123,6 @@ function AppShell() {
           onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           onOpenSearch={() => setSearch(true)}
           onOpenMobileNav={() => setMobileNav(true)}
-          notifOpen={notif}
-          onToggleNotif={() => setNotif(!notif)}
-          onCloseNotif={() => setNotif(false)}
         />
         <div className="content">{renderView()}</div>
       </div>

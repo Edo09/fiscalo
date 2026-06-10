@@ -12,6 +12,7 @@ export {
   type DocKind,
 } from './facturas'
 export { listClients } from './clients'
+export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
 export { listUsers } from './users'
 export { getStats } from './stats'
 export { login, logout, type LoginResult } from './auth'
@@ -23,4 +24,4 @@ export {
   getGastoXml,
   createGasto,
 } from './gastos'
-export { formatApiDate, dgiiLabel, isRechazo, formatMonthKey, mapFacturaRow, mapClientRow, mapUserRow } from './mappers'
+export { formatApiDate, dgiiLabel, isRechazo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapUserRow } from './mappers'

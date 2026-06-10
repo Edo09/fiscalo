@@ -46,7 +46,7 @@ export const NAV: NavGroup[] = [
     group: 'Principal',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-      { id: 'notificaciones', label: 'Notificaciones', icon: 'bell', badge: 3, badgeTone: 'danger' },
+      // 'notificaciones' (Centro de notificaciones) oculto hasta implementarlo.
     ],
   },
   {

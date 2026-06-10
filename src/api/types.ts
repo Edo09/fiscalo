@@ -253,6 +253,43 @@ export interface ClientRow {
 }
 
 // ---------------------------------------------------------------------------
+// Productos — tabla `products` (catálogo del tenant)
+// ---------------------------------------------------------------------------
+
+export interface ProductRow {
+  id: number
+  sku?: string | null
+  nombre?: string | null
+  descripcion?: string | null
+  categoria?: string | null
+  /** 1=Bien | 2=Servicio */
+  indicador_bien_servicio?: number | null
+  /** 0=No facturable | 1=ITBIS 18% (gravado) | 2=16% | 3=Tasa cero | 4=Exento */
+  indicador_facturacion?: number | null
+  precio?: number | string | null
+  costo?: number | string | null
+  unidad_medida?: string | null
+  stock?: number | null
+  stock_minimo?: number | null
+  activo?: number | boolean | null
+}
+
+export interface CreateProductInput {
+  nombre: string
+  sku?: string
+  descripcion?: string
+  categoria?: string
+  indicador_bien_servicio?: number
+  indicador_facturacion?: number
+  precio?: number
+  costo?: number
+  unidad_medida?: string
+  stock?: number | null
+  stock_minimo?: number | null
+  activo?: boolean | number
+}
+
+// ---------------------------------------------------------------------------
 // Usuarios — esquema gratexdb.users
 // ---------------------------------------------------------------------------
 

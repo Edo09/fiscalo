@@ -33,6 +33,8 @@ export interface Cliente {
   id: string
   nombre: string
   contacto: string
+  /** Nombre de la empresa (company_name / razón social). */
+  empresa?: string
   tipo: string
   doc: string
   email: string

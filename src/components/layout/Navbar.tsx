@@ -1,5 +1,4 @@
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
-import { NotifPopover } from './NotifPopover'
 import { DATA } from '@/data/mockData'
 import { useSession } from '@/auth/useSession'
 import { clearSession } from '@/auth/session'
@@ -12,13 +11,10 @@ export interface NavbarProps {
   onToggleTheme: () => void
   onOpenSearch: () => void
   onOpenMobileNav: () => void
-  notifOpen: boolean
-  onToggleNotif: () => void
-  onCloseNotif: () => void
 }
 
 export function Navbar({
-  nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav, notifOpen, onToggleNotif, onCloseNotif,
+  nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav,
 }: NavbarProps) {
   const D = DATA
   const { user } = useSession()
@@ -52,10 +48,6 @@ export function Navbar({
         <button className="icon-btn" onClick={onToggleTheme} title="Cambiar tema">
           <Icon name={theme === 'light' ? 'moon' : 'sun'} />
         </button>
-        <div style={{ position: 'relative' }}>
-          <button className="icon-btn" onClick={onToggleNotif}><Icon name="bell" /><span className="dot"></span></button>
-          {notifOpen && <NotifPopover onClose={onCloseNotif} nav={nav} />}
-        </div>
         <span className="navbar-divider"></span>
         <Dropdown align="right" width={220} trigger={
           <div className="user-chip"><Avatar name={userName} color={user ? undefined : D.usuario.color} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
