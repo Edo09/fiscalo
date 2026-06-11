@@ -759,7 +759,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .login-aside-top, .login-aside-mid, .login-aside-foot { position: relative; z-index: 1; }
 
 .login-aside .brand-mark { box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-.login-aside .brand-name { color: #fff; font-size: 20px; }
+.login-aside .brand-name { color: #fff; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.login-aside .brand-name b { font-weight: 900; }
 
 .login-aside-mid { max-width: 420px; }
 .login-ecf-badge {
@@ -813,8 +814,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .login-card { width: 100%; max-width: 372px; }
 .login-brand-mobile { display: none; margin-bottom: 26px; }
 .login-mark { width: 36px; height: 36px; border-radius: 10px; font-size: 18px; }
-.login-brand { display: flex; align-items: center; gap: 10px; }
-.login-brand .brand-icon { height: 40px; width: auto; display: block; flex-shrink: 0; object-fit: contain; }
+.login-brand { display: flex; align-items: center; gap: 11px; }
+.login-brand .brand-icon {
+  width: 64px; height: 64px;
+  padding: 2px;
+  display: block; flex-shrink: 0;
+  object-fit: cover;
+  background: #fff;
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.18);
+}
+.login-card .brand-name { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+.login-card .brand-name b { font-weight: 900; }
+.login-card .login-brand { margin-bottom: 4px; }
 .login-title { font-size: 24px; letter-spacing: -0.02em; margin: 0; }
 .login-sub { font-size: 14px; color: var(--text-2); margin: 7px 0 28px; }
 .login-pass-row { display: flex; align-items: baseline; justify-content: space-between; }

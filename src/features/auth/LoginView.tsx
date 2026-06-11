@@ -116,7 +116,6 @@ export function LoginView() {
             <div className={'field' + (errors.pass ? ' field-error' : '')}>
               <div className="login-pass-row">
                 <label htmlFor="login-pass">Contraseña</label>
-                <a href="#" className="login-forgot" onClick={(e) => e.preventDefault()}>¿Olvidaste tu contraseña?</a>
               </div>
               <div className="login-pass-wrap">
                 <input

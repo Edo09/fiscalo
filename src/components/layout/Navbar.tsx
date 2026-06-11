@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
 import { DATA } from '@/data/mockData'
 import { useSession, clearSession } from '@/stores/auth'
@@ -20,15 +21,24 @@ export function Navbar({
   const userName = user?.name || D.usuario.nombre
   const userEmail = user?.email || D.usuario.email
   const userRole = user?.role || D.usuario.rol
+  const [loggingOut, setLoggingOut] = useState(false)
 
-  // Logout: revoca el token en el backend (best-effort) y limpia la sesión local.
-  // clearSession() notifica a App, que vuelve a mostrar el login.
   const handleLogout = async () => {
+    setLoggingOut(true)
     await logout()
     clearSession()
   }
 
   return (
+    <>
+    {loggingOut && (
+      <div className="overlay" style={{ zIndex: 9999 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+          <span style={{ color: '#fff', fontSize: 14, opacity: 0.85 }}>Cerrando sesión…</span>
+        </div>
+      </div>
+    )}
     <header className="navbar">
       <button className="icon-btn mobile-only" onClick={onOpenMobileNav}><Icon name="menu" /></button>
       <div className="co-switch desktop-only">
@@ -52,13 +62,12 @@ export function Navbar({
           <div className="user-chip"><Avatar name={userName} color={user ? undefined : D.usuario.color} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
         }>
           <div className="menu-label">{userEmail}</div>
-          <MenuItem icon="user">Mi perfil</MenuItem>
-          <MenuItem icon="building-2">Datos de empresa</MenuItem>
           <MenuItem icon="settings" onClick={() => nav('configuracion')}>Configuración</MenuItem>
           <div className="menu-sep"></div>
           <MenuItem icon="log-out" danger onClick={handleLogout}>Cerrar sesión</MenuItem>
         </Dropdown>
       </div>
     </header>
+    </>
   )
 }
