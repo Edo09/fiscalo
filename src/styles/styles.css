@@ -175,8 +175,8 @@ a { color: inherit; text-decoration: none; }
   height: var(--navbar-h);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 12px;
+  gap: 9px;
+  padding: 0 9px 0 20px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   cursor: pointer;
@@ -191,13 +191,23 @@ a { color: inherit; text-decoration: none; }
   box-shadow: var(--sh-sm);
   letter-spacing: -0.02em;
 }
-.brand-name { font-weight: 650; font-size: 15.5px; letter-spacing: -0.02em; }
-.brand-name b { color: var(--accent); font-weight: 650; }
+.brand-name { font-weight: 650; font-size: 18px; letter-spacing: -0.02em; }
+.brand-name b { color: var(--accent); font-weight: 800; }
 
-/* Icono del sidebar (logo sin texto, transparente). El nombre va al lado. */
-/* El PNG trae aire alrededor del icono: márgenes negativos lo compensan para
-   que el dibujo (no el lienzo) llene la cabecera de 56px. */
-.sidebar-brand .brand-icon { height: 72px; width: auto; display: block; flex-shrink: 0; object-fit: contain; margin: -8px -10px -8px -14px; }
+/* Icono del sidebar (logo sin texto) dentro de un cuadro blanco redondeado.
+   `cover` recorta el aire transparente del PNG para que el dibujo llene el cuadro;
+   el padding deja un marco blanco fino alrededor. */
+.sidebar-brand .brand-icon {
+  width: 42px; height: 42px;
+  padding: 3px;
+  display: block; flex-shrink: 0;
+  object-fit: cover;
+  background: #fff;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06), var(--sh-sm);
+  transition: transform 0.15s ease;
+}
+.sidebar-brand:hover .brand-icon { transform: scale(1.06); }
 
 .sidebar-scroll { flex: 1; overflow-y: auto; padding: 10px 10px 20px; }
 .nav-group { margin-bottom: 6px; }
@@ -667,6 +677,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 /* Sidebar: compacto */
 .sidebar.sb-compact { --sidebar-w: 210px; }
+.sidebar.sb-compact .brand-name { font-size: 16.5px; }
+.sidebar.sb-compact .sidebar-brand .brand-icon { width: 38px; height: 38px; border-radius: 10px; }
 .sidebar.sb-compact .nav-item { padding: 5px 9px; font-size: 13px; }
 .sidebar.sb-compact .nav-group-label { padding: 8px 9px 4px; }
 .sidebar.sb-compact .nav-group { margin-bottom: 2px; }
