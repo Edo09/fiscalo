@@ -1,6 +1,6 @@
 // Conversión de filas de la API a los tipos de dominio de la UI.
-import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, UserRow } from './types'
-import type { Cliente, Factura, Producto, UsuarioRow } from '@/types/domain'
+import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserRow } from './types'
+import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { colorFor } from '@/lib/format'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
@@ -113,6 +113,23 @@ export function mapProductRow(r: ProductRow): Producto {
     min,
     itbis,
     estado,
+  }
+}
+
+/** Mapea una fila de `proveedores` al tipo Proveedor de la UI. */
+export function mapProveedorRow(r: ProveedorRow): Proveedor {
+  return {
+    id: String(r.id),
+    nombre: r.nombre || '—',
+    rnc: r.rnc || '',
+    contacto: r.contacto || '',
+    tel: r.telefono || '',
+    correo: r.correo || '',
+    direccion: r.direccion || '',
+    notas: r.notas || '',
+    activo: r.activo === undefined || r.activo === null ? true : Boolean(Number(r.activo)),
+    compras: Number(r.compras ?? 0),
+    balance: 0, // sin cuentas por pagar en el backend (aún)
   }
 }
 

@@ -5,6 +5,8 @@ import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { CATEGORIA_TIPOS, CATEGORIA_LABEL, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
+import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
+import type { Proveedor } from '@/types/domain'
 
 interface Linea {
   id: number
@@ -25,8 +27,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   onCreated: (g: GastoRow) => void
 }) {
   const [tipo, setTipo] = useState<GastoTipo>(CATEGORIA_TIPOS[categoria][0])
-  const [rnc, setRnc] = useState('')
-  const [nombre, setNombre] = useState('')
+  const [proveedor, setProveedor] = useState<Proveedor | null>(null)
   const [ncf, setNcf] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [conProveedor, setConProveedor] = useState(false)
@@ -61,20 +62,20 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     // Gastos menores (E43): proveedor enteramente opcional (el e-CF 43 se emite
     // sin comprador y el backend pone fecha y etiqueta por defecto).
     if (esCompra) {
-      if (!nombre.trim()) { setError('Indica el nombre del proveedor.'); return }
-      if (!rnc.trim()) { setError('Indica el RNC/Cédula del proveedor.'); return }
+      if (!proveedor) { setError('Selecciona un proveedor del directorio o crea uno nuevo.'); return }
+      if (!proveedor.rnc) { setError('El proveedor seleccionado no tiene RNC; complétalo en Proveedores.'); return }
       if (recibido && !ncf.trim()) { setError(`El tipo ${tipo} es recibido: digita el NCF que entregó el proveedor.`); return }
     }
     const items = lineas.filter((l) => l.description.trim() && l.amount > 0)
     if (items.length === 0) { setError('Agrega al menos una línea con descripción e importe.'); return }
 
     // En gastos menores el proveedor solo viaja si el usuario activó la sección.
-    const incluirProveedor = esCompra || conProveedor
+    const incluirProveedor = (esCompra || conProveedor) && proveedor != null
     const payload: CreateGastoInput = {
       categoria,
       tipo_gasto: tipo,
-      rnc_proveedor: incluirProveedor ? rnc.trim() : '',
-      nombre_proveedor: incluirProveedor ? nombre.trim() : '',
+      rnc_proveedor: incluirProveedor && proveedor ? proveedor.rnc : '',
+      nombre_proveedor: incluirProveedor && proveedor ? proveedor.nombre : '',
       items: items.map<GastoItemInput>((l) => ({
         description: l.description.trim(),
         amount: l.amount,
@@ -171,27 +172,17 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
               </div>
             </div>
             {conProveedor && (
-              <>
-                <div className="field">
-                  <label>RNC / Cédula proveedor <span className="opt">(opcional)</span></label>
-                  <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
-                </div>
-                <div className="field">
-                  <label>Nombre proveedor <span className="opt">(opcional)</span></label>
-                  <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
-                </div>
-              </>
+              <div className="field full">
+                <label>Proveedor <span className="opt">(busca o crea uno)</span></label>
+                <ProveedorCombobox value={proveedor} onChange={setProveedor} />
+              </div>
             )}
           </>
         ) : (
           <>
-            <div className="field">
-              <label>RNC / Cédula proveedor <span className="req">*</span></label>
-              <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
-            </div>
-            <div className="field">
-              <label>Nombre proveedor <span className="req">*</span></label>
-              <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
+            <div className="field full">
+              <label>Proveedor <span className="req">*</span></label>
+              <ProveedorCombobox value={proveedor} onChange={setProveedor} />
             </div>
 
             {recibido ? (

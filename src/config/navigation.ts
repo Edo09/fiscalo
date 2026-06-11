@@ -1,5 +1,5 @@
 // Navegación de la aplicación: vistas, grupos del sidebar y títulos.
-import type { Factura, EcfTipo } from '@/types/domain'
+import type { Factura, EcfTipo, FacturaPrefill } from '@/types/domain'
 
 export type ViewId =
   | 'dashboard'
@@ -8,6 +8,7 @@ export type ViewId =
   | 'factura-nueva'
   | 'factura-ver'
   | 'recurrentes'
+  | 'cotizaciones'
   | 'clientes'
   | 'productos'
   | 'ecf'
@@ -21,7 +22,12 @@ export type ViewId =
   | 'usuarios'
   | 'configuracion'
 
-export type NavPayload = Factura | EcfTipo | null
+export type NavPayload = Factura | EcfTipo | FacturaPrefill | null
+
+/** ¿El payload es un borrador de factura (conversión de cotización)? */
+export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
+  return p != null && (p as FacturaPrefill).kind === 'factura-prefill'
+}
 
 /** Cambia de vista, con un payload opcional (factura, tipo e-CF…). */
 export type Nav = (view: ViewId, payload?: NavPayload) => void
@@ -53,6 +59,7 @@ export const NAV: NavGroup[] = [
     group: 'Ventas',
     items: [
       { id: 'facturas', label: 'Facturación', icon: 'file-text' },
+      { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus' },
       { id: 'clientes', label: 'Clientes', icon: 'users' },
       { id: 'productos', label: 'Productos y servicios', icon: 'package' },
     ],
@@ -95,6 +102,7 @@ export const TITLES: Record<ViewId, string> = {
   'factura-nueva': 'Nueva factura',
   'factura-ver': 'Factura',
   recurrentes: 'Recurrentes',
+  cotizaciones: 'Cotizaciones',
   clientes: 'Clientes',
   productos: 'Productos',
   ecf: 'e-CF',

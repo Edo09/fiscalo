@@ -1,10 +1,15 @@
 // Servicio: clientes.
-import { getList, request, qs } from './http'
+import { getJson, getList, request, qs } from './http'
 import type { ClientRow, ListParams, ListResult } from './types'
 
 export function listClients(params: ListParams = {}): Promise<ListResult<ClientRow>> {
   const query = qs({ page: params.page, pageSize: params.pageSize, query: params.query })
   return getList<ClientRow>(`/api/clients${query}`)
+}
+
+/** Detalle de un cliente (registro completo: RNC, dirección, correo…). */
+export function getClient(id: number | string): Promise<ClientRow> {
+  return getJson<ClientRow>(`/api/clients${qs({ id })}`)
 }
 
 /** Actualiza un cliente (PUT con id en el cuerpo, igual que products). */

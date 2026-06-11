@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Card, Modal, PageHead, Spinner } from '@/components/ui'
+import { Icon, Btn, Money, Card, Modal, PageHead, Spinner, Switch } from '@/components/ui'
 import {
-  ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats,
-  listProducts, mapProductRow, formatApiDate, dgiiLabel,
+  ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats, getClient,
+  listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel,
 } from '@/api'
 import type {
   CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
@@ -14,7 +14,7 @@ import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
-import type { Cliente, Producto, Factura } from '@/types/domain'
+import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
 
 interface Linea {
   id: number
@@ -58,18 +58,54 @@ function nextENcf(tipo: TipoEcf, secuencias?: StatsSecuencia[]): string | null {
   return `E${tipo}${String(next).padStart(10, '0')}`
 }
 
-/* FISCALO — Crear factura (emite contra POST /api/facturas) */
-export function InvoiceFormView({ nav }: { nav: Nav }) {
+/* FISCALO — Crear factura (emite contra POST /api/facturas).
+   `prefill` permite llegar con cliente y líneas precargados (ej. al convertir
+   una cotización); todo sigue siendo editable antes de emitir. */
+export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: FacturaPrefill | null }) {
   const queryClient = useQueryClient()
   const { user } = useSession()
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [cliente, setCliente] = useState<Cliente | null>(() =>
+    prefill && prefill.clienteId
+      ? {
+          id: prefill.clienteId, nombre: prefill.clienteNombre || `Cliente #${prefill.clienteId}`,
+          contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
+          balance: 0, facturas: 0, estado: '', desde: '',
+        }
+      : null,
+  )
   const [tipo, setTipo] = useState<TipoEcf>('32')
   const [metodo, setMetodo] = useState('Efectivo')
   const [obs, setObs] = useState('')
-  const [lineas, setLineas] = useState<Linea[]>([])
+  // ¿Los precios de las líneas YA incluyen ITBIS? Las cotizaciones se cotizan
+  // con impuesto incluido, así que al convertir arranca en true (editable).
+  // Mapea a indicador_monto_gravado: true => "0" (incluido), false => "1" (excluido).
+  const [precioConItbis, setPrecioConItbis] = useState(prefill != null)
+  const [lineas, setLineas] = useState<Linea[]>(() =>
+    (prefill?.lineas ?? []).map((l, i) => ({
+      id: i + 1, prodId: '', nombre: l.nombre, cant: l.cantidad, precio: l.precio,
+      // La cotización no distingue ITBIS: por defecto gravado 18%, editable por línea.
+      desc: 0, indFact: 1, tipoItem: 'Bien',
+    })),
+  )
   const [prodPicker, setProdPicker] = useState(false)
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+
+  // El prefill (cotización) solo trae id + nombre del cliente: se busca el
+  // registro completo para que la ficha muestre el RNC real (E31 lo requiere).
+  const prefillClientId = prefill?.clienteId ? Number(prefill.clienteId) : null
+  const clienteEnriquecido = useRef(false)
+  const clienteDetalle = useApiQuery(
+    ['clients', 'detail', prefillClientId],
+    () => (prefillClientId ? getClient(prefillClientId) : Promise.resolve(null)),
+  )
+  useEffect(() => {
+    const row = clienteDetalle.data
+    if (!clienteEnriquecido.current && row && cliente && String(row.id) === cliente.id) {
+      clienteEnriquecido.current = true
+      setCliente(mapClientRow(row))
+    }
+  }, [clienteDetalle.data, cliente])
 
   // Secuencias e-CF del ambiente activo, para mostrar el próximo e-NCF a usar.
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
@@ -100,8 +136,14 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
   const delLinea = (id: number) => setLineas(lineas.filter((l) => l.id !== id))
 
   const calc = (l: Linea) => {
-    const base = l.cant * l.precio * (1 - l.desc / 100)
-    return { base, itbis: base * itbisRate(l.indFact) }
+    const bruto = l.cant * l.precio * (1 - l.desc / 100)
+    const rate = itbisRate(l.indFact)
+    if (precioConItbis) {
+      // Precio con ITBIS incluido: se desglosa la base (bruto / 1.18) y el impuesto.
+      const base = bruto / (1 + rate)
+      return { base, itbis: bruto - base, importe: bruto }
+    }
+    return { base: bruto, itbis: bruto * rate, importe: bruto }
   }
   const subtotal = lineas.reduce((a, l) => a + calc(l).base, 0)
   const itbisTotal = lineas.reduce((a, l) => a + calc(l).itbis, 0)
@@ -145,7 +187,8 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
       user_id: user?.id ?? DEFAULT_USER_ID,
       tipo_ecf: tipo,
       tipo_pago: metodo === 'Efectivo' ? 1 : 2,
-      indicador_monto_gravado: '1', // los precios del formulario excluyen ITBIS
+      // "0" = el precio incluye ITBIS (DGII lo desglosa); "1" = se suma al precio.
+      indicador_monto_gravado: precioConItbis ? '0' : '1',
       items,
     }
   }
@@ -233,6 +276,16 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
         }
       />
 
+      {prefill?.origen && (
+        <div className="card card-pad row gap-sm" style={{ marginBottom: 14, background: 'var(--info-soft)', borderColor: 'transparent', color: 'var(--info)' }}>
+          <Icon name="file-plus" size={16} />
+          <span className="fw6 text-sm">Convertida desde la cotización {prefill.origen}.</span>
+          <span className="text-sm" style={{ opacity: 0.85 }}>
+            Los precios vienen con ITBIS incluido (se desglosa, no se suma). Edita líneas, tipo e ITBIS libremente antes de emitir.
+          </span>
+        </div>
+      )}
+
       <div className="dash-grid">
         <div className="col gap-md">
           <Card title="Datos del comprobante">
@@ -267,6 +320,17 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
                   {metodos.map((m) => <option key={m}>{m}</option>)}
                 </select>
               </div>
+              <div className="field full">
+                <span className="row gap-sm" style={{ alignItems: 'center', cursor: 'pointer' }} onClick={() => setPrecioConItbis(!precioConItbis)}>
+                  <Switch on={precioConItbis} onChange={setPrecioConItbis} />
+                  <span className="text-sm">Los precios incluyen ITBIS</span>
+                </span>
+                <div className="text-xs muted-3" style={{ marginTop: 4 }}>
+                  {precioConItbis
+                    ? 'El ITBIS se desglosa del precio de cada línea (no se suma encima).'
+                    : 'El ITBIS se calcula y se suma encima del precio de cada línea.'}
+                </div>
+              </div>
             </div>
           </Card>
 
@@ -297,7 +361,7 @@ export function InvoiceFormView({ nav }: { nav: Nav }) {
                           {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </td>
-                      <td className="num fw6"><Money value={calc(l).base} cur={false} /></td>
+                      <td className="num fw6"><Money value={calc(l).importe} cur={false} /></td>
                       <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
                     </tr>
                   ))}
