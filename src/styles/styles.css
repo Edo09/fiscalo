@@ -199,7 +199,7 @@ a { color: inherit; text-decoration: none; }
    el padding deja un marco blanco fino alrededor. */
 .sidebar-brand .brand-icon {
   width: 42px; height: 42px;
-  padding: 3px;
+  padding: 1px;
   display: block; flex-shrink: 0;
   object-fit: cover;
   background: #fff;
