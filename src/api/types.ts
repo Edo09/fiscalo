@@ -336,6 +336,77 @@ export interface CreateProductInput {
 }
 
 // ---------------------------------------------------------------------------
+// Cotizaciones — tablas `cotizaciones` / `cotizacion_items`
+// ---------------------------------------------------------------------------
+
+export interface CotizacionItemRow {
+  id?: number
+  cotizacion_id?: number
+  description?: string | null
+  amount?: number | string | null
+  quantity?: number | string | null
+  subtotal?: number | string | null
+}
+
+export interface CotizacionRow {
+  id: number
+  /** Código único generado por el backend (ej. 48213AB). */
+  code?: string | null
+  date?: string | null
+  client_id?: number | null
+  client_name?: string | null
+  total?: number | string | null
+  /** Resumen: descripciones de los ítems unidas (lo arma el backend). */
+  description?: string | null
+  items?: CotizacionItemRow[]
+}
+
+export interface CotizacionItemInput {
+  description: string
+  amount: number
+  quantity: number
+}
+
+export interface CreateCotizacionInput {
+  client_id: number
+  items: CotizacionItemInput[]
+  total: number
+  date?: string
+  user_id?: number
+  /** true => el backend envía la cotización por correo al cliente. */
+  sent_email?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Proveedores — tabla `proveedores` (directorio del tenant)
+// ---------------------------------------------------------------------------
+
+export interface ProveedorRow {
+  id: number
+  rnc?: string | null
+  nombre?: string | null
+  contacto?: string | null
+  telefono?: string | null
+  correo?: string | null
+  direccion?: string | null
+  notas?: string | null
+  activo?: number | boolean | null
+  /** Derivado: cantidad de gastos/compras asociados al RNC. */
+  compras?: number | string | null
+}
+
+export interface CreateProveedorInput {
+  nombre: string
+  rnc?: string
+  contacto?: string
+  telefono?: string
+  correo?: string
+  direccion?: string
+  notas?: string
+  activo?: boolean | number
+}
+
+// ---------------------------------------------------------------------------
 // Usuarios — esquema gratexdb.users
 // ---------------------------------------------------------------------------
 

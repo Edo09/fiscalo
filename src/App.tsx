@@ -12,6 +12,7 @@ import { EcfDashboardView } from '@/features/ecf/EcfDashboardView'
 import { EcfTypeView } from '@/features/ecf/EcfTypeView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
+import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { ProductsView } from '@/features/products/ProductsView'
 import { ExpensesView } from '@/features/expenses/ExpensesView'
 import { PurchasesView } from '@/features/purchases/PurchasesView'
@@ -23,7 +24,7 @@ import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
 import { useSession } from '@/stores/auth'
-import type { Nav, NavPayload, ViewId } from '@/config/navigation'
+import { isFacturaPrefill, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -87,9 +88,10 @@ function AppShell() {
     switch (view) {
       case 'dashboard': return <DashboardView nav={nav} variant={THEME.dashLayout === 'enfoque' ? 'focus' : 'balanced'} />
       case 'facturas': return <InvoiceListView nav={nav} />
-      case 'factura-nueva': return <InvoiceFormView nav={nav} />
+      case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'recurrentes': return <RecurringView nav={nav} />
+      case 'cotizaciones': return <CotizacionesView nav={nav} />
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'ecf': return <EcfDashboardView nav={nav} />

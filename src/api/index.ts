@@ -11,8 +11,18 @@ export {
   getDocumentBase64,
   type DocKind,
 } from './facturas'
-export { listClients, updateClient, deleteClient } from './clients'
+export { listClients, getClient, updateClient, deleteClient } from './clients'
+export {
+  listCotizaciones,
+  getCotizacion,
+  createCotizacion,
+  updateCotizacion,
+  deleteCotizacion,
+  getCotizacionPdf,
+  previewCotizacion,
+} from './cotizaciones'
 export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
+export { listProveedores, getProveedor, createProveedor, updateProveedor, deleteProveedor } from './proveedores'
 export { listUsers } from './users'
 export { getStats } from './stats'
 export { login, logout, type LoginResult } from './auth'
@@ -24,4 +34,4 @@ export {
   getGastoXml,
   createGasto,
 } from './gastos'
-export { formatApiDate, dgiiLabel, isRechazo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapUserRow } from './mappers'
+export { formatApiDate, dgiiLabel, isRechazo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProveedorRow, mapUserRow } from './mappers'

@@ -127,6 +127,17 @@ export interface Gasto {
   estado: string
 }
 
+/** Borrador para precargar el formulario de factura (ej. convertir una cotización). */
+export interface FacturaPrefill {
+  kind: 'factura-prefill'
+  /** Vacío si el documento de origen no tenía cliente. */
+  clienteId: string
+  clienteNombre: string
+  /** Código del documento de origen (ej. cotización) — informativo. */
+  origen?: string
+  lineas: { nombre: string; cantidad: number; precio: number }[]
+}
+
 export interface Proveedor {
   id: string
   nombre: string
@@ -135,6 +146,10 @@ export interface Proveedor {
   tel: string
   balance: number
   compras: number
+  correo?: string
+  direccion?: string
+  notas?: string
+  activo?: boolean
 }
 
 export interface Actividad {
