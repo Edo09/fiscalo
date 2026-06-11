@@ -534,3 +534,36 @@ export interface GastoStatsData {
   secuencias: GastoStatsSecuencia[]
   ambiente_activo: string
 }
+
+// ---------------------------------------------------------------------------
+// Emisor — GET /api/emisor (datos fiscales del emisor; solo lectura)
+// ---------------------------------------------------------------------------
+
+export interface EmisorData {
+  rnc: string
+  razon_social: string
+  nombre_comercial?: string | null
+  sucursal?: string | null
+  direccion?: string | null
+  municipio?: string | null
+  provincia?: string | null
+  telefono?: string | null
+  correo?: string | null
+  website?: string | null
+  actividad_economica?: string | null
+  fecha_vencimiento_secuencia?: string | null
+  ambiente: string
+  fuente?: string
+}
+
+// ---------------------------------------------------------------------------
+// Branding — /api/branding (plantilla PDF, acento y logo del tenant)
+// ---------------------------------------------------------------------------
+
+export interface BrandingData {
+  template: string
+  accent_color: string | null
+  logo_path: string | null
+  has_custom_logo: boolean
+  available_templates: string[]
+}
