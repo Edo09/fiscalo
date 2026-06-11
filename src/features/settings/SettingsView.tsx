@@ -15,9 +15,9 @@ const AMBIENTES: Record<string, string> = {
   testecf: 'Pruebas (TesteCF)',
 }
 
-function initials(name?: string | null): string {
-  return (name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '—'
-}
+// function initials(name?: string | null): string {
+//   return (name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '—'
+// }
 
 export function SettingsView() {
   const queryClient = useQueryClient()
@@ -87,7 +87,9 @@ export function SettingsView() {
                 <>
                   <div className="row gap-md mb-lg" style={{ alignItems: 'center' }}>
                     <input ref={fileRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={(e) => void onLogoPick(e)} />
-                    <div className="brand-mark" style={{ width: 56, height: 56, fontSize: 22 }}>{initials(emisor.razon_social)}</div>
+                    {branding?.has_custom_logo && branding?.logo_path ? (
+                      <img src={branding.logo_path} alt="Logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
+                    ) : null}
                     <Btn variant="secondary" size="sm" icon="upload" onClick={() => fileRef.current?.click()} disabled={logoBusy}>
                       {branding?.has_custom_logo ? 'Cambiar logo' : 'Subir logo'}
                     </Btn>
