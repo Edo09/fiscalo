@@ -4,7 +4,7 @@ import { Icon, Btn, Money, Modal, Badge, Checkbox } from '@/components/ui'
 import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { CATEGORIA_TIPOS, CATEGORIA_LABEL, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
+import { CATEGORIA_TIPOS, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import type { Proveedor } from '@/types/domain'
 
@@ -40,11 +40,13 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const esCompra = categoria === 'facturas_proveedores'
   const esGastoMenor = !esCompra
 
-  // Próximo NCF E43 (informativo): misma query cacheada que la página de Gastos;
+  // Próximo NCF (informativo): misma query cacheada que la página de Gastos;
   // se invalida al crear, así que siempre refleja la secuencia vigente.
   const stats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
   const seqE43 = stats.data?.secuencias.find((s) => s.type === 'E43')
   const proximoNcf = seqE43 != null ? `E43${String(seqE43.secuencia_actual + 1).padStart(10, '0')}` : null
+  const seqCompra = (!recibido && esCompra) ? stats.data?.secuencias.find((s) => s.type === tipo) : undefined
+  const proximoNcfCompra = seqCompra != null ? `${tipo}${String(seqCompra.secuencia_actual + 1).padStart(10, '0')}` : null
 
   const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0 }])
   const delLinea = (id: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
@@ -125,13 +127,6 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
 
       <div className="form-grid">
         <div className="field">
-          <label>Categoría</label>
-          <div className="input row gap-sm" style={{ color: 'var(--text-2)', alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
-            <Icon name={esCompra ? 'shopping-cart' : 'receipt'} size={14} />
-            <span className="text-sm">{CATEGORIA_LABEL[categoria]}</span>
-          </div>
-        </div>
-        <div className="field">
           <label>Tipo de comprobante</label>
           {tiposPermitidos.length === 1 ? (
             <div className="input row gap-sm" style={{ color: 'var(--text-2)', alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
@@ -146,20 +141,42 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         </div>
 
         {esGastoMenor ? (
-          <>
-            <div className="field">
-              <label>NCF a asignar</label>
-              <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
-                <Icon name="hash" size={14} style={{ color: 'var(--text-3)' }} />
-                {stats.loading ? (
-                  <span className="text-sm muted">Cargando…</span>
-                ) : proximoNcf ? (
-                  <span className="mono fw6">{proximoNcf}</span>
-                ) : (
-                  <span className="text-sm muted-3">Sin secuencia E43</span>
-                )}
-              </div>
+          <div className="field">
+            <label>NCF a asignar</label>
+            <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+              <Icon name="hash" size={14} style={{ color: 'var(--text-3)' }} />
+              {stats.loading ? (
+                <span className="text-sm muted">Cargando…</span>
+              ) : proximoNcf ? (
+                <span className="mono fw6">{proximoNcf}</span>
+              ) : (
+                <span className="text-sm muted-3">Sin secuencia E43</span>
+              )}
             </div>
+          </div>
+        ) : recibido ? (
+          <div className="field">
+            <label>NCF del proveedor <span className="req">*</span></label>
+            <input className="input mono" value={ncf} onChange={(e) => setNcf(e.target.value)} placeholder="E310000000123" />
+          </div>
+        ) : (
+          <div className="field">
+            <label>NCF a asignar</label>
+            <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
+              <Icon name="hash" size={14} style={{ color: 'var(--text-3)' }} />
+              {stats.loading ? (
+                <span className="text-sm muted">Cargando…</span>
+              ) : proximoNcfCompra ? (
+                <span className="mono fw6">{proximoNcfCompra}</span>
+              ) : (
+                <span className="text-sm muted-3">Sin secuencia {tipo}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {esGastoMenor ? (
+          <>
             <div className="field">
               <label>Proveedor</label>
               <div
@@ -184,24 +201,12 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
               <label>Proveedor <span className="req">*</span></label>
               <ProveedorCombobox value={proveedor} onChange={setProveedor} />
             </div>
-
-            {recibido ? (
+            {recibido && (
               <div className="field">
-                <label>NCF del proveedor <span className="req">*</span></label>
-                <input className="input mono" value={ncf} onChange={(e) => setNcf(e.target.value)} placeholder="E310000000123" />
-              </div>
-            ) : (
-              <div className="field">
-                <label>NCF</label>
-                <div className="input row gap-sm" style={{ color: 'var(--text-3)', alignItems: 'center' }}>
-                  <Icon name="shield-check" size={14} /><span className="text-sm">Lo asigna el sistema (auto-emisión)</span>
-                </div>
+                <label>Fecha</label>
+                <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
               </div>
             )}
-            <div className="field">
-              <label>Fecha</label>
-              <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
           </>
         )}
       </div>

@@ -22,7 +22,7 @@ export const GASTO_TIPOS: Record<GastoTipo, GastoTipoDef> = {
 
 export const CATEGORIA_TIPOS: Record<GastoCategoria, GastoTipo[]> = {
   gastos_menores: ['E43'],
-  facturas_proveedores: ['E41', 'E47', 'E31', 'B01', 'E33', 'E34'],
+  facturas_proveedores: ['E41', 'E47', 'E33', 'E34'],
 }
 
 export const CATEGORIA_LABEL: Record<GastoCategoria, string> = {
