@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, EstadoBadge, Drawer, Spinner } from '@/components/ui'
-import { ApiError, getGasto, getGastoEstado, getGastoXml } from '@/api'
+import { ApiError, getGasto, getGastoEstado, getGastoXml, isRechazo } from '@/api'
 import type { GastoRow } from '@/api'
 import { downloadBlob } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -9,6 +10,7 @@ import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/co
 
 /* FISCALO — Detalle de un gasto (líneas + estado DGII + XML) */
 export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose: () => void }) {
+  const queryClient = useQueryClient()
   const { data, loading, reload } = useApiQuery(['gastos', 'detail', gasto.id], () => getGasto(gasto.id))
   const g = data ?? gasto
   const items = g.items ?? []
@@ -59,6 +61,16 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
   }
 
   const estadoActual = estado ?? g.estado_dgii
+
+  const prevEstadoRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (estadoActual && estadoActual !== prevEstadoRef.current) {
+      prevEstadoRef.current = estadoActual
+      if (isRechazo(estadoActual)) {
+        void queryClient.invalidateQueries({ queryKey: ['gastos', 'stats'] })
+      }
+    }
+  }, [estadoActual, queryClient])
 
   return (
     <Drawer

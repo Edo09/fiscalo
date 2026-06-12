@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/components/ui'
 import {
   ApiError, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
@@ -23,6 +24,7 @@ const IND_FACT_LABEL: Record<number, string> = {
 export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; nav: Nav }) {
   const f = factura
   const id = f?.facturaId ?? null
+  const queryClient = useQueryClient()
 
   const estado = useApiQuery(['facturas', 'estado', id], () => (id != null ? getEstado(id) : Promise.resolve(null)))
   const detalle = useApiQuery(['facturas', 'detail', id], () => (id != null ? getFactura(id) : Promise.resolve(null)))
@@ -43,6 +45,16 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
+
+  const prevEstadoRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (estadoRaw && estadoRaw !== prevEstadoRef.current) {
+      prevEstadoRef.current = estadoRaw
+      if (isRechazo(estadoRaw)) {
+        void queryClient.invalidateQueries({ queryKey: ['facturas', 'stats'] })
+      }
+    }
+  }, [estadoRaw, queryClient])
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.
