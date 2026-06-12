@@ -110,6 +110,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Secuencias e-CF del ambiente activo, para mostrar el próximo e-NCF a usar.
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const proximoNcf = nextENcf(tipo, stats.data?.secuencias)
+  // Capacidad del rango DGII vigente para este tipo (null = sin límite registrado).
+  const seqTipo = stats.data?.secuencias.find((s) => s.type === `E${tipo}`)
+  const rangoRestantes = seqTipo?.restantes != null ? Number(seqTipo.restantes) : null
 
   // Catálogo de productos (GET /api/products) para el selector de líneas.
   // Misma clave que ProductsView => caché compartida, una sola petición.
@@ -312,7 +315,18 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                     <span className="text-sm muted-3">{stats.error ? 'No disponible' : 'Sin secuencia'}</span>
                   )}
                 </div>
-                <div className="text-xs muted-3" style={{ marginTop: 4 }}>Próximo en la secuencia; el backend lo confirma al emitir.</div>
+                {rangoRestantes != null && rangoRestantes <= 10 ? (
+                  <div className="row gap-sm text-xs" style={{ marginTop: 4, color: 'var(--danger)', alignItems: 'center' }}>
+                    <Icon name="alert-triangle" size={13} />
+                    <span>
+                      {rangoRestantes === 0
+                        ? 'Rango DGII agotado: solicita y registra el próximo rango para poder emitir.'
+                        : `Quedan ${rangoRestantes} números en el rango DGII: solicita el próximo.`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-xs muted-3" style={{ marginTop: 4 }}>Próximo en la secuencia; el backend lo confirma al emitir.</div>
+                )}
               </div>
               <div className="field">
                 <label>Método de pago</label>

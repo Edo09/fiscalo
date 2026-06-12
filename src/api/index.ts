@@ -23,6 +23,7 @@ export {
 } from './cotizaciones'
 export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
 export { listProveedores, getProveedor, createProveedor, updateProveedor, deleteProveedor } from './proveedores'
+export { listNcfRangos, registerNcfRango } from './ncf'
 export { listUsers } from './users'
 export { getStats } from './stats'
 export { getEmisor } from './emisor'

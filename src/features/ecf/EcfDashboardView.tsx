@@ -1,13 +1,16 @@
-import { Icon, Btn, Money, Card, Progress, Spinner, ErrorState, PageHead } from '@/components/ui'
-import { getStats } from '@/api'
+import { useState } from 'react'
+import { Icon, Btn, Money, Badge, Card, Progress, Spinner, ErrorState, PageHead } from '@/components/ui'
+import { getStats, formatApiDate } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
+import { RangosNcfModal } from './RangosNcfModal'
 import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Dashboard e-CF (GET /api/facturas/stats) */
 export function EcfDashboardView({ nav }: { nav: Nav }) {
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const d = stats.data
+  const [rangosOpen, setRangosOpen] = useState(false)
 
   const totalAceptados = d?.por_estado.filter((e) => e.estado.includes('ACEPTADO')).reduce((a, e) => a + e.total, 0) ?? 0
   const totalEnProceso = d?.por_estado.filter((e) => e.estado === 'ENVIADO' || e.estado === 'EN_PROCESO').reduce((a, e) => a + e.total, 0) ?? 0
@@ -38,22 +41,26 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
         <ErrorState title="No se pudieron cargar las estadísticas" onRetry={stats.reload}>{stats.error}</ErrorState>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 16 }}>
-            {estados.map((e, i) => (
-              <div className="kpi" key={i} style={{ padding: '13px 15px' }}>
-                <div className="row gap-sm" style={{ marginBottom: 10 }}>
-                  <span className="kpi-ic" style={{ background: e.bg, color: e.color, width: 26, height: 26 }}><Icon name={e.icon} size={14} /></span>
-                  <span className="kpi-label">{e.label}</span>
+          <div className="dash-grid">
+            <div className="col gap-md">
+            {/* KPIs compactos (2x2) al lado de Secuencias: sin franja vacía */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+              {estados.map((e, i) => (
+                <div className="kpi" key={i} style={{ padding: '10px 14px' }}>
+                  <div className="row between" style={{ alignItems: 'center' }}>
+                    <div className="row gap-sm" style={{ alignItems: 'center' }}>
+                      <span className="kpi-ic" style={{ background: e.bg, color: e.color, width: 26, height: 26 }}><Icon name={e.icon} size={14} /></span>
+                      <span className="kpi-label">{e.label}</span>
+                    </div>
+                    <div className="row gap-sm" style={{ alignItems: 'baseline' }}>
+                      <span className="num fw6" style={{ fontSize: 19, letterSpacing: '-0.02em' }}>{stats.loading ? '—' : e.value}</span>
+                      <span className="text-xs muted-3">de {totalEcf}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="row between" style={{ alignItems: 'baseline' }}>
-                  <span className="num fw6" style={{ fontSize: 21, letterSpacing: '-0.02em' }}>{stats.loading ? '—' : e.value}</span>
-                  <span className="text-xs muted-3">de {totalEcf}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="dash-grid" style={{ marginBottom: 16 }}>
             <Card title="Resumen por tipo" sub="Comprobantes emitidos por tipo de e-CF" noPad>
               {stats.loading ? (
                 <div className="row" style={{ justifyContent: 'center', padding: 32 }}><Spinner /></div>
@@ -81,18 +88,52 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
               )}
             </Card>
 
+            <Card title="Tipos de comprobante" sub="Tipos de e-CF habilitados por la DGII" noPad>
+              <div className="tbl-wrap">
+                <table className="tbl">
+                  <thead><tr><th>Código</th><th>Nombre</th><th style={{ width: 40 }}></th></tr></thead>
+                  <tbody>
+                    {ECF_TIPOS.map((t) => (
+                      <tr key={t.code} onClick={() => nav('ecf-tipo', { code: t.code, nombre: t.nombre, emitidos: 0, mes: 0, desc: t.desc })}>
+                        <td><span className="ecf-tag" style={{ fontSize: 12 }}>{t.code}</span></td>
+                        <td><span className="cell-main">{t.nombre}</span><div className="cell-sub">{t.desc}</div></td>
+                        <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            </div>
+
             <div className="col gap-md">
-              <Card title="Secuencias e-NCF">
+              <Card title="Secuencias e-NCF" sub="Rangos autorizados por DGII"
+                actions={<Btn variant="secondary" size="sm" icon="hash" onClick={() => setRangosOpen(true)}>Rangos</Btn>}>
                 {stats.loading ? (
                   <div className="row" style={{ justifyContent: 'center', padding: 16 }}><Spinner /></div>
                 ) : (
                   <div className="col gap-md">
-                    {(d?.secuencias ?? []).map((s) => (
-                      <div key={s.type}>
-                        <div className="row between mb-sm"><span className="text-sm fw5">{s.type} · {s.nombre}</span><span className="text-xs muted-3 num">{s.total_emitidos}</span></div>
-                        <Progress value={Math.min(100, (s.total_emitidos / Math.max(1, s.secuencia_actual)) * 100)} />
-                      </div>
-                    ))}
+                    {(d?.secuencias ?? []).map((s) => {
+                      const restantes = s.restantes != null ? Number(s.restantes) : null
+                      return (
+                        <div key={s.type}>
+                          <div className="row between mb-sm">
+                            <span className="text-sm fw5">{s.type} · {s.nombre}</span>
+                            {restantes != null ? (
+                              <Badge tone={restantes === 0 ? 'danger' : restantes <= 10 ? 'danger' : restantes <= 25 ? 'warning' : 'success'}>
+                                {restantes === 0 ? 'Agotado' : `Quedan ${restantes}`}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs muted-3 num">{s.total_emitidos}</span>
+                            )}
+                          </div>
+                          <Progress value={Math.min(100, (s.total_emitidos / Math.max(1, s.secuencia_actual)) * 100)} />
+                          {s.vencimiento && (
+                            <div className="text-xs muted-3" style={{ marginTop: 3 }}>Rango vence: {formatApiDate(s.vencimiento)}</div>
+                          )}
+                        </div>
+                      )
+                    })}
                     {(d?.secuencias ?? []).length === 0 && <div className="text-sm muted">Sin secuencias registradas.</div>}
                   </div>
                 )}
@@ -103,25 +144,10 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
               </Card>
             </div>
           </div>
-
-          <Card title="Tipos de comprobante" sub="Tipos de e-CF habilitados por la DGII" noPad>
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead><tr><th>Código</th><th>Nombre</th><th style={{ width: 40 }}></th></tr></thead>
-                <tbody>
-                  {ECF_TIPOS.map((t) => (
-                    <tr key={t.code} onClick={() => nav('ecf-tipo', { code: t.code, nombre: t.nombre, emitidos: 0, mes: 0, desc: t.desc })}>
-                      <td><span className="ecf-tag" style={{ fontSize: 12 }}>{t.code}</span></td>
-                      <td><span className="cell-main">{t.nombre}</span><div className="cell-sub">{t.desc}</div></td>
-                      <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
         </>
       )}
+
+      {rangosOpen && <RangosNcfModal onClose={() => setRangosOpen(false)} />}
     </div>
   )
 }
