@@ -68,10 +68,11 @@ export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosL
   const changePageSize = (n: number) => { setPageSize(n); setPage(1) }
   const searching = list.fetching && !list.loading
 
-  const onCreated = () => {
+  const onCreated = (g: GastoRow) => {
     setFormOpen(false)
     // Invalida TODAS las queries de gastos (ambas vistas, otras páginas y stats).
     void queryClient.invalidateQueries({ queryKey: ['gastos'] })
+    setDetail(g)
   }
 
   return (

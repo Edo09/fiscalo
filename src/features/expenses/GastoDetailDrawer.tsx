@@ -43,6 +43,13 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
     }
   }
 
+  useEffect(() => {
+    if (auto) {
+      void consultarEstado()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const descargarXml = async () => {
     setXmlBusy(true)
     setMsg(null)
