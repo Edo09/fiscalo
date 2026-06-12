@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Switch, Badge, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { BrandingSection } from './BrandingSection'
@@ -24,7 +24,6 @@ export function SettingsView() {
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [sec, setSec] = useState('empresa')
-  const [dgiiAuto, setDgiiAuto] = useState(true)
   const [logoBusy, setLogoBusy] = useState(false)
   const [rangosOpen, setRangosOpen] = useState(false)
   const { data: emisor, error, loading, reload } = useApiQuery(['emisor'], getEmisor)
@@ -125,8 +124,6 @@ export function SettingsView() {
                 <ErrorState title="No se pudo cargar la configuración" onRetry={reload}>{error}</ErrorState>
               ) : (
                 <div className="col gap-lg">
-                  <div className="row between"><div><div className="fw6 text-sm">Envío automático a DGII</div><div className="text-xs muted">Transmite los e-CF al emitirlos, sin pasos extra.</div></div><Switch on={dgiiAuto} onChange={setDgiiAuto} /></div>
-                  <div className="divider" style={{ margin: 0 }}></div>
                   <div className="form-grid">
                     <div className="field"><label>Ambiente</label><input className="input" readOnly value={AMBIENTES[emisor?.ambiente ?? ''] ?? emisor?.ambiente ?? '—'} /></div>
                     <div className="field"><label>RNC autorizado</label><input className="input mono" readOnly value={emisor?.rnc ?? '—'} /></div>
