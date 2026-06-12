@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Switch, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Icon, Btn, Switch, Badge, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { BrandingSection } from './BrandingSection'
+import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
 
 /* FISCALO — Configuración */
 
@@ -25,6 +26,7 @@ export function SettingsView() {
   const [sec, setSec] = useState('empresa')
   const [dgiiAuto, setDgiiAuto] = useState(true)
   const [logoBusy, setLogoBusy] = useState(false)
+  const [rangosOpen, setRangosOpen] = useState(false)
   const { data: emisor, error, loading, reload } = useApiQuery(['emisor'], getEmisor)
   const { data: branding } = useApiQuery(['branding'], getBranding)
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
@@ -135,26 +137,40 @@ export function SettingsView() {
             </Card>
           )}
           {sec === 'numeracion' && (
-            <Card title="Numeraciones e-CF" sub="Secuencias autorizadas por la DGII · solo lectura" noPad>
+            <Card title="Numeraciones e-CF" sub="Rangos autorizados por la DGII por tipo de comprobante" noPad
+              actions={<Btn variant="primary" size="sm" icon="hash" onClick={() => setRangosOpen(true)}>Gestionar rangos</Btn>}>
               {stats.loading ? (
                 <LoadingState rows={4} />
               ) : stats.error ? (
                 <ErrorState title="No se pudieron cargar las secuencias" onRetry={stats.reload}>{stats.error}</ErrorState>
               ) : (
                 <table className="tbl">
-                  <thead><tr><th>Tipo</th><th>Próximo e-NCF</th><th className="num">Emitidos</th></tr></thead>
+                  <thead><tr><th>Tipo</th><th>Próximo e-NCF</th><th className="num">Emitidos</th><th className="num">Restantes</th><th>Vence</th></tr></thead>
                   <tbody>
-                    {(stats.data?.secuencias ?? []).map((s) => (
-                      <tr key={s.type} style={{ cursor: 'default' }}>
-                        <td><span className="ecf-tag">{s.type}</span> <span className="text-sm">{s.nombre}</span></td>
-                        {/* secuencia_actual es el último número asignado; el próximo es +1 (10 dígitos). */}
-                        <td className="mono text-sm muted">{s.type}{String((s.secuencia_actual ?? 0) + 1).padStart(10, '0')}</td>
-                        <td className="num fw6">{s.total_emitidos}</td>
-                      </tr>
-                    ))}
+                    {(stats.data?.secuencias ?? []).map((s) => {
+                      const restantes = s.restantes != null ? Number(s.restantes) : null
+                      return (
+                        <tr key={s.type} style={{ cursor: 'pointer' }} onClick={() => setRangosOpen(true)}>
+                          <td><span className="ecf-tag">{s.type}</span> <span className="text-sm">{s.nombre}</span></td>
+                          {/* secuencia_actual es el último número asignado; el próximo es +1 (10 dígitos). */}
+                          <td className="mono text-sm muted">{s.type}{String((s.secuencia_actual ?? 0) + 1).padStart(10, '0')}</td>
+                          <td className="num fw6">{s.total_emitidos}</td>
+                          <td className="num">
+                            {restantes != null ? (
+                              <Badge tone={restantes === 0 ? 'danger' : restantes <= 10 ? 'danger' : restantes <= 25 ? 'warning' : 'success'}>
+                                {restantes === 0 ? 'Agotado' : restantes}
+                              </Badge>
+                            ) : (
+                              <Badge tone="warning">Sin rango</Badge>
+                            )}
+                          </td>
+                          <td className="text-sm muted">{s.vencimiento ? formatApiDate(s.vencimiento) : '—'}</td>
+                        </tr>
+                      )
+                    })}
                     {(stats.data?.secuencias ?? []).length === 0 && (
                       <tr style={{ cursor: 'default' }}>
-                        <td colSpan={3}><div className="text-sm muted" style={{ padding: 20, textAlign: 'center' }}>Sin secuencias registradas.</div></td>
+                        <td colSpan={5}><div className="text-sm muted" style={{ padding: 20, textAlign: 'center' }}>Sin secuencias registradas.</div></td>
                       </tr>
                     )}
                   </tbody>
@@ -165,6 +181,8 @@ export function SettingsView() {
           {sec === 'plantillas' && <BrandingSection />}
         </div>
       </div>
+
+      {rangosOpen && <RangosNcfModal onClose={() => setRangosOpen(false)} />}
     </div>
   )
 }

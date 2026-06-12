@@ -135,7 +135,7 @@ export interface FacturaRow {
   emisor?: EmisorRow | null
 }
 
-/** Configuración del emisor (tabla emisor_config, adjunta al detalle de factura). */
+/** Configuración del emisor (emisor_config; también vía GET /api/emisor). */
 export interface EmisorRow {
   id?: number
   rnc?: string | null
@@ -148,6 +148,10 @@ export interface EmisorRow {
   telefono?: string | null
   correo?: string | null
   website?: string | null
+  /** Solo en GET /api/emisor: ambiente del tenant (testecf | certecf | ecf). */
+  ambiente?: string | null
+  /** Solo en GET /api/emisor: 'emisor_config' o 'tenant' (integración). */
+  fuente?: string
 }
 
 /** esquema gratexdb.factura_items */
@@ -271,6 +275,10 @@ export interface StatsSecuencia {
   nombre: string
   secuencia_actual: number
   total_emitidos: number
+  /** Números disponibles en rangos vigentes; null = sin rango con límite registrado. */
+  restantes?: number | string | null
+  /** Vencimiento del rango vigente que dispensa. */
+  vencimiento?: string | null
 }
 
 export interface StatsData {
@@ -525,6 +533,40 @@ export interface GastoStatsSecuencia {
   secuencia_actual: number
   total_emitidos: number
   nombre: string
+  /** Números disponibles en rangos vigentes; null = sin rango con límite registrado. */
+  restantes?: number | string | null
+  /** Vencimiento del rango vigente que dispensa. */
+  vencimiento?: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Rangos e-NCF autorizados por DGII — /api/ncf/rangos
+// ---------------------------------------------------------------------------
+
+export interface NcfRango {
+  id: number
+  type: string
+  ambiente?: string | null
+  current_value: number | string
+  numero_desde: number | string
+  numero_hasta?: number | string | null
+  fecha_vencimiento?: string | null
+  no_solicitud?: string | null
+  no_autorizacion?: string | null
+  usados?: number | string | null
+  restantes?: number | string | null
+  /** activo | pendiente | agotado | vencido | sin_limite */
+  estado?: string
+}
+
+export interface RegisterRangoInput {
+  type: string
+  numero_desde: number
+  numero_hasta: number
+  /** YYYY-MM-DD */
+  fecha_vencimiento: string
+  no_solicitud?: string
+  no_autorizacion?: string
 }
 export interface GastoStatsData {
   resumen: GastoStatsResumen

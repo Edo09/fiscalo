@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
 import { DATA } from '@/data/mockData'
+import { getEmisor } from '@/api'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession } from '@/stores/auth'
 import { logout } from '@/api/auth'
 import type { Nav } from '@/config/navigation'
@@ -23,6 +25,13 @@ export function Navbar({
   const userRole = user?.role || D.usuario.rol
   const [loggingOut, setLoggingOut] = useState(false)
 
+  // Empresa real del tenant (GET /api/emisor) — misma caché que Configuración.
+  const emisorQ = useApiQuery(['emisor'], getEmisor)
+  const empresaNombre = emisorQ.data?.nombre_comercial || emisorQ.data?.razon_social || ''
+  const empresaIniciales = empresaNombre
+    ? empresaNombre.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+    : '…'
+
   const handleLogout = async () => {
     setLoggingOut(true)
     await logout()
@@ -41,10 +50,9 @@ export function Navbar({
     )}
     <header className="navbar">
       <button className="icon-btn mobile-only" onClick={onOpenMobileNav}><Icon name="menu" /></button>
-      <div className="co-switch desktop-only">
-        <span className="co-logo">DC</span>
-        <span className="nm">{D.empresa.nombre}</span>
-        <Icon name="chevrons-up-down" size={14} style={{ color: 'var(--text-3)' }} />
+      <div className="co-switch desktop-only" style={{ cursor: 'default' }} title={emisorQ.data?.rnc ? `RNC ${emisorQ.data.rnc}` : undefined}>
+        <span className="co-logo">{empresaIniciales}</span>
+        <span className="nm">{emisorQ.loading ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
       </div>
       <div className="navbar-search desktop-only" onClick={onOpenSearch}>
         <Icon name="search" /><span style={{ flex: 1 }}>Buscar facturas, clientes, e-CF…</span>
