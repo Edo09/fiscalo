@@ -134,7 +134,7 @@ function BrandingForm({ branding }: { branding: BrandingData }) {
                   <span className="fw6 text-sm">{info?.label ?? 'A la medida'}</span>
                   {sel && <span style={{ color: 'var(--accent)' }}><Icon name="check-circle" size={16} /></span>}
                 </div>
-                <div className="text-xs muted">{info?.desc ?? `Diseño exclusivo de tu empresa (${t}).`}</div>
+                <div className="text-xs muted">{info?.desc ?? 'Diseño exclusivo de tu empresa, hecho a la medida de tu factura.'}</div>
               </div>
             )
           })}
