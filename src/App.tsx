@@ -10,6 +10,7 @@ import { InvoiceFormView } from '@/features/invoices/InvoiceFormView'
 import { RecurringView } from '@/features/invoices/RecurringView'
 import { EcfDashboardView } from '@/features/ecf/EcfDashboardView'
 import { EcfTypeView } from '@/features/ecf/EcfTypeView'
+import { ApproveEcfView } from '@/features/ecf/ApproveEcfView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
@@ -96,6 +97,7 @@ function AppShell() {
       case 'productos': return <ProductsView />
       case 'ecf': return <EcfDashboardView nav={nav} />
       case 'ecf-tipo': return <EcfTypeView tipo={payload as EcfTipo | null} nav={nav} />
+      case 'aprobar-ecf': return <ApproveEcfView />
       case 'bandeja-dgii': return <DgiiInboxView nav={nav} />
       case 'gastos': return <ExpensesView />
       case 'compras': return <PurchasesView />

@@ -13,6 +13,7 @@ export type ViewId =
   | 'productos'
   | 'ecf'
   | 'ecf-tipo'
+  | 'aprobar-ecf'
   | 'bandeja-dgii'
   | 'gastos'
   | 'compras'
@@ -77,6 +78,7 @@ export const NAV: NavGroup[] = [
     group: 'Fiscal · DGII',
     items: [
       { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check' },
+      { id: 'aprobar-ecf', label: 'Aprobar e-CF', icon: 'check-circle' },
       { id: 'bandeja-dgii', label: 'Bandeja DGII', icon: 'inbox' },
     ],
   },
@@ -107,6 +109,7 @@ export const TITLES: Record<ViewId, string> = {
   productos: 'Productos',
   ecf: 'e-CF',
   'ecf-tipo': 'Tipo e-CF',
+  'aprobar-ecf': 'Aprobar e-CF',
   'bandeja-dgii': 'Bandeja DGII',
   gastos: 'Gastos',
   compras: 'Compras',

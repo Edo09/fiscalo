@@ -13,7 +13,7 @@ import { GastoFormModal } from './GastoFormModal'
 import { GastoDetailDrawer } from './GastoDetailDrawer'
 
 const PAGE_SIZES = [10, 25, 50]
-const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_DEBOUNCE_MS = 500
 
 export interface GastosListadoProps {
   categoria: GastoCategoria

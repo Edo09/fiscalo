@@ -7,6 +7,9 @@ import './styles/styles.css'
 // Capa "Bold": restyle global (sidebar ink, tipografía display, KPIs, login).
 // Debe importarse DESPUÉS de styles.css: gana por cascada.
 import './styles/bold.css'
+// Capa responsive: adapta el layout a tablet/móvil/teléfono. Va al final para
+// ganar por cascada sobre el layout base de escritorio.
+import './styles/responsive.css'
 // Para usar el tema "Editorial / Esmeralda", descomenta la siguiente línea:
 // import './styles/styles-v2.css'
 

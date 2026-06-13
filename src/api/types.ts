@@ -612,6 +612,64 @@ export interface EmisorData {
 }
 
 // ---------------------------------------------------------------------------
+// e-CF recibidos + aprobación comercial
+//   GET  /api/ecf/recepcion            -> e-CF que otros emisores te enviaron
+//   POST /api/aprobaciones-comerciales -> apruebas/rechazas uno (ACECF a DGII)
+// Ver docs/aprobacion-comercial-recibidos.md.
+// ---------------------------------------------------------------------------
+
+/** Fila de un e-CF que otro emisor te envió (GET /api/ecf/recepcion). */
+export interface EcfRecibidoRow {
+  track_id: string
+  tipo_ecf: string
+  e_ncf: string
+  rnc_emisor: string
+  razon_social_emisor: string | null
+  rnc_comprador: string | null
+  monto_total: number | string | null
+  fecha_emision: string | null
+  /** Estado TÉCNICO de recepción (firma): ENVIADO/ACEPTADO/EN_PROCESO/RECHAZADO. */
+  estado: string | null
+  ambiente: string | null
+  /** Tu decisión COMERCIAL enviada a DGII: ACEPTADO/RECHAZADO; null = pendiente. */
+  aprobacion_comercial: string | null
+  aprobacion_comercial_codigo_dgii?: string | null
+  aprobacion_comercial_estado_dgii?: string | null
+  /** 1 = DGII procesó tu aprobación; 0 = no procesada (mismatch/error). */
+  aprobacion_comercial_procesada?: number | string | null
+  aprobacion_comercial_fecha?: string | null
+}
+
+/** El endpoint de recepción pagina por page/pageSize (sin búsqueda server-side). */
+export type EcfRecibidoListParams = ListParams
+
+/** Cuerpo de POST /api/aprobaciones-comerciales (aprobar/rechazar un recibido). */
+export interface AprobacionComercialInput {
+  rnc_emisor: string
+  e_ncf: string
+  fecha_emision: string
+  monto_total: string | number
+  /** '1' = Aceptado, '2' = Rechazado. */
+  estado: '1' | '2'
+  /** Obligatorio si estado='2'. */
+  detalle_motivo?: string
+  /** Override de ambiente (testecf|certecf|ecf); por defecto el del e-CF recibido. */
+  ambiente?: string
+}
+
+export interface AprobacionComercialResponse {
+  rnc_emisor: string
+  e_ncf: string
+  estado_aprobacion: string
+  track_id: string | null
+  estado_dgii: string | null
+  codigo_seguridad: string | null
+  ambiente: string | null
+  fecha_envio: string | null
+  dgii_response?: unknown
+}
+
+// ---------------------------------------------------------------------------
 // Branding — /api/branding (plantilla PDF, acento y logo del tenant)
 // ---------------------------------------------------------------------------
 

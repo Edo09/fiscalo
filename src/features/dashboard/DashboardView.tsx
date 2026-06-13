@@ -112,7 +112,7 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
         <>
           {/* 6 KPIs en 3×2 + tarjeta ITBIS del mes al lado */}
           <div className="dash-grid" style={{ marginBottom: 16 }}>
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+            <div className="kpi-grid kpi-cols-3">
               {stats.loading
                 ? <div className="card card-pad row" style={{ justifyContent: 'center', gridColumn: '1 / -1' }}><Spinner /></div>
                 : kpiDefs.map((k, i) => <KPI key={i} {...k} />)}
@@ -192,7 +192,7 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
             </Card>
           </div>
 
-          <div className="dash-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="grid-2">
             <Card
               title="Últimas facturas"
               actions={<Btn variant="ghost" size="sm" iconRight="arrow-right" onClick={() => nav('facturas')}>Ver todas</Btn>}

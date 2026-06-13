@@ -136,8 +136,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     }])
     setProdPicker(false)
   }
+  // Línea libre: una descripción sin producto del catálogo (como en un gasto).
+  // El usuario escribe descripción, cantidad y precio; default gravado 18% / Unidad.
+  const addLineaLibre = () =>
+    setLineas([...lineas, {
+      id: Date.now(), prodId: '', nombre: '', cant: 1,
+      precio: 0, desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
+    }])
   const updLinea = (id: number, key: keyof Linea, val: number) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
+  const setNombre = (id: number, nombre: string) =>
+    setLineas(lineas.map((l) => (l.id === id ? { ...l, nombre } : l)))
   const setIndFact = (id: number, indFact: IndicadorFacturacion) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, indFact } : l)))
   const setUnidad = (id: number, unidadMedida: number) =>
@@ -175,6 +184,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     }
     if (lineas.length === 0) {
       toast.error('Agrega al menos un producto o servicio.')
+      return null
+    }
+    if (lineas.some((l) => l.nombre.trim() === '')) {
+      toast.error('Cada línea necesita una descripción.')
       return null
     }
     if (tipo === '33' || tipo === '34') {
@@ -244,6 +257,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const previsualizar = async () => {
     if (!cliente) { toast.error('Selecciona un cliente para la vista previa.'); return }
     if (lineas.length === 0) { toast.error('Agrega al menos un ítem.'); return }
+    if (lineas.some((l) => l.nombre.trim() === '')) { toast.error('Cada línea necesita una descripción.'); return }
     setPreviewing(true)
     const tid = toast.loading('Generando vista previa…')
     try {
@@ -355,7 +369,12 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           </Card>
 
           <Card title="Productos y servicios" noPad
-            actions={<Btn variant="secondary" size="sm" icon="plus" onClick={() => setProdPicker(true)}>Agregar línea</Btn>}>
+            actions={
+              <div className="row gap-sm">
+                <Btn variant="secondary" size="sm" icon="package" onClick={() => setProdPicker(true)}>Producto</Btn>
+                <Btn variant="secondary" size="sm" icon="file-plus" onClick={addLineaLibre}>Descripción</Btn>
+              </div>
+            }>
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead>
@@ -369,7 +388,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                 <tbody>
                   {lineas.map((l) => (
                     <tr key={l.id} style={{ cursor: 'default' }}>
-                      <td><span className="cell-main">{l.nombre}</span><div className="cell-sub">{l.tipoItem}</div></td>
+                      <td className="cell-input">
+                        <textarea
+                          className="input line-input"
+                          value={l.nombre}
+                          placeholder="Descripción del ítem"
+                          rows={2}
+                          onChange={(e) => setNombre(l.id, e.target.value)}
+                          style={{ height: 'auto', minHeight: 34, resize: 'vertical', lineHeight: 1.35 }}
+                        />
+                        {l.prodId !== '' && <div className="cell-sub">{l.tipoItem}</div>}
+                      </td>
                       <td className="cell-input"><input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
                       <td className="cell-input"><UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} /></td>
                       <td className="cell-input"><input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
@@ -388,13 +417,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                     </tr>
                   ))}
                   {lineas.length === 0 && (
-                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm muted">Sin líneas. Agrega un producto o servicio.</span></div></td></tr>
+                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm muted">Sin líneas. Agrega un producto del catálogo o una descripción libre.</span></div></td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="card-pad" style={{ borderTop: '1px solid var(--border)' }}>
-              <Btn variant="ghost" size="sm" icon="plus" onClick={() => setProdPicker(true)}>Agregar producto</Btn>
+            <div className="card-pad row gap-sm" style={{ borderTop: '1px solid var(--border)' }}>
+              <Btn variant="ghost" size="sm" icon="package" onClick={() => setProdPicker(true)}>Agregar producto</Btn>
+              <Btn variant="ghost" size="sm" icon="file-plus" onClick={addLineaLibre}>Agregar descripción</Btn>
             </div>
           </Card>
 

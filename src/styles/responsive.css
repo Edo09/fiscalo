@@ -1,0 +1,136 @@
+/* ============================================================
+   FISCALO — Capa responsive (única fuente de verdad)
+   Se carga DESPUÉS de styles.css + bold.css: gana por cascada.
+
+   El layout base es de escritorio; aquí se adapta a pantallas chicas.
+   Sistema de breakpoints:
+     ≤1024px  tablet  — dashboards de 2 columnas pasan a 1; chrome más ajustado
+     ≤860px   móvil / tablet-vertical — sidebar → drawer + hamburguesa, todo 1 col
+     ≤560px   teléfono — espaciado/tipografía compactos, controles full-width,
+                          targets táctiles y antizoom de iOS en inputs
+   La estética (colores, sombras, radios) NO cambia: solo tamaños y disposición.
+   ============================================================ */
+
+/* ============================================================
+   TABLET — ≤1024px
+   ============================================================ */
+@media (max-width: 1024px) {
+  /* Tableros de dos paneles → una sola columna apilada.
+     minmax(0,1fr) (en vez de 1fr) deja que la columna se encoja por debajo del
+     min-content de sus hijos: así una tabla ancha hace scroll dentro de su
+     .tbl-wrap en vez de ensanchar la rejilla y desbordar la página. */
+  .dash-grid,
+  .dash-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .grid-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* Refuerzo: los ítems de rejilla/flex pueden encogerse (min-width:auto -> 0). */
+  .dash-grid > *, .dash-grid-3 > *, .dash-grid .col { min-width: 0; }
+
+  .page { padding: 22px 22px 56px; }
+
+  /* Una columna sticky pierde sentido apilada: que fluya con el contenido. */
+  .dash-grid > .col[style*="sticky"] { position: static !important; }
+}
+
+/* ============================================================
+   MÓVIL / TABLET-VERTICAL — ≤860px
+   ============================================================ */
+@media (max-width: 860px) {
+  /* ---- Sidebar como drawer deslizable ----
+     App.tsx alterna .mobile-open (panel) y .sidebar-backdrop.show (fondo). */
+  .sidebar {
+    position: fixed; top: 0; left: 0; z-index: 110;
+    transform: translateX(-100%);
+    box-shadow: var(--sh-lg);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar-backdrop.show {
+    display: block; position: fixed; inset: 0;
+    background: rgba(0, 0, 0, .45); z-index: 105;
+  }
+
+  /* ---- Navbar: hamburguesa/búsqueda móvil visibles, chrome de escritorio oculto ---- */
+  .mobile-only { display: inline-grid; }
+  .desktop-only { display: none; }
+  .navbar { padding: 0 12px; gap: 8px; }
+
+  /* ---- Todo a una columna (minmax(0,1fr): hijos anchos hacen scroll, no desbordan) ---- */
+  .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .grid-2 > *, .grid-3 > * { min-width: 0; }
+
+  .page { padding: 16px 14px 56px; }
+  .user-chip { padding: 4px; }
+
+  /* Configuración: el nav lateral pasa a una fila de pestañas scrollable arriba. */
+  .settings-layout { grid-template-columns: 1fr; gap: 14px; }
+  .settings-nav { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; }
+  .settings-nav .nav-item { white-space: nowrap; flex-shrink: 0; }
+}
+
+/* ============================================================
+   TELÉFONO — ≤560px
+   ============================================================ */
+@media (max-width: 560px) {
+  /* ---- Espaciado y encabezados de página ---- */
+  .page { padding: 14px 12px 48px; }
+  .page-head { gap: 12px; margin-bottom: 18px; }
+  .page-title { font-size: 20px; }
+  .page-sub { font-size: 13px; }
+
+  /* Acciones de página: ocupan toda la fila y los botones crecen para repartirse. */
+  .page-head .page-actions { width: 100%; }
+  .page-head .page-actions .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* ---- KPIs: dos por fila (tarjetas más anchas para que entren montos largos) ---- */
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi-cols-3 { grid-template-columns: 1fr 1fr; }
+  .kpi-value { font-size: 19px; }
+
+  /* ---- Tarjetas y tablas: celdas más ajustadas (la tabla sigue con scroll-x) ---- */
+  .card-pad { padding: 14px; }
+  /* El encabezado de tarjeta envuelve sus acciones a una segunda línea si no caben
+     (p.ej. "Producto"/"Descripción" en la tabla de líneas de factura). */
+  .card-head { padding: 12px 14px; flex-wrap: wrap; row-gap: 8px; }
+  .tbl thead th { padding: 9px 10px; }
+  .tbl tbody td { padding: 9px 10px; }
+
+  /* ---- Toolbar: buscador a todo el ancho; filtros se reparten debajo ---- */
+  .toolbar { gap: 8px; }
+  .toolbar .search-input { flex: 1 1 100%; min-width: 0; }
+  .toolbar .select,
+  .toolbar .filter-chip { flex: 1 1 auto; }
+
+  /* ---- Formularios ----
+     font-size ≥16px evita el zoom automático de iOS Safari al enfocar un input. */
+  .input, .select, .textarea { font-size: 16px; padding: 10px 12px; }
+
+  /* ---- Targets táctiles ---- */
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 34px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .navbar .icon-btn .lucide { width: 20px; height: 20px; }
+
+  /* ---- Modal: hoja casi a pantalla completa ---- */
+  .overlay { padding: 12px; }
+  .modal { max-height: 94vh; border-radius: var(--r-lg); }
+  .modal-head { padding: 16px; }
+  .modal-body { padding: 16px; }
+  .modal-foot { padding: 12px 16px; flex-wrap: wrap; }
+  .modal-foot .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* ---- Drawer: pie con botones repartidos ---- */
+  .drawer-foot { flex-wrap: wrap; }
+  .drawer-foot .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* ---- Control segmentado: a todo el ancho, repartido ---- */
+  .seg { display: flex; width: 100%; }
+  .seg button { flex: 1; }
+
+  /* ---- Gráficos ---- */
+  .bars { height: 150px; }
+  .chart-tip { min-width: 150px; }
+  .donut-wrap { flex-wrap: wrap; justify-content: center; }
+
+  /* ---- Dropdown: no más ancho que la pantalla ---- */
+  .menu { max-width: calc(100vw - 24px); }
+}

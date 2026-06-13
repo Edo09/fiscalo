@@ -71,8 +71,8 @@ export function SettingsView() {
   return (
     <div className="page page-wide">
       <PageHead title="Configuración" sub="Ajustes generales y fiscales del sistema" />
-      <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr', gap: 20, alignItems: 'start' }}>
-        <div className="card" style={{ padding: 8 }}>
+      <div className="settings-layout">
+        <div className="card settings-nav" style={{ padding: 8 }}>
           {secs.map((s) => (
             <div key={s.id} className={'nav-item' + (sec === s.id ? ' active' : '')} onClick={() => setSec(s.id)}><Icon name={s.ic} size={17} />{s.label}</div>
           ))}

@@ -7,7 +7,7 @@ import type { FacturaEstadoUi } from '@/stores/facturasList'
 import type { Nav } from '@/config/navigation'
 
 const PAGE_SIZES = [10, 25, 50]
-const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_DEBOUNCE_MS = 500
 
 // Filtros server-side: estado (?estado=) y tipo e-CF (?tipo_ecf=). 'todos' => sin filtro.
 const ESTADO_OPCIONES: { value: FacturaEstadoUi; label: string }[] = [
@@ -113,7 +113,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
           onSubmit={(e) => { e.preventDefault(); submitSearch() }}
         >
           <Icon name={searching ? 'loader' : 'search'} className={searching ? 'spin' : undefined} />
-          <input placeholder="Buscar por e-NCF, cliente…" value={input} onChange={(e) => setInput(e.target.value)} />
+          <input placeholder="Buscar por e-NCF, cliente, artículo…" value={input} onChange={(e) => setInput(e.target.value)} />
         </form>
         {query && (
           <button type="button" className="filter-chip" onClick={clearSearch}>
