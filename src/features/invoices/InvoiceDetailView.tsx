@@ -31,6 +31,19 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
 
   const [docBusy, setDocBusy] = useState<DocKind | null>(null)
 
+  // Si el estado DGII pasa a un rechazo, refrescar los stats (la secuencia pudo
+  // liberarse). Hooks ANTES del early return (rules-of-hooks).
+  const prevEstadoRef = useRef<string | null>(null)
+  useEffect(() => {
+    const raw = estado.data?.estado_dgii ?? f?.estadoDgiiRaw ?? null
+    if (raw && raw !== prevEstadoRef.current) {
+      prevEstadoRef.current = raw
+      if (isRechazo(raw)) {
+        void queryClient.invalidateQueries({ queryKey: ['facturas', 'stats'] })
+      }
+    }
+  }, [estado.data, f, queryClient])
+
   if (!f) {
     return (
       <div className="page">
@@ -45,16 +58,6 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
-
-  const prevEstadoRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (estadoRaw && estadoRaw !== prevEstadoRef.current) {
-      prevEstadoRef.current = estadoRaw
-      if (isRechazo(estadoRaw)) {
-        void queryClient.invalidateQueries({ queryKey: ['facturas', 'stats'] })
-      }
-    }
-  }, [estadoRaw, queryClient])
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.

@@ -10,6 +10,7 @@ import type {
   CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
+import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
@@ -25,6 +26,8 @@ interface Linea {
   desc: number
   /** Indicador de facturación DGII (1=18%, 2=16%, 3=tasa cero, 4=exento). */
   indFact: IndicadorFacturacion
+  /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
+  unidadMedida: number
   tipoItem: 'Bien' | 'Servicio'
 }
 
@@ -83,8 +86,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const [lineas, setLineas] = useState<Linea[]>(() =>
     (prefill?.lineas ?? []).map((l, i) => ({
       id: i + 1, prodId: '', nombre: l.nombre, cant: l.cantidad, precio: l.precio,
-      // La cotización no distingue ITBIS: por defecto gravado 18%, editable por línea.
-      desc: 0, indFact: 1, tipoItem: 'Bien',
+      // La cotización no distingue ITBIS ni unidad: default gravado 18% / Unidad (43).
+      desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
     })),
   )
   const [prodPicker, setProdPicker] = useState(false)
@@ -126,8 +129,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const addLinea = (p: Producto) => {
     setLineas([...lineas, {
       id: Date.now(), prodId: p.id, nombre: p.nombre, cant: 1,
-      // El producto define el indicador por defecto según su tasa de ITBIS.
+      // El producto define el indicador y la unidad por defecto.
       precio: p.precio, desc: 0, indFact: indFactFromItbis(p.itbis),
+      unidadMedida: p.unidadMedida || 43,
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
     setProdPicker(false)
@@ -136,6 +140,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     setLineas(lineas.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
   const setIndFact = (id: number, indFact: IndicadorFacturacion) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, indFact } : l)))
+  const setUnidad = (id: number, unidadMedida: number) =>
+    setLineas(lineas.map((l) => (l.id === id ? { ...l, unidadMedida } : l)))
   const delLinea = (id: number) => setLineas(lineas.filter((l) => l.id !== id))
 
   const calc = (l: Linea) => {
@@ -181,7 +187,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       indicador_facturacion: l.indFact,
       indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
       cantidad: l.cant,
-      unidad_medida: '43',
+      unidad_medida: String(l.unidadMedida),
       precio_unitario: l.precio,
     }))
     return {
@@ -247,7 +253,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         indicador_facturacion: l.indFact,
         indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
         cantidad: l.cant,
-        unidad_medida: '43',
+        unidad_medida: String(l.unidadMedida),
         precio_unitario: l.precio,
       }))
       const doc = await previewFactura({ client_id: Number(cliente.id), tipo_ecf: tipo, items })
@@ -354,9 +360,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 180 }}>Descripción</th><th className="num" style={{ width: 84 }}>Cant.</th>
-                    <th className="num" style={{ width: 116 }}>Precio</th><th className="num" style={{ width: 84 }}>Desc%</th>
-                    <th style={{ width: 150 }}>ITBIS</th><th className="num" style={{ width: 116 }}>Importe</th><th style={{ width: 40 }}></th>
+                    <th style={{ minWidth: 160 }}>Descripción</th><th className="num" style={{ width: 76 }}>Cant.</th>
+                    <th style={{ width: 150 }}>Unidad</th>
+                    <th className="num" style={{ width: 110 }}>Precio</th><th className="num" style={{ width: 76 }}>Desc%</th>
+                    <th style={{ width: 130 }}>ITBIS</th><th className="num" style={{ width: 110 }}>Importe</th><th style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -364,6 +371,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                     <tr key={l.id} style={{ cursor: 'default' }}>
                       <td><span className="cell-main">{l.nombre}</span><div className="cell-sub">{l.tipoItem}</div></td>
                       <td className="cell-input"><input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
+                      <td className="cell-input"><UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} /></td>
                       <td className="cell-input"><input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
                       <td className="cell-input"><input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} /></td>
                       <td className="cell-input">
@@ -380,7 +388,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                     </tr>
                   ))}
                   {lineas.length === 0 && (
-                    <tr style={{ cursor: 'default' }}><td colSpan={7}><div className="state" style={{ padding: 28 }}><span className="text-sm muted">Sin líneas. Agrega un producto o servicio.</span></div></td></tr>
+                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm muted">Sin líneas. Agrega un producto o servicio.</span></div></td></tr>
                   )}
                 </tbody>
               </table>

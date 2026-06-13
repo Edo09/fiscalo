@@ -441,6 +441,19 @@ export interface GastoItemInput {
   quantity?: number
   subtotal?: number
   itbis_amount?: number
+  /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
+  unidad_medida?: string
+}
+
+// ---------------------------------------------------------------------------
+// Unidades de medida — catálogo DGII (/api/unidades-medida)
+// ---------------------------------------------------------------------------
+
+/** `id` = código numérico DGII (va en el XML); codigo/descripcion para mostrar. */
+export interface UnidadMedida {
+  id: number
+  codigo: string
+  descripcion: string
 }
 
 export interface CreateGastoInput {

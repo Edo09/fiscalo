@@ -6,6 +6,7 @@ import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoT
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { CATEGORIA_TIPOS, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
+import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import type { Proveedor } from '@/types/domain'
 
 interface Linea {
@@ -14,6 +15,8 @@ interface Linea {
   amount: number
   quantity: number
   itbis_amount: number
+  /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
+  unidad_medida: number
 }
 
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -31,7 +34,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const [ncf, setNcf] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [conProveedor, setConProveedor] = useState(false)
-  const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0 }])
+  const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -48,7 +51,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const seqCompra = (!recibido && esCompra) ? stats.data?.secuencias.find((s) => s.type === tipo) : undefined
   const proximoNcfCompra = seqCompra != null ? `${tipo}${String(seqCompra.secuencia_actual + 1).padStart(10, '0')}` : null
 
-  const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0 }])
+  const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
   const delLinea = (id: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
   const updLinea = (id: number, key: keyof Linea, val: string | number) =>
     setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
@@ -83,6 +86,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         amount: l.amount,
         quantity: l.quantity,
         itbis_amount: l.itbis_amount,
+        unidad_medida: String(l.unidad_medida),
       })),
     }
     if (esCompra) payload.fecha = fecha
@@ -219,10 +223,11 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         <table className="tbl">
           <thead>
             <tr>
-              <th style={{ minWidth: 180 }}>Descripción</th>
-              <th className="num" style={{ width: 70 }}>Cant.</th>
-              <th className="num" style={{ width: 110 }}>Importe</th>
-              <th className="num" style={{ width: 100 }}>ITBIS</th>
+              <th style={{ minWidth: 150 }}>Descripción</th>
+              <th className="num" style={{ width: 64 }}>Cant.</th>
+              <th style={{ width: 140 }}>Unidad</th>
+              <th className="num" style={{ width: 104 }}>Importe</th>
+              <th className="num" style={{ width: 96 }}>ITBIS</th>
               <th style={{ width: 36 }}></th>
             </tr>
           </thead>
@@ -230,7 +235,8 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
             {lineas.map((l) => (
               <tr key={l.id} style={{ cursor: 'default' }}>
                 <td><input className="input" style={{ padding: '5px 8px' }} value={l.description} onChange={(e) => updLinea(l.id, 'description', e.target.value)} placeholder="Concepto…" /></td>
-                <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 58 }} type="number" value={l.quantity} onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)} /></td>
+                <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 56 }} type="number" value={l.quantity} onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)} /></td>
+                <td><UnidadMedidaSelect style={{ padding: '5px 8px' }} value={l.unidad_medida} onChange={(v) => updLinea(l.id, 'unidad_medida', v)} /></td>
                 <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} /></td>
                 <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.itbis_amount} onChange={(e) => updLinea(l.id, 'itbis_amount', +e.target.value || 0)} /></td>
                 <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>

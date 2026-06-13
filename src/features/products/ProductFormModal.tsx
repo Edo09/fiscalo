@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
+import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { ApiError, createProduct, updateProduct, deleteProduct } from '@/api'
 import type { Producto } from '@/types/domain'
 
@@ -22,6 +23,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
   const [categoria, setCategoria] = useState(product && product.cat !== '—' ? product.cat : '')
   const [tipo, setTipo] = useState<'Bien' | 'Servicio'>(product?.tipo === 'Servicio' ? 'Servicio' : 'Bien')
   const [gravado, setGravado] = useState(product ? product.itbis > 0 : true)
+  const [unidadMedida, setUnidadMedida] = useState(product?.unidadMedida || 43)
   const [precio, setPrecio] = useState(product ? String(product.precio) : '')
   const [costo, setCosto] = useState(product ? String(product.costo) : '')
   const [stock, setStock] = useState(product?.stock != null ? String(product.stock) : '')
@@ -43,6 +45,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
       categoria: categoria.trim() || undefined,
       indicador_bien_servicio: tipo === 'Servicio' ? 2 : 1,
       indicador_facturacion: gravado ? 1 : 4, // 1=gravado 18%, 4=exento
+      unidad_medida: String(unidadMedida),
       precio: Number(precio) || 0,
       costo: Number(costo) || 0,
       stock: tipo === 'Servicio' || stock === '' ? null : Number(stock),
@@ -133,6 +136,10 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
             <Switch on={gravado} onChange={setGravado} />
             <span className="text-sm muted">{gravado ? 'Gravado 18%' : 'Exento'}</span>
           </div>
+        </div>
+        <div className="field">
+          <label className="label">Unidad de medida</label>
+          <UnidadMedidaSelect value={unidadMedida} onChange={setUnidadMedida} />
         </div>
         <div className="field">
           <label className="label">Precio (RD$)</label>

@@ -112,6 +112,7 @@ export function mapProductRow(r: ProductRow): Producto {
     stock,
     min,
     itbis,
+    unidadMedida: Number(r.unidad_medida ?? 43) || 43,
     estado,
   }
 }

@@ -57,6 +57,8 @@ export interface Producto {
   stock: number | null
   min: number | null
   itbis: number
+  /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
+  unidadMedida: number
   estado: string
 }
 
