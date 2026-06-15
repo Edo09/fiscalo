@@ -23,11 +23,19 @@ export type ViewId =
   | 'usuarios'
   | 'configuracion'
 
-export type NavPayload = Factura | EcfTipo | FacturaPrefill | null
+/** Señal del botón "Nueva" del navbar: abre el formulario de alta al llegar a la vista. */
+export interface NuevoSignal { kind: 'nuevo' }
+
+export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
   return p != null && (p as FacturaPrefill).kind === 'factura-prefill'
+}
+
+/** ¿El payload pide abrir el formulario de "nuevo" (desde el botón Nueva)? */
+export function isNuevoSignal(p: NavPayload): p is NuevoSignal {
+  return p != null && (p as NuevoSignal).kind === 'nuevo'
 }
 
 /** Cambia de vista, con un payload opcional (factura, tipo e-CF…). */

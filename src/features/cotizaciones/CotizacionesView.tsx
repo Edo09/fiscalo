@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
 import { ApiError, listCotizaciones, getCotizacionPdf, formatApiDate } from '@/api'
 import type { CotizacionRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -29,11 +29,12 @@ function toFacturaPrefill(c: CotizacionRow): FacturaPrefill {
 }
 
 /* FISCALO — Cotizaciones (GET /api/cotizaciones) */
-export function CotizacionesView({ nav }: { nav: Nav }) {
+export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?: boolean }) {
   const [page, setPage] = useState(1)
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  const [modal, setModal] = useState<{ cotizacion: CotizacionRow | null } | null>(null)
+  // autoNew (botón "Nueva" del navbar): abre el modal de nueva cotización al montar.
+  const [modal, setModal] = useState<{ cotizacion: CotizacionRow | null } | null>(autoNew ? { cotizacion: null } : null)
   const [pdfBusy, setPdfBusy] = useState<number | null>(null)
 
   const { data, error, loading, reload } = useApiQuery(
@@ -63,7 +64,7 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
       <PageHead title="Cotizaciones" sub={total != null ? `${total} cotizaciones registradas` : 'Propuestas para tus clientes'}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn>
+            <RefreshButton onRefresh={reload} />
             <Btn variant="primary" icon="plus" onClick={() => setModal({ cotizacion: null })}>Nueva cotización</Btn>
           </>
         } />

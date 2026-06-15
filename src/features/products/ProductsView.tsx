@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon, Btn, Money, EstadoBadge, Card, PageHead, LoadingState, ErrorState, EmptyState } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, PageHead, LoadingState, ErrorState, EmptyState } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ProductFormModal } from './ProductFormModal'
@@ -22,7 +22,7 @@ export function ProductsView() {
   return (
     <div className="page page-wide">
       <PageHead title="Productos y servicios" sub={`${productos.length} artículos en el catálogo`}
-        actions={<><Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn><Btn variant="primary" icon="plus" onClick={() => setModal({ product: null })}>Nuevo producto</Btn></>} />
+        actions={<><RefreshButton onRefresh={reload} /><Btn variant="primary" icon="plus" onClick={() => setModal({ product: null })}>Nuevo producto</Btn></>} />
 
       {bajos > 0 && (
         <div className="card card-pad row gap-sm mb-md" style={{ background: 'var(--warning-soft)', borderColor: 'transparent', color: 'var(--warning)' }}>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Btn, Badge, EstadoBadge, Avatar, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Btn, RefreshButton, Badge, EstadoBadge, Avatar, Card, Tabs, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
 import { listUsers, mapUserRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 
@@ -21,7 +21,7 @@ export function UsersView() {
   return (
     <div className="page page-wide">
       <PageHead title="Usuarios y roles" sub="Gestiona el acceso de tu equipo"
-        actions={<><Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn><Btn variant="primary" icon="user-plus">Invitar usuario</Btn></>} />
+        actions={<><RefreshButton onRefresh={reload} /><Btn variant="primary" icon="user-plus">Invitar usuario</Btn></>} />
       <Tabs
         tabs={[{ id: 'usuarios', label: 'Usuarios', count: usuarios.length }, { id: 'roles', label: 'Roles', count: roles.length }]}
         active={tab}

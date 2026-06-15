@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon, Btn, Avatar, Badge, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Avatar, Badge, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
 import { listProveedores, mapProveedorRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ProveedorFormModal } from './ProveedorFormModal'
@@ -30,7 +30,7 @@ export function SuppliersView() {
       <PageHead title="Proveedores" sub={total != null ? `${total} proveedores registrados` : 'Directorio de proveedores'}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn>
+            <RefreshButton onRefresh={reload} />
             <Btn variant="primary" icon="plus" onClick={() => setModal({ proveedor: null })}>Nuevo proveedor</Btn>
           </>
         } />

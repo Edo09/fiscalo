@@ -1,4 +1,4 @@
-import { Icon, Btn, Money, EstadoBadge, Card, KPI, LoadingState, ErrorState, EmptyState, PageHead } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, LoadingState, ErrorState, EmptyState, PageHead } from '@/components/ui'
 import { listFacturas, mapFacturaRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
@@ -28,7 +28,7 @@ export function EcfTypeView({ tipo, nav }: { tipo: EcfTipo | null; nav: Nav }) {
         sub={desc}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn>
+            <RefreshButton onRefresh={reload} />
             <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Emitir {code}</Btn>
           </>
         }

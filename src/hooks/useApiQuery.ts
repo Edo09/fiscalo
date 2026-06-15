@@ -12,7 +12,9 @@ export interface ApiQueryState<T> {
   loading: boolean
   /** true mientras hay un fetch en vuelo, aunque haya datos cacheados visibles. */
   fetching: boolean
-  reload: () => void
+  /** Re-consulta ignorando el staleTime. Devuelve la promesa del refetch
+      (para que un botón "Actualizar" pueda esperar y mostrar feedback). */
+  reload: () => Promise<unknown>
 }
 
 export function useApiQuery<T>(
@@ -32,6 +34,6 @@ export function useApiQuery<T>(
     error: q.error ? (q.error instanceof Error ? q.error.message : String(q.error)) : null,
     loading: q.isPending,
     fetching: q.isFetching,
-    reload: () => { void q.refetch() },
+    reload: () => q.refetch(),
   }
 }

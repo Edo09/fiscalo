@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { ApiError, listClients, updateClient, deleteClient, mapClientRow } from '@/api'
 import type { ClientRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -66,7 +66,7 @@ export function ClientsView({ nav }: { nav: Nav }) {
   return (
     <div className="page page-wide">
       <PageHead title="Clientes" sub={total != null ? `${total} clientes registrados` : 'Clientes registrados'}
-        actions={<><Btn variant="secondary" icon="refresh-cw" onClick={reload}>Actualizar</Btn><Btn variant="primary" icon="user-plus">Nuevo cliente</Btn></>} />
+        actions={<><RefreshButton onRefresh={reload} /><Btn variant="primary" icon="user-plus">Nuevo cliente</Btn></>} />
 
       <div className="kpi-grid compact" style={{ marginBottom: 16 }}>
         <KPI label="Total registrados" value={total ?? rows.length} icon="users" />

@@ -4,7 +4,7 @@
 // Ver docs/aprobacion-comercial-recibidos.md.
 import { useState } from 'react'
 import {
-  Icon, Btn, Money, Badge, EstadoBadge, Card, LoadingState, ErrorState, EmptyState, PageHead, Pagination,
+  Icon, Btn, RefreshButton, Money, Badge, EstadoBadge, Card, LoadingState, ErrorState, EmptyState, PageHead, Pagination,
 } from '@/components/ui'
 import { listEcfRecibidos, dgiiLabel, formatApiDate } from '@/api'
 import type { EcfRecibidoRow } from '@/api'
@@ -56,7 +56,7 @@ export function ApproveEcfView() {
             ? `${total} recibido${total === 1 ? '' : 's'}${pendientes ? ` · ${pendientes} pendiente${pendientes === 1 ? '' : 's'} en esta página` : ''}`
             : 'Comprobantes que otros emisores te enviaron'
         }
-        actions={<Btn variant="secondary" icon="refresh-cw" onClick={list.reload}>Actualizar</Btn>}
+        actions={<RefreshButton onRefresh={list.reload} />}
       />
 
       <div className="toolbar">

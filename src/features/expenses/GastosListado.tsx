@@ -4,7 +4,7 @@
 // GET /api/gastos?categoria=... + /api/gastos/stats (KPIs acotados a la categoría).
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Icon, Btn, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { listGastos, getGastoStats } from '@/api'
 import type { GastoCategoria, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -23,15 +23,17 @@ export interface GastosListadoProps {
   ctaLabel: string
   /** Icono del KPI principal y del estado vacío. */
   icon: string
+  /** Si true, abre el formulario de alta al montar (botón "Nueva" del navbar). */
+  autoNew?: boolean
 }
 
-export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosListadoProps) {
+export function GastosListado({ categoria, title, sub, ctaLabel, icon, autoNew = false }: GastosListadoProps) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(autoNew)
   const [detail, setDetail] = useState<GastoRow | null>(null)
 
   // Búsqueda servida por el backend: al dejar de teclear (debounce) se fija la
@@ -80,7 +82,7 @@ export function GastosListado({ categoria, title, sub, ctaLabel, icon }: GastosL
       <PageHead title={title} sub={sub}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={() => { list.reload(); stats.reload() }}>Actualizar</Btn>
+            <RefreshButton onRefresh={() => Promise.all([list.reload(), stats.reload()])} />
             <Btn variant="primary" icon="plus" onClick={() => setFormOpen(true)}>{ctaLabel}</Btn>
           </>
         } />

@@ -3,6 +3,7 @@
 // Un archivo por componente; importa siempre desde '@/components/ui'.
 export * from './Icon'
 export * from './Btn'
+export * from './RefreshButton'
 export * from './Money'
 export * from './Badge'
 export * from './Avatar'

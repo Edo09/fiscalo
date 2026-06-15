@@ -7,8 +7,10 @@ export interface DropdownProps {
   children?: ReactNode
   align?: 'left' | 'right'
   width?: number
+  /** Clase del contenedor (p.ej. `desktop-only` para ocultarlo en móvil). */
+  className?: string
 }
-export function Dropdown({ trigger, children, align = 'right', width = 200 }: DropdownProps) {
+export function Dropdown({ trigger, children, align = 'right', width = 200, className }: DropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -25,7 +27,7 @@ export function Dropdown({ trigger, children, align = 'right', width = 200 }: Dr
     ...(align === 'right' ? { right: 0 } : { left: 0 }),
   }
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className={className} style={{ position: 'relative' }}>
       <div onClick={() => setOpen(!open)}>{trigger}</div>
       {open && (
         <div className="menu" style={menuStyle} onClick={() => setOpen(false)}>

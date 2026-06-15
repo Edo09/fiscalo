@@ -61,7 +61,14 @@ export function Navbar({
       <div className="navbar-spacer"></div>
       <div className="navbar-actions">
         <button className="icon-btn mobile-only" onClick={onOpenSearch}><Icon name="search" /></button>
-        <Btn variant="primary" size="sm" icon="plus" className="desktop-only" onClick={() => nav('factura-nueva')}>Nueva</Btn>
+        <Dropdown align="right" width={210} className="desktop-only" trigger={
+          <Btn variant="primary" size="sm" icon="plus">Nueva</Btn>
+        }>
+          <MenuItem icon="file-text" onClick={() => nav('factura-nueva')}>Factura</MenuItem>
+          <MenuItem icon="receipt" onClick={() => nav('gastos', { kind: 'nuevo' })}>Gasto menor</MenuItem>
+          <MenuItem icon="shopping-cart" onClick={() => nav('compras', { kind: 'nuevo' })}>Compra</MenuItem>
+          <MenuItem icon="file-plus" onClick={() => nav('cotizaciones', { kind: 'nuevo' })}>Cotización</MenuItem>
+        </Dropdown>
         <button className="icon-btn" onClick={onToggleTheme} title="Cambiar tema">
           <Icon name={theme === 'light' ? 'moon' : 'sun'} />
         </button>

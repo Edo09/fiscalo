@@ -25,7 +25,7 @@ import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
 import { useSession } from '@/stores/auth'
-import { isFacturaPrefill, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import { isFacturaPrefill, isNuevoSignal, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -92,15 +92,15 @@ function AppShell() {
       case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'recurrentes': return <RecurringView nav={nav} />
-      case 'cotizaciones': return <CotizacionesView nav={nav} />
+      case 'cotizaciones': return <CotizacionesView nav={nav} autoNew={isNuevoSignal(payload)} />
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'ecf': return <EcfDashboardView nav={nav} />
       case 'ecf-tipo': return <EcfTypeView tipo={payload as EcfTipo | null} nav={nav} />
       case 'aprobar-ecf': return <ApproveEcfView />
       case 'bandeja-dgii': return <DgiiInboxView nav={nav} />
-      case 'gastos': return <ExpensesView />
-      case 'compras': return <PurchasesView />
+      case 'gastos': return <ExpensesView autoNew={isNuevoSignal(payload)} />
+      case 'compras': return <PurchasesView autoNew={isNuevoSignal(payload)} />
       case 'proveedores': return <SuppliersView />
       case 'tesoreria': return <TreasuryView />
       case 'reportes': return <ReportsView />

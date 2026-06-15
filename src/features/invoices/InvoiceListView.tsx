@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Icon, Btn, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { listFacturas, mapFacturaRow, getStats } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
@@ -94,7 +94,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         sub={total != null ? `${total} comprobantes emitidos` : 'Comprobantes fiscales electrónicos'}
         actions={
           <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={() => { reload(); stats.reload() }}>Actualizar</Btn>
+            <RefreshButton onRefresh={() => Promise.all([reload(), stats.reload()])} />
             <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Nueva factura</Btn>
           </>
         }

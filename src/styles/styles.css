@@ -581,6 +581,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 99px; animation: spin .7s linear infinite; }
 .spin { animation: spin .8s linear infinite; }
+/* Botón "Actualizar" recargando: gira su icono refresh y se ve deshabilitado. */
+.btn.is-refreshing .lucide { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============================================================

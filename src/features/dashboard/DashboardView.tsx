@@ -1,4 +1,4 @@
-import { Btn, Money, EstadoBadge, Card, KPI, BarChart, Donut, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
+import { Btn, RefreshButton, Money, EstadoBadge, Card, KPI, BarChart, Donut, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
 import { getStats, getGastoStats, listFacturas, listGastos, mapFacturaRow, formatMonthKey, dgiiLabel } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
@@ -99,10 +99,7 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
         title={`${saludo()}${user?.name ? `, ${user.name.split(' ')[0]}` : ''}`}
         sub={`Resumen de tu facturación electrónica · ${fechaLarga}`}
         actions={
-          <>
-            <Btn variant="secondary" icon="refresh-cw" onClick={() => { stats.reload(); gastoStats.reload(); mesFacturas.reload(); mesCompras.reload(); ultimasReq.reload(); ultimasGastosReq.reload() }}>Actualizar</Btn>
-            <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Nueva factura</Btn>
-          </>
+          <RefreshButton onRefresh={() => Promise.all([stats.reload(), gastoStats.reload(), mesFacturas.reload(), mesCompras.reload(), ultimasReq.reload(), ultimasGastosReq.reload()])} />
         }
       />
 
