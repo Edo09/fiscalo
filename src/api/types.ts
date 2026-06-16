@@ -680,3 +680,59 @@ export interface BrandingData {
   has_custom_logo: boolean
   available_templates: string[]
 }
+
+// ---------------------------------------------------------------------------
+// Reportes fiscales — Formato 606 (compras) — GET /api/reportes/606/preview
+//   Los montos vienen como `number` (listos para formatear). Las fechas son
+//   strings `AAAAMMDD` (vacías si no aplican). Ver docs/reporte-606-frontend.md.
+// ---------------------------------------------------------------------------
+
+/** Un registro del 606: 3 campos auxiliares de display + los 23 oficiales DGII. */
+export interface Reporte606Registro {
+  // Auxiliares de display (no forman parte de los 23 campos del 606).
+  razon_social: string
+  origen: string // 'ecf_recibido' | 'gasto'
+  tipo_comprobante: string // E31, E41, E43, B01…
+  // Los 23 campos oficiales del 606, en orden.
+  rnc: string
+  tipo_id: string // 1=RNC, 2=Cédula
+  tipo_bienes_serv: string
+  ncf: string
+  ncf_modificado: string
+  fecha_comprobante: string // AAAAMMDD
+  fecha_pago: string // AAAAMMDD o ''
+  monto_servicios: number
+  monto_bienes: number
+  total_facturado: number
+  itbis_facturado: number
+  itbis_retenido: number
+  itbis_proporcionalidad: number
+  itbis_costo: number
+  itbis_adelantar: number
+  itbis_percibido: number
+  tipo_retencion_isr: string
+  retencion_renta: number
+  isr_percibido: number
+  isc: number
+  otros_impuestos: number
+  propina_legal: number
+  forma_pago: string // código DGII 01–08
+}
+
+export interface Reporte606Totales {
+  monto_servicios: number
+  monto_bienes: number
+  total_facturado: number
+  itbis_facturado: number
+  itbis_retenido: number
+  retencion_renta: number
+}
+
+export interface Reporte606Preview {
+  periodo: string // AAAAMM
+  rnc_emisor: string
+  cantidad: number
+  totales: Reporte606Totales
+  advertencias: string[]
+  registros: Reporte606Registro[]
+}

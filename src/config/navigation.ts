@@ -20,6 +20,8 @@ export type ViewId =
   | 'proveedores'
   | 'tesoreria'
   | 'reportes'
+  | 'reportes-fiscales'
+  | 'reportes-606'
   | 'usuarios'
   | 'configuracion'
 
@@ -124,6 +126,8 @@ export const TITLES: Record<ViewId, string> = {
   proveedores: 'Proveedores',
   tesoreria: 'Tesorería',
   reportes: 'Reportes',
+  'reportes-fiscales': 'Reportes fiscales',
+  'reportes-606': 'Reporte 606',
   usuarios: 'Usuarios',
   configuracion: 'Configuración',
   notificaciones: 'Notificaciones',

@@ -19,6 +19,8 @@ import { ExpensesView } from '@/features/expenses/ExpensesView'
 import { PurchasesView } from '@/features/purchases/PurchasesView'
 import { SuppliersView } from '@/features/suppliers/SuppliersView'
 import { ReportsView } from '@/features/reports/ReportsView'
+import { ReportesFiscalesView } from '@/features/reports/ReportesFiscalesView'
+import { Reporte606View } from '@/features/reports/Reporte606View'
 import { TreasuryView } from '@/features/treasury/TreasuryView'
 import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
@@ -83,7 +85,9 @@ function AppShell() {
       ? 'facturas'
       : view === 'ecf-tipo'
         ? 'ecf'
-        : view
+        : view.startsWith('reportes')
+          ? 'reportes'
+          : view
 
   const renderView = () => {
     switch (view) {
@@ -103,7 +107,9 @@ function AppShell() {
       case 'compras': return <PurchasesView autoNew={isNuevoSignal(payload)} />
       case 'proveedores': return <SuppliersView />
       case 'tesoreria': return <TreasuryView />
-      case 'reportes': return <ReportsView />
+      case 'reportes': return <ReportsView nav={nav} />
+      case 'reportes-fiscales': return <ReportesFiscalesView nav={nav} />
+      case 'reportes-606': return <Reporte606View nav={nav} />
       case 'usuarios': return <UsersView />
       case 'configuracion': return <SettingsView />
       case 'notificaciones': return <NotificationsView />
