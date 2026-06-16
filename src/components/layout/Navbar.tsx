@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
-import { DATA } from '@/data/mockData'
 import { getEmisor } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession } from '@/stores/auth'
@@ -18,11 +17,10 @@ export interface NavbarProps {
 export function Navbar({
   nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav,
 }: NavbarProps) {
-  const D = DATA
   const { user } = useSession()
-  const userName = user?.name || D.usuario.nombre
-  const userEmail = user?.email || D.usuario.email
-  const userRole = user?.role || D.usuario.rol
+  const userName = user?.name || 'Usuario'
+  const userEmail = user?.email || ''
+  const userRole = user?.role || ''
   const [loggingOut, setLoggingOut] = useState(false)
 
   // Empresa real del tenant (GET /api/emisor) — misma caché que Configuración.
@@ -74,7 +72,7 @@ export function Navbar({
         </button>
         <span className="navbar-divider"></span>
         <Dropdown align="right" width={220} trigger={
-          <div className="user-chip"><Avatar name={userName} color={user ? undefined : D.usuario.color} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
+          <div className="user-chip"><Avatar name={userName} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
         }>
           <div className="menu-label">{userEmail}</div>
           <MenuItem icon="settings" onClick={() => nav('configuracion')}>Configuración</MenuItem>

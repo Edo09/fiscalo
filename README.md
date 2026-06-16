@@ -72,8 +72,6 @@ src/
     domain.ts                   # tipos de dominio de la UI (Cliente, Producto, Factura…)
     database.ts                 # AUTO-GENERADO: tipos del esquema SQL
 
-  data/
-    mockData.ts                 # datos de ejemplo de las vistas aún sin endpoint
   db/
     schema.ts                   # AUTO-GENERADO: metadatos del esquema en runtime
   styles/
@@ -121,7 +119,6 @@ import './styles/styles-v2.css'
 - La app se conecta al backend **api-gratex** (login multi-tenant, clientes,
   productos, facturas e-CF, gastos, stats). Configura `.env.local` a partir de
   `.env.example` (proxy de Vite + `VITE_TENANT_ID`).
-- Algunas vistas aún muestran datos simulados (`src/data/mockData.ts`) porque su
-  endpoint no existe todavía: compras, proveedores, tesorería, reportes,
-  recurrentes y notificaciones.
+- Tesorería, recurrentes y notificaciones aún no tienen endpoint: muestran un
+  estado vacío hasta que el backend los exponga.
 - El cambio de tema claro/oscuro está en la barra superior y persiste en `localStorage`.

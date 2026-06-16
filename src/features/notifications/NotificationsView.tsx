@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { Icon, Btn, Card, EmptyState, PageHead } from '@/components/ui'
-import { DATA } from '@/data/mockData'
-import type { NotifTipo } from '@/types/domain'
+import type { NotifTipo, Notificacion } from '@/types/domain'
 
 /* FISCALO — Centro de notificaciones */
 export function NotificationsView() {
-  const D = DATA
-  const [items, setItems] = useState(D.notificaciones)
+  const [items, setItems] = useState<Notificacion[]>([])
   const toneMap: Record<NotifTipo, string> = { danger: 'var(--danger)', warning: 'var(--warning)', info: 'var(--accent)', success: 'var(--success)' }
   const bgMap: Record<NotifTipo, string> = { danger: 'var(--danger-soft)', warning: 'var(--warning-soft)', info: 'var(--accent-soft)', success: 'var(--success-soft)' }
   return (
