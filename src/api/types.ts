@@ -736,3 +736,57 @@ export interface Reporte606Preview {
   advertencias: string[]
   registros: Reporte606Registro[]
 }
+
+// ---------------------------------------------------------------------------
+// Reportes fiscales — Formato 607 (ventas) — GET /api/reportes/607/preview
+//   Contraparte del 606. Montos como `number`; fechas `AAAAMMDD` (vacías si no
+//   aplican). Ver docs/reporte-607-frontend.md.
+// ---------------------------------------------------------------------------
+
+/** Un registro del 607: 3 campos auxiliares de display + los 23 oficiales DGII. */
+export interface Reporte607Registro {
+  // Auxiliares de display (no forman parte de los 23 campos del 607).
+  razon_social: string
+  tipo_comprobante: string // E31/E32/E33/E34 (e-CF) o NCF (factura simple)
+  estado_dgii: string // ACEPTADO, PENDIENTE…
+  // Los 23 campos oficiales del 607, en orden.
+  rnc: string
+  tipo_id: string // 1=RNC, 2=Cédula
+  ncf: string
+  ncf_modificado: string
+  tipo_ingreso: string // default 01
+  fecha_comprobante: string // AAAAMMDD
+  fecha_retencion: string // AAAAMMDD o ''
+  monto_facturado: number
+  itbis_facturado: number
+  itbis_retenido: number
+  itbis_percibido: number
+  retencion_renta: number
+  isr_percibido: number
+  isc: number
+  otros_impuestos: number
+  propina_legal: number
+  efectivo: number
+  cheque_transf: number
+  tarjeta: number
+  credito: number
+  bonos: number
+  permuta: number
+  otras: number
+}
+
+export interface Reporte607Totales {
+  monto_facturado: number
+  itbis_facturado: number
+  itbis_retenido: number
+  retencion_renta: number
+}
+
+export interface Reporte607Preview {
+  periodo: string // AAAAMM
+  rnc_emisor: string
+  cantidad: number
+  totales: Reporte607Totales
+  advertencias: string[]
+  registros: Reporte607Registro[]
+}

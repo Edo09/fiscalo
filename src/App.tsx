@@ -21,6 +21,7 @@ import { SuppliersView } from '@/features/suppliers/SuppliersView'
 import { ReportsView } from '@/features/reports/ReportsView'
 import { ReportesFiscalesView } from '@/features/reports/ReportesFiscalesView'
 import { Reporte606View } from '@/features/reports/Reporte606View'
+import { Reporte607View } from '@/features/reports/Reporte607View'
 import { TreasuryView } from '@/features/treasury/TreasuryView'
 import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
@@ -110,6 +111,7 @@ function AppShell() {
       case 'reportes': return <ReportsView nav={nav} />
       case 'reportes-fiscales': return <ReportesFiscalesView nav={nav} />
       case 'reportes-606': return <Reporte606View nav={nav} />
+      case 'reportes-607': return <Reporte607View nav={nav} />
       case 'usuarios': return <UsersView />
       case 'configuracion': return <SettingsView />
       case 'notificaciones': return <NotificationsView />

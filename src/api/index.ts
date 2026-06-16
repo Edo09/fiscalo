@@ -28,7 +28,7 @@ export { listEcfRecibidos, aprobarEcfRecibido } from './recepcion'
 export { listUnidadesMedida } from './unidadesMedida'
 export { listUsers } from './users'
 export { getStats } from './stats'
-export { getReporte606Preview, downloadReporte606 } from './reportes'
+export { getReporte606Preview, downloadReporte606, getReporte607Preview, downloadReporte607 } from './reportes'
 export { getEmisor } from './emisor'
 export {
   getBranding,

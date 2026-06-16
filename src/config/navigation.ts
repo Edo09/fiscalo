@@ -22,6 +22,7 @@ export type ViewId =
   | 'reportes'
   | 'reportes-fiscales'
   | 'reportes-606'
+  | 'reportes-607'
   | 'usuarios'
   | 'configuracion'
 
@@ -128,6 +129,7 @@ export const TITLES: Record<ViewId, string> = {
   reportes: 'Reportes',
   'reportes-fiscales': 'Reportes fiscales',
   'reportes-606': 'Reporte 606',
+  'reportes-607': 'Reporte 607',
   usuarios: 'Usuarios',
   configuracion: 'Configuración',
   notificaciones: 'Notificaciones',

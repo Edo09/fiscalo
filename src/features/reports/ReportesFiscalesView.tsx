@@ -14,7 +14,7 @@ interface ReporteFiscal {
 
 const REPORTES: ReporteFiscal[] = [
   { code: '606', label: '606 — Compras', desc: 'Compras de bienes y servicios del período', ic: 'shopping-cart', c: 'var(--accent)', to: 'reportes-606' },
-  { code: '607', label: '607 — Ventas', desc: 'Ventas de bienes y servicios del período', ic: 'trending-up', c: 'var(--success)', to: null },
+  { code: '607', label: '607 — Ventas', desc: 'Ventas de bienes y servicios del período', ic: 'trending-up', c: 'var(--success)', to: 'reportes-607' },
   { code: '608', label: '608 — Anulados', desc: 'Comprobantes anulados', ic: 'file-x', c: 'var(--danger)', to: null },
   { code: 'IR-17', label: 'IR-17 — Retenciones', desc: 'Retenciones de renta a terceros', ic: 'percent', c: 'var(--warning)', to: null },
 ]
