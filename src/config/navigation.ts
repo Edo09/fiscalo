@@ -90,7 +90,7 @@ export const NAV: NavGroup[] = [
     items: [
       { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check' },
       { id: 'aprobar-ecf', label: 'Aprobar e-CF', icon: 'check-circle' },
-      { id: 'bandeja-dgii', label: 'Bandeja DGII', icon: 'inbox' },
+      // 'bandeja-dgii' (Bandeja DGII) oculto: redundante con el dashboard e-CF (estado por tipo).
     ],
   },
   {

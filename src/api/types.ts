@@ -427,6 +427,62 @@ export interface UserRow {
   role?: string | null
 }
 
+/** Alta de usuario — POST /api/users. El tenant sale del token, nunca del body. */
+export interface CreateUserInput {
+  email: string
+  password: string
+  name: string
+  username: string
+  last_name?: string
+  /** Rol validado contra los roles del tenant; default `user`. */
+  role?: string
+}
+
+/** Edición de usuario — PUT /api/users/{id}. Todo opcional; password en blanco = sin cambio. */
+export interface UpdateUserInput {
+  name?: string
+  last_name?: string
+  email?: string
+  username?: string
+  role?: string
+  password?: string
+}
+
+// ---------------------------------------------------------------------------
+// Roles y permisos (RBAC) — /api/roles. Ver docs/roles-permisos.md.
+//   Permiso = nombre de módulo (`facturas`, `gastos`, …) o `*` (todos).
+//   Roles de sistema (`is_system=1`: admin/user) no se editan ni borran.
+// ---------------------------------------------------------------------------
+
+export interface RoleRow {
+  id: number
+  tenant_id?: number | null
+  name: string
+  description?: string | null
+  /** 1 = rol de sistema (admin/user): no editable ni borrable. */
+  is_system?: number | boolean | null
+  /** Módulos que concede el rol (`['*']` = todos). */
+  permissions: string[]
+}
+
+export interface CreateRoleInput {
+  name: string
+  description?: string
+  permissions: string[]
+}
+
+/** Actualización de un rol (no aplica a roles de sistema). */
+export interface UpdateRoleInput {
+  description?: string
+  permissions?: string[]
+}
+
+/** Asignar un rol (por nombre) a un usuario. */
+export interface AssignRoleInput {
+  user_id: number
+  role: string
+}
+
 // ---------------------------------------------------------------------------
 // Gastos — /api/gastos (tablas gastos / gasto_items)
 // ---------------------------------------------------------------------------

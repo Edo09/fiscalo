@@ -17,11 +17,16 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
   const totalRechazados = d?.por_estado.filter((e) => e.estado.includes('RECHAZADO')).reduce((a, e) => a + e.total, 0) ?? 0
   const totalEcf = d?.resumen.total_ecf ?? 0
 
+  // Solo tipos con rango autorizado por la DGII (secuencias). type viene como 'E31'.
+  const tiposAutorizados = ECF_TIPOS.filter((t) =>
+    (d?.secuencias ?? []).some((s) => s.type.replace(/^E/i, '') === t.code),
+  )
+
   const estados = [
+    { label: 'Total e-CF', value: totalEcf, color: 'var(--text-2)', icon: 'file-text', bg: 'var(--neutral-soft)', total: true },
     { label: 'Aceptados', value: totalAceptados, color: 'var(--success)', icon: 'check-circle', bg: 'var(--success-soft)' },
     { label: 'En proceso', value: totalEnProceso, color: 'var(--warning)', icon: 'loader', bg: 'var(--warning-soft)' },
     { label: 'Rechazados', value: totalRechazados, color: 'var(--danger)', icon: 'x-circle', bg: 'var(--danger-soft)' },
-    { label: 'Total e-CF', value: totalEcf, color: 'var(--text-2)', icon: 'file-text', bg: 'var(--neutral-soft)' },
   ]
 
   return (
@@ -31,7 +36,6 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
         sub="Monitoreo de tu facturación electrónica ante la DGII."
         actions={
           <>
-            <Btn variant="secondary" icon="inbox" onClick={() => nav('bandeja-dgii')}>Bandeja DGII</Btn>
             <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Emitir e-CF</Btn>
           </>
         }
@@ -54,7 +58,7 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
                     </div>
                     <div className="row gap-sm" style={{ alignItems: 'baseline' }}>
                       <span className="num fw6" style={{ fontSize: 19, letterSpacing: '-0.02em' }}>{stats.loading ? '—' : e.value}</span>
-                      <span className="text-xs muted-3">de {totalEcf}</span>
+                      {!e.total && <span className="text-xs muted-3">de {totalEcf}</span>}
                     </div>
                   </div>
                 </div>
@@ -88,21 +92,28 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
               )}
             </Card>
 
-            <Card title="Tipos de comprobante" sub="Tipos de e-CF habilitados por la DGII" noPad>
-              <div className="tbl-wrap">
-                <table className="tbl">
-                  <thead><tr><th>Código</th><th>Nombre</th><th style={{ width: 40 }}></th></tr></thead>
-                  <tbody>
-                    {ECF_TIPOS.map((t) => (
-                      <tr key={t.code} onClick={() => nav('ecf-tipo', { code: t.code, nombre: t.nombre, emitidos: 0, mes: 0, desc: t.desc })}>
-                        <td><span className="ecf-tag" style={{ fontSize: 12 }}>{t.code}</span></td>
-                        <td><span className="cell-main">{t.nombre}</span><div className="cell-sub">{t.desc}</div></td>
-                        <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <Card title="Tipos de comprobante" sub="Tipos de e-CF autorizados por la DGII" noPad>
+              {stats.loading ? (
+                <div className="row" style={{ justifyContent: 'center', padding: 32 }}><Spinner /></div>
+              ) : (
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr><th>Código</th><th>Nombre</th><th style={{ width: 40 }}></th></tr></thead>
+                    <tbody>
+                      {tiposAutorizados.map((t) => (
+                        <tr key={t.code} onClick={() => nav('ecf-tipo', { code: t.code, nombre: t.nombre, emitidos: 0, mes: 0, desc: t.desc })}>
+                          <td><span className="ecf-tag" style={{ fontSize: 12 }}>{t.code}</span></td>
+                          <td><span className="cell-main">{t.nombre}</span><div className="cell-sub">{t.desc}</div></td>
+                          <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
+                        </tr>
+                      ))}
+                      {tiposAutorizados.length === 0 && (
+                        <tr style={{ cursor: 'default' }}><td colSpan={3}><div className="state" style={{ padding: 24 }}><span className="text-sm muted">Sin tipos autorizados por la DGII.</span></div></td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
             </div>
 
@@ -115,6 +126,12 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
                   <div className="col gap-md">
                     {(d?.secuencias ?? []).map((s) => {
                       const restantes = s.restantes != null ? Number(s.restantes) : null
+                      // % consumido del rango vigente: usados / (usados + restantes).
+                      // Sin límite registrado (restantes null): caer al progreso por secuencia.
+                      const usados = s.total_emitidos
+                      const consumido = restantes != null
+                        ? (usados / Math.max(1, usados + restantes)) * 100
+                        : (usados / Math.max(1, s.secuencia_actual)) * 100
                       return (
                         <div key={s.type}>
                           <div className="row between mb-sm">
@@ -127,7 +144,7 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
                               <span className="text-xs muted-3 num">{s.total_emitidos}</span>
                             )}
                           </div>
-                          <Progress value={Math.min(100, (s.total_emitidos / Math.max(1, s.secuencia_actual)) * 100)} />
+                          <Progress value={Math.min(100, consumido)} />
                           {s.vencimiento && (
                             <div className="text-xs muted-3" style={{ marginTop: 3 }}>Rango vence: {formatApiDate(s.vencimiento)}</div>
                           )}
