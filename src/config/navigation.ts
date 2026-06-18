@@ -11,6 +11,8 @@ export type ViewId =
   | 'cotizaciones'
   | 'clientes'
   | 'productos'
+  | 'categorias'
+  | 'almacenes'
   | 'ecf'
   | 'ecf-tipo'
   | 'aprobar-ecf'
@@ -73,10 +75,16 @@ export const NAV: NavGroup[] = [
       { id: 'facturas', label: 'Facturación', icon: 'file-text' },
       { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus' },
       { id: 'clientes', label: 'Clientes', icon: 'users' },
-      { id: 'productos', label: 'Productos y servicios', icon: 'package' },
     ],
   },
-
+  {
+    group: 'Inventario',
+    items: [
+      { id: 'productos', label: 'Productos y servicios', icon: 'package' },
+      { id: 'categorias', label: 'Categorías', icon: 'tag' },
+      { id: 'almacenes', label: 'Almacenes', icon: 'archive' },
+    ],
+  },
   {
     group: 'Compras',
     items: [
@@ -118,6 +126,8 @@ export const TITLES: Record<ViewId, string> = {
   cotizaciones: 'Cotizaciones',
   clientes: 'Clientes',
   productos: 'Productos',
+  categorias: 'Categorías',
+  almacenes: 'Almacenes',
   ecf: 'e-CF',
   'ecf-tipo': 'Tipo e-CF',
   'aprobar-ecf': 'Aprobar e-CF',

@@ -1,10 +1,11 @@
 // FISCALO — Alta/edición/eliminación de un producto (CRUD contra /api/products).
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
-import { ApiError, createProduct, updateProduct, deleteProduct } from '@/api'
+import { ApiError, createProduct, updateProduct, deleteProduct, listCategories, listWarehouses } from '@/api'
+import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Producto } from '@/types/domain'
 
 interface ProductFormModalProps {
@@ -20,7 +21,8 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
   const editing = product !== null
   const [nombre, setNombre] = useState(product && product.nombre !== '—' ? product.nombre : '')
   const [sku, setSku] = useState(product?.sku ?? '')
-  const [categoria, setCategoria] = useState(product && product.cat !== '—' ? product.cat : '')
+  const [categoryId, setCategoryId] = useState(product?.categoryId != null ? String(product.categoryId) : '')
+  const [warehouseId, setWarehouseId] = useState(product?.warehouseId != null ? String(product.warehouseId) : '')
   const [tipo, setTipo] = useState<'Bien' | 'Servicio'>(product?.tipo === 'Servicio' ? 'Servicio' : 'Bien')
   const [gravado, setGravado] = useState(product ? product.itbis > 0 : true)
   const [unidadMedida, setUnidadMedida] = useState(product?.unidadMedida || 43)
@@ -35,6 +37,19 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
   const [confirmDel, setConfirmDel] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Opciones de los selects (inventario). Listas pequeñas → cargar todas.
+  const catsQ = useApiQuery(['categories', 'list'], () => listCategories({ pageSize: 100 }))
+  const whQ = useApiQuery(['warehouses', 'list'], () => listWarehouses({ pageSize: 100 }))
+  const categories = useMemo(() => catsQ.data?.items ?? [], [catsQ.data])
+  const warehouses = useMemo(() => whQ.data?.items ?? [], [whQ.data])
+
+  // Al crear, preseleccionar el Almacén Principal (o el primero) cuando carguen.
+  useEffect(() => {
+    if (editing || warehouseId || warehouses.length === 0) return
+    const principal = warehouses.find((w) => (w.nombre || '').toLowerCase().includes('principal'))
+    setWarehouseId(String((principal ?? warehouses[0]).id))
+  }, [warehouses, editing, warehouseId])
+
   const save = async () => {
     if (!nombre.trim()) { setError('El nombre es obligatorio.'); return }
     setError(null)
@@ -42,7 +57,8 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
     const payload = {
       nombre: nombre.trim(),
       sku: sku.trim() || undefined,
-      categoria: categoria.trim() || undefined,
+      category_id: categoryId ? Number(categoryId) : null,
+      warehouse_id: warehouseId ? Number(warehouseId) : undefined,
       indicador_bien_servicio: tipo === 'Servicio' ? 2 : 1,
       indicador_facturacion: gravado ? 1 : 4, // 1=gravado 18%, 4=exento
       unidad_medida: String(unidadMedida),
@@ -124,7 +140,17 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
         </div>
         <div className="field">
           <label className="label">Categoría <span className="opt">(opcional)</span></label>
-          <input className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ej. Alimentos" />
+          <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={catsQ.loading}>
+            <option value="">Sin categoría</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="label">Almacén</label>
+          <select className="select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} disabled={whQ.loading}>
+            {warehouses.length === 0 && <option value="">{whQ.loading ? 'Cargando…' : 'Sin almacenes'}</option>}
+            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.nombre}</option>)}
+          </select>
         </div>
         <div className="field">
           <label className="label">Tipo</label>

@@ -15,6 +15,8 @@ import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { ProductsView } from '@/features/products/ProductsView'
+import { CategoriesView } from '@/features/categories/CategoriesView'
+import { WarehousesView } from '@/features/warehouses/WarehousesView'
 import { ExpensesView } from '@/features/expenses/ExpensesView'
 import { PurchasesView } from '@/features/purchases/PurchasesView'
 import { SuppliersView } from '@/features/suppliers/SuppliersView'
@@ -100,6 +102,8 @@ function AppShell() {
       case 'cotizaciones': return <CotizacionesView nav={nav} autoNew={isNuevoSignal(payload)} />
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
+      case 'categorias': return <CategoriesView />
+      case 'almacenes': return <WarehousesView />
       case 'ecf': return <EcfDashboardView nav={nav} />
       case 'ecf-tipo': return <EcfTypeView tipo={payload as EcfTipo | null} nav={nav} />
       case 'aprobar-ecf': return <ApproveEcfView />

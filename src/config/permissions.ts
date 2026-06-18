@@ -26,6 +26,8 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { id: 'cotizaciones', label: 'Cotizaciones' },
   { id: 'clients', label: 'Clientes' },
   { id: 'products', label: 'Productos y servicios' },
+  { id: 'categories', label: 'Categorías' },
+  { id: 'warehouses', label: 'Almacenes' },
   { id: 'gastos', label: 'Gastos y compras' },
   { id: 'proveedores', label: 'Proveedores' },
   { id: 'aprobaciones', label: 'Aprobación de e-CF' },

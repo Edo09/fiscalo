@@ -316,6 +316,13 @@ export interface ProductRow {
   nombre?: string | null
   descripcion?: string | null
   categoria?: string | null
+  /** FK a `categories` (nullable). */
+  category_id?: number | null
+  /** FK a `warehouses` (obligatorio; default Almacén Principal). */
+  warehouse_id?: number | null
+  /** Nombres resueltos vía JOIN para mostrar en tablas. */
+  categoria_nombre?: string | null
+  almacen_nombre?: string | null
   /** 1=Bien | 2=Servicio */
   indicador_bien_servicio?: number | null
   /** 0=No facturable | 1=ITBIS 18% (gravado) | 2=16% | 3=Tasa cero | 4=Exento */
@@ -333,6 +340,8 @@ export interface CreateProductInput {
   sku?: string
   descripcion?: string
   categoria?: string
+  category_id?: number | null
+  warehouse_id?: number
   indicador_bien_servicio?: number
   indicador_facturacion?: number
   precio?: number
@@ -412,6 +421,42 @@ export interface CreateProveedorInput {
   direccion?: string
   notas?: string
   activo?: boolean | number
+}
+
+// ---------------------------------------------------------------------------
+// Inventario — tablas `categories` / `warehouses` (DB del tenant)
+// Mismo contrato CRUD que /api/products. Ver docs/inventario.md.
+//   estado: 1 = activo | 0 = inactivo (desactivar en vez de borrar).
+// ---------------------------------------------------------------------------
+
+export interface CategoryRow {
+  id: number
+  nombre?: string | null
+  descripcion?: string | null
+  estado?: number | boolean | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CreateCategoryInput {
+  nombre: string
+  descripcion?: string
+  estado?: number
+}
+
+export interface WarehouseRow {
+  id: number
+  nombre?: string | null
+  descripcion?: string | null
+  estado?: number | boolean | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CreateWarehouseInput {
+  nombre: string
+  descripcion?: string
+  estado?: number
 }
 
 // ---------------------------------------------------------------------------

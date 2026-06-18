@@ -23,6 +23,8 @@ export {
 } from './cotizaciones'
 export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
 export { listProveedores, getProveedor, createProveedor, updateProveedor, deleteProveedor } from './proveedores'
+export { listCategories, getCategory, createCategory, updateCategory, deleteCategory } from './categories'
+export { listWarehouses, getWarehouse, createWarehouse, updateWarehouse, deleteWarehouse } from './warehouses'
 export { listNcfRangos, registerNcfRango } from './ncf'
 export { listEcfRecibidos, aprobarEcfRecibido } from './recepcion'
 export { listUnidadesMedida } from './unidadesMedida'

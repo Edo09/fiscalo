@@ -50,7 +50,12 @@ export interface Producto {
   id: string
   sku: string
   nombre: string
+  /** Nombre de la categoría (categoria_nombre), para mostrar/filtrar. */
   cat: string
+  /** FK a `categories` (null = sin categoría). */
+  categoryId: number | null
+  /** FK a `warehouses` (almacén asignado). */
+  warehouseId: number | null
   tipo: string
   precio: number
   costo: number
