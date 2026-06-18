@@ -555,6 +555,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 @keyframes slidein { from { transform: translateX(100%); } }
 @keyframes slideup { from { transform: translateY(20px); opacity: 0; } }
 
+/* Salida (overlay click / Escape / botón X) — ver Modal.tsx y Drawer.tsx. */
+@keyframes fadeOut { to { opacity: 0; } }
+@keyframes popOut { to { opacity: 0; transform: scale(.96) translateY(8px); } }
+@keyframes slideOut { to { transform: translateX(100%); } }
+.overlay.closing { animation: fadeOut .16s ease forwards; pointer-events: none; }
+.modal.closing { animation: popOut .16s cubic-bezier(.4,0,1,1) forwards; }
+.drawer-overlay.closing { animation: fadeOut .18s ease forwards; pointer-events: none; }
+.drawer.closing { animation: slideOut .18s cubic-bezier(.4,0,1,1) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .modal, .drawer-overlay, .drawer { animation: none !important; }
+}
+
 /* ============================================================
    MENU / DROPDOWN
    ============================================================ */
