@@ -1,5 +1,6 @@
 // Servicio: facturas e-CF.
 import { getJson, postJson, getList, qs } from './http'
+import { createFacturaSchema } from './schemas/factura'
 import type {
   CreateFacturaInput,
   CreateFacturaResponse,
@@ -32,7 +33,10 @@ export async function getFactura(id: number): Promise<FacturaRow | null> {
 }
 
 export function createFactura(input: CreateFacturaInput): Promise<CreateFacturaResponse> {
-  return postJson<CreateFacturaResponse>('/api/facturas', input)
+  // Validación de frontera: garantiza que un payload malformado nunca llegue a la
+  // DGII, incluso si un futuro llamador omite la validación del formulario.
+  const body = createFacturaSchema.parse(input)
+  return postJson<CreateFacturaResponse>('/api/facturas', body)
 }
 
 export function previewFactura(input: Partial<CreateFacturaInput>): Promise<DocBase64> {

@@ -16,6 +16,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
+import { facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors } from './factura.schema'
 
 interface Linea {
   id: number
@@ -93,6 +94,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const [prodPicker, setProdPicker] = useState(false)
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [errors, setErrors] = useState<FacturaFormErrors>(emptyFormErrors)
 
   // El prefill (cotización) solo trae id + nombre del cliente: se busca el
   // registro completo para que la ficha muestre el RNC real (E31 lo requiere).
@@ -143,15 +145,31 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       id: Date.now(), prodId: '', nombre: '', cant: 1,
       precio: 0, desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
     }])
-  const updLinea = (id: number, key: keyof Linea, val: number) =>
+  // Limpia los errores en línea de una fila al editarla (o al eliminarla).
+  const clearLineaErr = (id: number) =>
+    setErrors((e) =>
+      e.lineas[id]
+        ? { ...e, lineas: Object.fromEntries(Object.entries(e.lineas).filter(([k]) => Number(k) !== id)) }
+        : e,
+    )
+  const updLinea = (id: number, key: keyof Linea, val: number) => {
     setLineas(lineas.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
-  const setNombre = (id: number, nombre: string) =>
+    clearLineaErr(id)
+  }
+  const setNombre = (id: number, nombre: string) => {
     setLineas(lineas.map((l) => (l.id === id ? { ...l, nombre } : l)))
+    clearLineaErr(id)
+  }
   const setIndFact = (id: number, indFact: IndicadorFacturacion) =>
     setLineas(lineas.map((l) => (l.id === id ? { ...l, indFact } : l)))
-  const setUnidad = (id: number, unidadMedida: number) =>
+  const setUnidad = (id: number, unidadMedida: number) => {
     setLineas(lineas.map((l) => (l.id === id ? { ...l, unidadMedida } : l)))
-  const delLinea = (id: number) => setLineas(lineas.filter((l) => l.id !== id))
+    clearLineaErr(id)
+  }
+  const delLinea = (id: number) => {
+    setLineas(lineas.filter((l) => l.id !== id))
+    clearLineaErr(id)
+  }
 
   const calc = (l: Linea) => {
     const bruto = l.cant * l.precio * (1 - l.desc / 100)
@@ -176,24 +194,25 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   ]
   const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
 
-  /** Construye el payload mínimo para POST /api/facturas. */
+  /**
+   * Valida el formulario con Zod (facturaFormSchema). Pinta errores en línea por
+   * campo/línea y muestra un toast resumen. Devuelve true si el form es válido.
+   */
+  function validateForm(): boolean {
+    const res = facturaFormSchema.safeParse({ cliente, tipo, lineas })
+    if (!res.success) {
+      setErrors(mapFormIssues(res.error, lineas))
+      const n = res.error.issues.length
+      toast.error(n === 1 ? 'Revisa 1 campo del formulario.' : `Revisa ${n} campos del formulario.`)
+      return false
+    }
+    setErrors(emptyFormErrors())
+    return true
+  }
+
+  /** Construye el payload para POST /api/facturas (asume formulario ya validado). */
   function buildPayload(): CreateFacturaInput | null {
-    if (!cliente) {
-      toast.error('Selecciona un cliente para continuar.')
-      return null
-    }
-    if (lineas.length === 0) {
-      toast.error('Agrega al menos un producto o servicio.')
-      return null
-    }
-    if (lineas.some((l) => l.nombre.trim() === '')) {
-      toast.error('Cada línea necesita una descripción.')
-      return null
-    }
-    if (tipo === '33' || tipo === '34') {
-      toast.error(`Las notas (e-CF ${tipo}) requieren un comprobante de referencia, aún no soportado en este formulario.`)
-      return null
-    }
+    if (!cliente) return null
     const items: FacturaItemInput[] = lineas.map((l, i) => ({
       numero_linea: i + 1,
       nombre_item: l.nombre,
@@ -216,6 +235,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   const emitir = async () => {
+    if (!validateForm()) return
     const payload = buildPayload()
     if (!payload) return
     setEmitting(true)
@@ -255,9 +275,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   const previsualizar = async () => {
-    if (!cliente) { toast.error('Selecciona un cliente para la vista previa.'); return }
-    if (lineas.length === 0) { toast.error('Agrega al menos un ítem.'); return }
-    if (lineas.some((l) => l.nombre.trim() === '')) { toast.error('Cada línea necesita una descripción.'); return }
+    if (!validateForm() || !cliente) return
     setPreviewing(true)
     const tid = toast.loading('Generando vista previa…')
     try {
@@ -313,15 +331,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         <div className="col gap-md">
           <Card title="Datos del comprobante">
             <div className="form-grid">
-              <div className="field full">
+              <div className={'field full' + (errors.cliente ? ' field-error' : '')}>
                 <label>Cliente <span className="req">*</span></label>
-                <ClientCombobox value={cliente} onChange={setCliente} />
+                <ClientCombobox value={cliente} onChange={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }} />
+                {errors.cliente && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.cliente}</div>}
               </div>
-              <div className="field">
+              <div className={'field' + (errors.tipo ? ' field-error' : '')}>
                 <label>Tipo de comprobante</label>
-                <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value as TipoEcf)}>
+                <select className="select" value={tipo} onChange={(e) => { setTipo(e.target.value as TipoEcf); if (errors.tipo) setErrors((er) => ({ ...er, tipo: undefined })) }}>
                   {tipos.map((t) => <option key={t.code} value={t.code}>e-CF {t.code} · {t.n}</option>)}
                 </select>
+                {errors.tipo && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.tipo}</div>}
               </div>
               <div className="field">
                 <label>e-NCF a asignar</label>
@@ -386,9 +406,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                   </tr>
                 </thead>
                 <tbody>
-                  {lineas.map((l) => (
+                  {lineas.map((l) => {
+                    const le = errors.lineas[l.id]
+                    return (
                     <tr key={l.id} style={{ cursor: 'default' }}>
-                      <td className="cell-input">
+                      <td className={'cell-input' + (le?.nombre ? ' field-error' : '')}>
                         <textarea
                           className="input line-input"
                           value={l.nombre}
@@ -398,11 +420,24 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                           style={{ height: 'auto', minHeight: 34, resize: 'vertical', lineHeight: 1.35 }}
                         />
                         {l.prodId !== '' && <div className="cell-sub">{l.tipoItem}</div>}
+                        {le?.nombre && <div className="err-msg"><Icon name="alert-circle" size={13} />{le.nombre}</div>}
                       </td>
-                      <td className="cell-input"><input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} /></td>
-                      <td className="cell-input"><UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} /></td>
-                      <td className="cell-input"><input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} /></td>
-                      <td className="cell-input"><input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} /></td>
+                      <td className={'cell-input' + (le?.cant ? ' field-error' : '')}>
+                        <input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} />
+                        {le?.cant && <div className="err-msg">{le.cant}</div>}
+                      </td>
+                      <td className={'cell-input' + (le?.unidadMedida ? ' field-error' : '')}>
+                        <UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} />
+                        {le?.unidadMedida && <div className="err-msg">{le.unidadMedida}</div>}
+                      </td>
+                      <td className={'cell-input' + (le?.precio ? ' field-error' : '')}>
+                        <input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} />
+                        {le?.precio && <div className="err-msg">{le.precio}</div>}
+                      </td>
+                      <td className={'cell-input' + (le?.desc ? ' field-error' : '')}>
+                        <input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} />
+                        {le?.desc && <div className="err-msg">{le.desc}</div>}
+                      </td>
                       <td className="cell-input">
                         <select
                           className="select line-input"
@@ -415,9 +450,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                       <td className="num fw6"><Money value={calc(l).importe} cur={false} /></td>
                       <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
                     </tr>
-                  ))}
+                    )
+                  })}
                   {lineas.length === 0 && (
-                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm muted">Sin líneas. Agrega un producto del catálogo o una descripción libre.</span></div></td></tr>
+                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: errors.form ? 'var(--danger)' : 'var(--text-2)' }}>{errors.form ?? 'Sin líneas. Agrega un producto del catálogo o una descripción libre.'}</span></div></td></tr>
                   )}
                 </tbody>
               </table>

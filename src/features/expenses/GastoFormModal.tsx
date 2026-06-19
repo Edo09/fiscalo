@@ -8,6 +8,7 @@ import { CATEGORIA_TIPOS, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import type { Proveedor } from '@/types/domain'
+import { gastoFormSchema, mapGastoIssues, emptyGastoErrors, type GastoFormErrors } from './gasto.schema'
 
 interface Linea {
   id: number
@@ -36,6 +37,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const [conProveedor, setConProveedor] = useState(false)
   const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<GastoFormErrors>(emptyGastoErrors)
   const [saving, setSaving] = useState(false)
 
   const tiposPermitidos = CATEGORIA_TIPOS[categoria]
@@ -51,10 +53,22 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const seqCompra = (!recibido && esCompra) ? stats.data?.secuencias.find((s) => s.type === tipo) : undefined
   const proximoNcfCompra = seqCompra != null ? `${tipo}${String(seqCompra.secuencia_actual + 1).padStart(10, '0')}` : null
 
+  // Limpia los errores en línea de una fila al editarla (o al eliminarla).
+  const clearLineaErr = (id: number) =>
+    setErrors((e) =>
+      e.lineas[id]
+        ? { ...e, lineas: Object.fromEntries(Object.entries(e.lineas).filter(([k]) => Number(k) !== id)) }
+        : e,
+    )
   const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
-  const delLinea = (id: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
-  const updLinea = (id: number, key: keyof Linea, val: string | number) =>
+  const delLinea = (id: number) => {
+    setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
+    clearLineaErr(id)
+  }
+  const updLinea = (id: number, key: keyof Linea, val: string | number) => {
     setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, [key]: val } : l)))
+    clearLineaErr(id)
+  }
 
   const { subtotal, itbis, total } = useMemo(() => {
     const sub = lineas.reduce((a, l) => a + l.amount * l.quantity, 0)
@@ -62,17 +76,32 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     return { subtotal: sub, itbis: itb, total: sub + itb }
   }, [lineas])
 
+  // Líneas con algún contenido (las completamente vacías se ignoran). Gastos
+  // menores (E43): proveedor opcional; el backend pone fecha/etiqueta por defecto.
+  const lineasConContenido = () =>
+    lineas.filter((l) => l.description.trim() !== '' || l.amount > 0 || l.itbis_amount > 0)
+
+  /**
+   * Valida el formulario con Zod (gastoFormSchema). Pinta errores en línea por
+   * campo/línea y muestra un toast resumen. Devuelve true si el form es válido.
+   */
+  function validateForm(): boolean {
+    const validables = lineasConContenido()
+    const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, proveedor, ncf, lineas: validables })
+    if (!res.success) {
+      setErrors(mapGastoIssues(res.error, validables))
+      const n = res.error.issues.length
+      toast.error(n === 1 ? 'Revisa 1 campo del formulario.' : `Revisa ${n} campos del formulario.`)
+      return false
+    }
+    setErrors(emptyGastoErrors())
+    return true
+  }
+
   const submit = async () => {
     setError(null)
-    // Gastos menores (E43): proveedor enteramente opcional (el e-CF 43 se emite
-    // sin comprador y el backend pone fecha y etiqueta por defecto).
-    if (esCompra) {
-      if (!proveedor) { setError('Selecciona un proveedor del directorio o crea uno nuevo.'); return }
-      if (!proveedor.rnc) { setError('El proveedor seleccionado no tiene RNC; complétalo en Proveedores.'); return }
-      if (recibido && !ncf.trim()) { setError(`El tipo ${tipo} es recibido: digita el NCF que entregó el proveedor.`); return }
-    }
-    const items = lineas.filter((l) => l.description.trim() && l.amount > 0)
-    if (items.length === 0) { setError('Agrega al menos una línea con descripción e importe.'); return }
+    if (!validateForm()) return
+    const items = lineasConContenido()
 
     // En gastos menores el proveedor solo viaja si el usuario activó la sección.
     const incluirProveedor = (esCompra || conProveedor) && proveedor != null
@@ -159,9 +188,10 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
             </div>
           </div>
         ) : recibido ? (
-          <div className="field">
+          <div className={'field' + (errors.ncf ? ' field-error' : '')}>
             <label>NCF del proveedor <span className="req">*</span></label>
-            <input className="input mono" value={ncf} onChange={(e) => setNcf(e.target.value)} placeholder="E310000000123" />
+            <input className="input mono" value={ncf} onChange={(e) => { setNcf(e.target.value); if (errors.ncf) setErrors((er) => ({ ...er, ncf: undefined })) }} placeholder="E310000000123" />
+            {errors.ncf && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.ncf}</div>}
           </div>
         ) : (
           <div className="field">
@@ -201,9 +231,10 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
           </>
         ) : (
           <>
-            <div className="field full">
+            <div className={'field full' + (errors.proveedor ? ' field-error' : '')}>
               <label>Proveedor <span className="req">*</span></label>
-              <ProveedorCombobox value={proveedor} onChange={setProveedor} />
+              <ProveedorCombobox value={proveedor} onChange={(p) => { setProveedor(p); if (errors.proveedor) setErrors((er) => ({ ...er, proveedor: undefined })) }} />
+              {errors.proveedor && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.proveedor}</div>}
             </div>
             {recibido && (
               <div className="field">
@@ -232,19 +263,43 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
             </tr>
           </thead>
           <tbody>
-            {lineas.map((l) => (
+            {lineas.map((l) => {
+              const le = errors.lineas[l.id]
+              return (
               <tr key={l.id} style={{ cursor: 'default' }}>
-                <td><input className="input" style={{ padding: '5px 8px' }} value={l.description} onChange={(e) => updLinea(l.id, 'description', e.target.value)} placeholder="Concepto…" /></td>
-                <td><input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 56 }} type="number" value={l.quantity} onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)} /></td>
-                <td><UnidadMedidaSelect style={{ padding: '5px 8px' }} value={l.unidad_medida} onChange={(v) => updLinea(l.id, 'unidad_medida', v)} /></td>
-                <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} /></td>
-                <td><input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.itbis_amount} onChange={(e) => updLinea(l.id, 'itbis_amount', +e.target.value || 0)} /></td>
+                <td className={le?.description ? 'field-error' : undefined}>
+                  <input className="input" style={{ padding: '5px 8px' }} value={l.description} onChange={(e) => updLinea(l.id, 'description', e.target.value)} placeholder="Concepto…" />
+                  {le?.description && <div className="err-msg">{le.description}</div>}
+                </td>
+                <td className={le?.quantity ? 'field-error' : undefined}>
+                  <input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 56 }} type="number" value={l.quantity} onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)} />
+                  {le?.quantity && <div className="err-msg">{le.quantity}</div>}
+                </td>
+                <td className={le?.unidad_medida ? 'field-error' : undefined}>
+                  <UnidadMedidaSelect style={{ padding: '5px 8px' }} value={l.unidad_medida} onChange={(v) => updLinea(l.id, 'unidad_medida', v)} />
+                  {le?.unidad_medida && <div className="err-msg">{le.unidad_medida}</div>}
+                </td>
+                <td className={le?.amount ? 'field-error' : undefined}>
+                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} />
+                  {le?.amount && <div className="err-msg">{le.amount}</div>}
+                </td>
+                <td className={le?.itbis_amount ? 'field-error' : undefined}>
+                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.itbis_amount} onChange={(e) => updLinea(l.id, 'itbis_amount', +e.target.value || 0)} />
+                  {le?.itbis_amount && <div className="err-msg">{le.itbis_amount}</div>}
+                </td>
                 <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
+
+      {errors.form && (
+        <div className="row gap-sm text-sm mt-sm" style={{ color: 'var(--danger)', alignItems: 'center' }}>
+          <Icon name="alert-circle" size={13} />{errors.form}
+        </div>
+      )}
 
       <div className="row between mt-md" style={{ alignItems: 'center' }}>
         <Badge tone={recibido ? 'neutral' : 'accent'}>

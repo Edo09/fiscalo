@@ -1,5 +1,7 @@
 // Punto de entrada del cliente API.
 export * from './types'
+export { createFacturaSchema } from './schemas/factura'
+export { createGastoSchema } from './schemas/gasto'
 export { ApiError } from './http'
 export { DEFAULT_USER_ID } from './config'
 export {

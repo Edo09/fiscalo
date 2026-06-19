@@ -1,5 +1,6 @@
 // Servicio: gastos (módulo de egresos / e-CF de compras).
 import { getJson, postJson, getBlob, getList, qs } from './http'
+import { createGastoSchema } from './schemas/gasto'
 import type {
   CreateGastoInput,
   GastoListParams,
@@ -37,5 +38,7 @@ export function getGastoXml(id: number): Promise<{ blob: Blob; filename: string 
 }
 
 export function createGasto(input: CreateGastoInput): Promise<GastoRow> {
-  return postJson<GastoRow>('/api/gastos', input)
+  // Validación de frontera: ningún payload malformado llega al backend.
+  const body = createGastoSchema.parse(input)
+  return postJson<GastoRow>('/api/gastos', body)
 }

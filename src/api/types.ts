@@ -1,18 +1,23 @@
 // Tipos de petición/respuesta de la API e-CF.
 // Derivados de ecf-api-payloads.md y del esquema gratexdb.
+import type { GastoCategoria } from './schemas/gasto'
 
 /** Envoltorio estándar de respuesta de la API. */
 export type ApiEnvelope<T> =
   | { status: true; data: T }
   | { status: false; error: string }
 
-/** Tipos de comprobante fiscal electrónico (DGII). */
-export type TipoEcf = '31' | '32' | '33' | '34' | '41' | '43' | '44' | '45' | '46' | '47'
-
-/** 1=ITBIS 18%, 2=ITBIS 16%, 3=Tasa cero, 4=Exento. */
-export type IndicadorFacturacion = 1 | 2 | 3 | 4
-/** 1=Bien, 2=Servicio. */
-export type IndicadorBienServicio = 1 | 2
+// Tipos del payload e-CF inferidos desde los esquemas Zod (fuente única de verdad).
+export type {
+  TipoEcf,
+  IndicadorFacturacion,
+  IndicadorBienServicio,
+  FacturaItemInput,
+  CompradorInput,
+  TotalesInput,
+  InformacionReferencia,
+  CreateFacturaInput,
+} from './schemas/factura'
 
 /** Estados posibles devueltos por DGII. */
 export type EstadoDgii =
@@ -28,64 +33,10 @@ export type EstadoDgii =
 
 // ---------------------------------------------------------------------------
 // Crear factura — POST /api/facturas
+// El payload (FacturaItemInput, CompradorInput, TotalesInput,
+// InformacionReferencia, CreateFacturaInput) se infiere de los esquemas Zod en
+// ./schemas/factura y se re-exporta arriba.
 // ---------------------------------------------------------------------------
-
-export interface FacturaItemInput {
-  numero_linea?: number
-  nombre_item: string
-  indicador_facturacion: IndicadorFacturacion
-  indicador_bien_servicio: IndicadorBienServicio
-  cantidad: number
-  unidad_medida: string
-  precio_unitario: number
-  // Retenciones (E41/E47) — opcionales, el backend las calcula si faltan.
-  indicador_agente_retencion_percepcion?: string
-  monto_itbis_retenido?: number
-  monto_isr_retenido?: number
-}
-
-export interface CompradorInput {
-  rnc?: string
-  razon_social?: string
-  identificador_extranjero?: string
-  direccion?: string
-  municipio?: string
-  provincia?: string
-  correo?: string
-  contacto?: string
-}
-
-export interface TotalesInput {
-  itbis1?: string
-  itbis2?: string
-  itbis3?: string
-  total_itbis_retenido?: number
-  total_isr_retencion?: number
-}
-
-export interface InformacionReferencia {
-  ncf_modificado: string
-  rnc_otro_contribuyente: string | null
-  fecha_ncf_modificado: string
-  codigo_modificacion: string
-  razon_modificacion: string
-}
-
-export interface CreateFacturaInput {
-  client_id: number
-  tipo_ecf: TipoEcf
-  items: FacturaItemInput[]
-  user_id?: number
-  fecha_emision?: string
-  tipo_pago?: number
-  tipo_ingresos?: string
-  indicador_monto_gravado?: string
-  indicador_nota_credito?: string
-  comprador?: CompradorInput
-  totales?: TotalesInput
-  informacion_referencia?: InformacionReferencia
-  e_ncf?: string
-}
 
 /** Respuesta de POST /api/facturas. */
 export interface CreateFacturaResponse {
@@ -532,19 +483,13 @@ export interface AssignRoleInput {
 // Gastos — /api/gastos (tablas gastos / gasto_items)
 // ---------------------------------------------------------------------------
 
-export type GastoCategoria = 'gastos_menores' | 'facturas_proveedores'
-/** Auto-emitidos por la empresa: E41/E43/E47. Recibidos: E31/B01/E33/E34. */
-export type GastoTipo = 'E43' | 'E41' | 'E47' | 'E31' | 'B01' | 'E33' | 'E34'
-
-export interface GastoItemInput {
-  description: string
-  amount: number
-  quantity?: number
-  subtotal?: number
-  itbis_amount?: number
-  /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
-  unidad_medida?: string
-}
+// Tipos del payload de gastos inferidos desde los esquemas Zod (./schemas/gasto).
+export type {
+  GastoCategoria,
+  GastoTipo,
+  GastoItemInput,
+  CreateGastoInput,
+} from './schemas/gasto'
 
 // ---------------------------------------------------------------------------
 // Unidades de medida — catálogo DGII (/api/unidades-medida)
@@ -557,20 +502,7 @@ export interface UnidadMedida {
   descripcion: string
 }
 
-export interface CreateGastoInput {
-  categoria: GastoCategoria
-  tipo_gasto: GastoTipo
-  rnc_proveedor: string
-  nombre_proveedor: string
-  /** Solo para tipos recibidos (E31/B01/E33/E34); en auto-emisión se ignora. */
-  ncf?: string
-  items: GastoItemInput[]
-  fecha?: string
-  subtotal?: number
-  itbis?: number
-  total?: number
-  user_id?: number
-}
+// CreateGastoInput se infiere desde ./schemas/gasto (re-exportado arriba).
 
 export interface GastoItemRow {
   id?: number
