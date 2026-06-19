@@ -17,6 +17,9 @@ export interface SessionUser {
   username: string
   name: string
   role: string
+  /** Módulos del rol (ej. ["facturas","gastos"] o ["*"] para admin). Lo provee
+      el backend en login y /api/auth/me; ausente en sesiones viejas (fail-open). */
+  permissions?: string[]
 }
 
 interface AuthState {

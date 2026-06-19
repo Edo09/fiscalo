@@ -54,6 +54,9 @@ export interface NavItem {
   icon: string
   badge?: number
   badgeTone?: BadgeTone
+  /** Módulo RBAC requerido para ver este item (del catálogo en config/permissions).
+      Sin `module` => siempre visible. Ver hasModule() / docs/roles-permisos.md. */
+  module?: string
 }
 
 export interface NavGroup {
@@ -72,50 +75,61 @@ export const NAV: NavGroup[] = [
   {
     group: 'Ventas',
     items: [
-      { id: 'facturas', label: 'Facturación', icon: 'file-text' },
-      { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus' },
-      { id: 'clientes', label: 'Clientes', icon: 'users' },
+      { id: 'facturas', label: 'Facturación', icon: 'file-text', module: 'facturas' },
+      { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus', module: 'cotizaciones' },
+      { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
     ],
   },
   {
     group: 'Inventario',
     items: [
-      { id: 'productos', label: 'Productos y servicios', icon: 'package' },
-      { id: 'categorias', label: 'Categorías', icon: 'tag' },
-      { id: 'almacenes', label: 'Almacenes', icon: 'archive' },
+      { id: 'productos', label: 'Productos y servicios', icon: 'package', module: 'products' },
+      { id: 'categorias', label: 'Categorías', icon: 'tag', module: 'categories' },
+      { id: 'almacenes', label: 'Almacenes', icon: 'archive', module: 'warehouses' },
     ],
   },
   {
     group: 'Compras',
     items: [
-      { id: 'gastos', label: 'Gastos', icon: 'receipt' },
-      { id: 'compras', label: 'Compras', icon: 'shopping-cart' },
-      { id: 'proveedores', label: 'Proveedores', icon: 'truck' },
+      { id: 'gastos', label: 'Gastos', icon: 'receipt', module: 'gastos' },
+      { id: 'compras', label: 'Compras', icon: 'shopping-cart', module: 'gastos' },
+      { id: 'proveedores', label: 'Proveedores', icon: 'truck', module: 'proveedores' },
     ],
   },
     {
     group: 'Fiscal · DGII',
     items: [
-      { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check' },
-      { id: 'aprobar-ecf', label: 'Aprobar e-CF', icon: 'check-circle' },
+      { id: 'ecf', label: 'Comprobantes e-CF', icon: 'badge-check', module: 'facturas' },
+      { id: 'aprobar-ecf', label: 'Aprobar e-CF', icon: 'check-circle', module: 'aprobaciones' },
       // 'bandeja-dgii' (Bandeja DGII) oculto: redundante con el dashboard e-CF (estado por tipo).
     ],
   },
   {
     group: 'Finanzas',
     items: [
+      // 'tesoreria' sin módulo en el catálogo → siempre visible (el backend igual valida).
       { id: 'tesoreria', label: 'Tesorería', icon: 'landmark' },
-      { id: 'reportes', label: 'Reportes', icon: 'bar-chart-3' },
+      { id: 'reportes', label: 'Reportes', icon: 'bar-chart-3', module: 'reportes' },
     ],
   },
   {
     group: 'Administración',
     items: [
-      { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield' },
+      { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield', module: 'users' },
       { id: 'configuracion', label: 'Configuración', icon: 'settings' },
     ],
   },
 ]
+
+/** Módulo RBAC asociado a una vista (resolviendo subvistas a su item del menú).
+    undefined => la vista no está gateada (siempre accesible). */
+export function navModuleFor(view: ViewId): string | undefined {
+  for (const g of NAV) {
+    const it = g.items.find((i) => i.id === view)
+    if (it) return it.module
+  }
+  return undefined
+}
 
 export const TITLES: Record<ViewId, string> = {
   dashboard: 'Dashboard',

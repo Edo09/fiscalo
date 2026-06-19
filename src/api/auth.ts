@@ -69,6 +69,41 @@ export async function login(emailOrUsername: string, password: string, tenantId?
   return body.data as LoginResult
 }
 
+/**
+ * Devuelve el usuario actual (rol + permisos vivos) sin re-login. Úsalo para
+ * refrescar los módulos cuando un admin cambia el rol. GET con el mismo
+ * envoltorio { success, data } de los demás /api/auth/*.
+ */
+export async function me(): Promise<SessionUser> {
+  const token = getToken()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(30_000),
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+  } catch (e) {
+    throw networkError(e)
+  }
+  const raw = await res.text()
+  let body: AuthEnvelope<{ user: SessionUser }> | null = null
+  if (raw) {
+    try {
+      body = JSON.parse(raw) as AuthEnvelope<{ user: SessionUser }>
+    } catch {
+      throw new ApiError(`Respuesta no válida del servidor (HTTP ${res.status}).`, res.status)
+    }
+  }
+  if (!body || body.success !== true || !body.data?.user) {
+    throw new ApiError(body?.error || `Error HTTP ${res.status}.`, res.status)
+  }
+  return body.data.user
+}
+
 /** Revoca el token en el backend (best-effort). El borrado local lo hace clearSession(). */
 export async function logout(): Promise<void> {
   try {

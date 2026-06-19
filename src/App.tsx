@@ -29,8 +29,10 @@ import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
-import { useSession } from '@/stores/auth'
-import { isFacturaPrefill, isNuevoSignal, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import { useSession, getToken, setSession } from '@/stores/auth'
+import { me } from '@/api/auth'
+import { hasModule } from '@/config/permissions'
+import { isFacturaPrefill, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -50,6 +52,7 @@ function App() {
 }
 
 function AppShell() {
+  const { user } = useSession()
   const [view, setView] = useState<ViewId>(() => (localStorage.getItem('fiscalo.view') as ViewId) || 'dashboard')
   const [payload, setPayload] = useState<NavPayload>(null)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
@@ -62,6 +65,14 @@ function AppShell() {
   }, [theme])
   useEffect(() => { localStorage.setItem('fiscalo.view', view) }, [view])
   useEffect(() => { document.documentElement.setAttribute('data-accent', THEME.accent) }, [])
+
+  // Refresca rol/permisos vivos desde el backend al montar (sin re-login), así el
+  // menú refleja cambios de rol. Best-effort: si falla, se conserva la sesión actual.
+  useEffect(() => {
+    const token = getToken()
+    if (!token) return
+    me().then((u) => setSession(token, u)).catch(() => {})
+  }, [])
 
   const sbClass = THEME.sidebarStyle === 'contraste' ? ' sb-contrast' : THEME.sidebarStyle === 'compacto' ? ' sb-compact' : ''
 
@@ -91,6 +102,14 @@ function AppShell() {
         : view.startsWith('reportes')
           ? 'reportes'
           : view
+
+  // Si el rol no tiene el módulo de la vista actual, volver al dashboard (evita
+  // quedar en una página que el backend va a rechazar con 403). Fail-open sin permisos.
+  useEffect(() => {
+    const mod = navModuleFor(activeTop as ViewId)
+    const perms = user?.permissions
+    if (mod && perms && !hasModule(perms, mod)) nav('dashboard')
+  }, [activeTop, user, nav])
 
   const renderView = () => {
     switch (view) {
