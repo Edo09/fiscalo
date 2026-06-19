@@ -107,7 +107,8 @@ export const NAV: NavGroup[] = [
   {
     group: 'Finanzas',
     items: [
-      // 'tesoreria' sin módulo en el catálogo → siempre visible (el backend igual valida).
+      // 'tesoreria' no tiene módulo RBAC propio → siempre visible (solo se ocultan
+      // las páginas con un permiso real que el rol no tenga).
       { id: 'tesoreria', label: 'Tesorería', icon: 'landmark' },
       { id: 'reportes', label: 'Reportes', icon: 'bar-chart-3', module: 'reportes' },
     ],
@@ -116,6 +117,7 @@ export const NAV: NavGroup[] = [
     group: 'Administración',
     items: [
       { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield', module: 'users' },
+      // 'configuracion' sin módulo RBAC propio → siempre visible.
       { id: 'configuracion', label: 'Configuración', icon: 'settings' },
     ],
   },
