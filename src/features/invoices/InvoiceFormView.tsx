@@ -235,6 +235,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   const emitir = async () => {
+    if (emitting) return
     if (!validateForm()) return
     const payload = buildPayload()
     if (!payload) return
@@ -266,10 +267,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         codigoSeguridad: res.codigo_seguridad,
         estadoDgiiRaw: res.estado_dgii,
       }
+      // No se rehabilita el botón en éxito: queda deshabilitado (con spinner)
+      // durante la ventana previa al redirect para evitar una segunda emisión.
       setTimeout(() => nav('factura-ver', created), 1200)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
-    } finally {
       setEmitting(false)
     }
   }
