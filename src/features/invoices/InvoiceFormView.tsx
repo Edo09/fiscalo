@@ -193,6 +193,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     { code: '33', n: 'Nota de Débito' },
   ]
   const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
+  // E32 (Consumo) y E43 (Gastos Menores) se pueden emitir sin cliente (consumidor
+  // final); el resto sí lo requiere. Igual criterio que el backend.
+  const requiereCliente = tipo !== '32' && tipo !== '43'
 
   /**
    * Valida el formulario con Zod (facturaFormSchema). Pinta errores en línea por
@@ -212,7 +215,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
   /** Construye el payload para POST /api/facturas (asume formulario ya validado). */
   function buildPayload(): CreateFacturaInput | null {
-    if (!cliente) return null
+    // E32/E43 pueden emitirse sin cliente (consumidor final); el resto lo exige.
+    if (!cliente && requiereCliente) return null
     const items: FacturaItemInput[] = lineas.map((l, i) => ({
       numero_linea: i + 1,
       nombre_item: l.nombre,
@@ -223,7 +227,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       precio_unitario: l.precio,
     }))
     return {
-      client_id: Number(cliente.id),
+      // Sin cliente (E32/E43) se omite client_id: el backend factura a consumidor final.
+      ...(cliente ? { client_id: Number(cliente.id) } : {}),
       // Emisor = usuario autenticado (id del login). Fallback al .env por si acaso.
       user_id: user?.id ?? DEFAULT_USER_ID,
       tipo_ecf: tipo,
@@ -252,9 +257,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         facturaId: res.factura_id,
         ncf: res.e_ncf,
         tipo: res.tipo_ecf,
-        cliente: cliente!.nombre,
-        clienteId: cliente!.id,
-        rnc: cliente!.doc,
+        cliente: cliente?.nombre ?? 'Consumidor final',
+        clienteId: cliente?.id ?? '',
+        rnc: cliente?.doc ?? '',
         fecha: formatApiDate(res.fecha_emision_dgii),
         vence: '—',
         subtotal,
@@ -277,7 +282,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   const previsualizar = async () => {
-    if (!validateForm() || !cliente) return
+    // validateForm ya exige cliente salvo en E32/E43 (consumidor final).
+    if (!validateForm()) return
     setPreviewing(true)
     const tid = toast.loading('Generando vista previa…')
     try {
@@ -290,7 +296,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         unidad_medida: String(l.unidadMedida),
         precio_unitario: l.precio,
       }))
-      const doc = await previewFactura({ client_id: Number(cliente.id), tipo_ecf: tipo, items })
+      const doc = await previewFactura({ ...(cliente ? { client_id: Number(cliente.id) } : {}), tipo_ecf: tipo, items })
       presentDocument(doc)
       toast.success('Vista previa generada.', { id: tid })
     } catch (e) {
@@ -334,7 +340,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           <Card title="Datos del comprobante">
             <div className="form-grid">
               <div className={'field full' + (errors.cliente ? ' field-error' : '')}>
-                <label>Cliente <span className="req">*</span></label>
+                <label>Cliente {requiereCliente ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
                 <ClientCombobox value={cliente} onChange={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }} />
                 {errors.cliente && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.cliente}</div>}
               </div>

@@ -56,7 +56,8 @@ export const informacionReferenciaSchema = z.object({
 })
 
 export const createFacturaSchema = z.object({
-  client_id: z.number().int().positive(),
+  // Opcional: E32 (Consumo) y E43 (Gastos Menores) se emiten sin comprador.
+  client_id: z.number().int().positive().optional(),
   tipo_ecf: tipoEcfSchema,
   items: z.array(facturaItemSchema).min(1, 'Agrega al menos un producto o servicio.'),
   user_id: z.number().int().optional(),

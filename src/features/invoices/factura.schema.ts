@@ -21,8 +21,14 @@ export const facturaFormSchema = z
     lineas: z.array(lineaSchema).min(1, 'Agrega al menos un producto o servicio.'),
   })
   .superRefine((val, ctx) => {
+    // E32 (Consumo) y E43 (Gastos Menores) pueden emitirse sin comprador
+    // (consumidor final); el resto sí exige cliente. Igual que el backend
+    // (facturaController: $permiteSinCliente).
+    const permiteSinCliente = val.tipo === '32' || val.tipo === '43'
     if (!val.cliente) {
-      ctx.addIssue({ code: 'custom', path: ['cliente'], message: 'Selecciona un cliente.' })
+      if (!permiteSinCliente) {
+        ctx.addIssue({ code: 'custom', path: ['cliente'], message: 'Selecciona un cliente.' })
+      }
     } else if (val.tipo === '31' && !String(val.cliente.doc ?? '').trim()) {
       ctx.addIssue({ code: 'custom', path: ['cliente'], message: 'El cliente debe tener RNC para e-CF 31 (Crédito Fiscal).' })
     }
