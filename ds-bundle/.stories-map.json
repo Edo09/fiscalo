@@ -1,0 +1,236 @@
+{
+  "global": "Fiscalo",
+  "pkg": "fiscalo",
+  "pkgDir": "C:\\Users\\edgarcia\\Documents\\facturacion\\fiscalo",
+  "extraEntries": [],
+  "exported": [],
+  "storybookStatic": null,
+  "keyRecipe": 7,
+  "cfgSliceGlobal": "b0ae233bd63cfaf1587ba3e983f272b05e2020d902380b9454b11c47a051328e",
+  "components": [
+    {
+      "name": "Avatar",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Badge",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "BarChart",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Btn",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Card",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Checkbox",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Donut",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Drawer",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Dropdown",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "EmptyState",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "ErrorState",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "EstadoBadge",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Icon",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Image",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "KPI",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "LoadingState",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "MenuItem",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Modal",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Money",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "PageHead",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Pagination",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Progress",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "RefreshButton",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Seg",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Sparkline",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Spinner",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Switch",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    },
+    {
+      "name": "Tabs",
+      "group": "general",
+      "srcSha": null,
+      "sourceKey": "96fc9a2dfcfcb759",
+      "cfgSlice": "5ff899b099eb6923833804cda955efdd69101524bec86f67dac5537cd81802e8",
+      "stories": []
+    }
+  ]
+}

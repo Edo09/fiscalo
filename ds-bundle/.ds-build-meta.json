@@ -1,0 +1,9 @@
+{
+  "namespace": "Fiscalo",
+  "source": "fiscalo@1.0.0",
+  "shape": "package",
+  "provider": null,
+  "componentCount": 28,
+  "skippedStoryIds": [],
+  "runtimeFontPrefixes": []
+}
