@@ -307,7 +307,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   return (
-    <div className="page page-wide">
+    <div className="page page-wide factura-new">
       <PageHead
         crumbs={[{ label: 'Facturación', onClick: () => nav('facturas') }, { label: 'Nueva factura' }]}
         title="Nueva factura"
@@ -353,16 +353,25 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               </div>
               <div className="field">
                 <label>e-NCF a asignar</label>
-                <div className="input row gap-sm" style={{ alignItems: 'center', background: 'var(--surface-2)', cursor: 'default' }}>
-                  <Icon name="hash" size={15} style={{ color: 'var(--text-3)' }} />
-                  {stats.loading ? (
-                    <span className="text-sm muted">Cargando…</span>
-                  ) : proximoNcf ? (
-                    <span className="mono fw6">{proximoNcf}</span>
-                  ) : (
+                {stats.loading ? (
+                  <div className="ncf-callout" style={{ background: 'var(--surface-2)', borderColor: 'var(--border)' }}>
+                    <span className="ncf-ic" style={{ color: 'var(--text-3)' }}><Icon name="hash" size={15} /></span>
+                    <span className="text-sm muted">Cargando secuencia…</span>
+                  </div>
+                ) : proximoNcf ? (
+                  <div className="ncf-callout">
+                    <span className="ncf-ic"><Icon name="hash" size={15} /></span>
+                    <span className="ncf-meta">
+                      <span className="ncf-lbl">Próximo comprobante</span>
+                      <span className="ncf-num">{proximoNcf}</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="ncf-callout" style={{ background: 'var(--surface-2)', borderColor: 'var(--border)' }}>
+                    <span className="ncf-ic" style={{ color: 'var(--text-3)' }}><Icon name="hash" size={15} /></span>
                     <span className="text-sm muted-3">{stats.error ? 'No disponible' : 'Sin secuencia'}</span>
-                  )}
-                </div>
+                  </div>
+                )}
                 {rangoRestantes != null && rangoRestantes <= 10 ? (
                   <div className="row gap-sm text-xs" style={{ marginTop: 4, color: 'var(--danger)', alignItems: 'center' }}>
                     <Icon name="alert-triangle" size={13} />
@@ -382,17 +391,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                   {metodos.map((m) => <option key={m}>{m}</option>)}
                 </select>
               </div>
-              <div className="field full">
-                <span className="row gap-sm" style={{ alignItems: 'center', cursor: 'pointer' }} onClick={() => setPrecioConItbis(!precioConItbis)}>
-                  <Switch on={precioConItbis} onChange={setPrecioConItbis} />
-                  <span className="text-sm">Los precios incluyen ITBIS</span>
+              <label className={'field full opt-row' + (precioConItbis ? ' on' : '')} onClick={() => setPrecioConItbis(!precioConItbis)}>
+                <Switch on={precioConItbis} onChange={setPrecioConItbis} />
+                <span className="opt-txt">
+                  <span className="text-sm fw6">Los precios incluyen ITBIS</span>
+                  <span className="text-xs muted-3">
+                    {precioConItbis
+                      ? 'El ITBIS se desglosa del precio de cada línea (no se suma encima).'
+                      : 'El ITBIS se calcula y se suma encima del precio de cada línea.'}
+                  </span>
                 </span>
-                <div className="text-xs muted-3" style={{ marginTop: 4 }}>
-                  {precioConItbis
-                    ? 'El ITBIS se desglosa del precio de cada línea (no se suma encima).'
-                    : 'El ITBIS se calcula y se suma encima del precio de cada línea.'}
-                </div>
-              </div>
+              </label>
             </div>
           </Card>
 
@@ -407,15 +416,16 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 160 }}>Descripción</th><th className="num" style={{ width: 76 }}>Cant.</th>
-                    <th style={{ width: 150 }}>Unidad</th>
-                    <th className="num" style={{ width: 110 }}>Precio</th><th className="num" style={{ width: 76 }}>Desc%</th>
-                    <th style={{ width: 130 }}>ITBIS</th><th className="num" style={{ width: 110 }}>Importe</th><th style={{ width: 40 }}></th>
+                    <th style={{ minWidth: 150 }}>Descripción</th><th className="num" style={{ width: 62 }}>Cant.</th>
+                    <th style={{ width: 116 }}>Unidad</th>
+                    <th className="num" style={{ width: 96 }}>Precio</th><th className="num" style={{ width: 62 }}>Desc%</th>
+                    <th style={{ width: 100 }}>ITBIS</th><th className="num" style={{ width: 100 }}>Importe</th><th style={{ width: 36 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {lineas.map((l) => {
                     const le = errors.lineas[l.id]
+                    const c = calc(l)
                     return (
                     <tr key={l.id} style={{ cursor: 'default' }}>
                       <td className={'cell-input' + (le?.nombre ? ' field-error' : '')}>
@@ -455,7 +465,12 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                           {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </td>
-                      <td className="num fw6"><Money value={calc(l).importe} cur={false} /></td>
+                      <td className="num">
+                        <div className="imp-cell">
+                          <span className="fw6"><Money value={c.importe} cur={false} /></span>
+                          <span className="imp-sub">ITBIS <Money value={c.itbis} cur={false} /></span>
+                        </div>
+                      </td>
                       <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
                     </tr>
                     )
@@ -479,12 +494,20 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
         <div className="col gap-md" style={{ position: 'sticky', top: 16 }}>
           <Card title="Resumen">
+            <div className="row between mb-sm">
+              <span className="sum-head">Desglose</span>
+              <span className="text-xs muted-3">{lineas.length} {lineas.length === 1 ? 'línea' : 'líneas'}</span>
+            </div>
             <div className="col gap-sm">
               <div className="row between text-sm"><span className="muted">Subtotal</span><Money value={subtotal} cur={false} /></div>
-              <div className="row between text-sm"><span className="muted">Descuentos</span><span className="num" style={{ color: descTotal > 0 ? 'var(--danger)' : 'inherit' }}>{descTotal > 0 ? '−' : ''}<Money value={descTotal} cur={false} /></span></div>
+              {descTotal > 0 && (
+                <div className="row between text-sm"><span className="muted">Descuentos</span><span className="num" style={{ color: 'var(--danger)' }}>−<Money value={descTotal} cur={false} /></span></div>
+              )}
               <div className="row between text-sm"><span className="muted">ITBIS</span><Money value={itbisTotal} cur={false} /></div>
-              <div className="divider" style={{ margin: '6px 0' }}></div>
-              <div className="row between" style={{ fontSize: 19, fontWeight: 700 }}><span>Total</span><Money value={total} /></div>
+            </div>
+            <div className="total-block">
+              <span className="t-lbl">Total</span>
+              <span className="t-val"><Money value={total} /></span>
             </div>
             <div className="text-xs muted-3 mt-sm">Totales estimados. El monto fiscal definitivo lo calcula el backend al emitir.</div>
             <Btn variant="primary" icon="send" className="mt-md" style={{ width: '100%' }} onClick={emitir} disabled={emitting}>{emitting ? 'Emitiendo…' : 'Emitir e-CF'}</Btn>

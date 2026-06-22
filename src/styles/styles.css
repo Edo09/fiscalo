@@ -533,6 +533,105 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .switch.on::after { transform: translateX(16px); }
 
 /* ============================================================
+   NUEVA FACTURA — refinamiento visual (scoped a .factura-new)
+   ============================================================ */
+/* e-NCF que se asignará: resaltado como dato fiscal clave, con filo de acento. */
+.factura-new .ncf-callout {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px 9px 14px;
+  border-radius: var(--r-sm); background: var(--accent-soft);
+  border: 1px solid var(--accent-soft-2);
+}
+.factura-new .ncf-callout::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent);
+}
+.factura-new .ncf-ic {
+  width: 30px; height: 30px; border-radius: var(--r-xs); flex-shrink: 0;
+  display: grid; place-items: center; background: var(--surface); color: var(--accent);
+}
+.factura-new .ncf-meta { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; min-width: 0; }
+.factura-new .ncf-lbl { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); }
+.factura-new .ncf-num { font-family: var(--font-mono); font-weight: 700; font-size: 14px; color: var(--accent-text); }
+
+/* Fila-opción (toggle ITBIS): marco que reacciona al estado. */
+.factura-new .opt-row {
+  display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); cursor: pointer; transition: border-color .12s, background .12s;
+}
+.factura-new .opt-row:hover { border-color: var(--text-3); }
+.factura-new .opt-row.on { border-color: var(--accent-soft-2); background: var(--accent-soft); }
+.factura-new .opt-row .opt-txt { display: flex; flex-direction: column; gap: 3px; }
+
+/* Selects de línea (Unidad/ITBIS): caret propio y compacto para que el valor
+   no quede recortado por la flecha nativa cuando la columna se comprime. */
+.factura-new .tbl select.line-input {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding: 7px 22px 7px 9px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23899099' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center; background-size: 11px;
+}
+
+/* Tabla de líneas: importe con desglose de ITBIS. */
+.factura-new .imp-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.factura-new .imp-cell .imp-sub { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Resumen: filas + bloque total destacado. */
+.factura-new .sum-head { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+.factura-new .total-block {
+  margin-top: 10px; padding: 13px 2px 2px; border-top: 1.5px solid var(--border-strong);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.factura-new .total-block .t-lbl { font-size: 14px; font-weight: 700; color: var(--text); }
+.factura-new .total-block .t-val {
+  font-family: var(--font-display); font-size: 26px; font-weight: 700;
+  letter-spacing: -.02em; color: var(--text);
+}
+.factura-new .total-block .t-val .num { color: inherit; }
+.factura-new .total-block .t-val .cur { color: var(--text-3); font-size: 14px; font-weight: 600; margin-right: 3px; }
+
+/* Profundidad: un lienzo más marcado para que las tarjetas blancas resalten
+   y se rompa la sensación de "todo blanco". */
+.factura-new { background: var(--surface-active); }
+.factura-new .card { box-shadow: var(--sh-sm); }
+.factura-new .card-head {
+  background: var(--surface-2);
+  border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg);
+}
+/* Tabla de líneas con textura: cabecera tintada + filas alternas. */
+.factura-new .tbl thead th { background: var(--surface-2); }
+.factura-new .tbl tbody tr:nth-child(even) td { background: var(--surface-2); }
+.factura-new .tbl tbody tr:hover td { background: var(--surface-hover); }
+
+/* ── Capa de diseño: entrada orquestada + micro-interacciones ── */
+@keyframes facturaRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.factura-new .page-head,
+.factura-new .dash-grid > .col { animation: facturaRise .5s cubic-bezier(.16,.84,.44,1) both; }
+.factura-new .dash-grid > .col:first-child { animation-delay: .06s; }
+.factura-new .dash-grid > .col:last-child  { animation-delay: .14s; }
+
+/* Filo de acento táctil en la fila al pasar el cursor. */
+.factura-new .tbl tbody tr td:first-child { box-shadow: inset 0 0 0 transparent; transition: box-shadow .12s; }
+.factura-new .tbl tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 -1px var(--accent); }
+
+/* Emitir: leve elevación que confirma la acción principal. */
+.factura-new .btn-primary { transition: transform .12s ease, box-shadow .12s ease, background .12s; }
+.factura-new .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--sh-md); }
+
+/* Contraste AA: subir los grises de 10.5px (text-3 → text-2). */
+.factura-new .imp-cell .imp-sub,
+.factura-new .sum-head { color: var(--text-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .factura-new .page-head,
+  .factura-new .dash-grid > .col { animation: none; }
+  .factura-new .btn-primary:hover:not(:disabled) { transform: none; }
+}
+
+/* ============================================================
    MODAL / DRAWER
    ============================================================ */
 .overlay { position: fixed; inset: 0; background: rgba(16,20,28,0.45); backdrop-filter: blur(2px); z-index: 100; display: grid; place-items: center; padding: 24px; animation: fade .15s ease; }
