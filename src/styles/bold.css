@@ -214,3 +214,45 @@ h1, h2, h3,
   radial-gradient(120% 60% at 100% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%),
   var(--bg); }
 [data-theme="dark"] .navbar { background: color-mix(in oklab, var(--surface) 82%, transparent); }
+
+/* ============================================================
+   MOVIMIENTO Y FOCO — capa global
+   Entrada orquestada por vista, micro-interacciones uniformes y
+   foco de teclado accesible. Respeta prefers-reduced-motion.
+   `backwards` (no `forwards`): sostiene el estado inicial durante el
+   retardo del escalonado y luego libera, para no congelar `transform`
+   y romper los hovers (p.ej. el realce de las KPI).
+   ============================================================ */
+@keyframes appFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes appRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Cada vista revela su contenido al montar (cambio de ruta).
+   Solo opacidad en .page: sin transform no crea bloque contenedor que
+   descoloque overlays/modales fijos. */
+.page { animation: appFade .45s ease backwards; }
+.page-head { animation: appRise .5s cubic-bezier(.16,.84,.44,1) backwards; }
+
+/* KPIs entran en cascada. */
+.kpi-grid > .kpi { animation: appRise .5s cubic-bezier(.16,.84,.44,1) backwards; }
+.kpi-grid > .kpi:nth-child(2) { animation-delay: .05s; }
+.kpi-grid > .kpi:nth-child(3) { animation-delay: .10s; }
+.kpi-grid > .kpi:nth-child(4) { animation-delay: .15s; }
+.kpi-grid > .kpi:nth-child(5) { animation-delay: .20s; }
+.kpi-grid > .kpi:nth-child(6) { animation-delay: .25s; }
+
+/* Botones: realimentación de pulsación + leve elevación al pasar. */
+.btn { transition: background .12s, border .12s, box-shadow .12s, color .12s, filter .12s, transform .1s; }
+.btn:not(:disabled):hover { transform: translateY(-1px); }
+.btn:not(:disabled):active { transform: translateY(1px); }
+
+/* Foco visible y consistente para teclado (no pisa el anillo de los inputs). */
+.btn:focus-visible, .nav-item:focus-visible, .tab:focus-visible,
+.filter-chip:focus-visible, .seg button:focus-visible, a:focus-visible,
+.menu-item:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page, .page-head, .kpi-grid > .kpi { animation: none; }
+  .btn:not(:disabled):hover, .btn:not(:disabled):active { transform: none; }
+}
