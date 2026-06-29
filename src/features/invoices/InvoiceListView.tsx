@@ -70,9 +70,10 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
   const aceptados = porEstado
     .filter((e) => ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO'].includes(e.estado))
     .reduce((a, e) => a + e.total, 0)
-  const rechazados = porEstado
-    .filter((e) => ['RECHAZADO', 'RFCE_RECHAZADO'].includes(e.estado))
-    .reduce((a, e) => a + e.total, 0)
+  const rechazadosBuckets = porEstado.filter((e) => ['RECHAZADO', 'RFCE_RECHAZADO'].includes(e.estado))
+  const rechazados = rechazadosBuckets.reduce((a, e) => a + e.total, 0)
+  // El "Monto total" excluye los rechazados: un comprobante rechazado no es ingreso.
+  const montoTotal = Number(resumen?.monto_total ?? 0) - rechazadosBuckets.reduce((a, e) => a + e.monto_total, 0)
 
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const total = data?.total ?? null
@@ -102,7 +103,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <KPI label="Comprobantes" value={resumen?.total_ecf ?? 0} icon="file-text" />
-        <KPI label="Monto total" value={Number(resumen?.monto_total ?? 0)} money icon="trending-up" iconBg="var(--success-soft)" iconColor="var(--success)" />
+        <KPI label="Monto total" value={montoTotal} money icon="trending-up" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Aceptados" value={aceptados} icon="check-circle" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Rechazados" value={rechazados} icon="x-circle" iconBg="var(--danger-soft)" iconColor="var(--danger)" />
       </div>
