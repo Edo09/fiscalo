@@ -21,7 +21,10 @@ import { facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErro
 interface Linea {
   id: number
   prodId: string
+  /** Nombre corto del ítem (DGII máx. 80 caracteres). */
   nombre: string
+  /** Detalle largo opcional (DGII máx. 1000): material, medidas, color, etc. */
+  descripcion: string
   cant: number
   precio: number
   desc: number
@@ -86,7 +89,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const [precioConItbis, setPrecioConItbis] = useState(prefill != null)
   const [lineas, setLineas] = useState<Linea[]>(() =>
     (prefill?.lineas ?? []).map((l, i) => ({
-      id: i + 1, prodId: '', nombre: l.nombre, cant: l.cantidad, precio: l.precio,
+      id: i + 1, prodId: '', nombre: l.nombre, descripcion: '', cant: l.cantidad, precio: l.precio,
       // La cotización no distingue ITBIS ni unidad: default gravado 18% / Unidad (43).
       desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
     })),
@@ -95,6 +98,18 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [errors, setErrors] = useState<FacturaFormErrors>(emptyFormErrors)
+  // Líneas con el campo de detalle (descripcion) desplegado. Se colapsa por
+  // defecto para mantener la tabla compacta; la mayoría de líneas no lo necesitan.
+  const [descOpen, setDescOpen] = useState<Set<number>>(() => new Set())
+  const toggleDesc = (id: number) =>
+    setDescOpen((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  // Mostrar el textarea de detalle si está desplegado o si ya trae contenido.
+  const showDesc = (l: Linea) => l.descripcion.trim() !== '' || descOpen.has(l.id)
 
   // El prefill (cotización) solo trae id + nombre del cliente: se busca el
   // registro completo para que la ficha muestre el RNC real (E31 lo requiere).
@@ -130,7 +145,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
   const addLinea = (p: Producto) => {
     setLineas([...lineas, {
-      id: Date.now(), prodId: p.id, nombre: p.nombre, cant: 1,
+      id: Date.now(), prodId: p.id, nombre: p.nombre, descripcion: '', cant: 1,
       // El producto define el indicador y la unidad por defecto.
       precio: p.precio, desc: 0, indFact: indFactFromItbis(p.itbis),
       unidadMedida: p.unidadMedida || 43,
@@ -142,7 +157,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // El usuario escribe descripción, cantidad y precio; default gravado 18% / Unidad.
   const addLineaLibre = () =>
     setLineas([...lineas, {
-      id: Date.now(), prodId: '', nombre: '', cant: 1,
+      id: Date.now(), prodId: '', nombre: '', descripcion: '', cant: 1,
       precio: 0, desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
     }])
   // Limpia los errores en línea de una fila al editarla (o al eliminarla).
@@ -158,6 +173,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
   const setNombre = (id: number, nombre: string) => {
     setLineas(lineas.map((l) => (l.id === id ? { ...l, nombre } : l)))
+    clearLineaErr(id)
+  }
+  const setDescripcion = (id: number, descripcion: string) => {
+    setLineas(lineas.map((l) => (l.id === id ? { ...l, descripcion } : l)))
     clearLineaErr(id)
   }
   const setIndFact = (id: number, indFact: IndicadorFacturacion) =>
@@ -213,19 +232,29 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     return true
   }
 
-  /** Construye el payload para POST /api/facturas (asume formulario ya validado). */
-  function buildPayload(): CreateFacturaInput | null {
-    // E32/E43 pueden emitirse sin cliente (consumidor final); el resto lo exige.
-    if (!cliente && requiereCliente) return null
-    const items: FacturaItemInput[] = lineas.map((l, i) => ({
+  /**
+   * Mapea las líneas de la UI a items del payload e-CF. `nombre_item` (≤80) y
+   * `descripcion` (≤1000) van separados y recortados; la descripción se omite si
+   * está vacía. La longitud ya la garantiza la validación Zod (hard block).
+   */
+  function buildItems(): FacturaItemInput[] {
+    return lineas.map((l, i) => ({
       numero_linea: i + 1,
-      nombre_item: l.nombre,
+      nombre_item: l.nombre.trim(),
+      ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
       indicador_facturacion: l.indFact,
       indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
       cantidad: l.cant,
       unidad_medida: String(l.unidadMedida),
       precio_unitario: l.precio,
     }))
+  }
+
+  /** Construye el payload para POST /api/facturas (asume formulario ya validado). */
+  function buildPayload(): CreateFacturaInput | null {
+    // E32/E43 pueden emitirse sin cliente (consumidor final); el resto lo exige.
+    if (!cliente && requiereCliente) return null
+    const items = buildItems()
     return {
       // Sin cliente (E32/E43) se omite client_id: el backend factura a consumidor final.
       ...(cliente ? { client_id: Number(cliente.id) } : {}),
@@ -287,15 +316,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     setPreviewing(true)
     const tid = toast.loading('Generando vista previa…')
     try {
-      const items: FacturaItemInput[] = lineas.map((l, i) => ({
-        numero_linea: i + 1,
-        nombre_item: l.nombre,
-        indicador_facturacion: l.indFact,
-        indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
-        cantidad: l.cant,
-        unidad_medida: String(l.unidadMedida),
-        precio_unitario: l.precio,
-      }))
+      const items = buildItems()
       const doc = await previewFactura({ ...(cliente ? { client_id: Number(cliente.id) } : {}), tipo_ecf: tipo, items })
       presentDocument(doc)
       toast.success('Vista previa generada.', { id: tid })
@@ -412,51 +433,72 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                 <Btn variant="secondary" size="sm" icon="file-plus" onClick={addLineaLibre}>Descripción</Btn>
               </div>
             }>
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{ minWidth: 150 }}>Descripción</th><th className="num" style={{ width: 62 }}>Cant.</th>
-                    <th style={{ width: 116 }}>Unidad</th>
-                    <th className="num" style={{ width: 96 }}>Precio</th><th className="num" style={{ width: 62 }}>Desc%</th>
-                    <th style={{ width: 100 }}>ITBIS</th><th className="num" style={{ width: 100 }}>Importe</th><th style={{ width: 36 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineas.map((l) => {
-                    const le = errors.lineas[l.id]
-                    const c = calc(l)
-                    return (
-                    <tr key={l.id} style={{ cursor: 'default' }}>
-                      <td className={'cell-input' + (le?.nombre ? ' field-error' : '')}>
-                        <textarea
+            <div className="line-list">
+              {lineas.map((l, i) => {
+                const le = errors.lineas[l.id]
+                const c = calc(l)
+                return (
+                  <div key={l.id} className="line-card">
+                    <div className="line-card-top">
+                      <span className="line-num" aria-label={`Ítem ${i + 1}`}>#{i + 1}</span>
+                      <div className={'line-name' + (le?.nombre || le?.descripcion ? ' field-error' : '')}>
+                        <input
                           className="input line-input"
                           value={l.nombre}
-                          placeholder="Descripción del ítem"
-                          rows={2}
+                          placeholder="Nombre corto (ej. Sticker Vinyl 2x2)"
                           onChange={(e) => setNombre(l.id, e.target.value)}
-                          style={{ height: 'auto', minHeight: 34, resize: 'vertical', lineHeight: 1.35 }}
                         />
-                        {l.prodId !== '' && <div className="cell-sub">{l.tipoItem}</div>}
+                        <div className="row between" style={{ marginTop: 3, alignItems: 'center' }}>
+                          <span className="row gap-sm" style={{ alignItems: 'center' }}>
+                            {l.prodId !== '' && <span className="cell-sub">{l.tipoItem}</span>}
+                            {!showDesc(l) ? (
+                              <button type="button" className="line-detail-toggle" onClick={() => toggleDesc(l.id)}>+ Detalle</button>
+                            ) : l.descripcion.trim() === '' ? (
+                              <button type="button" className="line-detail-toggle" onClick={() => toggleDesc(l.id)}>− Ocultar</button>
+                            ) : null}
+                          </span>
+                          <span className="text-xs" style={{ color: l.nombre.length > 80 ? 'var(--danger)' : 'var(--text-3)' }}>{l.nombre.length}/80</span>
+                        </div>
                         {le?.nombre && <div className="err-msg"><Icon name="alert-circle" size={13} />{le.nombre}</div>}
-                      </td>
-                      <td className={'cell-input' + (le?.cant ? ' field-error' : '')}>
+                        {showDesc(l) && (
+                          <>
+                            <textarea
+                              className="input line-input"
+                              value={l.descripcion}
+                              placeholder="Detalle: material, medidas, color, sucursal… (opcional)"
+                              rows={2}
+                              onChange={(e) => setDescripcion(l.id, e.target.value)}
+                              style={{ height: 'auto', minHeight: 34, resize: 'vertical', lineHeight: 1.35, marginTop: 6 }}
+                            />
+                            {le?.descripcion && <div className="err-msg"><Icon name="alert-circle" size={13} />{le.descripcion}</div>}
+                          </>
+                        )}
+                      </div>
+                      <Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} />
+                    </div>
+                    <div className="line-fields">
+                      <div className={'lf lf-cant' + (le?.cant ? ' field-error' : '')}>
+                        <label>Cant.</label>
                         <input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} />
                         {le?.cant && <div className="err-msg">{le.cant}</div>}
-                      </td>
-                      <td className={'cell-input' + (le?.unidadMedida ? ' field-error' : '')}>
+                      </div>
+                      <div className={'lf lf-unidad' + (le?.unidadMedida ? ' field-error' : '')}>
+                        <label>Unidad</label>
                         <UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} />
                         {le?.unidadMedida && <div className="err-msg">{le.unidadMedida}</div>}
-                      </td>
-                      <td className={'cell-input' + (le?.precio ? ' field-error' : '')}>
+                      </div>
+                      <div className={'lf lf-precio' + (le?.precio ? ' field-error' : '')}>
+                        <label>Precio</label>
                         <input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} />
                         {le?.precio && <div className="err-msg">{le.precio}</div>}
-                      </td>
-                      <td className={'cell-input' + (le?.desc ? ' field-error' : '')}>
+                      </div>
+                      <div className={'lf lf-desc' + (le?.desc ? ' field-error' : '')}>
+                        <label>Desc%</label>
                         <input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} />
                         {le?.desc && <div className="err-msg">{le.desc}</div>}
-                      </td>
-                      <td className="cell-input">
+                      </div>
+                      <div className="lf lf-itbis">
+                        <label>ITBIS</label>
                         <select
                           className="select line-input"
                           value={l.indFact}
@@ -464,22 +506,23 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                         >
                           {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                      </td>
-                      <td className="num">
+                      </div>
+                      <div className="lf lf-importe">
+                        <label>Importe</label>
                         <div className="imp-cell">
                           <span className="fw6"><Money value={c.importe} cur={false} /></span>
                           <span className="imp-sub">ITBIS <Money value={c.itbis} cur={false} /></span>
                         </div>
-                      </td>
-                      <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>
-                    </tr>
-                    )
-                  })}
-                  {lineas.length === 0 && (
-                    <tr style={{ cursor: 'default' }}><td colSpan={8}><div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: errors.form ? 'var(--danger)' : 'var(--text-2)' }}>{errors.form ?? 'Sin líneas. Agrega un producto del catálogo o una descripción libre.'}</span></div></td></tr>
-                  )}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {lineas.length === 0 && (
+                <div className="state" style={{ padding: 28 }}>
+                  <span className="text-sm" style={{ color: errors.form ? 'var(--danger)' : 'var(--text-2)' }}>{errors.form ?? 'Sin líneas. Agrega un producto del catálogo o una descripción libre.'}</span>
+                </div>
+              )}
             </div>
             <div className="card-pad row gap-sm" style={{ borderTop: '1px solid var(--border)' }}>
               <Btn variant="ghost" size="sm" icon="package" onClick={() => setProdPicker(true)}>Agregar producto</Btn>

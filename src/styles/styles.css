@@ -526,6 +526,50 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* La celda con select de tasa no debe colapsar bajo su texto. */
 .tbl td.cell-input { padding-top: 8px; padding-bottom: 8px; }
 
+/* Enlace "+ Detalle / − Ocultar" para desplegar el detalle largo de una línea. */
+.line-detail-toggle {
+  background: none; border: none; padding: 0; font: inherit; font-size: 12px;
+  color: var(--accent); cursor: pointer; line-height: 1;
+}
+.line-detail-toggle:hover { text-decoration: underline; }
+
+/* Líneas de factura como tarjetas apiladas: nombre/detalle a todo el ancho
+   arriba; los campos numéricos abajo con más espacio para leer el valor. */
+.factura-new .line-list { display: flex; flex-direction: column; }
+.factura-new .line-card { padding: 14px 16px; border-bottom: 2px solid var(--border-strong); }
+.factura-new .line-card:last-child { border-bottom: none; }
+.factura-new .line-card-top { display: flex; gap: 10px; align-items: flex-start; }
+/* Badge "#n" para distinguir cada ítem. */
+.factura-new .line-num {
+  flex-shrink: 0; min-width: 26px; height: 26px; padding: 0 7px; margin-top: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-xs); background: var(--accent-soft); color: var(--accent-text);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.factura-new .line-card-top .line-name { flex: 1; min-width: 0; }
+.factura-new .line-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; align-items: flex-end; }
+.factura-new .line-fields .lf { display: flex; flex-direction: column; gap: 4px; }
+.factura-new .line-fields .lf > label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.factura-new .lf-cant { width: 70px; }
+.factura-new .lf-unidad { width: 134px; }
+.factura-new .lf-precio { width: 134px; }
+.factura-new .lf-desc { width: 70px; }
+.factura-new .lf-itbis { width: 108px; }
+.factura-new .lf-importe { margin-left: auto; align-items: flex-end; text-align: right; }
+
+/* Inputs/selects compactos también fuera de la tabla (tarjetas de línea). */
+.factura-new .line-card .line-input { width: 100%; min-width: 0; padding: 7px 10px; font-size: 13px; height: 34px; }
+.factura-new .line-card .line-input.num { text-align: right; }
+.factura-new .line-card select.line-input {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding: 7px 22px 7px 9px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23899099' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center; background-size: 11px;
+}
+
 /* toggle */
 .switch { width: 38px; height: 22px; border-radius: 99px; background: var(--border-strong); position: relative; transition: background .15s; flex-shrink: 0; }
 .switch.on { background: var(--accent); }
@@ -563,16 +607,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .factura-new .opt-row.on { border-color: var(--accent-soft-2); background: var(--accent-soft); }
 .factura-new .opt-row .opt-txt { display: flex; flex-direction: column; gap: 3px; }
 
-/* Selects de línea (Unidad/ITBIS): caret propio y compacto para que el valor
-   no quede recortado por la flecha nativa cuando la columna se comprime. */
-.factura-new .tbl select.line-input {
-  appearance: none; -webkit-appearance: none; -moz-appearance: none;
-  padding: 7px 22px 7px 9px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23899099' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 7px center; background-size: 11px;
-}
-
-/* Tabla de líneas: importe con desglose de ITBIS. */
+/* Importe de línea: valor con desglose de ITBIS, alineado a la derecha. */
 .factura-new .imp-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .factura-new .imp-cell .imp-sub { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
@@ -598,10 +633,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   background: var(--surface-2);
   border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg);
 }
-/* Tabla de líneas con textura: cabecera tintada + filas alternas. */
-.factura-new .tbl thead th { background: var(--surface-2); }
-.factura-new .tbl tbody tr:nth-child(even) td { background: var(--surface-2); }
-.factura-new .tbl tbody tr:hover td { background: var(--surface-hover); }
 
 /* ── Capa de diseño: entrada orquestada + micro-interacciones ── */
 @keyframes facturaRise {
@@ -612,10 +643,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .factura-new .dash-grid > .col { animation: facturaRise .5s cubic-bezier(.16,.84,.44,1) both; }
 .factura-new .dash-grid > .col:first-child { animation-delay: .06s; }
 .factura-new .dash-grid > .col:last-child  { animation-delay: .14s; }
-
-/* Filo de acento táctil en la fila al pasar el cursor. */
-.factura-new .tbl tbody tr td:first-child { box-shadow: inset 0 0 0 transparent; transition: box-shadow .12s; }
-.factura-new .tbl tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 -1px var(--accent); }
 
 /* Emitir: leve elevación que confirma la acción principal. */
 .factura-new .btn-primary { transition: transform .12s ease, box-shadow .12s ease, background .12s; }

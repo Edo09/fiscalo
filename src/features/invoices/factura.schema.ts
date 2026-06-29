@@ -6,7 +6,10 @@ import { indicadorFacturacionSchema } from '@/api/schemas/factura'
 
 const lineaSchema = z.object({
   id: z.number(),
-  nombre: z.string().trim().min(1, 'La descripción es obligatoria.'),
+  // Nombre corto del ítem (DGII AlfNum80Type, máx. 80). El detalle largo va en `descripcion`.
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio.').max(80, 'El nombre no puede superar 80 caracteres (límite DGII). Mueve el detalle a la descripción.'),
+  // Detalle largo opcional (DGII AlfNum1000Type, máx. 1000).
+  descripcion: z.string().trim().max(1000, 'La descripción no puede superar 1000 caracteres (límite DGII).').optional(),
   cant: z.number().positive('La cantidad debe ser mayor que 0.'),
   precio: z.number().nonnegative('El precio no puede ser negativo.'),
   desc: z.number().min(0, 'El descuento debe estar entre 0 y 100.').max(100, 'El descuento debe estar entre 0 y 100.'),
@@ -52,6 +55,7 @@ export interface FacturaFormErrors {
 
 export interface LineaErrors {
   nombre?: string
+  descripcion?: string
   cant?: string
   precio?: string
   desc?: string

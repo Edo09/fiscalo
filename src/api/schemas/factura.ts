@@ -16,7 +16,11 @@ export const indicadorBienServicioSchema = z.union([z.literal(1), z.literal(2)])
 
 export const facturaItemSchema = z.object({
   numero_linea: z.number().int().optional(),
-  nombre_item: z.string().min(1, 'La descripción es obligatoria.'),
+  // DGII AlfNum80Type: máx. 80 caracteres. El nombre debe ser corto; el detalle
+  // (material, medidas, color, sucursal) va en `descripcion`.
+  nombre_item: z.string().min(1, 'El nombre del ítem es obligatorio.').max(80, 'El nombre del ítem no puede superar 80 caracteres (límite DGII).'),
+  // DGII AlfNum1000Type: detalle largo opcional, hasta 1000 caracteres.
+  descripcion: z.string().max(1000, 'La descripción no puede superar 1000 caracteres (límite DGII).').optional(),
   indicador_facturacion: indicadorFacturacionSchema,
   indicador_bien_servicio: indicadorBienServicioSchema,
   cantidad: z.number().positive('La cantidad debe ser mayor que 0.'),
