@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
-import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, formatApiDate, ApiError } from '@/api'
+import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, listUbicaciones, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { BrandingSection } from './BrandingSection'
 import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
@@ -28,7 +28,15 @@ export function SettingsView() {
   const [rangosOpen, setRangosOpen] = useState(false)
   const { data: emisor, error, loading, reload } = useApiQuery(['emisor'], getEmisor)
   const { data: branding } = useApiQuery(['branding'], getBranding)
+  const { data: ubicaciones } = useApiQuery(['ubicaciones'], listUbicaciones)
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
+
+  // Municipio/Provincia se guardan como código DGII; mostramos la descripción.
+  const locByCode = useMemo(
+    () => Object.fromEntries((ubicaciones ?? []).map((u) => [u.codigo, u.descripcion])),
+    [ubicaciones],
+  )
+  const loc = (code?: string | null) => (code ? (locByCode[code] ?? '—') : '—')
 
   const invalidateBranding = () => void queryClient.invalidateQueries({ queryKey: ['branding'] })
 
@@ -105,8 +113,8 @@ export function SettingsView() {
                     <div className="field"><label>RNC</label><input className="input mono" readOnly value={emisor.rnc} /></div>
                     <div className="field"><label>Sucursal</label><input className="input" readOnly value={emisor.sucursal ?? '—'} /></div>
                     <div className="field full"><label>Dirección</label><input className="input" readOnly value={emisor.direccion ?? '—'} /></div>
-                    <div className="field"><label>Municipio</label><input className="input" readOnly value={emisor.municipio ?? '—'} /></div>
-                    <div className="field"><label>Provincia</label><input className="input" readOnly value={emisor.provincia ?? '—'} /></div>
+                    <div className="field"><label>Municipio</label><input className="input" readOnly value={loc(emisor.municipio)} /></div>
+                    <div className="field"><label>Provincia</label><input className="input" readOnly value={loc(emisor.provincia)} /></div>
                     <div className="field"><label>Teléfono</label><input className="input" readOnly value={emisor.telefono ?? '—'} /></div>
                     <div className="field"><label>Correo</label><input className="input" readOnly value={emisor.correo ?? '—'} /></div>
                     <div className="field"><label>Sitio web</label><input className="input" readOnly value={emisor.website ?? '—'} /></div>

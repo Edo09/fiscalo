@@ -30,6 +30,7 @@ export { listWarehouses, getWarehouse, createWarehouse, updateWarehouse, deleteW
 export { listNcfRangos, registerNcfRango } from './ncf'
 export { listEcfRecibidos, aprobarEcfRecibido } from './recepcion'
 export { listUnidadesMedida } from './unidadesMedida'
+export { listUbicaciones } from './ubicaciones'
 export { listUsers, getUser, createUser, updateUser, deleteUser } from './users'
 export { listRoles, getRole, createRole, updateRole, deleteRole, assignUserRole } from './roles'
 export { getStats } from './stats'

@@ -502,6 +502,18 @@ export interface UnidadMedida {
   descripcion: string
 }
 
+// ---------------------------------------------------------------------------
+// Ubicaciones — catálogo DGII de provincias y municipios (/api/provincias-municipios)
+// ---------------------------------------------------------------------------
+
+/** `codigo` es lo que se persiste (emisor/cliente); descripcion solo para mostrar. */
+export interface Ubicacion {
+  tipo: 'PROVINCIA' | 'MUNICIPIO'
+  codigo: string
+  descripcion: string
+  provincia_codigo?: string | null
+}
+
 // CreateGastoInput se infiere desde ./schemas/gasto (re-exportado arriba).
 
 export interface GastoItemRow {
