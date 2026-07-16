@@ -23,6 +23,7 @@ const DGII_LABEL: Record<string, string> = {
   ENVIADO: 'En proceso',
   EN_PROCESO: 'En proceso',
   RECHAZADO: 'Rechazado',
+  RECHAZADO_ARCHIVADO: 'Rechazado',
   RFCE_RECHAZADO: 'Rechazado',
   NO_ENCONTRADO: 'Pendiente',
   RFCE_NO_ENCONTRADO: 'Pendiente',
@@ -43,7 +44,7 @@ export function formatMonthKey(key: string): string {
 
 /** ¿El estado DGII es un rechazo (incluido RFCE)? */
 export function isRechazo(raw?: string | null): boolean {
-  return raw === 'RECHAZADO' || raw === 'RFCE_RECHAZADO'
+  return raw === 'RECHAZADO' || raw === 'RECHAZADO_ARCHIVADO' || raw === 'RFCE_RECHAZADO'
 }
 
 export function mapFacturaRow(r: FacturaRow): Factura {

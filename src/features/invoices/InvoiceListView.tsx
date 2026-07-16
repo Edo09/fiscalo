@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
-import { listFacturas, mapFacturaRow, getStats } from '@/api'
+import { listFacturas, mapFacturaRow, getStats, isRechazo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
@@ -70,7 +70,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
   const aceptados = porEstado
     .filter((e) => ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO'].includes(e.estado))
     .reduce((a, e) => a + e.total, 0)
-  const rechazadosBuckets = porEstado.filter((e) => ['RECHAZADO', 'RFCE_RECHAZADO'].includes(e.estado))
+  const rechazadosBuckets = porEstado.filter((e) => isRechazo(e.estado))
   const rechazados = rechazadosBuckets.reduce((a, e) => a + e.total, 0)
   // El "Monto total" excluye los rechazados: un comprobante rechazado no es ingreso.
   const montoTotal = Number(resumen?.monto_total ?? 0) - rechazadosBuckets.reduce((a, e) => a + e.monto_total, 0)
