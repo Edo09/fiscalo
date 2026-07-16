@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Carga TODAS las variables (incluidas las sin prefijo VITE_), que solo
@@ -10,7 +12,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.API_PROXY_TARGET
 
   return {
-    plugins: [react()],
+    plugins: [react(), cloudflare()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -46,5 +48,5 @@ export default defineConfig(({ mode }) => {
           }
         : undefined,
     },
-  }
+  };
 })
