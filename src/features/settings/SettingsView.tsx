@@ -96,8 +96,8 @@ export function SettingsView() {
                 <>
                   <div className="row gap-md mb-lg" style={{ alignItems: 'center' }}>
                     <input ref={fileRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={(e) => void onLogoPick(e)} />
-                    {branding?.has_custom_logo && branding?.logo_path ? (
-                      <img src={branding.logo_path} alt="Logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
+                    {branding?.logo_data_uri ? (
+                      <img src={branding.logo_data_uri} alt="Logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
                     ) : null}
                     <Btn variant="secondary" size="sm" icon="upload" onClick={() => fileRef.current?.click()} disabled={logoBusy}>
                       {branding?.has_custom_logo ? 'Cambiar logo' : 'Subir logo'}

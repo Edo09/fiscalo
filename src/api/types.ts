@@ -724,6 +724,8 @@ export interface BrandingData {
   accent_color: string | null
   logo_path: string | null
   has_custom_logo: boolean
+  /** Logo listo para <img src>. El API no sirve logos/ por URL: llega embebido. */
+  logo_data_uri: string | null
   available_templates: string[]
 }
 
