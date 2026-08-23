@@ -45,6 +45,21 @@ const THEME = { accent: 'blue', sidebarStyle: 'espaciado', dashLayout: 'completo
 
 type ThemeMode = 'light' | 'dark'
 
+// Vistas que necesitan un payload en memoria (la factura abierta, el tipo e-CF).
+// `view` se persiste pero el payload NO, asi que al reabrir la pestana quedarian
+// en blanco ('No hay factura seleccionada') con el menu marcando su grupo, que
+// se lee como "el listado salio vacio". Se cae al listado correspondiente.
+const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
+  'factura-ver': 'facturas',
+  'ecf-tipo': 'ecf',
+}
+
+function restoreView(): ViewId {
+  const guardada = localStorage.getItem('fiscalo.view') as ViewId | null
+  if (!guardada) return 'dashboard'
+  return VIEW_SIN_PAYLOAD[guardada] ?? guardada
+}
+
 function App() {
   // Puerta de autenticación: sin sesión se muestra el login; con sesión, el shell.
   const { authenticated } = useSession()
@@ -53,7 +68,8 @@ function App() {
 
 function AppShell() {
   const { user } = useSession()
-  const [view, setView] = useState<ViewId>(() => (localStorage.getItem('fiscalo.view') as ViewId) || 'dashboard')
+  const [view, setView] = useState<ViewId>(() => restoreView())
+
   const [payload, setPayload] = useState<NavPayload>(null)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
