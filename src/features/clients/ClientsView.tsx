@@ -7,6 +7,7 @@ import type { ClientRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Cliente } from '@/types/domain'
+import { NewClientModal } from './NewClientModal'
 
 const PAGE_SIZES = [10, 25, 50]
 const SEARCH_DEBOUNCE_MS = 350
@@ -19,6 +20,7 @@ export function ClientsView({ nav }: { nav: Nav }) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
   const [perfil, setPerfil] = useState<ClientRow | null>(null)
+  const [nuevoAbierto, setNuevoAbierto] = useState(false)
   const [confirmDel, setConfirmDel] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -66,7 +68,7 @@ export function ClientsView({ nav }: { nav: Nav }) {
   return (
     <div className="page page-wide">
       <PageHead title="Clientes" sub={total != null ? `${total} clientes registrados` : 'Clientes registrados'}
-        actions={<><RefreshButton onRefresh={reload} /><Btn variant="primary" icon="user-plus">Nuevo cliente</Btn></>} />
+        actions={<><RefreshButton onRefresh={reload} /><Btn variant="primary" icon="user-plus" onClick={() => setNuevoAbierto(true)}>Nuevo cliente</Btn></>} />
 
       <div className="kpi-grid compact" style={{ marginBottom: 16 }}>
         <KPI label="Total registrados" value={total ?? rows.length} icon="users" />
@@ -151,6 +153,7 @@ export function ClientsView({ nav }: { nav: Nav }) {
       )}
 
       {perfil && <ClientEditDrawer client={perfil} nav={nav} onClose={() => setPerfil(null)} />}
+      {nuevoAbierto && <NewClientModal onClose={() => setNuevoAbierto(false)} />}
     </div>
   )
 }

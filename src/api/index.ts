@@ -13,7 +13,17 @@ export {
   getDocumentBase64,
   type DocKind,
 } from './facturas'
-export { listClients, getClient, updateClient, deleteClient } from './clients'
+export {
+  listFacturasSimples,
+  getFacturaSimple,
+  createFacturaSimple,
+  updateFacturaSimple,
+  deleteFacturaSimple,
+  getFacturaSimplePdf,
+  previewFacturaSimple,
+} from './facturasSimples'
+export { listClients, getClient, createClient, updateClient, deleteClient } from './clients'
+export type { NewClientInput } from './clients'
 export {
   listCotizaciones,
   getCotizacion,

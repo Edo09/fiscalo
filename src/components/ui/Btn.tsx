@@ -3,7 +3,9 @@ import type { ButtonHTMLAttributes } from 'react'
 import { Icon } from './Icon'
 
 export interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost'
+  /** 'danger' para acciones destructivas confirmadas (la clase .btn-danger
+      ya existia en styles.css; faltaba exponerla en el tipo). */
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'lg' | ''
   icon?: string
   iconRight?: string

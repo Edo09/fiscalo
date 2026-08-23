@@ -838,3 +838,56 @@ export interface Reporte607Preview {
   advertencias: string[]
   registros: Reporte607Registro[]
 }
+
+// ---------------------------------------------------------------------------
+// Facturas simples — /api/facturas-simples
+//   Factura interna que NO se emite a la DGII (tipo_ecf IS NULL): sin e-NCF, sin
+//   NCF fiscal y fuera del reporte 607. El backend genera el numero (0001-230826)
+//   y calcula subtotal e ITBIS de cada linea desde indicador_facturacion.
+// ---------------------------------------------------------------------------
+
+/** Linea que el formulario envia. El backend deriva subtotal e itbis_amount. */
+export interface FacturaSimpleItemInput {
+  description: string
+  quantity: number
+  amount: number
+  /** 1 = gravado 18%, 2 = gravado 16%, 3 = 0%, 4 = exento. */
+  indicador_facturacion: number
+}
+
+export interface FacturaSimpleInput {
+  client_id?: number | null
+  client_name?: string
+  date?: string
+  items: FacturaSimpleItemInput[]
+}
+
+/** Linea tal como la devuelve el backend. */
+export interface FacturaSimpleItem {
+  id?: number
+  description: string
+  quantity: number
+  amount: number
+  subtotal: number
+  itbis_amount: number
+  indicador_facturacion?: number
+}
+
+/** Fila del listado (GET /api/facturas-simples). */
+export interface FacturaSimpleRow {
+  id: number
+  no_factura: string
+  date: string
+  client_id: number | null
+  client_name: string | null
+  company_name?: string | null
+  total: number | string
+  /** Descripciones de las lineas concatenadas (para la columna Concepto). */
+  description?: string | null
+}
+
+/** Detalle (GET /api/facturas-simples/{id}), con sus lineas. */
+export interface FacturaSimple extends FacturaSimpleRow {
+  items: FacturaSimpleItem[]
+  client_email?: string | null
+}

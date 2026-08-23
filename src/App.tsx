@@ -7,6 +7,8 @@ import { DashboardView } from '@/features/dashboard/DashboardView'
 import { InvoiceListView } from '@/features/invoices/InvoiceListView'
 import { InvoiceDetailView } from '@/features/invoices/InvoiceDetailView'
 import { InvoiceFormView } from '@/features/invoices/InvoiceFormView'
+import { SimpleInvoiceListView } from '@/features/invoices/SimpleInvoiceListView'
+import { SimpleInvoiceFormView } from '@/features/invoices/SimpleInvoiceFormView'
 import { RecurringView } from '@/features/invoices/RecurringView'
 import { EcfDashboardView } from '@/features/ecf/EcfDashboardView'
 import { EcfTypeView } from '@/features/ecf/EcfTypeView'
@@ -32,7 +34,7 @@ import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { hasModule } from '@/config/permissions'
-import { isFacturaPrefill, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import { isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -51,6 +53,7 @@ type ThemeMode = 'light' | 'dark'
 // se lee como "el listado salio vacio". Se cae al listado correspondiente.
 const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
   'factura-ver': 'facturas',
+  'factura-simple-editar': 'facturas-simples',
   'ecf-tipo': 'ecf',
 }
 
@@ -109,7 +112,11 @@ function AppShell() {
     return () => window.removeEventListener('keydown', h)
   }, [])
 
-  const activeTop: string = view.startsWith('factura')
+  // Ojo con el orden: 'facturas-simples' y 'factura-simple-*' tambien empiezan
+  // por 'factura', asi que se resuelven ANTES del prefijo generico.
+  const activeTop: string = view.startsWith('factura-simple') || view === 'facturas-simples'
+    ? 'facturas-simples'
+    : view.startsWith('factura')
     ? 'facturas'
     : view === 'recurrentes'
       ? 'facturas'
@@ -133,6 +140,10 @@ function AppShell() {
       case 'facturas': return <InvoiceListView nav={nav} />
       case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
+      case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
+      case 'factura-simple-nueva': return <SimpleInvoiceFormView nav={nav} facturaId={null} />
+      case 'factura-simple-editar':
+        return <SimpleInvoiceFormView nav={nav} facturaId={isFacturaSimpleRef(payload) ? payload.id : null} />
       case 'recurrentes': return <RecurringView nav={nav} />
       case 'cotizaciones': return <CotizacionesView nav={nav} autoNew={isNuevoSignal(payload)} />
       case 'clientes': return <ClientsView nav={nav} />

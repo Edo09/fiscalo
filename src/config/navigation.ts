@@ -7,6 +7,9 @@ export type ViewId =
   | 'facturas'
   | 'factura-nueva'
   | 'factura-ver'
+  | 'facturas-simples'
+  | 'factura-simple-nueva'
+  | 'factura-simple-editar'
   | 'recurrentes'
   | 'cotizaciones'
   | 'clientes'
@@ -31,11 +34,19 @@ export type ViewId =
 /** Señal del botón "Nueva" del navbar: abre el formulario de alta al llegar a la vista. */
 export interface NuevoSignal { kind: 'nuevo' }
 
-export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | null
+/** Referencia a una factura simple para abrirla en su formulario de edición. */
+export interface FacturaSimpleRef { kind: 'factura-simple'; id: number }
+
+export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | FacturaSimpleRef | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
   return p != null && (p as FacturaPrefill).kind === 'factura-prefill'
+}
+
+/** ¿El payload apunta a una factura simple? */
+export function isFacturaSimpleRef(p: NavPayload): p is FacturaSimpleRef {
+  return p != null && (p as FacturaSimpleRef).kind === 'factura-simple'
 }
 
 /** ¿El payload pide abrir el formulario de "nuevo" (desde el botón Nueva)? */
@@ -76,6 +87,7 @@ export const NAV: NavGroup[] = [
     group: 'Ventas',
     items: [
       { id: 'facturas', label: 'Facturación', icon: 'file-text', module: 'facturas' },
+      { id: 'facturas-simples', label: 'Facturas simples', icon: 'file', module: 'facturas-simples' },
       { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus', module: 'cotizaciones' },
       { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
     ],
@@ -138,6 +150,9 @@ export const TITLES: Record<ViewId, string> = {
   facturas: 'Facturación',
   'factura-nueva': 'Nueva factura',
   'factura-ver': 'Factura',
+  'facturas-simples': 'Facturas simples',
+  'factura-simple-nueva': 'Nueva factura simple',
+  'factura-simple-editar': 'Factura simple',
   recurrentes: 'Recurrentes',
   cotizaciones: 'Cotizaciones',
   clientes: 'Clientes',
