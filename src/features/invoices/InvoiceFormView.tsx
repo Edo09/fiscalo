@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Card, Modal, PageHead, Spinner, Switch } from '@/components/ui'
+import { Icon, Btn, Money, Modal, Spinner, Switch } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats, getClient,
-  listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel,
+  getBranding, getEmisor, listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel,
 } from '@/api'
 import type {
   CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
+import { NewClientModal } from '@/features/clients/NewClientModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -17,6 +18,7 @@ import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
 import { facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors } from './factura.schema'
+import '@/styles/factura-doc.css'
 
 interface Linea {
   id: number
@@ -42,6 +44,83 @@ const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
   { value: 3, label: 'Tasa 0%' },
   { value: 4, label: 'Exento' },
 ]
+
+/**
+ * Selector del tipo de comprobante, dibujado como el titulo del documento.
+ * Reemplaza al <select> nativo porque su lista la pinta el sistema operativo y
+ * no admite estilos. Cierra con Escape, clic fuera o al elegir; las flechas
+ * recorren las opciones.
+ */
+function TipoDocSelect({
+  value, options, onChange,
+}: {
+  value: TipoEcf
+  options: { code: TipoEcf; n: string }[]
+  onChange: (t: TipoEcf) => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const caja = useRef<HTMLDivElement | null>(null)
+  const actual = options.find((o) => o.code === value)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false)
+    }
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', tecla)
+    }
+  }, [abierto])
+
+  const mover = (desde: number, paso: number) => {
+    const destino = (desde + paso + options.length) % options.length
+    const btns = caja.current?.querySelectorAll<HTMLButtonElement>('.fx-tipo-op')
+    btns?.[destino]?.focus()
+  }
+
+  return (
+    <div className="fx-tipo" ref={caja} data-abierto={abierto ? 'true' : 'false'}>
+      <button
+        type="button"
+        className="fx-tipo-trigger"
+        onClick={() => setAbierto((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        aria-label={`Tipo de comprobante: ${actual?.n ?? value}`}
+      >
+        {actual ? `${actual.n} · e-CF ${actual.code}` : `e-CF ${value}`}
+        <Icon name="chevron-down" size={17} className="fx-tipo-chev" />
+      </button>
+
+      {abierto && (
+        <div className="menu fx-tipo-menu" role="listbox" aria-label="Tipo de comprobante">
+          {options.map((o, i) => (
+            <button
+              type="button"
+              key={o.code}
+              className="fx-tipo-op"
+              role="option"
+              aria-selected={o.code === value}
+              onClick={() => { onChange(o.code); setAbierto(false) }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); mover(i, 1) }
+                if (e.key === 'ArrowUp') { e.preventDefault(); mover(i, -1) }
+              }}
+            >
+              <span className="fx-tipo-op-nombre">{o.n}</span>
+              <span className="fx-tipo-op-codigo">e-CF {o.code}</span>
+              {o.code === value && <Icon name="check" size={15} className="fx-tipo-op-check" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Tasa de ITBIS según indicador_facturacion: 1=18%, 2=16%, 3 y 4 = 0%. */
 function itbisRate(ind: IndicadorFacturacion): number {
@@ -137,6 +216,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Catálogo de productos (GET /api/products) para el selector de líneas.
   // Misma clave que ProductsView => caché compartida, una sola petición.
   const productos = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
+
+  // Identidad del emisor: la hoja muestra los mismos datos que va a imprimir.
+  // Mismas claves de caché que Configuración y la factura simple.
+  const { data: emisor } = useApiQuery(['emisor'], getEmisor)
+  const { data: branding } = useApiQuery(['branding'], getBranding)
+  const emisorNombre = emisor?.nombre_comercial || emisor?.razon_social || ''
+  const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
+  const [nuevoCliente, setNuevoCliente] = useState(false)
   const [prodQuery, setProdQuery] = useState('')
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
   const catalogoFiltrado = catalogo.filter((p) =>
@@ -328,246 +415,315 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   }
 
   return (
-    <div className="page page-wide factura-new">
-      <PageHead
-        crumbs={[{ label: 'Facturación', onClick: () => nav('facturas') }, { label: 'Nueva factura' }]}
-        title="Nueva factura"
-        sub="Completa los datos y emite un comprobante fiscal electrónico."
-        actions={
-          <>
-            <Btn variant="ghost" onClick={() => nav('facturas')}>Cancelar</Btn>
-            <Btn variant="secondary" icon="eye" onClick={previsualizar} disabled={previewing}>
-              {previewing ? 'Generando…' : 'Vista previa'}
-            </Btn>
-            <Btn variant="primary" icon="send" onClick={emitir} disabled={emitting}>
-              {emitting ? 'Emitiendo…' : 'Emitir e-CF'}
-            </Btn>
-          </>
-        }
-      />
-
-      {prefill?.origen && (
-        <div className="card card-pad row gap-sm" style={{ marginBottom: 14, background: 'var(--info-soft)', borderColor: 'transparent', color: 'var(--info)' }}>
-          <Icon name="file-plus" size={16} />
-          <span className="fw6 text-sm">Convertida desde la cotización {prefill.origen}.</span>
-          <span className="text-sm" style={{ opacity: 0.85 }}>
-            Los precios vienen con ITBIS incluido (se desglosa, no se suma). Edita líneas, tipo e ITBIS libremente antes de emitir.
+    <div className="page fx-desk factura-new">
+      <div className="row between" style={{ marginBottom: 14 }}>
+        <Btn variant="ghost" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
+        {prefill?.origen && (
+          <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
+            <Icon name="file-plus" size={15} />
+            Convertida desde la cotización {prefill.origen} · los precios ya traen ITBIS incluido
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="dash-grid">
-        <div className="col gap-md">
-          <Card title="Datos del comprobante">
-            <div className="form-grid">
-              <div className={'field full' + (errors.cliente ? ' field-error' : '')}>
-                <label>Cliente {requiereCliente ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
-                <ClientCombobox value={cliente} onChange={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }} />
-                {errors.cliente && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.cliente}</div>}
-              </div>
-              <div className={'field' + (errors.tipo ? ' field-error' : '')}>
-                <label>Tipo de comprobante</label>
-                <select className="select" value={tipo} onChange={(e) => { setTipo(e.target.value as TipoEcf); if (errors.tipo) setErrors((er) => ({ ...er, tipo: undefined })) }}>
-                  {tipos.map((t) => <option key={t.code} value={t.code}>e-CF {t.code} · {t.n}</option>)}
-                </select>
-                {errors.tipo && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.tipo}</div>}
-              </div>
-              <div className="field">
-                <label>e-NCF a asignar</label>
-                {stats.loading ? (
-                  <div className="ncf-callout" style={{ background: 'var(--surface-2)', borderColor: 'var(--border)' }}>
-                    <span className="ncf-ic" style={{ color: 'var(--text-3)' }}><Icon name="hash" size={15} /></span>
-                    <span className="text-sm muted">Cargando secuencia…</span>
-                  </div>
-                ) : proximoNcf ? (
-                  <div className="ncf-callout">
-                    <span className="ncf-ic"><Icon name="hash" size={15} /></span>
-                    <span className="ncf-meta">
-                      <span className="ncf-lbl">Próximo comprobante</span>
-                      <span className="ncf-num">{proximoNcf}</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="ncf-callout" style={{ background: 'var(--surface-2)', borderColor: 'var(--border)' }}>
-                    <span className="ncf-ic" style={{ color: 'var(--text-3)' }}><Icon name="hash" size={15} /></span>
-                    <span className="text-sm muted-3">{stats.error ? 'No disponible' : 'Sin secuencia'}</span>
-                  </div>
-                )}
-                {rangoRestantes != null && rangoRestantes <= 10 ? (
-                  <div className="row gap-sm text-xs" style={{ marginTop: 4, color: 'var(--danger)', alignItems: 'center' }}>
-                    <Icon name="alert-triangle" size={13} />
-                    <span>
-                      {rangoRestantes === 0
-                        ? 'Rango DGII agotado: solicita y registra el próximo rango para poder emitir.'
-                        : `Quedan ${rangoRestantes} números en el rango DGII: solicita el próximo.`}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="text-xs muted-3" style={{ marginTop: 4 }}>Próximo en la secuencia; el backend lo confirma al emitir.</div>
-                )}
-              </div>
-              <div className="field">
-                <label>Método de pago</label>
-                <select className="select" value={metodo} onChange={(e) => setMetodo(e.target.value)}>
-                  {metodos.map((m) => <option key={m}>{m}</option>)}
-                </select>
-              </div>
-              <label className={'field full opt-row' + (precioConItbis ? ' on' : '')} onClick={() => setPrecioConItbis(!precioConItbis)}>
-                <Switch on={precioConItbis} onChange={setPrecioConItbis} />
-                <span className="opt-txt">
-                  <span className="text-sm fw6">Los precios incluyen ITBIS</span>
-                  <span className="text-xs muted-3">
-                    {precioConItbis
-                      ? 'El ITBIS se desglosa del precio de cada línea (no se suma encima).'
-                      : 'El ITBIS se calcula y se suma encima del precio de cada línea.'}
-                  </span>
-                </span>
-              </label>
+      <article className="fx-sheet fx-sheet--ancha">
+        {/* --- Emisor + identificación del comprobante --- */}
+        <header className="fx-head">
+          <div>
+            {branding?.logo_data_uri && <img className="fx-logo" src={branding.logo_data_uri} alt="" />}
+            <div className="fx-emisor-name">{emisorNombre || 'Tu empresa'}</div>
+            {emisor?.direccion && <div className="fx-emisor-line">{emisor.direccion}</div>}
+            {contactoEmisor && <div className="fx-emisor-line">{contactoEmisor}</div>}
+            {emisor?.rnc && <div className="fx-emisor-line">RNC {emisor.rnc}</div>}
+          </div>
+
+          <div className="fx-meta">
+            <span className="fx-eyebrow">Comprobante fiscal electrónico</span>
+            {/* El tipo ES el título del documento: cambiarlo lo retitula. */}
+            <TipoDocSelect
+              value={tipo}
+              options={tipos}
+              onChange={(t) => { setTipo(t); if (errors.tipo) setErrors((er) => ({ ...er, tipo: undefined })) }}
+            />
+            {errors.tipo && <span className="fx-err"><Icon name="alert-circle" size={12} />{errors.tipo}</span>}
+
+            <span className={'fx-numero' + (proximoNcf ? '' : ' fx-numero-pend')}>
+              {stats.loading ? 'Cargando secuencia…' : proximoNcf ?? (stats.error ? 'Secuencia no disponible' : 'Sin secuencia')}
+            </span>
+
+            {rangoRestantes != null && rangoRestantes <= 10 ? (
+              <span className="fx-aviso">
+                <Icon name="alert-triangle" size={13} />
+                {rangoRestantes === 0
+                  ? 'Rango DGII agotado: registra el próximo para poder emitir.'
+                  : `Quedan ${rangoRestantes} números en el rango DGII.`}
+              </span>
+            ) : (
+              <span className="fx-aviso fx-aviso--suave">El backend confirma el e-NCF definitivo al emitir</span>
+            )}
+          </div>
+        </header>
+
+        <div className="fx-rule" />
+
+        <div className="fx-doc-datos">
+        {/* --- Receptor --- */}
+        <section className="fx-a-quien">
+          <span className="fx-eyebrow">
+            Facturar a {requiereCliente ? <span className="req">*</span> : <span className="opt">(opcional)</span>}
+          </span>
+          <div className="fx-cliente-row">
+            <div className="fx-cliente">
+              <ClientCombobox
+                value={cliente}
+                onChange={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }}
+              />
             </div>
-          </Card>
+            <button
+              type="button"
+              className="fx-cliente-add"
+              onClick={() => setNuevoCliente(true)}
+              title="Nuevo cliente"
+              aria-label="Crear un cliente nuevo"
+            >
+              <Icon name="plus" size={16} />
+            </button>
+          </div>
+          {errors.cliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errors.cliente}</span>}
+        </section>
 
-          <Card title="Productos y servicios" noPad
-            actions={
-              <div className="row gap-sm">
-                <Btn variant="secondary" size="sm" icon="package" onClick={() => setProdPicker(true)}>Producto</Btn>
-                <Btn variant="secondary" size="sm" icon="file-plus" onClick={addLineaLibre}>Descripción</Btn>
-              </div>
-            }>
-            <div className="line-list">
-              {lineas.map((l, i) => {
-                const le = errors.lineas[l.id]
-                const c = calc(l)
-                return (
-                  <div key={l.id} className="line-card">
-                    <div className="line-card-top">
-                      <span className="line-num" aria-label={`Ítem ${i + 1}`}>#{i + 1}</span>
-                      <div className={'line-name' + (le?.nombre || le?.descripcion ? ' field-error' : '')}>
-                        <input
-                          className="input line-input"
-                          value={l.nombre}
-                          placeholder="Nombre corto (ej. Sticker Vinyl 2x2)"
-                          onChange={(e) => setNombre(l.id, e.target.value)}
-                        />
-                        <div className="row between" style={{ marginTop: 3, alignItems: 'center' }}>
-                          <span className="row gap-sm" style={{ alignItems: 'center' }}>
-                            {l.prodId !== '' && <span className="cell-sub">{l.tipoItem}</span>}
-                            {!showDesc(l) ? (
-                              <button type="button" className="line-detail-toggle" onClick={() => toggleDesc(l.id)}>+ Detalle</button>
-                            ) : l.descripcion.trim() === '' ? (
-                              <button type="button" className="line-detail-toggle" onClick={() => toggleDesc(l.id)}>− Ocultar</button>
-                            ) : null}
-                          </span>
-                          <span className="text-xs" style={{ color: l.nombre.length > 80 ? 'var(--danger)' : 'var(--text-3)' }}>{l.nombre.length}/80</span>
-                        </div>
-                        {le?.nombre && <div className="err-msg"><Icon name="alert-circle" size={13} />{le.nombre}</div>}
-                        {showDesc(l) && (
-                          <>
-                            <textarea
-                              className="input line-input"
-                              value={l.descripcion}
-                              placeholder="Detalle: material, medidas, color, sucursal… (opcional)"
-                              rows={2}
-                              onChange={(e) => setDescripcion(l.id, e.target.value)}
-                              style={{ height: 'auto', minHeight: 34, resize: 'vertical', lineHeight: 1.35, marginTop: 6 }}
-                            />
-                            {le?.descripcion && <div className="err-msg"><Icon name="alert-circle" size={13} />{le.descripcion}</div>}
-                          </>
-                        )}
-                      </div>
-                      <Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} />
-                    </div>
-                    <div className="line-fields">
-                      <div className={'lf lf-cant' + (le?.cant ? ' field-error' : '')}>
-                        <label>Cant.</label>
-                        <input className="input line-input num" type="number" value={l.cant} onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)} />
-                        {le?.cant && <div className="err-msg">{le.cant}</div>}
-                      </div>
-                      <div className={'lf lf-unidad' + (le?.unidadMedida ? ' field-error' : '')}>
-                        <label>Unidad</label>
-                        <UnidadMedidaSelect className="select line-input" value={l.unidadMedida} onChange={(v) => setUnidad(l.id, v)} />
-                        {le?.unidadMedida && <div className="err-msg">{le.unidadMedida}</div>}
-                      </div>
-                      <div className={'lf lf-precio' + (le?.precio ? ' field-error' : '')}>
-                        <label>Precio</label>
-                        <input className="input line-input num" type="number" value={l.precio} onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)} />
-                        {le?.precio && <div className="err-msg">{le.precio}</div>}
-                      </div>
-                      <div className={'lf lf-desc' + (le?.desc ? ' field-error' : '')}>
-                        <label>Desc%</label>
-                        <input className="input line-input num" type="number" value={l.desc} onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)} />
-                        {le?.desc && <div className="err-msg">{le.desc}</div>}
-                      </div>
-                      <div className="lf lf-itbis">
-                        <label>ITBIS</label>
-                        <select
-                          className="select line-input"
-                          value={l.indFact}
-                          onChange={(e) => setIndFact(l.id, Number(e.target.value) as IndicadorFacturacion)}
-                        >
-                          {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                      </div>
-                      <div className="lf lf-importe">
-                        <label>Importe</label>
-                        <div className="imp-cell">
-                          <span className="fw6"><Money value={c.importe} cur={false} /></span>
-                          <span className="imp-sub">ITBIS <Money value={c.itbis} cur={false} /></span>
-                        </div>
-                      </div>
-                    </div>
+        {/* --- Condiciones del documento --- */}
+        <section className="fx-cond">
+          <span className="fx-cond-item">
+            <span className="fx-eyebrow">Pago</span>
+            <select
+              className="fx-cond-sel"
+              value={metodo}
+              onChange={(e) => setMetodo(e.target.value)}
+              aria-label="Método de pago"
+            >
+              {metodos.map((m) => <option key={m}>{m}</option>)}
+            </select>
+          </span>
+          <span className="fx-cond-item">
+            <Switch on={precioConItbis} onChange={setPrecioConItbis} />
+            <span className="text-sm">
+              Los precios incluyen ITBIS
+              <span className="text-xs muted-3" style={{ display: 'block' }}>
+                {precioConItbis ? 'Se desglosa del precio de cada línea' : 'Se suma encima del precio de cada línea'}
+              </span>
+            </span>
+          </span>
+        </section>
+        </div>
+
+        {/* --- Líneas --- */}
+        <section className="fx-items" style={{ marginTop: 24 }}>
+          <div className="fx-grid-ecf fx-items-head">
+            <span />
+            <span>Descripción</span>
+            <span style={{ textAlign: 'right' }}>Cant.</span>
+            <span>Unidad</span>
+            <span style={{ textAlign: 'right' }}>Precio</span>
+            <span style={{ textAlign: 'right' }}>Desc%</span>
+            <span>ITBIS</span>
+            <span style={{ textAlign: 'right' }}>Importe</span>
+          </div>
+
+          {lineas.map((l, i) => {
+            const le = errors.lineas[l.id]
+            const c = calc(l)
+            return (
+              <div className="fx-grid-ecf fx-row" key={l.id}>
+                <button
+                  type="button"
+                  className="fx-gutter"
+                  onClick={() => delLinea(l.id)}
+                  aria-label={`Quitar línea ${i + 1}`}
+                  title="Quitar línea"
+                >
+                  <Icon name="x" size={14} />
+                </button>
+
+                <div className="fx-desc">
+                  <input
+                    className={'fx-field' + (le?.nombre ? ' fx-field--err' : '')}
+                    value={l.nombre}
+                    placeholder="Nombre del ítem (ej. Sticker Vinyl 2x2)"
+                    onChange={(e) => setNombre(l.id, e.target.value)}
+                    aria-label={`Nombre del ítem ${i + 1}`}
+                  />
+                  {le?.nombre && <span className="fx-err"><Icon name="alert-circle" size={12} />{le.nombre}</span>}
+
+                  <div className="fx-linea-pie">
+                    {!showDesc(l) ? (
+                      <button type="button" className="fx-detalle-toggle" onClick={() => toggleDesc(l.id)}>+ Detalle</button>
+                    ) : l.descripcion.trim() === '' ? (
+                      <button type="button" className="fx-detalle-toggle" onClick={() => toggleDesc(l.id)}>− Ocultar detalle</button>
+                    ) : null}
+                    {l.prodId !== '' && <span className="fx-contador">{l.tipoItem}</span>}
+                    <span className={'fx-contador' + (l.nombre.length > 80 ? ' fx-contador--tope' : '')}>
+                      {l.nombre.length}/80
+                    </span>
                   </div>
-                )
-              })}
-              {lineas.length === 0 && (
-                <div className="state" style={{ padding: 28 }}>
-                  <span className="text-sm" style={{ color: errors.form ? 'var(--danger)' : 'var(--text-2)' }}>{errors.form ?? 'Sin líneas. Agrega un producto del catálogo o una descripción libre.'}</span>
+
+                  {showDesc(l) && (
+                    <>
+                      <textarea
+                        className={'fx-obs' + (le?.descripcion ? ' fx-field--err' : '')}
+                        style={{ minHeight: 40, fontSize: 12.5 }}
+                        value={l.descripcion}
+                        placeholder="Detalle: material, medidas, color, sucursal… (opcional)"
+                        onChange={(e) => setDescripcion(l.id, e.target.value)}
+                        aria-label={`Detalle del ítem ${i + 1}`}
+                      />
+                      {le?.descripcion && <span className="fx-err"><Icon name="alert-circle" size={12} />{le.descripcion}</span>}
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="card-pad row gap-sm" style={{ borderTop: '1px solid var(--border)' }}>
-              <Btn variant="ghost" size="sm" icon="package" onClick={() => setProdPicker(true)}>Agregar producto</Btn>
-              <Btn variant="ghost" size="sm" icon="file-plus" onClick={addLineaLibre}>Agregar descripción</Btn>
-            </div>
-          </Card>
 
-          <Card title="Observaciones">
-            <textarea className="textarea" placeholder="Notas internas o mensaje para el cliente (opcional)…" value={obs} onChange={(e) => setObs(e.target.value)}></textarea>
-          </Card>
+                <div className="fx-cell" data-label="Cant.">
+                  <input
+                    className={'fx-field fx-num' + (le?.cant ? ' fx-field--err' : '')}
+                    type="number" inputMode="decimal"
+                    value={l.cant}
+                    onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)}
+                    aria-label={`Cantidad del ítem ${i + 1}`}
+                  />
+                  {le?.cant && <span className="fx-err">{le.cant}</span>}
+                </div>
+
+                <div className="fx-cell" data-label="Unidad">
+                  <UnidadMedidaSelect
+                    className={'fx-tasa' + (le?.unidadMedida ? ' fx-tasa--err' : '')}
+                    value={l.unidadMedida}
+                    onChange={(v) => setUnidad(l.id, v)}
+                  />
+                  {le?.unidadMedida && <span className="fx-err">{le.unidadMedida}</span>}
+                </div>
+
+                <div className="fx-cell" data-label="Precio">
+                  <input
+                    className={'fx-field fx-num' + (le?.precio ? ' fx-field--err' : '')}
+                    type="number" inputMode="decimal"
+                    value={l.precio}
+                    onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)}
+                    aria-label={`Precio del ítem ${i + 1}`}
+                  />
+                  {le?.precio && <span className="fx-err">{le.precio}</span>}
+                </div>
+
+                <div className="fx-cell" data-label="Desc%">
+                  <input
+                    className={'fx-field fx-num' + (le?.desc ? ' fx-field--err' : '')}
+                    type="number" inputMode="decimal"
+                    value={l.desc}
+                    onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)}
+                    aria-label={`Descuento del ítem ${i + 1}`}
+                  />
+                  {le?.desc && <span className="fx-err">{le.desc}</span>}
+                </div>
+
+                <select
+                  className="fx-tasa fx-cell" data-label="ITBIS"
+                  value={l.indFact}
+                  onChange={(e) => setIndFact(l.id, Number(e.target.value) as IndicadorFacturacion)}
+                  aria-label={`ITBIS del ítem ${i + 1}`}
+                >
+                  {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+
+                <span className="fx-importe fx-cell" data-label="Importe">
+                  <Money value={c.importe} cur={false} />
+                  <span className="fx-contador" style={{ display: 'block' }}>ITBIS <Money value={c.itbis} cur={false} /></span>
+                </span>
+              </div>
+            )
+          })}
+
+          {lineas.length === 0 && (
+            <div className="state" style={{ padding: 26 }}>
+              <span className="text-sm" style={{ color: errors.form ? 'var(--danger)' : 'var(--text-2)' }}>
+                {errors.form ?? 'Sin líneas. Agrega un producto del catálogo o una descripción libre.'}
+              </span>
+            </div>
+          )}
+
+          <div className="fx-add-row">
+            <button type="button" className="fx-add" onClick={() => setProdPicker(true)}>
+              <Icon name="package" size={14} />Producto
+            </button>
+            <button type="button" className="fx-add" onClick={addLineaLibre}>
+              <Icon name="plus" size={14} />Descripción
+            </button>
+          </div>
+        </section>
+
+        {/* --- Observaciones + totales, como en una factura impresa --- */}
+        <section className="fx-cierre">
+          <div>
+            <span className="fx-eyebrow">Observaciones</span>
+            <textarea
+              className="fx-obs fx-obs--visible"
+              placeholder="Notas internas o mensaje para el cliente (opcional)…"
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              aria-label="Observaciones"
+            />
+          </div>
+
+          <div className="fx-totales-box">
+            <div className="fx-total-linea">
+              <span>Subtotal</span><span><Money value={subtotal} cur={false} /></span>
+            </div>
+            {descTotal > 0 && (
+              <div className="fx-total-linea">
+                <span>Descuentos</span>
+                <span style={{ color: 'var(--danger)' }}>−<Money value={descTotal} cur={false} /></span>
+              </div>
+            )}
+            <div className="fx-total-linea">
+              <span>ITBIS</span><span><Money value={itbisTotal} cur={false} /></span>
+            </div>
+            <div className="fx-total-final">
+              <span>Total</span><span><Money value={total} cur={false} /></span>
+            </div>
+          </div>
+        </section>
+
+        <footer className="fx-nota">
+          Secuencia e-NCF asignada por el backend · firma y envío a la DGII automáticos ·
+          el monto fiscal definitivo lo calcula el backend al emitir
+        </footer>
+      </article>
+
+      {/* --- Acciones (fuera del papel) --- */}
+      <div className="fx-bar fx-bar--ancha">
+        <div className="fx-bar-total">
+          <span className="text-sm muted">
+            {lineas.length === 0
+              ? 'Sin líneas todavía'
+              : `${lineas.length} ${lineas.length === 1 ? 'línea' : 'líneas'}`}
+          </span>
+          <b><Money value={total} cur={false} /></b>
         </div>
-
-        <div className="col gap-md" style={{ position: 'sticky', top: 16 }}>
-          <Card title="Resumen">
-            <div className="row between mb-sm">
-              <span className="sum-head">Desglose</span>
-              <span className="text-xs muted-3">{lineas.length} {lineas.length === 1 ? 'línea' : 'líneas'}</span>
-            </div>
-            <div className="col gap-sm">
-              <div className="row between text-sm"><span className="muted">Subtotal</span><Money value={subtotal} cur={false} /></div>
-              {descTotal > 0 && (
-                <div className="row between text-sm"><span className="muted">Descuentos</span><span className="num" style={{ color: 'var(--danger)' }}>−<Money value={descTotal} cur={false} /></span></div>
-              )}
-              <div className="row between text-sm"><span className="muted">ITBIS</span><Money value={itbisTotal} cur={false} /></div>
-            </div>
-            <div className="total-block">
-              <span className="t-lbl">Total</span>
-              <span className="t-val"><Money value={total} /></span>
-            </div>
-            <div className="text-xs muted-3 mt-sm">Totales estimados. El monto fiscal definitivo lo calcula el backend al emitir.</div>
-            <Btn variant="primary" icon="send" className="mt-md" style={{ width: '100%' }} onClick={emitir} disabled={emitting}>{emitting ? 'Emitiendo…' : 'Emitir e-CF'}</Btn>
-            <Btn variant="secondary" icon="eye" className="mt-sm" style={{ width: '100%' }} onClick={previsualizar} disabled={previewing}>Vista previa</Btn>
-          </Card>
-
-          <Card>
-            <div className="row gap-sm mb-sm"><Icon name="shield-check" size={16} style={{ color: 'var(--success)' }} /><span className="fw6 text-sm">Emisión a la DGII</span></div>
-            <div className="col gap-sm text-sm muted">
-              <div className="row gap-sm"><Icon name="check" size={14} style={{ color: 'var(--success)' }} />Secuencia e-NCF asignada por el backend</div>
-              <div className="row gap-sm"><Icon name="check" size={14} style={{ color: 'var(--success)' }} />Firma y envío automáticos</div>
-              <div className="row gap-sm"><Icon name="check" size={14} style={{ color: 'var(--success)' }} />Estado consultable tras emitir</div>
-            </div>
-          </Card>
+        <div className="row gap-sm">
+          <Btn variant="ghost" onClick={() => nav('facturas')}>Cancelar</Btn>
+          <Btn variant="secondary" icon="eye" onClick={previsualizar} disabled={previewing}>
+            {previewing ? 'Generando…' : 'Vista previa'}
+          </Btn>
+          <Btn variant="primary" icon="send" onClick={emitir} disabled={emitting}>
+            {emitting ? 'Emitiendo…' : 'Emitir e-CF'}
+          </Btn>
         </div>
       </div>
 
+      {nuevoCliente && (
+        <NewClientModal
+          onClose={() => setNuevoCliente(false)}
+          onCreated={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }}
+        />
+      )}
       {prodPicker && (
         <Modal title="Agregar producto o servicio" icon="package" onClose={() => setProdPicker(false)}>
           <div className="search-input mb-md" style={{ width: '100%' }}>

@@ -621,3 +621,349 @@
 @media (prefers-reduced-motion: reduce) {
   .fx-sheet, .fx-row { animation: none; }
 }
+
+/* ============================================================
+   Variante e-CF: mismo papel, documento mas denso.
+   La factura electronica lleva tipo de comprobante, unidad de medida y
+   descuento por linea, asi que la hoja se ensancha y la tabla suma columnas.
+   Todo lo demas (campos sin caja, totales, barra fija) se hereda.
+   ============================================================ */
+
+.fx-sheet--ancha { max-width: 1040px; }
+.fx-bar--ancha { max-width: 1040px; }
+
+/* Aviso bajo el numero (rango DGII por agotarse). */
+.fx-aviso {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 34ch;
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--danger);
+}
+
+.fx-aviso--suave { color: var(--text-3); }
+
+/* Condiciones del documento: metodo de pago y regimen de ITBIS. Van en una
+   franja fina bajo el receptor, no en tarjetas: son parte de la factura. */
+.fx-cond {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+/* Los dos items van SIEMPRE en la misma fila. Antes, con el interruptor
+   apagado el texto es mas largo ("Se suma encima…") y no cabia junto a Pago,
+   asi que el item entero saltaba de linea. Ahora Pago no se encoge y el item
+   del ITBIS toma el resto: si hace falta, el que se ajusta es su texto. */
+.fx-cond { flex-wrap: nowrap; }
+
+.fx-cond-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fx-cond-item:first-child { flex: 0 0 auto; }
+.fx-cond-item:last-child { flex: 1 1 auto; }
+.fx-cond-item > .text-sm { min-width: 0; }
+
+@media (max-width: 620px) {
+  .fx-cond { flex-wrap: wrap; }
+}
+
+.fx-cond-sel {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.fx-cond-sel:focus-visible { outline: none; border-bottom-color: var(--accent); }
+
+/* Receptor y condiciones, lado a lado: son los dos bloques de cabecera del
+   documento y juntos ocupan una sola banda. Los ajustes van scoped al wrapper
+   para no tocar como se ven esos mismos bloques en la factura simple. */
+.fx-doc-datos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.fx-doc-datos .fx-a-quien { max-width: none; }
+.fx-doc-datos .fx-cond { margin-top: 4px; }
+
+@media (max-width: 760px) {
+  .fx-doc-datos { grid-template-columns: 1fr; gap: 18px; }
+}
+
+/* Rejilla de lineas del e-CF (8 columnas). */
+.fx-grid-ecf {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 62px 96px 96px 56px 86px 110px;
+  gap: 10px;
+  align-items: start;
+}
+
+.fx-grid-ecf > .fx-importe,
+.fx-grid-ecf > .fx-num { align-self: center; }
+
+/* Pie de linea: contador de caracteres y enlace al detalle largo. */
+.fx-linea-pie {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+.fx-detalle-toggle {
+  padding: 0;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--accent-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.fx-detalle-toggle:hover { text-decoration: underline; }
+.fx-contador { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.fx-contador--tope { color: var(--danger); }
+
+/* Errores de validacion sobre el papel. */
+.fx-field--err,
+.fx-tasa--err { border-bottom-color: var(--danger) !important; }
+
+.fx-err {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--danger);
+}
+
+/* Observaciones + totales: como en una factura impresa, notas a la izquierda
+   y el cuadro de totales a la derecha. */
+.fx-cierre {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: start;
+  margin-top: 26px;
+}
+
+.fx-obs {
+  width: 100%;
+  min-height: 62px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding: 4px 0;
+  resize: vertical;
+  transition: border-color 140ms ease;
+}
+
+.fx-obs:hover { border-bottom-color: var(--border-strong); }
+.fx-obs:focus { outline: none; border-bottom-color: var(--accent); }
+
+/* Observaciones: el subrayado se queda visible. Es un campo que esta siempre
+   presente y vacio, asi que sin la linea se leia como texto muerto en vez de
+   como algo escribible. (El detalle de linea NO lo lleva: aparece solo cuando
+   el usuario lo abre, asi que ya sabe que es un campo.) */
+.fx-obs--visible { border-bottom-color: var(--border-strong); }
+
+@media (max-width: 900px) {
+  .fx-grid-ecf { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .fx-grid-ecf > .fx-desc { grid-column: 1 / -1; }
+  .fx-cierre { grid-template-columns: 1fr; }
+  /* La cabecera se oculta EN EL MISMO breakpoint en que colapsa la rejilla: si
+     no, entre 720 y 900 px los rotulos quedan desalineados de sus columnas. */
+  .fx-grid-ecf.fx-items-head { display: none; }
+  .fx-grid-ecf > .fx-cell::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 2px;
+  }
+  .fx-grid-ecf .fx-gutter { opacity: 1; justify-self: end; }
+}
+
+/* ---------- Hoja en modo lectura (factura ya emitida) -------- */
+/* Un e-CF emitido tambien es un documento: se lee en el mismo papel, pero sin
+   campos editables y con el estado de la DGII sellado arriba. */
+
+.fx-estado-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin-top: 18px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+/* Fuera del papel: el estado de la DGII, el track y el codigo de seguridad no
+   se imprimen en la representacion impresa — son datos SOBRE el documento, no
+   parte de el. Se alinea al ancho de la hoja para que lea como una sola pieza. */
+.fx-estado-band--fuera {
+  max-width: 1040px;
+  margin: 0 auto 12px;
+}
+
+.fx-estado-dato {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.fx-estado-dato b {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* Emisor y comprador, uno frente al otro. */
+.fx-partes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  margin-top: 22px;
+}
+
+.fx-parte-nombre { font-size: 14.5px; font-weight: 600; color: var(--text); margin-top: 4px; }
+.fx-parte-linea { font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
+.fx-parte-linea.mono { font-family: var(--font-mono); }
+
+/* Tabla de lineas en lectura: mismas columnas que la RI impresa. */
+.fx-grid-ver {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 116px 116px 124px;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.fx-linea-tasa { font-size: 11.5px; color: var(--text-3); }
+
+@media (max-width: 760px) {
+  .fx-grid-ver { grid-template-columns: 1fr auto; gap: 6px 12px; }
+  .fx-grid-ver.fx-items-head { display: none; }
+  .fx-grid-ver > .fx-desc { grid-column: 1 / -1; }
+}
+
+/* ---------- Selector de tipo de comprobante ------------------ */
+/* El desplegable nativo lo dibuja el sistema operativo y no admite estilos: se
+   sustituye por un menu propio para que combine con el papel. El disparador
+   sigue siendo el titulo del documento. */
+
+/* inline-flex y no inline-block: el segundo arrastra el hueco de linea base,
+   que desalineaba el menu respecto al borde del titulo. */
+.fx-tipo { position: relative; display: inline-flex; }
+
+.fx-tipo-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.4vw, 25px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  padding: 0 0 2px;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.fx-tipo-trigger:hover { border-bottom-color: var(--border-strong); }
+.fx-tipo-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 3px; }
+
+/* El chevron se mantiene discreto: solo indica que el titulo es elegible. */
+.fx-tipo-chev {
+  color: var(--text-3);
+  transition: transform 160ms ease, color 140ms ease;
+}
+
+.fx-tipo-trigger:hover .fx-tipo-chev { color: var(--text-2); }
+.fx-tipo[data-abierto='true'] .fx-tipo-chev { transform: rotate(180deg); color: var(--accent); }
+
+.menu.fx-tipo-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  /* Gana a la min-width de .menu sin depender del orden de carga del CSS. */
+  min-width: 264px;
+  padding: 6px;
+  text-align: left;
+  z-index: 60;
+}
+
+.fx-tipo-op {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.fx-tipo-op:hover { background: var(--surface-hover); }
+.fx-tipo-op:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.fx-tipo-op[aria-selected='true'] { background: var(--accent-soft); }
+
+.fx-tipo-op-nombre {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fx-tipo-op[aria-selected='true'] .fx-tipo-op-nombre { color: var(--accent-text); }
+
+.fx-tipo-op-codigo {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-tipo-op-check { color: var(--accent); }
