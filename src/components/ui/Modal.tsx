@@ -1,6 +1,6 @@
 // Diálogo modal centrado (cierra con Escape o click en el overlay).
 import { useEffect, useState, type ReactNode } from 'react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import { Btn } from './Btn'
 
 // Debe calzar con la duración de @keyframes popOut/fadeOut en styles.css.
@@ -9,7 +9,7 @@ const EXIT_MS = 160
 export interface ModalProps {
   title: ReactNode
   sub?: ReactNode
-  icon?: string
+  icon?: IconName
   children?: ReactNode
   footer?: ReactNode
   onClose: () => void

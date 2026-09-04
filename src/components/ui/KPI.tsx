@@ -1,6 +1,6 @@
 // Tarjeta de indicador: etiqueta, valor (numérico o monetario), delta y pie.
 import type { ReactNode } from 'react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import { Money } from './Money'
 import { fmt0 } from '@/lib/format'
 
@@ -8,7 +8,7 @@ export interface KpiProps {
   label: string
   value: number | string
   money?: boolean
-  icon?: string
+  icon?: IconName
   iconBg?: string
   iconColor?: string
   delta?: string

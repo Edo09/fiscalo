@@ -1,4 +1,4 @@
-import { Icon, Badge, PageHead } from '@/components/ui'
+import { Icon, Badge, PageHead, type IconName } from '@/components/ui'
 import type { Nav, ViewId } from '@/config/navigation'
 
 /* FISCALO — Reportes > Fiscales (formatos DGII) */
@@ -6,7 +6,7 @@ interface ReporteFiscal {
   code: string
   label: string
   desc: string
-  ic: string
+  ic: IconName
   c: string
   /** Vista destino; null mientras no esté implementado. */
   to: ViewId | null
@@ -15,7 +15,7 @@ interface ReporteFiscal {
 const REPORTES: ReporteFiscal[] = [
   { code: '606', label: '606 — Compras', desc: 'Compras de bienes y servicios del período', ic: 'shopping-cart', c: 'var(--accent)', to: 'reportes-606' },
   { code: '607', label: '607 — Ventas', desc: 'Ventas de bienes y servicios del período', ic: 'trending-up', c: 'var(--success)', to: 'reportes-607' },
-  { code: '608', label: '608 — Anulados', desc: 'Comprobantes anulados', ic: 'file-x', c: 'var(--danger)', to: null },
+  { code: '608', label: '608 — Anulados', desc: 'Comprobantes anulados', ic: 'file-minus', c: 'var(--danger)', to: null },
   { code: 'IR-17', label: 'IR-17 — Retenciones', desc: 'Retenciones de renta a terceros', ic: 'percent', c: 'var(--warning)', to: null },
 ]
 

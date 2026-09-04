@@ -1,4 +1,5 @@
 // Navegación de la aplicación: vistas, grupos del sidebar y títulos.
+import type { IconName } from '@/components/ui/Icon'
 import type { Factura, EcfTipo, FacturaPrefill } from '@/types/domain'
 
 export type ViewId =
@@ -62,7 +63,7 @@ export type BadgeTone = 'danger' | 'warn'
 export interface NavItem {
   id: ViewId
   label: string
-  icon: string
+  icon: IconName
   badge?: number
   badgeTone?: BadgeTone
   /** Módulo RBAC requerido para ver este item (del catálogo en config/permissions).

@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { FRESCURA } from './config/cache'
 import { useAuthStore } from './stores/auth'
 import './styles/styles.css'
 // Capa "Bold": restyle global (sidebar ink, tipografía display, KPIs, login).
@@ -13,15 +14,25 @@ import './styles/responsive.css'
 // Para usar el tema "Editorial / Esmeralda", descomenta la siguiente línea:
 // import './styles/styles-v2.css'
 
-// Caché de datos de la API: con staleTime de 5 min, cambiar de página y volver
-// NO dispara otra petición; se sirve de la caché y solo refetchea si caducó.
+// Caché de datos de la API.
+//
+// La frescura de cada dato NO se decide aquí: sale del recurso de la queryKey
+// (config/cache.ts), porque una factura cambia sola y un catálogo DGII no. El
+// FRESCURA.NORMAL de abajo es solo el respaldo para queries sin recurso conocido.
+//
+// refetchOnWindowFocus va ENCENDIDO a propósito. Estaba apagado y era la causa
+// de tener que recargar a mano: al volver de otra pestaña (el portal de la DGII,
+// phpMyAdmin, el correo) la app seguía mostrando lo de antes sin volver a
+// preguntar. Solo refetchea lo que ya venció su frescura, y como el dato
+// cacheado sigue en pantalla mientras llega el nuevo, no parpadea.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
+      staleTime: FRESCURA.NORMAL,
       gcTime: 30 * 60 * 1000,
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
     },
   },
 })

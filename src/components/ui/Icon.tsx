@@ -13,10 +13,15 @@ import {
   Archive, Filter, Server, Save, AlertCircle, AlertTriangle, XCircle, Trash2,
   Wrench, Box, MapPin, CircleDot, HandCoins, Tag, Layers, Percent, Sheet,
   GitCompare, Key, Hash, Pause, Banknote, HelpCircle, Zap, EyeOff, LineChart,
+  ArrowLeft, Briefcase, File, Info,
   type LucideIcon,
 } from 'lucide-react'
 
-const ICONS: Record<string, LucideIcon> = {
+// `satisfies` (en vez de una anotación) conserva las claves literales, y de ahí
+// sale IconName. Así un nombre que no exista es un error de compilación y no un
+// signo de interrogación silencioso en pantalla — que es como se colaron
+// `arrow-left`, `file`, `info` y `briefcase`.
+const ICONS = {
   'layout-dashboard': LayoutDashboard, bell: Bell, 'bell-off': BellOff,
   'file-text': FileText, 'file-plus': FilePlus, 'file-minus': FileMinus,
   users: Users, user: User, 'user-plus': UserPlus, 'user-check': UserCheck,
@@ -42,11 +47,15 @@ const ICONS: Record<string, LucideIcon> = {
   'circle-dot': CircleDot, 'hand-coins': HandCoins, tag: Tag, layers: Layers,
   percent: Percent, sheet: Sheet, 'git-compare': GitCompare, key: Key, hash: Hash,
   pause: Pause, banknote: Banknote, 'help-circle': HelpCircle, zap: Zap,
-  'eye-off': EyeOff, 'line-chart': LineChart,
-}
+  'eye-off': EyeOff, 'line-chart': LineChart, 'arrow-left': ArrowLeft,
+  briefcase: Briefcase, file: File, info: Info,
+} satisfies Record<string, LucideIcon>
+
+/** Nombres válidos. Añadir uno = importarlo arriba y agregarlo al mapa. */
+export type IconName = keyof typeof ICONS
 
 export interface IconProps {
-  name: string
+  name: IconName
   size?: number
   className?: string
   style?: CSSProperties

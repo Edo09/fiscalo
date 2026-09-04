@@ -1,10 +1,10 @@
 // Estados de página/lista: vacío, cargando (skeleton), error y spinner.
 import type { ReactNode } from 'react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import { Btn } from './Btn'
 
 export interface EmptyStateProps {
-  icon?: string
+  icon?: IconName
   title: ReactNode
   children?: ReactNode
   action?: ReactNode

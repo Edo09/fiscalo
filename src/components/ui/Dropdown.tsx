@@ -3,7 +3,7 @@
 // contenedores con overflow (p.ej. `.tbl-wrap`).
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 
 export interface DropdownProps {
   trigger: ReactNode
@@ -74,7 +74,7 @@ export function Dropdown({ trigger, children, align = 'right', width = 200, clas
 }
 
 export interface MenuItemProps {
-  icon?: string
+  icon?: IconName
   children?: ReactNode
   danger?: boolean
   onClick?: () => void

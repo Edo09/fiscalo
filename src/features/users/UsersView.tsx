@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode, type MouseEvent } from 'react'
-import { Btn, RefreshButton, Badge, Avatar, Icon, Card, Tabs, Dropdown, MenuItem, EmptyState, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Btn, RefreshButton, Badge, Avatar, Icon, Card, Tabs, Dropdown, MenuItem, EmptyState, LoadingState, ErrorState, PageHead, type IconName } from '@/components/ui'
 import { listUsers, listRoles } from '@/api'
 import type { RoleRow, UserRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -91,7 +91,7 @@ const TONE_BG: Record<string, string> = {
 const TONE_FG: Record<string, string> = {
   accent: 'var(--accent)', success: 'var(--success)', info: 'var(--info)', warning: 'var(--warning)',
 }
-function Stat({ icon, label, value, tone }: { icon: string; label: string; value: number; tone: string }) {
+function Stat({ icon, label, value, tone }: { icon: IconName; label: string; value: number; tone: string }) {
   return (
     <div className="kpi">
       <div className="kpi-top">

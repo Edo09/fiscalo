@@ -1,14 +1,14 @@
 // Botón con variantes, tamaños e iconos opcionales.
 import type { ButtonHTMLAttributes } from 'react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 
 export interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** 'danger' para acciones destructivas confirmadas (la clase .btn-danger
       ya existia en styles.css; faltaba exponerla en el tipo). */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'lg' | ''
-  icon?: string
-  iconRight?: string
+  icon?: IconName
+  iconRight?: IconName
 }
 export function Btn({
   variant = 'secondary', size = '', icon, iconRight, children, className = '', ...rest

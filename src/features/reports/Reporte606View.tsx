@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Card, Badge, PageHead, RefreshButton, LoadingState, ErrorState, EmptyState } from '@/components/ui'
+import { Icon, Btn, Money, Card, Badge, PageHead, RefreshButton, LoadingState, ErrorState, EmptyState, type IconName } from '@/components/ui'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { getReporte606Preview, downloadReporte606, ApiError } from '@/api'
 import { downloadBlob } from '@/lib/file'
@@ -188,7 +188,7 @@ export function Reporte606View({ nav }: { nav: Nav }) {
   )
 }
 
-function Total({ label, value, icon, color, soft }: { label: string; value: number; icon: string; color: string; soft: string }) {
+function Total({ label, value, icon, color, soft }: { label: string; value: number; icon: IconName; color: string; soft: string }) {
   return (
     <div className="card card-pad" style={{ borderTop: `3px solid ${color}` }}>
       <div className="row between" style={{ alignItems: 'center', marginBottom: 10 }}>

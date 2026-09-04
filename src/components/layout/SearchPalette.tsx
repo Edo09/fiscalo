@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Icon } from '@/components/ui'
+import { Icon, type IconName } from '@/components/ui'
 import { NAV, type Nav } from '@/config/navigation'
 
 interface Result {
   type: string
   label: string
-  icon: string
+  icon: IconName
   action: () => void
 }
 

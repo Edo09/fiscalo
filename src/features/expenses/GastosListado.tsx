@@ -4,7 +4,7 @@
 // GET /api/gastos?categoria=... + /api/gastos/stats (KPIs acotados a la categoría).
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
+import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination, type IconName } from '@/components/ui'
 import { listGastos, getGastoStats } from '@/api'
 import type { GastoCategoria, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -22,7 +22,7 @@ export interface GastosListadoProps {
   /** Etiqueta del botón de alta (ej. "Registrar gasto" / "Registrar compra"). */
   ctaLabel: string
   /** Icono del KPI principal y del estado vacío. */
-  icon: string
+  icon: IconName
   /** Si true, abre el formulario de alta al montar (botón "Nueva" del navbar). */
   autoNew?: boolean
 }

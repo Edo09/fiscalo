@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead } from '@/components/ui'
+import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead, type IconName } from '@/components/ui'
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, listUbicaciones, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { BrandingSection } from './BrandingSection'
@@ -70,7 +70,7 @@ export function SettingsView() {
       setLogoBusy(false)
     }
   }
-  const secs = [
+  const secs: { id: string; label: string; ic: IconName }[] = [
     { id: 'empresa', label: 'Datos de empresa', ic: 'building-2' },
     { id: 'fiscal', label: 'Configuración DGII', ic: 'landmark' },
     { id: 'numeracion', label: 'Numeraciones e-CF', ic: 'hash' },

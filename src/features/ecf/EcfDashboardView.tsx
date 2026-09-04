@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon, Btn, Money, Badge, Card, Progress, Spinner, ErrorState, PageHead } from '@/components/ui'
+import { Icon, Btn, Money, Badge, Card, Progress, Spinner, ErrorState, PageHead, type IconName } from '@/components/ui'
 import { getStats, formatApiDate } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
@@ -22,7 +22,7 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
     (d?.secuencias ?? []).some((s) => s.type.replace(/^E/i, '') === t.code),
   )
 
-  const estados = [
+  const estados: { label: string; value: number; color: string; icon: IconName; bg: string; total?: boolean }[] = [
     { label: 'Total e-CF', value: totalEcf, color: 'var(--text-2)', icon: 'file-text', bg: 'var(--neutral-soft)', total: true },
     { label: 'Aceptados', value: totalAceptados, color: 'var(--success)', icon: 'check-circle', bg: 'var(--success-soft)' },
     { label: 'En proceso', value: totalEnProceso, color: 'var(--warning)', icon: 'loader', bg: 'var(--warning-soft)' },

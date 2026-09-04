@@ -1,11 +1,11 @@
-import { Icon, PageHead } from '@/components/ui'
+import { Icon, PageHead, type IconName } from '@/components/ui'
 import type { Nav, ViewId } from '@/config/navigation'
 
 /* FISCALO — Reportes (índice de categorías) */
 interface Categoria {
   t: string
   d: string
-  ic: string
+  ic: IconName
   c: string
   to: ViewId
 }

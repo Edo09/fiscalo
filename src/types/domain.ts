@@ -1,3 +1,4 @@
+import type { IconName } from '@/components/ui/Icon'
 // Tipos de dominio para la UI (datos de ejemplo del prototipo).
 // Independientes del esquema de base de datos en `@/types/database`.
 
@@ -164,14 +165,14 @@ export interface Actividad {
   txt: string
   monto: string | null
   hora: string
-  ic: string
+  ic: IconName
   color: string
 }
 
 export interface Notificacion {
   id: string
   tipo: NotifTipo
-  ic: string
+  ic: IconName
   titulo: string
   txt: string
   hora: string

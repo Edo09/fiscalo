@@ -74,12 +74,12 @@ export function EcfTypeView({ tipo, nav }: { tipo: EcfTipo | null; nav: Nav }) {
       <div className="grid-2 mt-md">
         <Card title="Auditoría y trazabilidad">
           <div className="col gap-md">
-            {[
+            {([
               { ic: 'file-plus', t: 'Emisión', d: 'Generación y firma del XML' },
               { ic: 'send', t: 'Transmisión', d: 'Envío al webservice de la DGII' },
               { ic: 'badge-check', t: 'Acuse de recibo', d: 'Track ID asignado por DGII' },
               { ic: 'shield-check', t: 'Aprobación comercial', d: 'Respuesta del receptor (si aplica)' },
-            ].map((s, i) => (
+            ] as const).map((s, i) => (
               <div className="row gap-md" key={i}>
                 <span className="kpi-ic" style={{ background: 'var(--accent-soft)', color: 'var(--accent)', width: 34, height: 34 }}><Icon name={s.ic} size={16} /></span>
                 <div><div className="fw6 text-sm">{s.t}</div><div className="text-xs muted">{s.d}</div></div>
