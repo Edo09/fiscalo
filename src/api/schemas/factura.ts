@@ -26,6 +26,10 @@ export const facturaItemSchema = z.object({
   cantidad: z.number().positive('La cantidad debe ser mayor que 0.'),
   unidad_medida: z.string().min(1, 'La unidad de medida es obligatoria.'),
   precio_unitario: z.number().nonnegative('El precio no puede ser negativo.'),
+  // Descuento de la línea EN MONTO (no en %), que es como lo pide DGII
+  // (<DescuentoMonto>). El backend resta esto del MontoItem y calcula el ITBIS
+  // sobre el neto, así que el total del documento coincide con lo que se ve.
+  descuento_monto: z.number().nonnegative('El descuento no puede ser negativo.').optional(),
   // Retenciones (E41/E47) — opcionales, el backend las calcula si faltan.
   indicador_agente_retencion_percepcion: z.string().optional(),
   monto_itbis_retenido: z.number().optional(),
@@ -67,6 +71,10 @@ export const createFacturaSchema = z.object({
   user_id: z.number().int().optional(),
   fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD).').optional(),
   tipo_pago: z.number().optional(),
+  // % de descuento del documento. Si se omite, el backend aplica el del cliente
+  // (clients.descuento). El formulario manda 0 porque ya baja el descuento a
+  // cada línea como `descuento_monto`: lo que se ve es lo que se emite.
+  descuento: z.number().min(0).max(100).optional(),
   tipo_ingresos: z.string().optional(),
   indicador_monto_gravado: z.string().optional(),
   indicador_nota_credito: z.string().optional(),

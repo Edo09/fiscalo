@@ -17,6 +17,10 @@ export interface NewClientInput {
   email: string
   phone_number: string
   rnc?: string
+  /** % de descuento por defecto de sus facturas (0-100). */
+  descuento?: number
+  /** 1 = se le puede facturar a crédito; 0 = solo contado. */
+  permitir_credito?: 0 | 1
 }
 
 export function createClient(input: NewClientInput): Promise<ClientRow> {

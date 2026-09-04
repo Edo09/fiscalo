@@ -37,6 +37,14 @@ interface Linea {
   tipoItem: 'Bien' | 'Servicio'
 }
 
+/**
+ * Métodos de pago que son venta a CRÉDITO (TipoPago=2 ante DGII). El resto
+ * —efectivo, transferencia, tarjeta, cheque— son formas de cobro de una venta
+ * de contado y van como TipoPago=1.
+ */
+const METODOS_CREDITO = ['Crédito 30 días']
+const esMetodoCredito = (metodo: string) => METODOS_CREDITO.includes(metodo)
+
 /** Opciones de indicador de facturación DGII (tasa de ITBIS por línea). */
 const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
   { value: 1, label: '18%' },
@@ -156,6 +164,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           id: prefill.clienteId, nombre: prefill.clienteNombre || `Cliente #${prefill.clienteId}`,
           contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
           balance: 0, facturas: 0, estado: '', desde: '',
+          // Placeholder: el efecto de abajo trae el cliente completo por id y
+          // con el sus condiciones reales (descuento y credito).
+          descuento: 0, permiteCredito: false,
         }
       : null,
   )
@@ -202,7 +213,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     const row = clienteDetalle.data
     if (!clienteEnriquecido.current && row && cliente && String(row.id) === cliente.id) {
       clienteEnriquecido.current = true
-      setCliente(mapClientRow(row))
+      const completo = mapClientRow(row)
+      setCliente(completo)
+      // Al llegar el cliente real llegan sus condiciones: se aplican igual que
+      // si se hubiera elegido a mano, para que convertir una cotizacion no se
+      // comporte distinto que crear la factura desde cero.
+      if (completo.descuento > 0) {
+        setLineas((ls) => ls.map((l) => ({ ...l, desc: completo.descuento })))
+      }
+      if (!completo.permiteCredito) {
+        setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
+      }
     }
   }, [clienteDetalle.data, cliente])
 
@@ -230,11 +251,31 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     `${p.nombre} ${p.sku} ${p.cat}`.toLowerCase().includes(prodQuery.trim().toLowerCase()),
   )
 
+  // Descuento por defecto de las líneas: el que tenga el cliente elegido. El
+  // usuario puede cambiarlo línea por línea después; esto solo lo precarga.
+  const descuentoCliente = cliente?.descuento ?? 0
+
+  /**
+   * Elegir cliente arrastra sus condiciones comerciales al documento: su % de
+   * descuento pasa a todas las líneas, y si no tiene crédito habilitado el
+   * método de pago vuelve a contado (el backend rechazaría la factura con 422).
+   */
+  const seleccionarCliente = (c: Cliente | null) => {
+    setCliente(c)
+    if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined }))
+    const pct = c?.descuento ?? 0
+    setLineas((ls) => ls.map((l) => ({ ...l, desc: pct })))
+    if (c && !c.permiteCredito && esMetodoCredito(metodo)) {
+      setMetodo('Efectivo')
+      toast.info(`${c.nombre} no tiene crédito habilitado: el pago queda de contado.`)
+    }
+  }
+
   const addLinea = (p: Producto) => {
     setLineas([...lineas, {
       id: Date.now(), prodId: p.id, nombre: p.nombre, descripcion: '', cant: 1,
       // El producto define el indicador y la unidad por defecto.
-      precio: p.precio, desc: 0, indFact: indFactFromItbis(p.itbis),
+      precio: p.precio, desc: descuentoCliente, indFact: indFactFromItbis(p.itbis),
       unidadMedida: p.unidadMedida || 43,
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
@@ -245,7 +286,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const addLineaLibre = () =>
     setLineas([...lineas, {
       id: Date.now(), prodId: '', nombre: '', descripcion: '', cant: 1,
-      precio: 0, desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
+      precio: 0, desc: descuentoCliente, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
     }])
   // Limpia los errores en línea de una fila al editarla (o al eliminarla).
   const clearLineaErr = (id: number) =>
@@ -299,6 +340,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     { code: '33', n: 'Nota de Débito' },
   ]
   const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
+  // Solo el crédito es TipoPago=2 ante DGII. Transferencia, tarjeta y cheque son
+  // formas de cobro de una venta de CONTADO: mandarlas como crédito falsea el
+  // comprobante (y ahora el backend las rechaza si el cliente no tiene crédito).
+  const esCredito = esMetodoCredito(metodo)
   // E32 (Consumo) y E43 (Gastos Menores) se pueden emitir sin cliente (consumidor
   // final); el resto sí lo requiere. Igual criterio que el backend.
   const requiereCliente = tipo !== '32' && tipo !== '43'
@@ -334,6 +379,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       cantidad: l.cant,
       unidad_medida: String(l.unidadMedida),
       precio_unitario: l.precio,
+      // La UI maneja el descuento en %, pero DGII lo quiere en monto por línea.
+      // Sin esto el descuento era solo visual: los totales de pantalla lo
+      // restaban y el comprobante emitido salía al precio completo.
+      ...(l.desc > 0 ? { descuento_monto: Math.round(l.cant * l.precio * l.desc) / 100 } : {}),
     }))
   }
 
@@ -348,7 +397,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       // Emisor = usuario autenticado (id del login). Fallback al .env por si acaso.
       user_id: user?.id ?? DEFAULT_USER_ID,
       tipo_ecf: tipo,
-      tipo_pago: metodo === 'Efectivo' ? 1 : 2,
+      tipo_pago: esCredito ? 2 : 1,
+      // El descuento de las líneas ya va en cada item; se manda explícito para
+      // que el backend no vuelva a aplicar el del cliente encima.
+      descuento: 0,
       // "0" = el precio incluye ITBIS (DGII lo desglosa); "1" = se suma al precio.
       indicador_monto_gravado: precioConItbis ? '0' : '1',
       items,
@@ -476,7 +528,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             <div className="fx-cliente">
               <ClientCombobox
                 value={cliente}
-                onChange={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }}
+                onChange={seleccionarCliente}
               />
             </div>
             <button
@@ -502,8 +554,19 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               onChange={(e) => setMetodo(e.target.value)}
               aria-label="Método de pago"
             >
-              {metodos.map((m) => <option key={m}>{m}</option>)}
+              {metodos.map((m) => (
+                // El crédito se deshabilita si el cliente no lo tiene permitido:
+                // vale más impedirlo aquí que dejar que la DGII lo rechace luego.
+                <option key={m} disabled={esMetodoCredito(m) && cliente != null && !cliente.permiteCredito}>
+                  {m}
+                </option>
+              ))}
             </select>
+            {cliente && !cliente.permiteCredito && (
+              <span className="text-xs muted-3" style={{ display: 'block' }}>
+                Este cliente no tiene crédito habilitado
+              </span>
+            )}
           </span>
           <span className="fx-cond-item">
             <Switch on={precioConItbis} onChange={setPrecioConItbis} />

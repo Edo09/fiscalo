@@ -154,5 +154,9 @@ export function mapClientRow(r: ClientRow): Cliente {
     facturas: 0,
     estado: 'Al día',
     desde: '',
+    // MySQL devuelve DECIMAL como string ("10.00"): se normaliza a número para
+    // que el formulario lo use directo como % de descuento.
+    descuento: Number(r.descuento ?? 0) || 0,
+    permiteCredito: Number(r.permitir_credito ?? 0) === 1,
   }
 }

@@ -172,6 +172,10 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     direccion: client.direccion ?? '',
     municipio: client.municipio ?? '',
     provincia: client.provincia ?? '',
+    // Condiciones comerciales. Van en el form porque el PUT manda el registro
+    // completo: si no viajaran, guardar aqui las pondria en 0.
+    descuento: String(client.descuento ?? 0),
+    permitir_credito: Number(client.permitir_credito ?? 0) === 1,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -183,7 +187,12 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     setSaving(true)
     setError(null)
     try {
-      await updateClient({ id: client.id, ...form })
+      await updateClient({
+        ...form,
+        id: client.id,
+        descuento: Number(form.descuento) || 0,
+        permitir_credito: form.permitir_credito ? 1 : 0,
+      })
       void queryClient.invalidateQueries({ queryKey: ['clients'] })
       toast.success('Cliente actualizado.')
       onClose()
@@ -227,6 +236,18 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
         <div className="field full"><label className="label">Dirección</label><input className="input" value={form.direccion} onChange={set('direccion')} /></div>
         <div className="field"><label className="label">Municipio</label><input className="input" value={form.municipio} onChange={set('municipio')} /></div>
         <div className="field"><label className="label">Provincia</label><input className="input" value={form.provincia} onChange={set('provincia')} /></div>
+        <div className="field"><label className="label">Descuento por defecto (%)</label><input className="input" inputMode="decimal" value={form.descuento} onChange={set('descuento')} /></div>
+        <div className="field">
+          <label className="label">Crédito</label>
+          <label className="text-sm">
+            <input
+              type="checkbox"
+              checked={form.permitir_credito}
+              onChange={(e) => setForm({ ...form, permitir_credito: e.target.checked })}
+            />{' '}
+            Permitir facturar a crédito
+          </label>
+        </div>
       </div>
     </Drawer>
   )

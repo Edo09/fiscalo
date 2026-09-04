@@ -14,9 +14,11 @@ interface Props {
   nombreInicial?: string
 }
 
-type Campos = { client_name: string; company_name: string; email: string; phone_number: string; rnc: string }
+type Campos = { client_name: string; company_name: string; email: string; phone_number: string; rnc: string; descuento: string; permitir_credito: boolean }
 
-const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '' }
+type CamposTexto = Exclude<keyof Campos, 'permitir_credito'>
+
+const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: false }
 
 /**
  * Alta rápida de cliente (POST /api/clients).
@@ -35,7 +37,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
   const [errores, setErrores] = useState<Partial<Record<keyof Campos, string>>>({})
   const [guardando, setGuardando] = useState(false)
 
-  const set = (k: keyof Campos, v: string) => {
+  const set = <K extends keyof Campos>(k: K, v: Campos[K]) => {
     setF((prev) => ({ ...prev, [k]: v }))
     if (errores[k]) setErrores((e) => ({ ...e, [k]: undefined }))
   }
@@ -61,6 +63,9 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
         email: f.email.trim(),
         phone_number: f.phone_number.trim(),
         ...(f.rnc.trim() ? { rnc: f.rnc.trim() } : {}),
+        // Condiciones comerciales: la factura las hereda al elegir este cliente.
+        descuento: Number(f.descuento) || 0,
+        permitir_credito: f.permitir_credito ? 1 : 0,
       })
       toast.success(`Cliente ${f.client_name.trim()} creado.`)
       await queryClient.invalidateQueries({ queryKey: ['clients'] })
@@ -73,7 +78,8 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     }
   }
 
-  const campo = (k: keyof Campos, label: string, extra: Record<string, unknown> = {}, req = true) => (
+  // Solo los campos de texto: el checkbox de credito se renderiza aparte.
+  const campo = (k: CamposTexto, label: string, extra: Record<string, unknown> = {}, req = true) => (
     <div className={'field' + (errores[k] ? ' field-error' : '')}>
       <label>{label} {req ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
       <input
@@ -108,6 +114,17 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
         {campo('rnc', 'RNC o cédula', { placeholder: '131000000', inputMode: 'numeric' }, false)}
         {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel' })}
         {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email' })}
+        {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
+        <div className="field">
+          <label>
+            <input
+              type="checkbox"
+              checked={f.permitir_credito}
+              onChange={(e) => set('permitir_credito', e.target.checked)}
+            />{' '}
+            Permitir facturar a crédito
+          </label>
+        </div>
       </div>
     </Modal>
   )

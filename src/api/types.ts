@@ -256,6 +256,10 @@ export interface ClientRow {
   client_name?: string | null
   company_name?: string | null
   phone_number?: string | null
+  /** % de descuento fijo del cliente (0 = ninguno). Llega como string desde MySQL. */
+  descuento?: number | string | null
+  /** 1 = se le puede facturar a crédito; 0 = solo contado. */
+  permitir_credito?: number | string | boolean | null
 }
 
 // ---------------------------------------------------------------------------

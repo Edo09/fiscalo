@@ -45,6 +45,10 @@ export interface Cliente {
   facturas: number
   estado: string
   desde: string
+  /** % de descuento que se aplica por defecto a sus facturas (0 = ninguno). */
+  descuento: number
+  /** Si se le puede facturar a crédito. Con `false`, el pago debe ser de contado. */
+  permiteCredito: boolean
 }
 
 export interface Producto {

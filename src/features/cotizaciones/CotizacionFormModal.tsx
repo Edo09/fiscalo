@@ -29,6 +29,8 @@ function clienteFromRow(c: CotizacionRow): Cliente | null {
     id: String(c.client_id), nombre: c.client_name || `Cliente #${c.client_id}`,
     contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
     balance: 0, facturas: 0, estado: '', desde: '',
+    // Placeholder: el combobox recarga el cliente real y con el sus condiciones.
+    descuento: 0, permiteCredito: false,
   }
 }
 
