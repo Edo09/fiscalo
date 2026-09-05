@@ -16,6 +16,9 @@ export const indicadorBienServicioSchema = z.union([z.literal(1), z.literal(2)])
 
 export const facturaItemSchema = z.object({
   numero_linea: z.number().int().optional(),
+  // Producto del catalogo. No va al XML: el backend lo usa para descontar
+  // inventario. Ausente = linea libre (mano de obra, flete), no mueve stock.
+  product_id: z.number().int().positive().optional(),
   // DGII AlfNum80Type: máx. 80 caracteres. El nombre debe ser corto; el detalle
   // (material, medidas, color, sucursal) va en `descripcion`.
   nombre_item: z.string().min(1, 'El nombre del ítem es obligatorio.').max(80, 'El nombre del ítem no puede superar 80 caracteres (límite DGII).'),

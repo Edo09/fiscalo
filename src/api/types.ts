@@ -853,6 +853,8 @@ export interface Reporte607Preview {
 
 /** Linea que el formulario envia. El backend deriva subtotal e itbis_amount. */
 export interface FacturaSimpleItemInput {
+  /** Producto del catálogo; ausente = línea libre (no mueve inventario). */
+  product_id?: number
   description: string
   quantity: number
   amount: number
@@ -874,6 +876,8 @@ export interface FacturaSimpleInput {
 /** Linea tal como la devuelve el backend. */
 export interface FacturaSimpleItem {
   id?: number
+  /** Producto del catálogo del que salió la línea (null = línea libre). */
+  product_id?: number | null
   description: string
   quantity: number
   amount: number
@@ -903,4 +907,75 @@ export interface FacturaSimpleRow {
 export interface FacturaSimple extends FacturaSimpleRow {
   items: FacturaSimpleItem[]
   client_email?: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Inventario — ajustes y libro de movimientos (/api/inventario)
+//
+// El ajuste es la CABECERA (motivo, nota, totales) y cada línea es un
+// movimiento del libro, con la foto del saldo antes y después. `products.stock`
+// es el saldo derivado: toda variación pasa por aquí.
+// ---------------------------------------------------------------------------
+
+/** Motivos de un ajuste. ANULACION la pone el sistema, no el usuario. */
+export type MotivoAjuste =
+  | 'CONTEO_FISICO' | 'MERMA' | 'DANO' | 'ROBO'
+  | 'DEVOLUCION' | 'ERROR_CAPTURA' | 'ANULACION' | 'OTRO'
+
+export interface AjusteRow {
+  id: number
+  codigo: string
+  fecha: string
+  motivo: MotivoAjuste
+  nota?: string | null
+  warehouse_id: number
+  almacen_nombre?: string | null
+  total_lineas: number | string
+  total_valor: number | string
+  /** Ajuste que anuló a este (si tiene valor, este ajuste está anulado). */
+  anulado_por_id?: number | null
+  /** Este ajuste es la anulación de aquel. */
+  anula_a_id?: number | null
+}
+
+/** Un movimiento del libro. Es también la línea de un ajuste. */
+export interface MovimientoRow {
+  id: number
+  product_id: number
+  producto_nombre?: string | null
+  sku?: string | null
+  warehouse_id: number
+  tipo_movimiento: 'AJUSTE' | 'VENTA' | 'COMPRA' | 'DEVOLUCION' | string
+  referencia_tipo?: string | null
+  referencia_id?: number | null
+  /** Con signo: positivo suma al stock, negativo resta. */
+  cantidad: number | string
+  cantidad_anterior: number | string
+  cantidad_nueva: number | string
+  costo_unitario: number | string
+  valor_movimiento: number | string
+  created_at: string
+  /** Solo en el kardex: el ajuste que lo originó. */
+  ajuste_codigo?: string | null
+  motivo?: MotivoAjuste | null
+}
+
+export interface Ajuste extends AjusteRow {
+  lineas: MovimientoRow[]
+}
+
+export interface CrearAjusteLinea {
+  product_id: number
+  tipo: 'INCREMENTO' | 'DISMINUCION'
+  /** Siempre positiva: el signo lo decide `tipo`. */
+  cantidad: number
+  /** Valoriza el movimiento. Si se omite, usa el costo del producto. */
+  costo_unitario?: number
+}
+
+export interface CrearAjusteInput {
+  motivo: MotivoAjuste
+  nota?: string
+  warehouse_id?: number
+  lineas: CrearAjusteLinea[]
 }

@@ -68,6 +68,8 @@ const indicadorDeItbis = (itbis: number) => (itbis === 18 ? 1 : itbis === 16 ? 2
 
 interface Linea {
   id: number
+  /** Producto del catalogo del que salio la linea (vacio = linea libre). */
+  prodId: string
   descripcion: string
   cantidad: number
   precio: number
@@ -76,7 +78,7 @@ interface Linea {
   indicador: number
 }
 
-const lineaVacia = (id: number, desc = 0): Linea => ({ id, descripcion: '', cantidad: 1, precio: 0, desc, indicador: 1 })
+const lineaVacia = (id: number, desc = 0): Linea => ({ id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc, indicador: 1 })
 
 /**
  * Metodos de pago que son venta a CREDITO (tipo_pago=2). Igual que en la factura
@@ -147,6 +149,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         if (f.date) setFecha(String(f.date).slice(0, 10))
         const cargadas: Linea[] = (f.items ?? []).map((it, i) => ({
           id: i + 1,
+          prodId: it.product_id ? String(it.product_id) : '',
           descripcion: it.description ?? '',
           cantidad: Number(it.quantity ?? 1),
           precio: Number(it.amount ?? 0),
@@ -192,6 +195,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const addProducto = (p: Producto) => {
     const desde = (id: number): Linea => ({
       id,
+      prodId: p.id,
       descripcion: p.nombre,
       cantidad: 1,
       precio: p.precio,
@@ -256,6 +260,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
 
   const items = (): FacturaSimpleItemInput[] =>
     lineasValidas.map((l) => ({
+      ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
       description: l.descripcion.trim(),
       quantity: l.cantidad,
       amount: l.precio,

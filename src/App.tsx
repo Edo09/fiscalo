@@ -19,6 +19,8 @@ import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
+import { AdjustmentsView } from '@/features/inventory/AdjustmentsView'
+import { AdjustmentFormView } from '@/features/inventory/AdjustmentFormView'
 import { ExpensesView } from '@/features/expenses/ExpensesView'
 import { PurchasesView } from '@/features/purchases/PurchasesView'
 import { SuppliersView } from '@/features/suppliers/SuppliersView'
@@ -150,6 +152,8 @@ function AppShell() {
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />
       case 'almacenes': return <WarehousesView />
+      case 'ajustes': return <AdjustmentsView nav={nav} />
+      case 'ajuste-nuevo': return <AdjustmentFormView nav={nav} />
       case 'ecf': return <EcfDashboardView nav={nav} />
       case 'ecf-tipo': return <EcfTypeView tipo={payload as EcfTipo | null} nav={nav} />
       case 'aprobar-ecf': return <ApproveEcfView />

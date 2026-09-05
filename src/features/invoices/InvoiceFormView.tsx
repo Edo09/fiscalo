@@ -378,6 +378,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   function buildItems(): FacturaItemInput[] {
     return lineas.map((l, i) => ({
       numero_linea: i + 1,
+      // Vinculo con el catalogo: sin esto la venta no descuenta inventario.
+      ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
       nombre_item: l.nombre.trim(),
       ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
       indicador_facturacion: l.indFact,
