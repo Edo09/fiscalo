@@ -858,12 +858,16 @@ export interface FacturaSimpleItemInput {
   amount: number
   /** 1 = gravado 18%, 2 = gravado 16%, 3 = 0%, 4 = exento. */
   indicador_facturacion: number
+  /** Descuento de la línea EN MONTO. El backend deja el subtotal neto de él. */
+  descuento_monto?: number
 }
 
 export interface FacturaSimpleInput {
   client_id?: number | null
   client_name?: string
   date?: string
+  /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
+  tipo_pago?: number
   items: FacturaSimpleItemInput[]
 }
 
@@ -874,6 +878,8 @@ export interface FacturaSimpleItem {
   quantity: number
   amount: number
   subtotal: number
+  /** Descuento aplicado a la línea; `subtotal` ya viene neto de él. */
+  descuento_monto?: number
   itbis_amount: number
   indicador_facturacion?: number
 }
@@ -887,6 +893,8 @@ export interface FacturaSimpleRow {
   client_name: string | null
   company_name?: string | null
   total: number | string
+  /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
+  tipo_pago?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
 }

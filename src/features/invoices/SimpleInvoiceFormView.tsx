@@ -71,10 +71,19 @@ interface Linea {
   descripcion: string
   cantidad: number
   precio: number
+  /** Descuento de la linea en %, igual que en la factura con comprobante. */
+  desc: number
   indicador: number
 }
 
-const lineaVacia = (id: number): Linea => ({ id, descripcion: '', cantidad: 1, precio: 0, indicador: 1 })
+const lineaVacia = (id: number, desc = 0): Linea => ({ id, descripcion: '', cantidad: 1, precio: 0, desc, indicador: 1 })
+
+/**
+ * Metodos de pago que son venta a CREDITO (tipo_pago=2). Igual que en la factura
+ * con comprobante: transferencia, tarjeta y cheque son cobros de contado.
+ */
+const METODOS_CREDITO = ['Credito 30 dias']
+const esMetodoCredito = (m: string) => METODOS_CREDITO.includes(m)
 
 /* FISCALO — Facturas simples: alta y edición (POST/PUT /api/facturas-simples).
    La pantalla tiene forma de documento: se escribe sobre el papel y cada dato
@@ -89,6 +98,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [numero, setNumero] = useState<string | null>(null)
 
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [metodo, setMetodo] = useState('Efectivo')
   const [clienteActual, setClienteActual] = useState<string | null>(null)
   const [clienteLibre, setClienteLibre] = useState('')
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
@@ -133,12 +143,17 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         if (!vivo) return
         setNumero(f.no_factura)
         setClienteActual(f.client_name || f.company_name || null)
+        if (Number(f.tipo_pago ?? 1) === 2) setMetodo(METODOS_CREDITO[0])
         if (f.date) setFecha(String(f.date).slice(0, 10))
         const cargadas: Linea[] = (f.items ?? []).map((it, i) => ({
           id: i + 1,
           descripcion: it.description ?? '',
           cantidad: Number(it.quantity ?? 1),
           precio: Number(it.amount ?? 0),
+          // El backend guarda el descuento en monto; la UI lo maneja en %.
+          desc: Number(it.amount ?? 0) * Number(it.quantity ?? 1) > 0
+            ? Math.round((Number(it.descuento_monto ?? 0) / (Number(it.amount ?? 0) * Number(it.quantity ?? 1))) * 10000) / 100
+            : 0,
           indicador: Number(it.indicador_facturacion ?? 1),
         }))
         setLineas(cargadas)
@@ -150,9 +165,24 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     return () => { vivo = false }
   }, [facturaId])
 
+  // Lista de metodos que ofrece el formulario (el credito depende del cliente).
+  const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Credito 30 dias', 'Cheque']
+
+  /**
+   * Elegir cliente arrastra sus condiciones: su % de descuento pasa a todas las
+   * lineas y, si no tiene credito, el pago vuelve a contado (el backend lo
+   * rechaza con 422, igual que en la factura con comprobante).
+   */
+  const seleccionarCliente = (c: Cliente | null) => {
+    setCliente(c)
+    const pct = c?.descuento ?? 0
+    setLineas((ls) => ls.map((l) => ({ ...l, desc: pct })))
+    if (c && !c.permiteCredito) setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
+  }
+
   const addLinea = () => {
     enfocarUltima.current = true
-    setLineas((ls) => [...ls, lineaVacia(Math.max(0, ...ls.map((l) => l.id)) + 1)])
+    setLineas((ls) => [...ls, lineaVacia(Math.max(0, ...ls.map((l) => l.id)) + 1, cliente?.descuento ?? 0)])
   }
   /**
    * Linea traida del catalogo: el producto define descripcion, precio y tasa.
@@ -165,6 +195,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       descripcion: p.nombre,
       cantidad: 1,
       precio: p.precio,
+      desc: cliente?.descuento ?? 0,
       indicador: indicadorDeItbis(p.itbis),
     })
     setLineas((ls) => {
@@ -188,7 +219,10 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     ? catalogo.filter((p) => `${p.nombre} ${p.sku} ${p.cat}`.toLowerCase().includes(filtroProd))
     : catalogo
 
-  const subtotalDe = (l: Linea) => Math.round(l.cantidad * l.precio * 100) / 100
+  // Neto de descuento: el backend guarda el subtotal ya rebajado y calcula el
+  // ITBIS sobre el, asi que la pantalla tiene que mostrar lo mismo.
+  const descuentoDe = (l: Linea) => Math.round(l.cantidad * l.precio * l.desc) / 100
+  const subtotalDe = (l: Linea) => Math.round(l.cantidad * l.precio * 100) / 100 - descuentoDe(l)
   const itbisDe = (l: Linea) => Math.round(subtotalDe(l) * rateOf(l.indicador) * 100) / 100
   const subtotal = lineas.reduce((c, l) => c + subtotalDe(l), 0)
   const itbis = lineas.reduce((c, l) => c + itbisDe(l), 0)
@@ -200,7 +234,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // la marca desaparece sola.
   const lineaOriginal = (id: number) => original?.lineas.find((o) => o.id === id)
   const esLineaNueva = (id: number) => original != null && lineaOriginal(id) === undefined
-  const campoCambiado = (l: Linea, k: 'descripcion' | 'cantidad' | 'precio' | 'indicador') => {
+  const campoCambiado = (l: Linea, k: 'descripcion' | 'cantidad' | 'precio' | 'desc' | 'indicador') => {
     if (original == null) return false
     const o = lineaOriginal(l.id)
     return o ? o[k] !== l[k] : true
@@ -211,7 +245,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const lineasCambiadas = original != null && (
     lineasBorradas ||
     lineas.some((l) => esLineaNueva(l.id) ||
-      (['descripcion', 'cantidad', 'precio', 'indicador'] as const).some((k) => campoCambiado(l, k)))
+      (['descripcion', 'cantidad', 'precio', 'desc', 'indicador'] as const).some((k) => campoCambiado(l, k)))
   )
   const hayCambios = clienteCambiado || fechaCambiada || lineasCambiadas
   const marca = (cond: boolean) => (cond ? ' fx-mod' : '')
@@ -226,6 +260,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       quantity: l.cantidad,
       amount: l.precio,
       indicador_facturacion: l.indicador,
+      ...(l.desc > 0 ? { descuento_monto: descuentoDe(l) } : {}),
     }))
 
   /**
@@ -270,10 +305,10 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     setGuardando(true)
     try {
       if (editando && facturaId != null) {
-        await updateFacturaSimple(facturaId, { ...clienteBody(), date: fecha, items: items() })
+        await updateFacturaSimple(facturaId, { ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
         toast.success('Factura simple actualizada.')
       } else {
-        const creada = await createFacturaSimple({ ...clienteBody(), date: fecha, items: items() })
+        const creada = await createFacturaSimple({ ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
         toast.success(`Factura simple ${creada?.no_factura ?? ''} creada.`)
       }
       await queryClient.invalidateQueries({ queryKey: ['facturas-simples'] })
@@ -355,7 +390,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           <>
           <div className="fx-cliente-row">
             <div className="fx-cliente">
-              <ClientCombobox value={cliente} onChange={setCliente} />
+              <ClientCombobox value={cliente} onChange={seleccionarCliente} />
             </div>
             <button
               type="button"
@@ -379,6 +414,24 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           )}
           </>
           )}
+          <div style={{ marginTop: 12 }}>
+            <span className="fx-eyebrow">Pago</span>
+            <select
+              className="fx-cond-sel"
+              value={metodo}
+              onChange={(e) => setMetodo(e.target.value)}
+              aria-label="Método de pago"
+            >
+              {METODOS_PAGO.map((m) => (
+                <option key={m} disabled={esMetodoCredito(m) && cliente != null && !cliente.permiteCredito}>{m}</option>
+              ))}
+            </select>
+            {cliente && !cliente.permiteCredito && (
+              <span className="text-xs muted-3" style={{ display: 'block' }}>
+                Este cliente no tiene crédito habilitado
+              </span>
+            )}
+          </div>
         </section>
 
         {/* --- Líneas --- */}
@@ -388,6 +441,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             <span>Descripción</span>
             <span style={{ textAlign: 'right' }}>Cant.</span>
             <span style={{ textAlign: 'right' }}>Precio</span>
+            <span style={{ textAlign: 'right' }}>Desc.%</span>
             <span>ITBIS</span>
             <span style={{ textAlign: 'right' }}>Importe</span>
           </div>
@@ -429,6 +483,14 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                 value={l.precio}
                 onChange={(e) => updLinea(l.id, { precio: Number(e.target.value) })}
                 aria-label={`Precio de la línea ${i + 1}`}
+              />
+
+              <input
+                className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'desc'))} data-label="Desc.%"
+                type="number" min={0} max={100} step="any" inputMode="decimal"
+                value={l.desc}
+                onChange={(e) => updLinea(l.id, { desc: Math.max(0, Math.min(100, Number(e.target.value))) })}
+                aria-label={`Descuento en porcentaje de la línea ${i + 1}`}
               />
 
               <select
@@ -561,7 +623,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         <NewClientModal
           nombreInicial={clienteLibre.trim()}
           onClose={() => setNuevoCliente(false)}
-          onCreated={(c) => { setCliente(c); setClienteLibre('') }}
+          onCreated={(c) => { seleccionarCliente(c); setClienteLibre('') }}
         />
       )}
     </div>
