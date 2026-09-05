@@ -14,6 +14,7 @@ import { NewClientModal } from '@/features/clients/NewClientModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
@@ -415,7 +416,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     }
   }
 
-  const emitir = async () => {
+  // Acción única: un doble clic emitiría DOS e-CF y quemaria un NCF en la DGII.
+  const emitir = useAccionUnica(async () => {
     if (emitting) return
     if (!validateForm()) return
     const payload = buildPayload()
@@ -455,7 +457,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
       setEmitting(false)
     }
-  }
+  })
 
   const previsualizar = async () => {
     // validateForm ya exige cliente salvo en E32/E43 (consumidor final).

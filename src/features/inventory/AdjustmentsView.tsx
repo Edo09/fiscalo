@@ -6,6 +6,7 @@ import {
 } from '@/components/ui'
 import { ApiError, listAjustes, getAjuste, anularAjuste } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import type { Nav } from '@/config/navigation'
 import { MOTIVOS, motivoLabel } from './motivos'
 
@@ -159,7 +160,8 @@ function AjusteDrawer({ id, onClose, onAnulado }: { id: number; onClose: () => v
   const [anulando, setAnulando] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
 
-  const anular = async () => {
+  // Acción única: dos anulaciones a la vez revertirian el stock dos veces.
+  const anular = useAccionUnica(async () => {
     setAnulando(true)
     try {
       const inverso = await anularAjuste(id)
@@ -169,7 +171,7 @@ function AjusteDrawer({ id, onClose, onAnulado }: { id: number; onClose: () => v
       toast.error(e instanceof ApiError ? e.message : 'No se pudo anular el ajuste.')
       setAnulando(false)
     }
-  }
+  })
 
   const yaAnulado = !!ajuste?.anulado_por_id
   const esAnulacion = ajuste?.motivo === 'ANULACION'

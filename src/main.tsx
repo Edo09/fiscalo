@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { FRESCURA } from './config/cache'
 import { useAuthStore } from './stores/auth'
 import './styles/styles.css'
@@ -48,8 +49,10 @@ if (!rootEl) throw new Error('No se encontró el elemento #root')
 
 createRoot(rootEl).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

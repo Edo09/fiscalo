@@ -5,6 +5,7 @@ import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState } from '@/compone
 import { ApiError, crearAjuste, listProducts, mapProductRow } from '@/api'
 import type { CrearAjusteLinea, MotivoAjuste } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import type { Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import { MOTIVOS } from './motivos'
@@ -85,7 +86,8 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
   const negativos = lineasValidas.filter((l) => finalDe(l) < 0)
   const puedeGuardar = lineasValidas.length > 0 && !guardando
 
-  const guardar = async () => {
+  // Acción única: un doble clic crearia dos ajustes y moveria el stock el doble.
+  const guardar = useAccionUnica(async () => {
     if (!puedeGuardar) return
     setGuardando(true)
     try {
@@ -109,7 +111,7 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo crear el ajuste.')
       setGuardando(false)
     }
-  }
+  })
 
   return (
     <div className="page page-wide">

@@ -10,6 +10,7 @@ import type { FacturaSimpleItemInput } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { presentDocument } from '@/lib/file'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
@@ -305,7 +306,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     }
   }
 
-  const guardar = async () => {
+  // Acción única: un doble clic crearia la misma factura dos veces.
+  const guardar = useAccionUnica(async () => {
     if (!puedeGuardar) return
     setGuardando(true)
     try {
@@ -323,7 +325,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     } finally {
       setGuardando(false)
     }
-  }
+  })
 
   if (cargando || errorCarga) {
     return (
