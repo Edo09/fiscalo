@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, RefreshButton, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
-import { ApiError, listClients, updateClient, deleteClient, mapClientRow } from '@/api'
-import type { ClientRow } from '@/api'
+import { ApiError, listClients, updateClient, deleteClient, mapClientRow, listUbicaciones } from '@/api'
+import type { ClientRow, Ubicacion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Cliente } from '@/types/domain'
@@ -158,10 +158,39 @@ export function ClientsView({ nav }: { nav: Nav }) {
   )
 }
 
+/**
+ * Municipio y provincia salen del catálogo DGII (`/api/provincias-municipios`),
+ * no de texto libre: lo que se persiste es el `codigo` de 6 dígitos, que es lo
+ * que viaja en el XML del e-CF. Un nombre escrito a mano no lo resuelve DGII.
+ *
+ * Los clientes migrados de sistemas anteriores traen nombres sueltos ("SAN
+ * FRANCISCO DE MACORIS"). Para no perderlos en silencio, si el valor guardado
+ * no es un código conocido se intenta casar por nombre y, si tampoco, se ofrece
+ * como una opción más marcada como valor actual.
+ */
+function opcionesUbicacion(
+  ubicaciones: Ubicacion[] | null | undefined,
+  tipo: 'PROVINCIA' | 'MUNICIPIO',
+  provinciaCodigo2: string,
+  valorActual: string,
+): Ubicacion[] {
+  const todas = (ubicaciones ?? []).filter((u) => u.tipo === tipo)
+  const lista = tipo === 'MUNICIPIO' && provinciaCodigo2
+    ? todas.filter((u) => (u.provincia_codigo ?? '') === provinciaCodigo2)
+    : todas
+  const v = valorActual.trim()
+  if (!v || lista.some((u) => u.codigo === v)) return lista
+  // Valor heredado: si coincide con un nombre del catálogo se usa ese código.
+  const porNombre = todas.find((u) => u.descripcion.toLowerCase() === v.toLowerCase())
+  if (porNombre) return lista.some((u) => u.codigo === porNombre.codigo) ? lista : [porNombre, ...lista]
+  return [{ tipo, codigo: v, descripcion: `${v} (valor actual)`, provincia_codigo: null }, ...lista]
+}
+
 /* Drawer de cliente: datos editables, guarda con PUT /api/clients. */
 function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Nav; onClose: () => void }) {
   const queryClient = useQueryClient()
   const cliente: Cliente = mapClientRow(client)
+  const { data: ubicaciones } = useApiQuery(['ubicaciones'], listUbicaciones)
   const [form, setForm] = useState({
     client_name: client.client_name ?? '',
     company_name: client.company_name ?? '',
@@ -180,8 +209,14 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [k]: e.target.value })
+
+  // Codigo de 2 digitos de la provincia elegida: filtra los municipios. Sale del
+  // catalogo, o de los 2 primeros digitos del codigo guardado como respaldo.
+  const provinciaCodigo2 =
+    (ubicaciones ?? []).find((u) => u.tipo === 'PROVINCIA' && u.codigo === form.provincia)?.provincia_codigo
+    ?? form.provincia.slice(0, 2)
 
   const save = async () => {
     setSaving(true)
@@ -234,8 +269,37 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
         <div className="field"><label className="label">Correo</label><input className="input" type="email" value={form.email} onChange={set('email')} /></div>
         <div className="field"><label className="label">Teléfono</label><input className="input" value={form.phone_number} onChange={set('phone_number')} /></div>
         <div className="field full"><label className="label">Dirección</label><input className="input" value={form.direccion} onChange={set('direccion')} /></div>
-        <div className="field"><label className="label">Municipio</label><input className="input" value={form.municipio} onChange={set('municipio')} /></div>
-        <div className="field"><label className="label">Provincia</label><input className="input" value={form.provincia} onChange={set('provincia')} /></div>
+        <div className="field">
+          <label className="label">Provincia</label>
+          <select
+            className="input"
+            value={form.provincia}
+            onChange={(e) => {
+              // Cambiar de provincia invalida el municipio: pertenece a la anterior.
+              const prov = e.target.value
+              setForm((f) => ({ ...f, provincia: prov, municipio: '' }))
+            }}
+          >
+            <option value="">— Sin especificar —</option>
+            {opcionesUbicacion(ubicaciones, 'PROVINCIA', '', form.provincia).map((u) => (
+              <option key={u.codigo} value={u.codigo}>{u.descripcion}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label className="label">Municipio</label>
+          <select
+            className="input"
+            value={form.municipio}
+            onChange={set('municipio')}
+            disabled={!form.provincia}
+          >
+            <option value="">{form.provincia ? '— Sin especificar —' : 'Elige una provincia primero'}</option>
+            {opcionesUbicacion(ubicaciones, 'MUNICIPIO', provinciaCodigo2, form.municipio).map((u) => (
+              <option key={u.codigo} value={u.codigo}>{u.descripcion}</option>
+            ))}
+          </select>
+        </div>
         <div className="field"><label className="label">Descuento por defecto (%)</label><input className="input" inputMode="decimal" value={form.descuento} onChange={set('descuento')} /></div>
         <div className="field">
           <label className="label">Crédito</label>

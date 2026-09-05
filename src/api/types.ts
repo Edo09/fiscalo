@@ -513,7 +513,8 @@ export interface UnidadMedida {
 
 /** `codigo` es lo que se persiste (emisor/cliente); descripcion solo para mostrar. */
 export interface Ubicacion {
-  tipo: 'PROVINCIA' | 'MUNICIPIO'
+  /** El catálogo trae los tres niveles: 32 provincias, 156 municipios, 394 distritos. */
+  tipo: 'PROVINCIA' | 'MUNICIPIO' | 'DISTRITO'
   codigo: string
   descripcion: string
   provincia_codigo?: string | null

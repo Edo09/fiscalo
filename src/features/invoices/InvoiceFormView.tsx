@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Icon, Btn, Money, Modal, Spinner, Switch } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats, getClient,
-  getBranding, getEmisor, listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel,
+  getBranding, getEmisor, listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel, updateClient,
 } from '@/api'
 import type {
   CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
@@ -245,6 +245,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const emisorNombre = emisor?.nombre_comercial || emisor?.razon_social || ''
   const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
   const [nuevoCliente, setNuevoCliente] = useState(false)
+  const [rncModal, setRncModal] = useState(false)
   const [prodQuery, setProdQuery] = useState('')
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
   const catalogoFiltrado = catalogo.filter((p) =>
@@ -339,6 +340,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     { code: '34', n: 'Nota de Crédito' },
     { code: '33', n: 'Nota de Débito' },
   ]
+  // El RNC del comprador es obligatorio en el E31 (Crédito Fiscal) y lo exige la
+  // DGII en las notas que modifican uno. Se avisa en vez de bloquear: el usuario
+  // puede corregirlo sin salir de la factura.
+  const faltaRnc = cliente != null && !cliente.doc.trim() && ['31', '33', '34'].includes(tipo)
+
   const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
   // Solo el crédito es TipoPago=2 ante DGII. Transferencia, tarjeta y cheque son
   // formas de cobro de una venta de CONTADO: mandarlas como crédito falsea el
@@ -542,6 +548,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             </button>
           </div>
           {errors.cliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errors.cliente}</span>}
+          {faltaRnc && cliente && (
+            <span className="fx-aviso fx-aviso--receptor">
+              <Icon name="alert-triangle" size={13} />
+              {tipo === '31'
+                ? `${cliente.nombre} no tiene RNC, y el Crédito Fiscal lo exige.`
+                : `${cliente.nombre} no tiene RNC. Si esta nota modifica un Crédito Fiscal, la DGII lo exige.`}
+              <button type="button" className="fx-link-btn" onClick={() => setRncModal(true)}>
+                Agregar RNC
+              </button>
+            </span>
+          )}
         </section>
 
         {/* --- Condiciones del documento --- */}
@@ -784,7 +801,19 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       {nuevoCliente && (
         <NewClientModal
           onClose={() => setNuevoCliente(false)}
-          onCreated={(c) => { setCliente(c); if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined })) }}
+          onCreated={(c) => seleccionarCliente(c)}
+        />
+      )}
+      {rncModal && cliente && (
+        <AgregarRncModal
+          cliente={cliente}
+          onClose={() => setRncModal(false)}
+          onGuardado={(rnc) => {
+            // Se refleja en la factura al instante, sin volver a elegir el cliente.
+            setCliente({ ...cliente, doc: rnc, tipo: rnc.length === 11 ? 'Cédula' : 'RNC' })
+            setErrors((e) => ({ ...e, cliente: undefined }))
+            setRncModal(false)
+          }}
         />
       )}
       {prodPicker && (
@@ -813,5 +842,79 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         </Modal>
       )}
     </div>
+  )
+}
+
+/**
+ * Corrige el RNC de un cliente sin salir de la factura.
+ *
+ * Manda un PUT parcial (solo id + rnc): el backend conserva el resto del
+ * registro. Eso importa con los catálogos migrados, donde muchos clientes no
+ * tienen correo ni teléfono y un PUT completo no pasaría la validación.
+ */
+function AgregarRncModal({
+  cliente, onClose, onGuardado,
+}: {
+  cliente: Cliente
+  onClose: () => void
+  onGuardado: (rnc: string) => void
+}) {
+  const queryClient = useQueryClient()
+  const [rnc, setRnc] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  const guardar = async () => {
+    const limpio = rnc.replace(/\D/g, '')
+    // DGII solo acepta 9 dígitos (RNC de empresa) u 11 (cédula).
+    if (limpio.length !== 9 && limpio.length !== 11) {
+      setError('El RNC debe tener 9 dígitos (empresa) u 11 (cédula).')
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await updateClient({ id: cliente.id, rnc: limpio })
+      void queryClient.invalidateQueries({ queryKey: ['clients'] })
+      toast.success(`RNC guardado para ${cliente.nombre}.`)
+      onGuardado(limpio)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo guardar el RNC.')
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal
+      title="Agregar RNC"
+      sub={cliente.nombre}
+      icon="user-check"
+      onClose={onClose}
+      footer={
+        <>
+          <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
+          <Btn variant="primary" icon="check" onClick={() => void guardar()} disabled={guardando}>
+            {guardando ? 'Guardando…' : 'Guardar'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="field">
+        <label className="label">RNC o cédula</label>
+        <input
+          className="input mono"
+          value={rnc}
+          onChange={(e) => { setRnc(e.target.value); setError(null) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') void guardar() }}
+          placeholder="131000000"
+          inputMode="numeric"
+          autoFocus
+        />
+        {error && <div className="err-msg"><Icon name="alert-circle" size={13} />{error}</div>}
+        <div className="text-xs muted-3" style={{ marginTop: 6 }}>
+          Se guarda en la ficha del cliente, no solo en esta factura.
+        </div>
+      </div>
+    </Modal>
   )
 }

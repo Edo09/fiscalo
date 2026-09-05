@@ -967,3 +967,25 @@
 }
 
 .fx-tipo-op-check { color: var(--accent); }
+
+/* Aviso dentro del bloque del receptor: hereda el estilo del aviso de secuencia
+   pero alineado a la izquierda, que es donde vive la ficha del cliente. */
+.fx-aviso--receptor {
+  max-width: none;
+  text-align: left;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* Accion inline dentro de un aviso (p. ej. "Agregar RNC"): es un boton, pero se
+   lee como enlace para no competir con las acciones principales del documento. */
+.fx-link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.fx-link-btn:hover { opacity: .8; }
