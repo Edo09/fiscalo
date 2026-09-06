@@ -186,6 +186,65 @@ export interface DocBase64 {
   mime_type: string
 }
 
+/**
+ * Papel de la representación impresa. 'carta' es la hoja 8½×11 de siempre;
+ * 'pos' es la tirilla térmica de 80 mm de ancho y alto variable. El contenido
+ * fiscal es idéntico en las dos — la DGII exige los mismos datos — así que la
+ * elección es del usuario en el momento de imprimir, no un ajuste de la cuenta.
+ */
+export type FormatoImpresion = 'carta' | 'pos'
+
+// ---------------------------------------------------------------------------
+// Reporte de ventas (gestión) — GET /api/reportes/ventas
+// ---------------------------------------------------------------------------
+
+/** Agrupación del reporte. 'documento' = detalle sin agrupar. */
+export type AgrupacionVentas = 'documento' | 'cliente' | 'forma_pago' | 'usuario'
+
+/** Formato de descarga del reporte: PDF para imprimir, Excel para seguir trabajando. */
+export type FormatoExportacion = 'pdf' | 'xlsx'
+
+/** Una venta del detalle. Las notas de crédito vienen con los montos en negativo. */
+export interface VentaDocumento {
+  id: number
+  fecha: string
+  documento: string
+  tipo: string
+  estado: string
+  client_id: number | null
+  cliente: string
+  cliente_rnc: string
+  tipo_pago: number
+  forma_pago: string
+  user_id: number | null
+  usuario: string
+  es_devolucion: boolean
+  sin_lineas: boolean
+  base: number
+  itbis: number
+  total: number
+}
+
+/** Una fila agrupada (por cliente, forma de pago o usuario). */
+export interface VentaGrupo {
+  clave: number | string | null
+  etiqueta: string
+  cantidad: number
+  cliente_rnc?: string
+  base: number
+  itbis: number
+  total: number
+}
+
+export interface ReporteVentas {
+  desde: string
+  hasta: string
+  agrupar: AgrupacionVentas
+  totales: { cantidad: number; base: number; itbis: number; total: number }
+  advertencias: string[]
+  filas: VentaDocumento[] | VentaGrupo[]
+}
+
 // ---------------------------------------------------------------------------
 // Estadísticas — GET /api/facturas/stats
 // ---------------------------------------------------------------------------

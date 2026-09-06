@@ -6,9 +6,9 @@ import {
   EmptyState, LoadingState, ErrorState,
 } from '@/components/ui'
 import { ApiError, listFacturasSimples, deleteFacturaSimple, getFacturaSimplePdf } from '@/api'
-import type { FacturaSimpleRow } from '@/api'
+import type { FacturaSimpleRow, FormatoImpresion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { presentDocument } from '@/lib/file'
+import { presentDocument, printDocument } from '@/lib/file'
 import type { Nav } from '@/config/navigation'
 
 const PAGE_SIZES = [10, 25, 50]
@@ -59,10 +59,16 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
 
   const changePageSize = (n: number) => { setPageSize(n); setPage(1) }
 
-  const verPdf = async (f: FacturaSimpleRow) => {
+  const verPdf = async (f: FacturaSimpleRow, formato: FormatoImpresion = 'carta') => {
     setPdfBusy(f.id)
     try {
-      presentDocument(await getFacturaSimplePdf(f.id))
+      const doc = await getFacturaSimplePdf(f.id, formato)
+      // La tirilla va derecho a imprimir; la hoja se abre para verla.
+      if (formato === 'pos') {
+        if (!(await printDocument(doc))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+      } else {
+        presentDocument(doc)
+      }
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar el PDF.')
     } finally {
@@ -189,6 +195,12 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
                           onClick={() => void verPdf(f)}
                           disabled={pdfBusy === f.id}
                           aria-label={`Ver PDF de ${f.no_factura}`}
+                        />
+                        <Btn
+                          variant="ghost" size="sm" icon="printer"
+                          onClick={() => void verPdf(f, 'pos')}
+                          disabled={pdfBusy === f.id}
+                          aria-label={`Imprimir recibo de 80 mm de ${f.no_factura}`}
                         />
                         <Btn
                           variant="ghost" size="sm" icon="trash-2"

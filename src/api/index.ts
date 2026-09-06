@@ -45,7 +45,12 @@ export { listAjustes, getAjuste, crearAjuste, anularAjuste, listMovimientos } fr
 export { listUsers, getUser, createUser, updateUser, deleteUser } from './users'
 export { listRoles, getRole, createRole, updateRole, deleteRole, assignUserRole } from './roles'
 export { getStats } from './stats'
-export { getReporte606Preview, downloadReporte606, getReporte607Preview, downloadReporte607 } from './reportes'
+export {
+  getReporte606Preview, downloadReporte606,
+  getReporte607Preview, downloadReporte607,
+  getReporteVentas, downloadReporteVentas,
+  type VentasParams,
+} from './reportes'
 export { getEmisor } from './emisor'
 export {
   getBranding,

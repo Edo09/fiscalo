@@ -13,6 +13,7 @@ export type ViewId =
   | 'factura-simple-editar'
   | 'recurrentes'
   | 'cotizaciones'
+  | 'cotizacion-nueva'
   | 'clientes'
   | 'productos'
   | 'categorias'
@@ -29,6 +30,7 @@ export type ViewId =
   | 'tesoreria'
   | 'reportes'
   | 'reportes-fiscales'
+  | 'reportes-ventas'
   | 'reportes-606'
   | 'reportes-607'
   | 'usuarios'
@@ -40,7 +42,10 @@ export interface NuevoSignal { kind: 'nuevo' }
 /** Referencia a una factura simple para abrirla en su formulario de edición. */
 export interface FacturaSimpleRef { kind: 'factura-simple'; id: number }
 
-export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | FacturaSimpleRef | null
+/** Referencia a una cotización para abrirla en su editor. */
+export interface CotizacionRef { kind: 'cotizacion'; id: number }
+
+export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
@@ -50,6 +55,11 @@ export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
 /** ¿El payload apunta a una factura simple? */
 export function isFacturaSimpleRef(p: NavPayload): p is FacturaSimpleRef {
   return p != null && (p as FacturaSimpleRef).kind === 'factura-simple'
+}
+
+/** ¿El payload apunta a una cotización existente? */
+export function isCotizacionRef(p: NavPayload): p is CotizacionRef {
+  return p != null && (p as CotizacionRef).kind === 'cotizacion'
 }
 
 /** ¿El payload pide abrir el formulario de "nuevo" (desde el botón Nueva)? */
@@ -159,6 +169,7 @@ export const TITLES: Record<ViewId, string> = {
   'factura-simple-editar': 'Factura simple',
   recurrentes: 'Recurrentes',
   cotizaciones: 'Cotizaciones',
+  'cotizacion-nueva': 'Nueva cotización',
   clientes: 'Clientes',
   productos: 'Productos',
   categorias: 'Categorías',
@@ -175,6 +186,7 @@ export const TITLES: Record<ViewId, string> = {
   tesoreria: 'Tesorería',
   reportes: 'Reportes',
   'reportes-fiscales': 'Reportes fiscales',
+  'reportes-ventas': 'Ventas',
   'reportes-606': 'Reporte 606',
   'reportes-607': 'Reporte 607',
   usuarios: 'Usuarios',

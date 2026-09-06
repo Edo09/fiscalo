@@ -724,6 +724,15 @@
 .fx-grid-ecf > .fx-importe,
 .fx-grid-ecf > .fx-num { align-self: center; }
 
+/* Rejilla de lineas de COTIZACION: hereda todo lo del e-CF (responsive, rotulos
+   por celda, hover del boton de borrar) y solo cambia las columnas. Una
+   cotizacion no guarda unidad, descuento ni ITBIS por linea, asi que esas tres
+   columnas no existen aqui: pintarlas seria ofrecer campos que el backend tira
+   al guardar. */
+.fx-grid-ecf.fx-grid-cot {
+  grid-template-columns: 22px minmax(0, 1fr) 70px 120px 130px;
+}
+
 /* Pie de linea: contador de caracteres y enlace al detalle largo. */
 .fx-linea-pie {
   display: flex;
@@ -744,6 +753,16 @@
 }
 
 .fx-detalle-toggle:hover { text-decoration: underline; }
+
+/* Accion secundaria del pie de linea ("Guardar como producto"): mismo tamano
+   que "+ Detalle" pero apagada, para que no compitan por la atencion. */
+.fx-detalle-toggle--sec {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-3);
+}
+.fx-detalle-toggle--sec:hover { color: var(--accent-text); }
 .fx-contador { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .fx-contador--tope { color: var(--danger); }
 
@@ -797,6 +816,9 @@
 
 @media (max-width: 900px) {
   .fx-grid-ecf { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  /* La variante de cotizacion tiene mas especificidad que .fx-grid-ecf, asi que
+     sin repetir aqui el colapso se quedaria con sus 5 columnas en movil. */
+  .fx-grid-ecf.fx-grid-cot { grid-template-columns: 1fr auto; }
   .fx-grid-ecf > .fx-desc { grid-column: 1 / -1; }
   .fx-cierre { grid-template-columns: 1fr; }
   /* La cabecera se oculta EN EL MISMO breakpoint en que colapsa la rejilla: si
@@ -907,6 +929,18 @@
   padding: 0 0 2px;
   cursor: pointer;
   transition: border-color 140ms ease;
+}
+
+/* Titulo de un documento cuyo tipo NO se elige (la cotizacion es una sola cosa):
+   misma tipografia que el selector, sin nada que sugiera que se puede tocar. */
+.fx-tipo-fijo {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.4vw, 25px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text);
+  padding: 0 0 2px;
 }
 
 .fx-tipo-trigger:hover { border-bottom-color: var(--border-strong); }

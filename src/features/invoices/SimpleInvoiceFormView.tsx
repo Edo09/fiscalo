@@ -6,12 +6,12 @@ import {
   ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple,
   getFacturaSimplePdf, listProducts, mapProductRow, previewFacturaSimple, updateFacturaSimple,
 } from '@/api'
-import type { FacturaSimpleItemInput } from '@/api'
+import type { FacturaSimpleItemInput, FormatoImpresion } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
-import { presentDocument } from '@/lib/file'
+import { presentDocument, printDocument } from '@/lib/file'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
@@ -107,12 +107,12 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
   const [guardando, setGuardando] = useState(false)
-  const [previaBusy, setPreviaBusy] = useState(false)
+  const [previaBusy, setPreviaBusy] = useState<FormatoImpresion | null>(null)
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [catalogoAbierto, setCatalogoAbierto] = useState(false)
   const [buscaProd, setBuscaProd] = useState('')
   const [cambiandoCliente, setCambiandoCliente] = useState(false)
-  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState<FormatoImpresion | null>(null)
   /** Foto del documento tal como se cargó: sirve para marcar qué se tocó. */
   const [original, setOriginal] = useState<{ fecha: string; lineas: Linea[] } | null>(null)
 
@@ -282,27 +282,33 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   }
 
   /** PDF de la factura tal como está guardada (no la edición en curso). */
-  const verGuardada = async () => {
+  /** La tirilla va derecho a imprimir; la hoja se abre para verla. */
+  const mostrar = async (doc: Awaited<ReturnType<typeof getFacturaSimplePdf>>, formato: FormatoImpresion) => {
+    if (formato !== 'pos') { presentDocument(doc); return }
+    if (!(await printDocument(doc))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+  }
+
+  const verGuardada = async (formato: FormatoImpresion = 'carta') => {
     if (facturaId == null) return
-    setPdfBusy(true)
+    setPdfBusy(formato)
     try {
-      presentDocument(await getFacturaSimplePdf(facturaId))
+      await mostrar(await getFacturaSimplePdf(facturaId, formato), formato)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo abrir la factura.')
     } finally {
-      setPdfBusy(false)
+      setPdfBusy(null)
     }
   }
 
-  const vistaPrevia = async () => {
+  const vistaPrevia = async (formato: FormatoImpresion = 'carta') => {
     if (lineasValidas.length === 0) { toast.error('Agrega al menos una línea con descripción.'); return }
-    setPreviaBusy(true)
+    setPreviaBusy(formato)
     try {
-      presentDocument(await previewFacturaSimple({ ...clienteBody(true), date: fecha, items: items() }))
+      await mostrar(await previewFacturaSimple({ ...clienteBody(true), date: fecha, items: items() }, formato), formato)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.')
     } finally {
-      setPreviaBusy(false)
+      setPreviaBusy(null)
     }
   }
 
@@ -563,14 +569,27 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           {/* Factura ya creada y sin tocar: lo util es ver el documento real.
               En cuanto se modifica algo, ese PDF ya no refleja la pantalla, asi
               que el boton pasa a ser la vista previa de lo editado. */}
+          {/* La tirilla de 80 mm sale del mismo sitio que la hoja: si la factura
+              esta guardada y sin tocar, del documento real; si se esta editando,
+              de la vista previa de lo que hay en pantalla. */}
           {editando && !hayCambios ? (
-            <Btn variant="secondary" icon="download" onClick={() => void verGuardada()} disabled={pdfBusy}>
-              {pdfBusy ? 'Abriendo…' : 'Ver factura'}
-            </Btn>
+            <>
+              <Btn variant="secondary" icon="download" onClick={() => void verGuardada()} disabled={pdfBusy != null}>
+                {pdfBusy === 'carta' ? 'Abriendo…' : 'Ver factura'}
+              </Btn>
+              <Btn variant="secondary" icon="printer" onClick={() => void verGuardada('pos')} disabled={pdfBusy != null}>
+                {pdfBusy === 'pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
+              </Btn>
+            </>
           ) : (
-            <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previaBusy}>
-              {previaBusy ? 'Generando…' : 'Vista previa'}
-            </Btn>
+            <>
+              <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previaBusy != null}>
+                {previaBusy === 'carta' ? 'Generando…' : 'Vista previa'}
+              </Btn>
+              <Btn variant="secondary" icon="printer" onClick={() => void vistaPrevia('pos')} disabled={previaBusy != null}>
+                {previaBusy === 'pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
+              </Btn>
+            </>
           )}
           <Btn variant="primary" icon="check" onClick={() => void guardar()} disabled={!puedeGuardar}>
             {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear factura'}

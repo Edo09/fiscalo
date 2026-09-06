@@ -65,7 +65,7 @@ export function Navbar({
           <MenuItem icon="file-text" onClick={() => nav('factura-nueva')}>Factura</MenuItem>
           <MenuItem icon="receipt" onClick={() => nav('gastos', { kind: 'nuevo' })}>Gasto menor</MenuItem>
           <MenuItem icon="shopping-cart" onClick={() => nav('compras', { kind: 'nuevo' })}>Compra</MenuItem>
-          <MenuItem icon="file-plus" onClick={() => nav('cotizaciones', { kind: 'nuevo' })}>Cotización</MenuItem>
+          <MenuItem icon="file-plus" onClick={() => nav('cotizacion-nueva')}>Cotización</MenuItem>
         </Dropdown>
         <button className="icon-btn" onClick={onToggleTheme} title="Cambiar tema">
           <Icon name={theme === 'light' ? 'moon' : 'sun'} />

@@ -11,6 +11,7 @@ import type {
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
+import { ProductFormModal } from '@/features/products/ProductFormModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -186,6 +187,12 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     })),
   )
   const [prodPicker, setProdPicker] = useState(false)
+  /** Id de la línea libre que se está convirtiendo en producto del catálogo. */
+  const [nuevoProdLinea, setNuevoProdLinea] = useState<number | null>(null)
+  // Se resuelve contra el estado actual en vez de guardar una copia: si la línea
+  // se borra con el modal abierto, esto queda en undefined y el modal se cierra
+  // solo, sin quedar apuntando a algo que ya no existe.
+  const lineaAConvertir = lineas.find((l) => l.id === nuevoProdLinea)
   const [emitting, setEmitting] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [errors, setErrors] = useState<FacturaFormErrors>(emptyFormErrors)
@@ -645,6 +652,18 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                     ) : l.descripcion.trim() === '' ? (
                       <button type="button" className="fx-detalle-toggle" onClick={() => toggleDesc(l.id)}>− Ocultar detalle</button>
                     ) : null}
+                    {/* Línea escrita a mano: se puede mandar al catálogo sin salir
+                        de la factura. Con producto ya enlazado no aplica. */}
+                    {l.prodId === '' && l.nombre.trim() !== '' && (
+                      <button
+                        type="button"
+                        className="fx-detalle-toggle fx-detalle-toggle--sec"
+                        onClick={() => setNuevoProdLinea(l.id)}
+                        title="Guardar este ítem en el catálogo de productos"
+                      >
+                        <Icon name="package" size={12} />Guardar como producto
+                      </button>
+                    )}
                     {l.prodId !== '' && <span className="fx-contador">{l.tipoItem}</span>}
                     <span className={'fx-contador' + (l.nombre.length > 80 ? ' fx-contador--tope' : '')}>
                       {l.nombre.length}/80
@@ -802,6 +821,42 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         </div>
       </div>
 
+      {lineaAConvertir && (
+        <ProductFormModal
+          product={null}
+          initial={{
+            nombre: lineaAConvertir.nombre.trim(),
+            precio: lineaAConvertir.precio,
+            unidadMedida: lineaAConvertir.unidadMedida,
+            tipo: lineaAConvertir.tipoItem,
+            // Indicadores 1 (18%) y 2 (16%) son gravados; 3 y 4 no.
+            gravado: lineaAConvertir.indFact === 1 || lineaAConvertir.indFact === 2,
+          }}
+          onClose={() => setNuevoProdLinea(null)}
+          onSaved={(creado) => {
+            setNuevoProdLinea(null)
+            if (!creado) return
+            // Se enlaza la línea con el producto recién creado: sin product_id
+            // la venta no descuenta inventario.
+            //
+            // Solo se copian los campos de identidad (nombre, unidad, tipo). El
+            // precio y el ITBIS de la línea NO se tocan: si el usuario puso otro
+            // precio en el catálogo, ese es el precio de catálogo, no un cambio
+            // silencioso al documento que está emitiendo.
+            setLineas((ls) => ls.map((x) => (
+              x.id === lineaAConvertir.id
+                ? {
+                    ...x,
+                    prodId: creado.id,
+                    nombre: creado.nombre,
+                    unidadMedida: creado.unidadMedida,
+                    tipoItem: creado.tipo === 'Servicio' ? 'Servicio' : 'Bien',
+                  }
+                : x
+            )))
+          }}
+        />
+      )}
       {nuevoCliente && (
         <NewClientModal
           onClose={() => setNuevoCliente(false)}

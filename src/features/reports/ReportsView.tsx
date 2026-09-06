@@ -11,6 +11,7 @@ interface Categoria {
 }
 
 const CATEGORIAS: Categoria[] = [
+  { t: 'Ventas', d: 'Detalle y totales por cliente, forma de pago y usuario', ic: 'trending-up', c: 'var(--success)', to: 'reportes-ventas' },
   { t: 'Fiscales', d: 'Formatos DGII: 606, 607, 608, IR-17', ic: 'landmark', c: 'var(--accent)', to: 'reportes-fiscales' },
 ]
 

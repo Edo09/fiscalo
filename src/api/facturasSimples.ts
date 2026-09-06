@@ -9,6 +9,7 @@ import { getJson, getList, postJson, request, qs } from './http'
 import type {
   DocBase64,
   FacturaSimple,
+  FormatoImpresion,
   FacturaSimpleInput,
   FacturaSimpleRow,
   ListResult,
@@ -53,12 +54,15 @@ export function deleteFacturaSimple(id: number): Promise<unknown> {
   return request(`/api/facturas-simples/${id}`, { method: 'DELETE' })
 }
 
-/** PDF de una factura ya guardada. */
-export function getFacturaSimplePdf(id: number): Promise<DocBase64> {
-  return getJson<DocBase64>(`/api/facturas-simples/${id}/pdf`)
+/** PDF de una factura ya guardada, en hoja carta o en tirilla POS de 80 mm. */
+export function getFacturaSimplePdf(id: number, formato: FormatoImpresion = 'carta'): Promise<DocBase64> {
+  return getJson<DocBase64>(`/api/facturas-simples/${id}/pdf${qs({ formato: formato === 'pos' ? 'pos' : undefined })}`)
 }
 
 /** PDF previo, sin guardar nada. */
-export function previewFacturaSimple(input: FacturaSimpleInput): Promise<DocBase64> {
-  return postJson<DocBase64>('/api/facturas-simples/preview', input)
+export function previewFacturaSimple(
+  input: FacturaSimpleInput,
+  formato: FormatoImpresion = 'carta',
+): Promise<DocBase64> {
+  return postJson<DocBase64>('/api/facturas-simples/preview', { ...input, ...(formato === 'pos' ? { formato } : {}) })
 }

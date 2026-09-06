@@ -6,8 +6,8 @@ import '@/styles/factura-doc.css'
 import {
   ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
 } from '@/api'
-import type { DocKind } from '@/api'
-import { presentDocument } from '@/lib/file'
+import type { DocKind, FormatoImpresion } from '@/api'
+import { presentDocument, printDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
@@ -46,7 +46,9 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   // Logo del tenant para el encabezado del documento (misma clave que Configuración).
   const { data: branding } = useApiQuery(['branding'], getBranding)
 
-  const [docBusy, setDocBusy] = useState<DocKind | null>(null)
+  // La clave distingue los dos PDF (carta y tirilla): con solo el DocKind los
+  // dos botones mostraban "Abriendo…" a la vez.
+  const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | null>(null)
 
   // Si el estado DGII pasa a un rechazo, refrescar los stats (la secuencia pudo
   // liberarse). Hooks ANTES del early return (rules-of-hooks).
@@ -93,14 +95,27 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const montoExento = Number(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
 
-  const openDoc = async (kind: DocKind, download = false) => {
+  const openDoc = async (kind: DocKind, download = false, formato: FormatoImpresion = 'carta') => {
     if (id == null) return
-    setDocBusy(kind)
-    const tid = toast.loading(kind === 'pdf' ? 'Generando PDF…' : 'Obteniendo XML…')
+    const esPos = kind === 'pdf' && formato === 'pos'
+    setDocBusy(esPos ? 'pdf-pos' : kind)
+    const tid = toast.loading(
+      kind !== 'pdf' ? 'Obteniendo XML…' : esPos ? 'Generando recibo…' : 'Generando PDF…',
+    )
     try {
-      const doc = await getDocumentBase64(id, kind)
-      presentDocument(doc, { download })
-      toast.success(download ? `Descargado ${doc.filename}.` : `Documento ${doc.filename} listo.`, { id: tid })
+      const doc = await getDocumentBase64(id, kind, formato)
+      // La tirilla va derecho al diálogo de impresión: es lo que se entrega en
+      // mostrador, no algo que se abra para leer.
+      if (esPos) {
+        const impreso = await printDocument(doc)
+        toast.success(
+          impreso ? 'Recibo enviado a la impresora.' : 'Recibo abierto: imprímelo con Ctrl+P.',
+          { id: tid },
+        )
+      } else {
+        presentDocument(doc, { download })
+        toast.success(download ? `Descargado ${doc.filename}.` : `Documento ${doc.filename} listo.`, { id: tid })
+      }
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo obtener el documento.', { id: tid })
     } finally {
@@ -253,8 +268,12 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           <b><Money value={total} cur={false} /></b>
         </div>
         <div className="row gap-sm">
-          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf')} disabled={id == null || docBusy === 'pdf'}>
+          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf')} disabled={id == null || docBusy != null}>
             {docBusy === 'pdf' ? 'Abriendo…' : 'Ver PDF'}
+          </Btn>
+          {/* Mismo comprobante, papel de tirilla: lo que se entrega en mostrador. */}
+          <Btn variant="secondary" icon="printer" onClick={() => openDoc('pdf', false, 'pos')} disabled={id == null || docBusy != null}>
+            {docBusy === 'pdf-pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
           </Btn>
           <Btn variant="secondary" icon="code" onClick={() => openDoc(isRfce ? 'xml-rfce' : 'xml', true)} disabled={id == null || docBusy != null}>
             XML firmado

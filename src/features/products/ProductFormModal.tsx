@@ -8,25 +8,49 @@ import { ApiError, createProduct, updateProduct, deleteProduct, listCategories, 
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Producto } from '@/types/domain'
 
+/** Valores con los que abrir el alta (p. ej. la línea de factura que se convierte). */
+export interface ProductoInicial {
+  nombre?: string
+  precio?: number
+  unidadMedida?: number
+  tipo?: 'Bien' | 'Servicio'
+  gravado?: boolean
+}
+
 interface ProductFormModalProps {
   /** null => crear; un Producto => editar. */
   product: Producto | null
+  /**
+   * Prellenado del alta. Solo aplica al crear: sirve para convertir en producto
+   * algo que el usuario ya escribió en otra pantalla, sin volver a teclearlo.
+   */
+  initial?: ProductoInicial
   onClose: () => void
-  /** Se llama tras guardar/eliminar con éxito (la vista recarga la lista). */
-  onSaved: () => void
+  /**
+   * Tras guardar o eliminar. Al CREAR recibe el producto recién creado, para que
+   * quien abrió el modal pueda enlazarlo en el acto (la factura necesita el id:
+   * sin él la venta no descuenta inventario). En editar/eliminar llega null.
+   */
+  onSaved: (creado?: Producto | null) => void
 }
 
-export function ProductFormModal({ product, onClose, onSaved }: ProductFormModalProps) {
+export function ProductFormModal({ product, initial, onClose, onSaved }: ProductFormModalProps) {
   const queryClient = useQueryClient()
   const editing = product !== null
-  const [nombre, setNombre] = useState(product && product.nombre !== '—' ? product.nombre : '')
+  const [nombre, setNombre] = useState(
+    product && product.nombre !== '—' ? product.nombre : (initial?.nombre ?? ''),
+  )
   const [sku, setSku] = useState(product?.sku ?? '')
   const [categoryId, setCategoryId] = useState(product?.categoryId != null ? String(product.categoryId) : '')
   const [warehouseId, setWarehouseId] = useState(product?.warehouseId != null ? String(product.warehouseId) : '')
-  const [tipo, setTipo] = useState<'Bien' | 'Servicio'>(product?.tipo === 'Servicio' ? 'Servicio' : 'Bien')
-  const [gravado, setGravado] = useState(product ? product.itbis > 0 : true)
-  const [unidadMedida, setUnidadMedida] = useState(product?.unidadMedida || 43)
-  const [precio, setPrecio] = useState(product ? String(product.precio) : '')
+  const [tipo, setTipo] = useState<'Bien' | 'Servicio'>(
+    (product ? product.tipo : initial?.tipo) === 'Servicio' ? 'Servicio' : 'Bien',
+  )
+  const [gravado, setGravado] = useState(product ? product.itbis > 0 : (initial?.gravado ?? true))
+  const [unidadMedida, setUnidadMedida] = useState(product?.unidadMedida || initial?.unidadMedida || 43)
+  const [precio, setPrecio] = useState(
+    product ? String(product.precio) : (initial?.precio ? String(initial.precio) : ''),
+  )
   const [costo, setCosto] = useState(product ? String(product.costo) : '')
   const [stock, setStock] = useState(product?.stock != null ? String(product.stock) : '')
   const [stockMin, setStockMin] = useState(product?.min != null ? String(product.min) : '')
@@ -69,12 +93,34 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
       activo,
     }
     try {
-      if (editing && product) await updateProduct({ id: product.id, ...payload })
-      else await createProduct(payload)
+      let creado: Producto | null = null
+      if (editing && product) {
+        await updateProduct({ id: product.id, ...payload })
+      } else {
+        const res = await createProduct(payload)
+        // Se arma con lo que se acaba de enviar en vez de recargar el catálogo:
+        // el id es lo único que faltaba y ya viene en la respuesta.
+        creado = {
+          id: String(res.id),
+          sku: payload.sku ?? '',
+          nombre: payload.nombre,
+          cat: '',
+          categoryId: payload.category_id ?? null,
+          warehouseId: payload.warehouse_id ?? null,
+          tipo,
+          precio: payload.precio,
+          costo: payload.costo,
+          stock: payload.stock,
+          min: payload.stock_minimo,
+          itbis: gravado ? 18 : 0,
+          unidadMedida,
+          estado: activo ? 'Activo' : 'Inactivo',
+        }
+      }
       // Invalida la caché de productos en TODAS las vistas (lista y picker de factura).
       void queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success(editing ? `Producto "${payload.nombre}" actualizado.` : `Producto "${payload.nombre}" creado.`)
-      onSaved()
+      onSaved(creado)
       onClose()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo guardar el producto.')
@@ -90,7 +136,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
       await deleteProduct(product.id)
       void queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success(`Producto "${product.nombre}" eliminado.`)
-      onSaved()
+      onSaved(null)
       onClose()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo eliminar el producto.')

@@ -5,7 +5,6 @@ import { ApiError, listCotizaciones, getCotizacionPdf, formatApiDate } from '@/a
 import type { CotizacionRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { presentDocument } from '@/lib/file'
-import { CotizacionFormModal } from './CotizacionFormModal'
 import type { Nav } from '@/config/navigation'
 import type { FacturaPrefill } from '@/types/domain'
 
@@ -29,13 +28,16 @@ function toFacturaPrefill(c: CotizacionRow): FacturaPrefill {
 }
 
 /* FISCALO — Cotizaciones (GET /api/cotizaciones) */
-export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?: boolean }) {
+export function CotizacionesView({ nav }: { nav: Nav }) {
   const [page, setPage] = useState(1)
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  // autoNew (botón "Nueva" del navbar): abre el modal de nueva cotización al montar.
-  const [modal, setModal] = useState<{ cotizacion: CotizacionRow | null } | null>(autoNew ? { cotizacion: null } : null)
   const [pdfBusy, setPdfBusy] = useState<number | null>(null)
+
+  // Crear y editar viven en su propia pantalla (el editor "en papel", igual que
+  // el de factura), no en un modal.
+  const abrir = (c: CotizacionRow | null) =>
+    nav('cotizacion-nueva', c ? { kind: 'cotizacion', id: c.id } : undefined)
 
   const { data, error, loading, reload } = useApiQuery(
     ['cotizaciones', 'list', { page, pageSize: PAGE_SIZE, query }],
@@ -65,7 +67,7 @@ export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?:
         actions={
           <>
             <RefreshButton onRefresh={reload} />
-            <Btn variant="primary" icon="plus" onClick={() => setModal({ cotizacion: null })}>Nueva cotización</Btn>
+            <Btn variant="primary" icon="plus" onClick={() => abrir(null)}>Nueva cotización</Btn>
           </>
         } />
 
@@ -85,7 +87,7 @@ export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?:
           <ErrorState title="No se pudieron cargar las cotizaciones" onRetry={reload}>{error}</ErrorState>
         ) : rows.length === 0 ? (
           <EmptyState icon="file-plus" title="No hay cotizaciones"
-            action={<Btn variant="primary" icon="plus" onClick={() => setModal({ cotizacion: null })}>Nueva cotización</Btn>}>
+            action={<Btn variant="primary" icon="plus" onClick={() => abrir(null)}>Nueva cotización</Btn>}>
             {query ? `Sin resultados para "${query}".` : 'Crea tu primera cotización para enviarla a un cliente.'}
           </EmptyState>
         ) : (
@@ -94,7 +96,7 @@ export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?:
               <thead><tr><th>Código</th><th>Cliente</th><th>Descripción</th><th>Fecha</th><th className="num">Total</th><th style={{ width: 190 }}></th></tr></thead>
               <tbody>
                 {rows.map((c) => (
-                  <tr key={c.id} onClick={() => setModal({ cotizacion: c })}>
+                  <tr key={c.id} onClick={() => abrir(c)}>
                     <td><span className="mono text-sm fw6">{c.code || `#${c.id}`}</span></td>
                     <td><div className="row gap-sm"><Avatar name={c.client_name || '—'} size={28} /><span className="cell-main">{c.client_name || '—'}</span></div></td>
                     <td className="text-sm muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description || '—'}</td>
@@ -129,7 +131,6 @@ export function CotizacionesView({ nav, autoNew = false }: { nav: Nav; autoNew?:
         </div>
       )}
 
-      {modal && <CotizacionFormModal cotizacion={modal.cotizacion} onClose={() => setModal(null)} />}
     </div>
   )
 }

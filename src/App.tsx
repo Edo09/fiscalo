@@ -16,6 +16,7 @@ import { ApproveEcfView } from '@/features/ecf/ApproveEcfView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
+import { CotizacionFormView } from '@/features/cotizaciones/CotizacionFormView'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -28,6 +29,7 @@ import { ReportsView } from '@/features/reports/ReportsView'
 import { ReportesFiscalesView } from '@/features/reports/ReportesFiscalesView'
 import { Reporte606View } from '@/features/reports/Reporte606View'
 import { Reporte607View } from '@/features/reports/Reporte607View'
+import { VentasView } from '@/features/reports/VentasView'
 import { TreasuryView } from '@/features/treasury/TreasuryView'
 import { UsersView } from '@/features/users/UsersView'
 import { SettingsView } from '@/features/settings/SettingsView'
@@ -36,7 +38,7 @@ import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { hasModule } from '@/config/permissions'
-import { isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -57,6 +59,10 @@ const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
   'factura-ver': 'facturas',
   'factura-simple-editar': 'facturas-simples',
   'ecf-tipo': 'ecf',
+  // Recargar sobre una cotizacion en edicion mostraria un formulario en blanco
+  // que parece listo para guardar: se vuelve al listado, que deja claro que lo
+  // que se estaba escribiendo ya no esta.
+  'cotizacion-nueva': 'cotizaciones',
 }
 
 function restoreView(): ViewId {
@@ -147,7 +153,9 @@ function AppShell() {
       case 'factura-simple-editar':
         return <SimpleInvoiceFormView nav={nav} facturaId={isFacturaSimpleRef(payload) ? payload.id : null} />
       case 'recurrentes': return <RecurringView nav={nav} />
-      case 'cotizaciones': return <CotizacionesView nav={nav} autoNew={isNuevoSignal(payload)} />
+      case 'cotizaciones': return <CotizacionesView nav={nav} />
+      case 'cotizacion-nueva':
+        return <CotizacionFormView nav={nav} cotizacionId={isCotizacionRef(payload) ? payload.id : null} />
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />
@@ -166,6 +174,7 @@ function AppShell() {
       case 'reportes-fiscales': return <ReportesFiscalesView nav={nav} />
       case 'reportes-606': return <Reporte606View nav={nav} />
       case 'reportes-607': return <Reporte607View nav={nav} />
+      case 'reportes-ventas': return <VentasView nav={nav} />
       case 'usuarios': return <UsersView />
       case 'configuracion': return <SettingsView />
       case 'notificaciones': return <NotificationsView />

@@ -6,6 +6,7 @@ import type {
   CreateFacturaResponse,
   DocBase64,
   EstadoData,
+  FormatoImpresion,
   FacturaListParams,
   FacturaRow,
   ListResult,
@@ -39,8 +40,11 @@ export function createFactura(input: CreateFacturaInput): Promise<CreateFacturaR
   return postJson<CreateFacturaResponse>('/api/facturas', body)
 }
 
-export function previewFactura(input: Partial<CreateFacturaInput>): Promise<DocBase64> {
-  return postJson<DocBase64>('/api/facturas/preview', input)
+export function previewFactura(
+  input: Partial<CreateFacturaInput>,
+  formato: FormatoImpresion = 'carta',
+): Promise<DocBase64> {
+  return postJson<DocBase64>('/api/facturas/preview', { ...input, ...(formato === 'pos' ? { formato } : {}) })
 }
 
 export function getEstado(id: number): Promise<EstadoData> {
@@ -49,10 +53,15 @@ export function getEstado(id: number): Promise<EstadoData> {
 
 export type DocKind = 'pdf' | 'xml' | 'xml-rfce'
 
-export function getDocumentBase64(id: number, kind: DocKind): Promise<DocBase64> {
+export function getDocumentBase64(
+  id: number,
+  kind: DocKind,
+  formato: FormatoImpresion = 'carta',
+): Promise<DocBase64> {
   const path =
     kind === 'pdf'
-      ? `/api/facturas/${id}/pdf${qs({ format: 'base64' })}`
+      // `formato` solo aplica al PDF: el XML firmado no tiene papel.
+      ? `/api/facturas/${id}/pdf${qs({ format: 'base64', formato: formato === 'pos' ? 'pos' : undefined })}`
       : kind === 'xml-rfce'
         ? `/api/facturas/${id}/xml${qs({ type: 'rfce', format: 'base64' })}`
         : `/api/facturas/${id}/xml${qs({ format: 'base64' })}`
