@@ -2,8 +2,39 @@
 //
 // Un ajuste NO se edita ni se borra: se anula creando el ajuste inverso, y los
 // dos quedan en el historial. Por eso aquí no hay update ni delete.
-import { getJson, getList, request, qs } from './http'
-import type { AjusteRow, Ajuste, MovimientoRow, CrearAjusteInput, ListParams, ListResult } from './types'
+import { getEnvelope, getJson, getList, request, qs } from './http'
+import type {
+  AjusteRow, Ajuste, MovimientoRow, CrearAjusteInput, ListParams, ListResult,
+  ValorInventarioParams, ValorInventarioRow, ValorInventarioTotales,
+} from './types'
+
+/**
+ * Valor del inventario producto por producto a una fecha de corte.
+ *
+ * Devuelve además los totales del inventario COMPLETO (no de la página): el
+ * backend calcula sobre todo lo filtrado y pagina después, porque el número que
+ * importa en un reporte de valorización es el total, no el de lo que se ve.
+ */
+export async function getValorInventario(
+  params: ValorInventarioParams = {},
+): Promise<{ items: ValorInventarioRow[]; total: number; totales: ValorInventarioTotales; hasta: string }> {
+  const query = qs({
+    page: params.page,
+    pageSize: params.pageSize,
+    query: params.query,
+    warehouse_id: params.warehouse_id,
+    category_id: params.category_id,
+    estado: params.estado,
+    hasta: params.hasta,
+  })
+  const res = await getEnvelope<{
+    data: ValorInventarioRow[]
+    totales: ValorInventarioTotales
+    hasta: string
+    pagination: { total: number }
+  }>(`/api/inventario/valor${query}`)
+  return { items: res.data, total: res.pagination.total, totales: res.totales, hasta: res.hasta }
+}
 
 export function listAjustes(
   params: ListParams & { motivo?: string; desde?: string; hasta?: string } = {},

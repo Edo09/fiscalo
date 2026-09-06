@@ -105,6 +105,18 @@ export function getJson<T>(path: string): Promise<T> {
 }
 
 /**
+ * GET que devuelve el SOBRE completo, sin desenvolver `data`.
+ *
+ * `getJson` se queda con `data` y `getList` solo con `items` + paginación. Hay
+ * endpoints cuyo sobre lleva más cosas al mismo nivel (el valor de inventario
+ * manda los totales del inventario completo, no los de la página); para esos,
+ * quedarse con `data` es perder justo el dato que importa.
+ */
+export function getEnvelope<T>(path: string): Promise<T> {
+  return fetchBody(path, { method: 'GET' }) as Promise<T>
+}
+
+/**
  * GET de un listado paginado. Tolera dos formas reales del backend:
  *   { status, data: [...], pagination: { total, page, pageSize, totalPages } }
  *   { status, data: { items|data|..., total } }       (forma alterna)

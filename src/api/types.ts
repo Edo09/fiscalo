@@ -998,6 +998,47 @@ export interface AjusteRow {
 }
 
 /** Un movimiento del libro. Es también la línea de un ajuste. */
+/** Estado de los productos que entran al reporte de valor. */
+export type EstadoValorInv = 'activos' | 'inactivos' | 'todos'
+
+export interface ValorInventarioParams {
+  page?: number
+  pageSize?: number
+  query?: string
+  warehouse_id?: number
+  category_id?: number
+  estado?: EstadoValorInv
+  /** Corte AAAA-MM-DD. Vacío = hoy. */
+  hasta?: string
+}
+
+/** Una fila del reporte de valor: un producto a la fecha de corte. */
+export interface ValorInventarioRow {
+  id: number
+  sku: string
+  nombre: string
+  categoria: string
+  almacen: string
+  activo: boolean
+  /** Cantidades acumuladas hasta el corte, no número de movimientos. */
+  entradas: number
+  salidas: number
+  existencia: number
+  costo_promedio: number
+  /**
+   * false => el costo mostrado es el de la ficha del producto, no un promedio
+   * calculado: ese producto no tiene entradas registradas en el libro.
+   */
+  costo_ponderado: boolean
+  valor_inventario: number
+}
+
+export interface ValorInventarioTotales {
+  productos: number
+  existencia: number
+  valor: number
+}
+
 export interface MovimientoRow {
   id: number
   product_id: number

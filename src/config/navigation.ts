@@ -18,6 +18,7 @@ export type ViewId =
   | 'productos'
   | 'categorias'
   | 'almacenes'
+  | 'inventario-valor'
   | 'ajustes'
   | 'ajuste-nuevo'
   | 'ecf'
@@ -112,6 +113,7 @@ export const NAV: NavGroup[] = [
       { id: 'categorias', label: 'Categorías', icon: 'tag', module: 'categories' },
       { id: 'almacenes', label: 'Almacenes', icon: 'archive', module: 'warehouses' },
       { id: 'ajustes', label: 'Ajuste de inventario', icon: 'git-compare', module: 'products' },
+      { id: 'inventario-valor', label: 'Valor de inventario', icon: 'hand-coins', module: 'products' },
     ],
   },
   {
@@ -175,6 +177,7 @@ export const TITLES: Record<ViewId, string> = {
   categorias: 'Categorías',
   almacenes: 'Almacenes',
   ajustes: 'Ajustes de inventario',
+  'inventario-valor': 'Valor de inventario',
   'ajuste-nuevo': 'Crear ajuste',
   ecf: 'e-CF',
   'ecf-tipo': 'Tipo e-CF',
