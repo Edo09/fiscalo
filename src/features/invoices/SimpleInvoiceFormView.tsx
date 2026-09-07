@@ -618,7 +618,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           <div className="search-input mb-md" style={{ width: '100%' }}>
             <Icon name="search" />
             <input
-              placeholder="Buscar por nombre o SKU…"
+              placeholder="Buscar por nombre, SKU o categoría…"
               value={buscaProd}
               onChange={(e) => setBuscaProd(e.target.value)}
               autoFocus

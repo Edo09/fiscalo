@@ -890,7 +890,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         <Modal title="Agregar producto o servicio" icon="package" onClose={() => { setProdPicker(false); setProdQuery('') }}>
           <div className="search-input mb-md" style={{ width: '100%' }}>
             <Icon name="search" />
-            <input placeholder="Buscar por nombre o SKU…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
+            <input placeholder="Buscar por nombre, SKU o categoría…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
             {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
           </div>
           {productos.loading ? (

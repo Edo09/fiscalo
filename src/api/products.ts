@@ -1,9 +1,11 @@
 // Servicio: catálogo de productos/servicios (/api/products).
 import { getList, getJson, postJson, request, qs } from './http'
-import type { CreateProductInput, ListParams, ListResult, ProductRow } from './types'
+import type { CreateProductInput, ListResult, ProductListParams, ProductRow } from './types'
 
-export function listProducts(params: ListParams = {}): Promise<ListResult<ProductRow>> {
-  const query = qs({ page: params.page, pageSize: params.pageSize, query: params.query })
+export function listProducts(params: ProductListParams = {}): Promise<ListResult<ProductRow>> {
+  const query = qs({
+    page: params.page, pageSize: params.pageSize, query: params.query, category_id: params.categoryId,
+  })
   return getList<ProductRow>(`/api/products${query}`)
 }
 

@@ -149,6 +149,15 @@ export interface FacturaListParams extends ListParams {
   tipoEcf?: string
 }
 
+export interface ProductListParams extends ListParams {
+  /**
+   * Filtra el listado por la categoría del producto (`?category_id=`). Distinto
+   * de `query`, que además matchea el nombre de la categoría (y traería los
+   * productos que la mencionan en su propio nombre o descripción).
+   */
+  categoryId?: number
+}
+
 // ---------------------------------------------------------------------------
 // Estado DGII — GET /api/facturas/{id}/estado
 // ---------------------------------------------------------------------------
