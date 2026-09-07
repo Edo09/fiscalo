@@ -121,7 +121,21 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // petición al navegar entre las dos pantallas.
   const { data: emisor } = useApiQuery(['emisor'], getEmisor)
   const { data: branding } = useApiQuery(['branding'], getBranding)
-  const productos = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
+
+  // La busqueda del catalogo va al servidor: hay cientos de articulos y filtrar
+  // solo la primera pagina dejaria fuera la mayoria. Con el buscador vacio se
+  // reusa la misma clave de cache que el resto de la app.
+  const [buscaProdDebounced, setBuscaProdDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaProdDebounced(buscaProd.trim()), 300)
+    return () => clearTimeout(t)
+  }, [buscaProd])
+
+  const productos = useApiQuery(
+    buscaProdDebounced ? ['products', 'list', buscaProdDebounced] : ['products', 'list'],
+    () => listProducts({ pageSize: 100, query: buscaProdDebounced || undefined }),
+    { keepPrevious: true },
+  )
 
   // La última descripción agregada recibe el foco: se puede encadenar
   // "agregar línea → escribir" sin tocar el ratón.
@@ -218,11 +232,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const updLinea = (id: number, cambio: Partial<Linea>) =>
     setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, ...cambio } : l)))
 
+  // Ya viene filtrado por el servidor: no se vuelve a filtrar en memoria.
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
-  const filtroProd = buscaProd.trim().toLowerCase()
-  const catalogoFiltrado = filtroProd
-    ? catalogo.filter((p) => `${p.nombre} ${p.sku} ${p.cat}`.toLowerCase().includes(filtroProd))
-    : catalogo
 
   // Neto de descuento: el backend guarda el subtotal ya rebajado y calcula el
   // ITBIS sobre el, asi que la pantalla tiene que mostrar lo mismo.
@@ -607,11 +618,12 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           <div className="search-input mb-md" style={{ width: '100%' }}>
             <Icon name="search" />
             <input
-              placeholder="Buscar por nombre, SKU o categoría…"
+              placeholder="Buscar por nombre o SKU…"
               value={buscaProd}
               onChange={(e) => setBuscaProd(e.target.value)}
               autoFocus
             />
+            {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
           </div>
 
           {productos.loading ? (
@@ -620,17 +632,17 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             <ErrorState title="No se pudo cargar el catálogo" onRetry={productos.reload}>
               {productos.error}
             </ErrorState>
-          ) : catalogoFiltrado.length === 0 ? (
+          ) : catalogo.length === 0 ? (
             <div className="state" style={{ padding: 26 }}>
               <span className="text-sm muted">
-                {catalogo.length === 0
-                  ? 'No hay productos en el catálogo todavía.'
-                  : `Sin resultados para "${buscaProd.trim()}".`}
+                {buscaProdDebounced
+                  ? `Sin resultados para "${buscaProdDebounced}".`
+                  : 'No hay productos en el catálogo todavía.'}
               </span>
             </div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -10px' }}>
-              {catalogoFiltrado.map((p) => (
+              {catalogo.map((p) => (
                 <button type="button" key={p.id} className="fx-prod" onClick={() => addProducto(p)}>
                   <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} style={{ color: 'var(--text-3)' }} />
                   <span style={{ flex: 1, minWidth: 0 }}>

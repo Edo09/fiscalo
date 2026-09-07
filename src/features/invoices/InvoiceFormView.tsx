@@ -243,8 +243,21 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const rangoRestantes = seqTipo?.restantes != null ? Number(seqTipo.restantes) : null
 
   // Catálogo de productos (GET /api/products) para el selector de líneas.
-  // Misma clave que ProductsView => caché compartida, una sola petición.
-  const productos = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
+  // La búsqueda va al servidor: el catálogo tiene cientos de artículos y filtrar
+  // solo la primera página dejaría fuera la mayoría. Con el buscador vacío se
+  // reusa la misma clave que ProductsView => caché compartida, una sola petición.
+  const [prodQuery, setProdQuery] = useState('')
+  const [prodQueryDebounced, setProdQueryDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setProdQueryDebounced(prodQuery.trim()), 300)
+    return () => clearTimeout(t)
+  }, [prodQuery])
+
+  const productos = useApiQuery(
+    prodQueryDebounced ? ['products', 'list', prodQueryDebounced] : ['products', 'list'],
+    () => listProducts({ pageSize: 100, query: prodQueryDebounced || undefined }),
+    { keepPrevious: true },
+  )
 
   // Identidad del emisor: la hoja muestra los mismos datos que va a imprimir.
   // Mismas claves de caché que Configuración y la factura simple.
@@ -254,11 +267,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [rncModal, setRncModal] = useState(false)
-  const [prodQuery, setProdQuery] = useState('')
+  // Ya viene filtrado por el servidor: no se vuelve a filtrar en memoria.
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
-  const catalogoFiltrado = catalogo.filter((p) =>
-    `${p.nombre} ${p.sku} ${p.cat}`.toLowerCase().includes(prodQuery.trim().toLowerCase()),
-  )
 
   // Descuento por defecto de las líneas: el que tenga el cliente elegido. El
   // usuario puede cambiarlo línea por línea después; esto solo lo precarga.
@@ -289,6 +299,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
     setProdPicker(false)
+    setProdQuery('')
   }
   // Línea libre: una descripción sin producto del catálogo (como en un gasto).
   // El usuario escribe descripción, cantidad y precio; default gravado 18% / Unidad.
@@ -876,20 +887,25 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         />
       )}
       {prodPicker && (
-        <Modal title="Agregar producto o servicio" icon="package" onClose={() => setProdPicker(false)}>
+        <Modal title="Agregar producto o servicio" icon="package" onClose={() => { setProdPicker(false); setProdQuery('') }}>
           <div className="search-input mb-md" style={{ width: '100%' }}>
             <Icon name="search" />
-            <input placeholder="Buscar en el catálogo…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
+            <input placeholder="Buscar por nombre o SKU…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
+            {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
           </div>
           {productos.loading ? (
             <div className="row" style={{ justifyContent: 'center', padding: 28 }}><Spinner /></div>
           ) : productos.error ? (
             <div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: 'var(--danger)' }}>{productos.error}</span></div>
-          ) : catalogoFiltrado.length === 0 ? (
-            <div className="state" style={{ padding: 28 }}><span className="text-sm muted">{catalogo.length === 0 ? 'No hay productos en el catálogo.' : 'Sin resultados.'}</span></div>
+          ) : catalogo.length === 0 ? (
+            <div className="state" style={{ padding: 28 }}>
+              <span className="text-sm muted">
+                {prodQueryDebounced ? `Ningún producto coincide con «${prodQueryDebounced}».` : 'No hay productos en el catálogo.'}
+              </span>
+            </div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
-              {catalogoFiltrado.map((p) => (
+              {catalogo.map((p) => (
                 <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
                   <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
                   <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div></div>
