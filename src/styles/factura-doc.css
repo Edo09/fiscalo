@@ -338,9 +338,11 @@
 
 .fx-grid {
   display: grid;
-  /* Todo el ancho que se pueda va a la descripcion: las columnas numericas
-     se ajustan a su contenido real (cantidades y tasas son cortas). */
-  grid-template-columns: 22px minmax(0, 1fr) 58px 100px 68px 76px 112px;
+  /* Factura simple: canaleta, descripcion, cantidad, precio, descuento e
+     importe. No lleva columna de ITBIS — es un documento interno, sin
+     impuestos. Todo el ancho que se pueda va a la descripcion; las columnas
+     numericas se ajustan a su contenido real. */
+  grid-template-columns: 22px minmax(0, 1fr) 58px 100px 68px 112px;
   gap: 10px;
   align-items: start;
 }

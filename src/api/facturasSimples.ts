@@ -1,10 +1,11 @@
 // Servicio: facturas simples (no electrónicas).
 //
 // Una factura simple es un documento INTERNO: no se emite a la DGII, no lleva
-// e-NCF ni NCF fiscal y no entra en el reporte 607. El backend genera el número
-// (`0001-230826`) y calcula subtotal e ITBIS de cada línea a partir de
-// `indicador_facturacion`, así que el formulario solo manda lo que el usuario
-// escribe. Ver src/Controllers/facturaSimpleController.php en la API.
+// e-NCF ni NCF fiscal y no entra en el reporte 607. Al no ser un comprobante
+// fiscal tampoco lleva ITBIS: sus líneas no tienen tasa ni impuesto, y el total
+// es la suma de los subtotales. El backend genera el número (`0001-230826`) y
+// calcula el subtotal de cada línea, así que el formulario solo manda lo que el
+// usuario escribe. Ver src/Controllers/facturaSimpleController.php en la API.
 import { getJson, getList, postJson, request, qs } from './http'
 import type {
   DocBase64,

@@ -920,14 +920,14 @@ export interface Reporte607Preview {
 // ---------------------------------------------------------------------------
 
 /** Linea que el formulario envia. El backend deriva subtotal e itbis_amount. */
+// Una factura simple no lleva impuestos: es un documento interno, no se emite a
+// la DGII y no entra en el 606/607. Sus líneas no tienen tasa ni ITBIS.
 export interface FacturaSimpleItemInput {
   /** Producto del catálogo; ausente = línea libre (no mueve inventario). */
   product_id?: number
   description: string
   quantity: number
   amount: number
-  /** 1 = gravado 18%, 2 = gravado 16%, 3 = 0%, 4 = exento. */
-  indicador_facturacion: number
   /** Descuento de la línea EN MONTO. El backend deja el subtotal neto de él. */
   descuento_monto?: number
 }
@@ -952,8 +952,6 @@ export interface FacturaSimpleItem {
   subtotal: number
   /** Descuento aplicado a la línea; `subtotal` ya viene neto de él. */
   descuento_monto?: number
-  itbis_amount: number
-  indicador_facturacion?: number
 }
 
 /** Fila del listado (GET /api/facturas-simples). */

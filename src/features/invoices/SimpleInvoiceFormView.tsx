@@ -54,19 +54,6 @@ function AutoTextarea({
   )
 }
 
-/** Tasas de ITBIS que ofrece el formulario. El backend deriva el monto desde aquí. */
-const TASAS = [
-  { value: 1, label: '18%', rate: 0.18 },
-  { value: 2, label: '16%', rate: 0.16 },
-  { value: 3, label: '0%', rate: 0 },
-  { value: 4, label: 'Exento', rate: 0 },
-]
-
-const rateOf = (ind: number) => TASAS.find((t) => t.value === ind)?.rate ?? 0
-
-/** El ITBIS del catalogo (18/16/0) se traduce al indicador de la linea. */
-const indicadorDeItbis = (itbis: number) => (itbis === 18 ? 1 : itbis === 16 ? 2 : 4)
-
 interface Linea {
   id: number
   /** Producto del catalogo del que salio la linea (vacio = linea libre). */
@@ -76,10 +63,9 @@ interface Linea {
   precio: number
   /** Descuento de la linea en %, igual que en la factura con comprobante. */
   desc: number
-  indicador: number
 }
 
-const lineaVacia = (id: number, desc = 0): Linea => ({ id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc, indicador: 1 })
+const lineaVacia = (id: number, desc = 0): Linea => ({ id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc })
 
 /**
  * Metodos de pago que son venta a CREDITO (tipo_pago=2). Igual que en la factura
@@ -172,7 +158,6 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           desc: Number(it.amount ?? 0) * Number(it.quantity ?? 1) > 0
             ? Math.round((Number(it.descuento_monto ?? 0) / (Number(it.amount ?? 0) * Number(it.quantity ?? 1))) * 10000) / 100
             : 0,
-          indicador: Number(it.indicador_facturacion ?? 1),
         }))
         setLineas(cargadas)
         setOriginal({ fecha: String(f.date ?? '').slice(0, 10), lineas: cargadas })
@@ -215,7 +200,6 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       cantidad: 1,
       precio: p.precio,
       desc: cliente?.descuento ?? 0,
-      indicador: indicadorDeItbis(p.itbis),
     })
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
@@ -235,14 +219,13 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // Ya viene filtrado por el servidor: no se vuelve a filtrar en memoria.
   const catalogo = (productos.data?.items ?? []).map(mapProductRow)
 
-  // Neto de descuento: el backend guarda el subtotal ya rebajado y calcula el
-  // ITBIS sobre el, asi que la pantalla tiene que mostrar lo mismo.
+  // Neto de descuento: el backend guarda el subtotal ya rebajado, asi que la
+  // pantalla tiene que mostrar lo mismo. Sin impuestos: la factura simple es un
+  // documento interno, no se emite a la DGII y no lleva ITBIS.
   const descuentoDe = (l: Linea) => Math.round(l.cantidad * l.precio * l.desc) / 100
   const subtotalDe = (l: Linea) => Math.round(l.cantidad * l.precio * 100) / 100 - descuentoDe(l)
-  const itbisDe = (l: Linea) => Math.round(subtotalDe(l) * rateOf(l.indicador) * 100) / 100
   const subtotal = lineas.reduce((c, l) => c + subtotalDe(l), 0)
-  const itbis = lineas.reduce((c, l) => c + itbisDe(l), 0)
-  const total = subtotal + itbis
+  const total = subtotal
 
   // --- Qué se tocó respecto al documento cargado -------------------------
   // Se compara contra la foto inicial en vez de llevar un flag "sucio": así el
@@ -250,7 +233,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // la marca desaparece sola.
   const lineaOriginal = (id: number) => original?.lineas.find((o) => o.id === id)
   const esLineaNueva = (id: number) => original != null && lineaOriginal(id) === undefined
-  const campoCambiado = (l: Linea, k: 'descripcion' | 'cantidad' | 'precio' | 'desc' | 'indicador') => {
+  const campoCambiado = (l: Linea, k: 'descripcion' | 'cantidad' | 'precio' | 'desc') => {
     if (original == null) return false
     const o = lineaOriginal(l.id)
     return o ? o[k] !== l[k] : true
@@ -261,7 +244,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const lineasCambiadas = original != null && (
     lineasBorradas ||
     lineas.some((l) => esLineaNueva(l.id) ||
-      (['descripcion', 'cantidad', 'precio', 'desc', 'indicador'] as const).some((k) => campoCambiado(l, k)))
+      (['descripcion', 'cantidad', 'precio', 'desc'] as const).some((k) => campoCambiado(l, k)))
   )
   const hayCambios = clienteCambiado || fechaCambiada || lineasCambiadas
   const marca = (cond: boolean) => (cond ? ' fx-mod' : '')
@@ -276,7 +259,6 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       description: l.descripcion.trim(),
       quantity: l.cantidad,
       amount: l.precio,
-      indicador_facturacion: l.indicador,
       ...(l.desc > 0 ? { descuento_monto: descuentoDe(l) } : {}),
     }))
 
@@ -466,7 +448,6 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             <span style={{ textAlign: 'right' }}>Cant.</span>
             <span style={{ textAlign: 'right' }}>Precio</span>
             <span style={{ textAlign: 'right' }}>Desc.%</span>
-            <span>ITBIS</span>
             <span style={{ textAlign: 'right' }}>Importe</span>
           </div>
 
@@ -517,17 +498,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                 aria-label={`Descuento en porcentaje de la línea ${i + 1}`}
               />
 
-              <select
-                className={'fx-tasa fx-cell' + marca(campoCambiado(l, 'indicador'))} data-label="ITBIS"
-                value={l.indicador}
-                onChange={(e) => updLinea(l.id, { indicador: Number(e.target.value) })}
-                aria-label={`Tasa de ITBIS de la línea ${i + 1}`}
-              >
-                {TASAS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-
               <span className="fx-importe fx-cell" data-label="Importe">
-                <Money value={subtotalDe(l) + itbisDe(l)} cur={false} />
+                <Money value={subtotalDe(l)} cur={false} />
               </span>
             </div>
           ))}
@@ -547,9 +519,6 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           <div className="fx-totales-box">
             <div className="fx-total-linea">
               <span>Subtotal</span><span><Money value={subtotal} cur={false} /></span>
-            </div>
-            <div className="fx-total-linea">
-              <span>ITBIS</span><span><Money value={itbis} cur={false} /></span>
             </div>
             <div className="fx-total-final">
               <span>Total</span><span><Money value={total} cur={false} /></span>
@@ -611,7 +580,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       {catalogoAbierto && (
         <Modal
           title="Agregar del catálogo"
-          sub="El producto trae su precio y su tasa de ITBIS"
+          sub="El producto trae su precio"
           icon="package"
           onClose={() => { setCatalogoAbierto(false); setBuscaProd('') }}
         >
