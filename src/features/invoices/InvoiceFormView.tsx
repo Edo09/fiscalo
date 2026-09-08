@@ -497,7 +497,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   return (
     <div className="page fx-desk factura-new">
       <div className="row between" style={{ marginBottom: 14 }}>
-        <Btn variant="ghost" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
+        <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
         {prefill?.origen && (
           <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
             <Icon name="file-plus" size={15} />

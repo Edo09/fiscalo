@@ -375,7 +375,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   return (
     <div className="page fx-desk">
       <div className="row" style={{ marginBottom: 14 }}>
-        <Btn variant="ghost" size="sm" icon="arrow-left" onClick={() => nav('facturas-simples')}>
+        <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas-simples')}>
           Facturas simples
         </Btn>
       </div>

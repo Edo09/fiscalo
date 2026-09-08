@@ -210,7 +210,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
   return (
     <div className="page fx-desk factura-new">
       <div className="row between" style={{ marginBottom: 14 }}>
-        <Btn variant="ghost" size="sm" icon="arrow-left" onClick={() => nav('cotizaciones')}>Cotizaciones</Btn>
+        <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('cotizaciones')}>Cotizaciones</Btn>
         {editing && confirmDel ? (
           <span className="row gap-sm" style={{ alignItems: 'center' }}>
             <span className="text-sm muted">¿Eliminar esta cotización?</span>

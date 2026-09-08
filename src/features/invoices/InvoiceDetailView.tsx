@@ -126,7 +126,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   return (
     <div className="page fx-desk">
       <div className="row" style={{ marginBottom: 14 }}>
-        <Btn variant="ghost" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
+        <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
       </div>
 
       {rechazado && (

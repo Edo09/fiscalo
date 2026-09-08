@@ -60,6 +60,13 @@ async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown>
       ...init,
       signal: init.signal ?? AbortSignal.timeout(timeout),
       headers: buildHeaders(init.headers),
+      // Nunca leer de la cache HTTP del navegador. La respuesta del API es de
+      // UN tenant y UN usuario, pero la clave de esa cache es la URL: el header
+      // Authorization no la diversifica, asi que la respuesta de una empresa se
+      // le puede servir a otra en el mismo equipo. El backend ya manda
+      // no-store; esto ademas SALTA las entradas que quedaron guardadas antes
+      // de ese arreglo, que si no se seguirian sirviendo sin llegar al servidor.
+      cache: 'no-store',
     })
   } catch (e) {
     throw networkError(e)
@@ -162,6 +169,7 @@ export async function getBlob(path: string): Promise<{ blob: Blob; filename: str
     res = await fetch(`${API_BASE_URL}${path}`, {
       signal: AbortSignal.timeout(TIMEOUT_BLOB_MS),
       headers: buildHeaders(),
+      cache: 'no-store', // un PDF tambien es dato del tenant (ver fetchBody)
     })
   } catch (e) {
     throw networkError(e)

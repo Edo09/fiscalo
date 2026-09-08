@@ -85,6 +85,9 @@ export async function me(): Promise<SessionUser> {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      // Identidad de la sesion: jamas desde la cache del navegador, que se
+      // indexa por URL y no distingue un token de otro (ver http.ts).
+      cache: 'no-store',
     })
   } catch (e) {
     throw networkError(e)
