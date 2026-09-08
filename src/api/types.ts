@@ -576,6 +576,17 @@ export interface UnidadMedida {
 }
 
 // ---------------------------------------------------------------------------
+// Tipo de Bienes y Servicios Comprados — catálogo DGII
+// (/api/tipos-bienes-servicios). Campo 3 del Formato 606.
+// ---------------------------------------------------------------------------
+
+/** `codigo` = '01'..'11'; se declara tal cual en el 606, siempre como cadena. */
+export interface TipoBienesServicios {
+  codigo: string
+  descripcion: string
+}
+
+// ---------------------------------------------------------------------------
 // Ubicaciones — catálogo DGII de provincias y municipios (/api/provincias-municipios)
 // ---------------------------------------------------------------------------
 
@@ -606,6 +617,8 @@ export interface GastoRow {
   id: number
   categoria?: string | null
   tipo_gasto?: string | null
+  /** Código DGII '01'..'11' (campo 3 del 606). null = gasto previo al campo. */
+  tipo_bienes_servicios?: string | null
   ncf?: string | null
   rnc_proveedor?: string | null
   nombre_proveedor?: string | null

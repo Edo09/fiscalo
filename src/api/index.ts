@@ -40,6 +40,7 @@ export { listWarehouses, getWarehouse, createWarehouse, updateWarehouse, deleteW
 export { listNcfRangos, registerNcfRango } from './ncf'
 export { listEcfRecibidos, aprobarEcfRecibido } from './recepcion'
 export { listUnidadesMedida } from './unidadesMedida'
+export { listTiposBienesServicios } from './tiposBienesServicios'
 export { listUbicaciones } from './ubicaciones'
 export { listAjustes, getAjuste, crearAjuste, anularAjuste, listMovimientos, getValorInventario } from './inventario'
 export { listUsers, getUser, createUser, updateUser, deleteUser } from './users'

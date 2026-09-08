@@ -7,6 +7,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { CATEGORIA_TIPOS, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
+import { TipoBienesServiciosSelect } from '@/components/TipoBienesServiciosSelect'
 import type { Proveedor } from '@/types/domain'
 import { gastoFormSchema, mapGastoIssues, emptyGastoErrors, type GastoFormErrors } from './gasto.schema'
 
@@ -33,6 +34,9 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const [tipo, setTipo] = useState<GastoTipo>(CATEGORIA_TIPOS[categoria][0])
   const [proveedor, setProveedor] = useState<Proveedor | null>(null)
   const [ncf, setNcf] = useState('')
+  // Tipo de Costos y Gastos (campo 3 del 606). Arranca vacio a proposito: es un
+  // dato que se declara a la DGII y nadie deberia heredarlo de un default.
+  const [tipoBienes, setTipoBienes] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [conProveedor, setConProveedor] = useState(false)
   const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
@@ -87,7 +91,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
    */
   function validateForm(): boolean {
     const validables = lineasConContenido()
-    const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, proveedor, ncf, lineas: validables })
+    const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, tipoBienes, proveedor, ncf, lineas: validables })
     if (!res.success) {
       setErrors(mapGastoIssues(res.error, validables))
       const n = res.error.issues.length
@@ -108,6 +112,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     const payload: CreateGastoInput = {
       categoria,
       tipo_gasto: tipo,
+      tipo_bienes_servicios: tipoBienes,
       rnc_proveedor: incluirProveedor && proveedor ? proveedor.rnc : '',
       nombre_proveedor: incluirProveedor && proveedor ? proveedor.nombre : '',
       items: items.map<GastoItemInput>((l) => ({
@@ -171,6 +176,27 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
               {tiposPermitidos.map((t) => <option key={t} value={t}>{t} · {GASTO_TIPOS[t].label}</option>)}
             </select>
           )}
+        </div>
+
+        {/* Tipo de Costos y Gastos: va al campo 3 del 606. Ocupa la fila
+            completa porque las descripciones DGII son largas y cortadas no se
+            distinguen ("Gastos de activos fijos" vs "Adquisiciones de activos"). */}
+        <div className={'field full' + (errors.tipoBienes ? ' field-error' : '')}>
+          <label htmlFor="gasto-tipo-bienes">
+            Tipo de Costos y Gastos <span className="req">*</span>
+          </label>
+          <TipoBienesServiciosSelect
+            id="gasto-tipo-bienes"
+            value={tipoBienes}
+            onChange={(codigo) => {
+              setTipoBienes(codigo)
+              if (errors.tipoBienes) setErrors((e) => ({ ...e, tipoBienes: undefined }))
+            }}
+            invalid={Boolean(errors.tipoBienes)}
+          />
+          {errors.tipoBienes
+            ? <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.tipoBienes}</div>
+            : <div className="text-xs muted-3" style={{ marginTop: 5 }}>Se declara en el Reporte 606 (campo 3).</div>}
         </div>
 
         {esGastoMenor ? (

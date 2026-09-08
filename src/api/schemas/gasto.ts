@@ -17,9 +17,19 @@ export const gastoItemSchema = z.object({
   unidad_medida: z.string().optional(),
 })
 
+/**
+ * Tipo de Bienes y Servicios Comprados — campo 3 del Formato 606 DGII.
+ * Cadena de 2 dígitos ('01'..'11'), NUNCA número: '01' como number es 1 y la
+ * DGII rechaza el archivo. El catálogo vive en /api/tipos-bienes-servicios.
+ */
+export const tipoBienesServiciosSchema = z
+  .string()
+  .regex(/^\d{2}$/, 'Elige el tipo de costo o gasto.')
+
 export const createGastoSchema = z.object({
   categoria: gastoCategoriaSchema,
   tipo_gasto: gastoTipoSchema,
+  tipo_bienes_servicios: tipoBienesServiciosSchema,
   rnc_proveedor: z.string(),
   nombre_proveedor: z.string(),
   // Solo para tipos recibidos (E31/B01/E33/E34); en auto-emisión se ignora.

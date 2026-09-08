@@ -17,6 +17,9 @@ export const gastoFormSchema = z
     esCompra: z.boolean(),
     recibido: z.boolean(),
     tipo: z.string(),
+    // Tipo de Costos y Gastos (campo 3 del 606). Obligatorio en las dos
+    // categorias: el reporte lo declara igual para gastos menores y compras.
+    tipoBienes: z.string().regex(/^\d{2}$/, 'Elige el tipo de costo o gasto.'),
     proveedor: z.any(),
     ncf: z.string(),
     lineas: z.array(gastoLineaSchema).min(1, 'Agrega al menos una línea con descripción e importe.'),
@@ -38,6 +41,7 @@ export const gastoFormSchema = z
 export interface GastoFormErrors {
   proveedor?: string
   ncf?: string
+  tipoBienes?: string
   /** Error a nivel de formulario (ej. sin líneas). */
   form?: string
   lineas: Record<number, GastoLineaErrors>
@@ -63,6 +67,8 @@ export function mapGastoIssues(error: z.ZodError, lineas: { id: number }[]): Gas
     const [head, idx, field] = issue.path
     if (head === 'proveedor') {
       out.proveedor ??= issue.message
+    } else if (head === 'tipoBienes') {
+      out.tipoBienes ??= issue.message
     } else if (head === 'ncf') {
       out.ncf ??= issue.message
     } else if (head === 'lineas') {
