@@ -249,9 +249,39 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const hayCambios = clienteCambiado || fechaCambiada || lineasCambiadas
   const marca = (cond: boolean) => (cond ? ' fx-mod' : '')
 
-  const lineasValidas = lineas.filter((l) => l.descripcion.trim() !== '' && l.cantidad > 0)
+  const esValida = (l: Linea) => l.descripcion.trim() !== '' && l.cantidad > 0
+  /**
+   * Fila sin contenido facturable: la que el formulario deja siempre al final.
+   * Se descarta sin avisar porque no hay nada que perder.
+   *
+   * La cantidad NO cuenta como contenido a proposito: vaciar ese campo da
+   * Number('') === 0, y bloquear el guardado por una fila por lo demas vacia
+   * seria pedirle al usuario que arregle algo que no escribio. En cuanto la fila
+   * tiene descripcion, precio, producto o descuento, una cantidad <= 0 si
+   * bloquea (ver lineasIncompletas).
+   */
+  const estaEnBlanco = (l: Linea) =>
+    l.descripcion.trim() === '' && l.precio === 0 && l.prodId === '' && l.desc === 0
+
+  const lineasValidas = lineas.filter(esValida)
+
+  /**
+   * Lineas CON datos que no se guardarian. Antes se descartaban en silencio: al
+   * guardar, el PUT reemplaza todas las lineas, asi que borrar una descripcion
+   * para reescribirla hacia desaparecer su importe de la factura para siempre.
+   * La unica senal era un total que bajaba solo.
+   */
+  const lineasIncompletas = lineas
+    .map((l, i) => ({ l, n: i + 1 }))
+    .filter(({ l }) => !esValida(l) && !estaEnBlanco(l))
+    .map(({ l, n }) => ({
+      n,
+      motivo: l.descripcion.trim() === '' ? 'falta la descripción' : 'la cantidad debe ser mayor que 0',
+    }))
+
   const clienteResuelto = cliente != null || clienteLibre.trim() !== '' || clienteActual != null
-  const puedeGuardar = clienteResuelto && lineasValidas.length > 0 && !guardando && (!editando || hayCambios)
+  const puedeGuardar = clienteResuelto && lineasValidas.length > 0 && lineasIncompletas.length === 0
+    && !guardando && (!editando || hayCambios)
 
   const items = (): FacturaSimpleItemInput[] =>
     lineasValidas.map((l) => ({
@@ -452,7 +482,11 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           </div>
 
           {lineas.map((l, i) => (
-            <div className={'fx-grid fx-row' + (esLineaNueva(l.id) ? ' fx-row-nueva' : '')} key={l.id}>
+            <div
+              className={'fx-grid fx-row' + (esLineaNueva(l.id) ? ' fx-row-nueva' : '')
+                + (!esValida(l) && !estaEnBlanco(l) ? ' fx-row-incompleta' : '')}
+              key={l.id}
+            >
               <button
                 type="button"
                 className="fx-gutter"
@@ -465,7 +499,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               </button>
 
               <AutoTextarea
-                className={'fx-field fx-desc' + marca(campoCambiado(l, 'descripcion'))}
+                className={'fx-field fx-desc' + marca(campoCambiado(l, 'descripcion'))
+                  + (l.descripcion.trim() === '' && !estaEnBlanco(l) ? ' fx-field--err' : '')}
                 inputRef={i === lineas.length - 1 ? ultimaDescRef : undefined}
                 placeholder="Concepto o artículo…"
                 value={l.descripcion}
@@ -475,7 +510,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               />
 
               <input
-                className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'cantidad'))} data-label="Cant."
+                className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'cantidad'))
+                  + (l.cantidad <= 0 && !estaEnBlanco(l) ? ' fx-field--err' : '')} data-label="Cant."
                 type="number" min={0} step="any" inputMode="decimal"
                 value={l.cantidad}
                 onChange={(e) => updLinea(l.id, { cantidad: Number(e.target.value) })}
@@ -512,6 +548,20 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               <Icon name="plus" size={14} />Descripción
             </button>
           </div>
+
+          {/* Lineas con datos que no se guardarian: se dicen en voz alta y
+              bloquean el guardado, en vez de desaparecer sin dejar rastro. */}
+          {lineasIncompletas.length > 0 && (
+            <div className="fx-incompletas" role="alert">
+              <Icon name="alert-circle" size={14} />
+              <span>
+                {lineasIncompletas.length === 1
+                  ? `La línea ${lineasIncompletas[0].n} no se guardará: ${lineasIncompletas[0].motivo}.`
+                  : `Estas líneas no se guardarán: ${lineasIncompletas.map((x) => `${x.n} (${x.motivo})`).join(', ')}.`}
+                {' '}Complétalas o quítalas con la ✕.
+              </span>
+            </div>
+          )}
         </section>
 
         {/* --- Totales --- */}

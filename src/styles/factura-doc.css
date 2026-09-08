@@ -299,6 +299,30 @@
 .fx-tasa.fx-mod { border-color: var(--warning); }
 .fx-tasa.fx-mod:focus-visible { border-color: var(--accent); }
 
+/* Linea con datos que NO se guardaria (le falta descripcion, o la cantidad no
+   es positiva). Se marca en rojo y bloquea el guardado: antes desaparecia sin
+   avisar y, como el PUT reemplaza todas las lineas, se perdia para siempre. */
+.fx-row-incompleta {
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.fx-field--err,
+.fx-field--err:hover {
+  border-bottom-color: var(--danger);
+  background: var(--danger-soft);
+}
+.fx-field--err:focus { border-bottom-color: var(--danger); }
+
+.fx-incompletas {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--danger);
+}
+
 /* Linea agregada en esta edicion: marca en la canaleta. */
 .fx-row-nueva {
   box-shadow: inset 2px 0 0 var(--warning);

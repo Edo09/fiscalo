@@ -806,7 +806,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         </section>
 
         <footer className="fx-nota">
-          Secuencia e-NCF asignada por el backend · firma y envío a la DGII automáticos ·
+          Secuencia e-NCF asignada automaticamente· firma y envío a la DGII automáticos ·
           el monto fiscal definitivo lo calcula el backend al emitir
         </footer>
       </article>
