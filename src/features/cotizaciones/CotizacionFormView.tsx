@@ -169,7 +169,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
       }
       if (enviarCorreo) toast.info('Se solicitó el envío por correo al cliente.')
       void queryClient.invalidateQueries({ queryKey: ['cotizaciones'] })
-      nav('cotizaciones')
+      nav('cotizaciones', null, { replace: true })
     } catch (e) {
       setErrorForm(e instanceof ApiError ? e.message : 'No se pudo guardar la cotización.')
       setGuardando(false)
@@ -198,7 +198,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
       await deleteCotizacion(cotizacionId)
       void queryClient.invalidateQueries({ queryKey: ['cotizaciones'] })
       toast.success(`Cotización ${codigo} eliminada.`)
-      nav('cotizaciones')
+      nav('cotizaciones', null, { replace: true })
     } catch (e) {
       setErrorForm(e instanceof ApiError ? e.message : 'No se pudo eliminar la cotización.')
       setBorrando(false)

@@ -348,7 +348,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         toast.success(`Factura simple ${creada?.no_factura ?? ''} creada.`)
       }
       await queryClient.invalidateQueries({ queryKey: ['facturas-simples'] })
-      nav('facturas-simples')
+      nav('facturas-simples', null, { replace: true })
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la factura.')
     } finally {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
@@ -39,7 +39,8 @@ import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { hasModule } from '@/config/permissions'
-import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import { useHistoryNav } from '@/hooks/useHistoryNav'
+import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -56,6 +57,7 @@ type ThemeMode = 'light' | 'dark'
 // `view` se persiste pero el payload NO, asi que al reabrir la pestana quedarian
 // en blanco ('No hay factura seleccionada') con el menu marcando su grupo, que
 // se lee como "el listado salio vacio". Se cae al listado correspondiente.
+// Mismo criterio al volver con "atras" a una de ellas despues de una recarga.
 const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
   'factura-ver': 'facturas',
   'factura-simple-editar': 'facturas-simples',
@@ -80,12 +82,23 @@ function App() {
 
 function AppShell() {
   const { user } = useSession()
-  const [view, setView] = useState<ViewId>(() => restoreView())
-
-  const [payload, setPayload] = useState<NavPayload>(null)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState(false)
+
+  // Vista actual enlazada al historial del navegador: atrás/adelante se mueven
+  // entre vistas de la app. Cualquier cambio de vista, venga de un clic o del
+  // navegador, cierra el menú móvil y la búsqueda y sube el scroll.
+  const { view, payload, nav } = useHistoryNav({
+    inicial: restoreView,
+    sinPayload: VIEW_SIN_PAYLOAD,
+    onCambio: () => {
+      setMobileNav(false)
+      setSearch(false)
+      const c = document.querySelector('.content')
+      if (c) c.scrollTop = 0
+    },
+  })
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -103,14 +116,6 @@ function AppShell() {
   }, [])
 
   const sbClass = THEME.sidebarStyle === 'contraste' ? ' sb-contrast' : THEME.sidebarStyle === 'compacto' ? ' sb-compact' : ''
-
-  const nav = useCallback<Nav>((v, p = null) => {
-    setView(v)
-    setPayload(p)
-    setMobileNav(false)
-    const c = document.querySelector('.content')
-    if (c) c.scrollTop = 0
-  }, [])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -137,10 +142,12 @@ function AppShell() {
 
   // Si el rol no tiene el módulo de la vista actual, volver al dashboard (evita
   // quedar en una página que el backend va a rechazar con 403). Fail-open sin permisos.
+  // Reemplaza en vez de apilar: si no, "atrás" volvería a la vista prohibida y
+  // la redirección se repetiría, dejando al usuario atrapado.
   useEffect(() => {
     const mod = navModuleFor(activeTop as ViewId)
     const perms = user?.permissions
-    if (mod && perms && !hasModule(perms, mod)) nav('dashboard')
+    if (mod && perms && !hasModule(perms, mod)) nav('dashboard', null, { replace: true })
   }, [activeTop, user, nav])
 
   const renderView = () => {

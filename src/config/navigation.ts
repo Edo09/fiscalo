@@ -68,8 +68,19 @@ export function isNuevoSignal(p: NavPayload): p is NuevoSignal {
   return p != null && (p as NuevoSignal).kind === 'nuevo'
 }
 
-/** Cambia de vista, con un payload opcional (factura, tipo e-CF…). */
-export type Nav = (view: ViewId, payload?: NavPayload) => void
+export interface NavOptions {
+  /**
+   * Reemplaza la entrada actual del historial en vez de apilar una nueva. Para
+   * redirecciones: tras guardar o borrar, "atrás" no debe volver al formulario
+   * ya enviado; y una vista sin permiso no debe quedar detrás, o "atrás"
+   * volvería a ella y redirigiría otra vez.
+   */
+  replace?: boolean
+}
+
+/** Cambia de vista, con un payload opcional (factura, tipo e-CF…). Cada cambio
+    queda en el historial del navegador (ver hooks/useHistoryNav). */
+export type Nav = (view: ViewId, payload?: NavPayload, opts?: NavOptions) => void
 
 export type BadgeTone = 'danger' | 'warn'
 

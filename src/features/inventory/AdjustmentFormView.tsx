@@ -106,7 +106,7 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       void queryClient.invalidateQueries({ queryKey: ['inventario'] })
       void queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success(`Ajuste ${creado.codigo} registrado.`)
-      nav('ajustes')
+      nav('ajustes', null, { replace: true })
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo crear el ajuste.')
       setGuardando(false)

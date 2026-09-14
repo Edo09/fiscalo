@@ -470,7 +470,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       }
       // No se rehabilita el botón en éxito: queda deshabilitado (con spinner)
       // durante la ventana previa al redirect para evitar una segunda emisión.
-      setTimeout(() => nav('factura-ver', created), 1200)
+      // Reemplaza el formulario en el historial: "atrás" desde la factura emitida
+      // no debe reabrirlo (con una cotización convertida volvería relleno).
+      setTimeout(() => nav('factura-ver', created, { replace: true }), 1200)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
       setEmitting(false)
