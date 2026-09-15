@@ -34,6 +34,10 @@ function concepto(m: MovimientoRow): string {
     if (m.tipo_movimiento === 'DEVOLUCION') return 'Devolución (nota de crédito)'
     return m.tipo_movimiento === 'COMPRA' ? 'Compra (E41)' : 'Venta'
   }
+  // Registrado en Compras (/api/gastos): E31/E41/E47 entran, E34 vuelve al proveedor.
+  if (m.referencia_tipo === 'gasto') {
+    return m.tipo_movimiento === 'DEVOLUCION' ? 'Devolución a proveedor (nota de crédito)' : 'Compra'
+  }
   return m.tipo_movimiento || '—'
 }
 

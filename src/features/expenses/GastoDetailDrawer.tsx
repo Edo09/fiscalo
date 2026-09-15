@@ -111,7 +111,7 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
         <div className="row between"><span className="text-sm muted">Proveedor</span><span className="text-sm">{g.nombre_proveedor ?? '—'}</span></div>
         <div className="row between"><span className="text-sm muted">RNC / Cédula</span><span className="mono text-sm">{g.rnc_proveedor ?? '—'}</span></div>
         <div className="row between"><span className="text-sm muted">Fecha</span><span className="text-sm">{g.fecha ?? '—'}</span></div>
-        <div className="row between"><span className="text-sm muted">Origen</span><span className="text-sm">{auto ? 'Auto-emisión (DGII)' : 'Recibido'}</span></div>
+        <div className="row between"><span className="text-sm muted">Origen</span><span className="text-sm">{auto ? 'Auto-emisión (DGII)' : 'Recibido · registro interno'}</span></div>
         <div className="row between"><span className="text-sm muted">Estado</span>{estadoActual ? <EstadoBadge estado={gastoEstadoLabel(estadoActual)} /> : <span className="muted-3">—</span>}</div>
         {g.track_id && <div className="row between"><span className="text-sm muted">Track ID</span><span className="mono text-xs">{g.track_id}</span></div>}
       </div>
@@ -128,7 +128,14 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
             <tbody>
               {items.map((l, i) => (
                 <tr key={i} style={{ cursor: 'default' }}>
-                  <td><span className="cell-main">{l.description ?? '—'}</span></td>
+                  <td>
+                    <span className="cell-main">{l.description ?? '—'}</span>
+                    <div className="cell-sub">
+                      {[Number(l.indicador_bien_servicio) === 1 ? 'Bien' : 'Servicio', l.product_id ? 'Producto del catálogo' : '']
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  </td>
                   <td className="num">{Number(l.quantity ?? 0)}</td>
                   <td className="num muted"><Money value={Number(l.itbis_amount ?? 0)} cur={false} /></td>
                   <td className="num fw6"><Money value={Number(l.subtotal ?? Number(l.amount ?? 0) * Number(l.quantity ?? 1))} cur={false} /></td>

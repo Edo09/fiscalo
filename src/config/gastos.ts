@@ -22,7 +22,7 @@ export const GASTO_TIPOS: Record<GastoTipo, GastoTipoDef> = {
 
 export const CATEGORIA_TIPOS: Record<GastoCategoria, GastoTipo[]> = {
   gastos_menores: ['E43'],
-  facturas_proveedores: ['E41', 'E47', 'E33', 'E34'],
+  facturas_proveedores: ['E41', 'E47', 'E31', 'E33', 'E34'],
 }
 
 export const CATEGORIA_LABEL: Record<GastoCategoria, string> = {
@@ -34,6 +34,17 @@ export const GASTO_CATEGORIAS: GastoCategoria[] = ['gastos_menores', 'facturas_p
 
 export function isAutoEmision(tipo: string | null | undefined): boolean {
   return tipo ? GASTO_TIPOS[tipo as GastoTipo]?.autoEmision === true : false
+}
+
+/**
+ * Qué hace una compra con el inventario en las líneas que traen producto.
+ * Espejo de inventoryModel::registrarCompra en el backend: si cambia uno,
+ * cambiar el otro.
+ */
+export function efectoInventario(tipo: string | null | undefined): 'entrada' | 'salida' | null {
+  if (tipo === 'E31' || tipo === 'E41' || tipo === 'E47') return 'entrada'
+  if (tipo === 'E34') return 'salida'
+  return null
 }
 
 export function tipoLabel(tipo: string | null | undefined): string {

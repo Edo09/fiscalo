@@ -1,24 +1,32 @@
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Money, Modal, Badge, Checkbox } from '@/components/ui'
 import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { CATEGORIA_TIPOS, GASTO_TIPOS, isAutoEmision } from '@/config/gastos'
+import { CATEGORIA_TIPOS, GASTO_TIPOS, efectoInventario, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
+import { ProductoCombobox } from '@/features/products/ProductoCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { TipoBienesServiciosSelect } from '@/components/TipoBienesServiciosSelect'
-import type { Proveedor } from '@/types/domain'
+import type { Producto, Proveedor } from '@/types/domain'
 import { gastoFormSchema, mapGastoIssues, emptyGastoErrors, type GastoFormErrors } from './gasto.schema'
 
 interface Linea {
   id: number
+  /** Producto del catálogo del que salió la línea ('' = línea libre, no mueve inventario). */
+  prodId: string
+  /** SKU del producto enlazado, solo para mostrarlo. */
+  sku: string
   description: string
   amount: number
   quantity: number
   itbis_amount: number
   /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
   unidad_medida: number
+  /** 1 = Bien, 2 = Servicio. En el 606 separa bienes (campo 9) de servicios (campo 8). */
+  bien_servicio: 1 | 2
 }
 
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -31,6 +39,16 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   onClose: () => void
   onCreated: (g: GastoRow) => void
 }) {
+  const queryClient = useQueryClient()
+  const esCompra = categoria === 'facturas_proveedores'
+  const esGastoMenor = !esCompra
+  // Bien o servicio por defecto: una compra suele ser mercancía; un gasto menor
+  // (peajes, parqueos) suele ser servicio, que es como se venía declarando.
+  const lineaVacia = (id: number): Linea => ({
+    id, prodId: '', sku: '', description: '', amount: 0, quantity: 1, itbis_amount: 0,
+    unidad_medida: 43, bien_servicio: esCompra ? 1 : 2,
+  })
+
   const [tipo, setTipo] = useState<GastoTipo>(CATEGORIA_TIPOS[categoria][0])
   const [proveedor, setProveedor] = useState<Proveedor | null>(null)
   const [ncf, setNcf] = useState('')
@@ -39,15 +57,15 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   const [tipoBienes, setTipoBienes] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [conProveedor, setConProveedor] = useState(false)
-  const [lineas, setLineas] = useState<Linea[]>([{ id: 1, description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
+  const [lineas, setLineas] = useState<Linea[]>(() => [lineaVacia(1)])
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<GastoFormErrors>(emptyGastoErrors)
   const [saving, setSaving] = useState(false)
 
   const tiposPermitidos = CATEGORIA_TIPOS[categoria]
   const recibido = !isAutoEmision(tipo)
-  const esCompra = categoria === 'facturas_proveedores'
-  const esGastoMenor = !esCompra
+  // Qué hacen con el inventario las líneas con producto (null = nada).
+  const efecto = efectoInventario(tipo)
 
   // Próximo NCF (informativo): misma query cacheada que la página de Gastos;
   // se invalida al crear, así que siempre refleja la secuencia vigente.
@@ -64,7 +82,38 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         ? { ...e, lineas: Object.fromEntries(Object.entries(e.lineas).filter(([k]) => Number(k) !== id)) }
         : e,
     )
-  const addLinea = () => setLineas((ls) => [...ls, { id: Date.now(), description: '', amount: 0, quantity: 1, itbis_amount: 0, unidad_medida: 43 }])
+  const addLinea = () => setLineas((ls) => [...ls, lineaVacia(Date.now())])
+  /**
+   * Línea desde el catálogo: trae nombre, unidad y si es bien o servicio. El
+   * importe arranca con el costo de ficha como referencia; el que manda es el
+   * de la factura del proveedor. Si la última línea sigue vacía se reutiliza,
+   * para no dejar en blanco la fila con la que abre el modal.
+   */
+  const addProducto = (p: Producto) => {
+    const desde = (id: number): Linea => ({
+      id,
+      prodId: p.id,
+      sku: p.sku,
+      description: p.nombre,
+      amount: p.costo,
+      quantity: 1,
+      itbis_amount: 0,
+      unidad_medida: p.unidadMedida || 43,
+      bien_servicio: p.tipo === 'Servicio' ? 2 : 1,
+    })
+    setLineas((ls) => {
+      const ultima = ls[ls.length - 1]
+      const ultimaVacia = ultima && ultima.prodId === '' && ultima.description.trim() === ''
+        && ultima.amount === 0 && ultima.itbis_amount === 0
+      return ultimaVacia
+        ? [...ls.slice(0, -1), desde(ultima.id)]
+        : [...ls, desde(Date.now())]
+    })
+    if (errors.form) setErrors((e) => ({ ...e, form: undefined }))
+  }
+  /** Suelta el producto: la línea sigue en la compra, pero ya no mueve inventario. */
+  const desvincular = (id: number) =>
+    setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, prodId: '', sku: '' } : l)))
   const delLinea = (id: number) => {
     setLineas((ls) => (ls.length > 1 ? ls.filter((l) => l.id !== id) : ls))
     clearLineaErr(id)
@@ -83,7 +132,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   // Líneas con algún contenido (las completamente vacías se ignoran). Gastos
   // menores (E43): proveedor opcional; el backend pone fecha/etiqueta por defecto.
   const lineasConContenido = () =>
-    lineas.filter((l) => l.description.trim() !== '' || l.amount > 0 || l.itbis_amount > 0)
+    lineas.filter((l) => l.prodId !== '' || l.description.trim() !== '' || l.amount > 0 || l.itbis_amount > 0)
 
   /**
    * Valida el formulario con Zod (gastoFormSchema). Pinta errores en línea por
@@ -116,21 +165,30 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
       rnc_proveedor: incluirProveedor && proveedor ? proveedor.rnc : '',
       nombre_proveedor: incluirProveedor && proveedor ? proveedor.nombre : '',
       items: items.map<GastoItemInput>((l) => ({
+        // Vínculo con el catálogo: sin esto la compra no mueve inventario.
+        ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
         description: l.description.trim(),
         amount: l.amount,
         quantity: l.quantity,
         itbis_amount: l.itbis_amount,
         unidad_medida: String(l.unidad_medida),
+        indicador_bien_servicio: l.bien_servicio,
       })),
     }
     if (esCompra) payload.fecha = fecha
-    if (recibido) payload.ncf = ncf.trim()
+    if (recibido) payload.ncf = ncf.trim().toUpperCase()
 
     setSaving(true)
     try {
       const g = await createGasto(payload)
       toast.success(`${esCompra ? 'Compra registrada' : 'Gasto registrado'}${g.ncf ? ` · ${g.ncf}` : ''}.`)
       if (g.aviso) toast.warning(g.aviso)
+      // Las líneas con producto movieron existencias: los listados de productos
+      // y el inventario quedaron viejos.
+      if (efecto && items.some((l) => l.prodId !== '')) {
+        void queryClient.invalidateQueries({ queryKey: ['products'] })
+        void queryClient.invalidateQueries({ queryKey: ['inventario'] })
+      }
       onCreated(g)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo registrar el gasto.')
@@ -143,10 +201,10 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     <Modal
       title={esCompra ? 'Registrar compra' : 'Registrar gasto'}
       sub={esCompra
-        ? 'Factura de proveedor: auto-emisión (E41/E47) o recibida (E31/B01/E33/E34)'
+        ? 'Factura de proveedor: auto-emisión (E41/E47) o recibida (E31/E33/E34)'
         : 'Gasto menor (E43, auto-emisión a DGII)'}
       icon={esCompra ? 'shopping-cart' : 'receipt'}
-      width={620}
+      width={780}
       onClose={onClose}
       footer={
         <>
@@ -216,7 +274,12 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         ) : recibido ? (
           <div className={'field' + (errors.ncf ? ' field-error' : '')}>
             <label>NCF del proveedor <span className="req">*</span></label>
-            <input className="input mono" value={ncf} onChange={(e) => { setNcf(e.target.value); if (errors.ncf) setErrors((er) => ({ ...er, ncf: undefined })) }} placeholder="E310000000123" />
+            <input
+              className="input mono"
+              value={ncf}
+              onChange={(e) => { setNcf(e.target.value.toUpperCase()); if (errors.ncf) setErrors((er) => ({ ...er, ncf: undefined })) }}
+              placeholder={`${tipo}0000000123`}
+            />
             {errors.ncf && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.ncf}</div>}
           </div>
         ) : (
@@ -273,16 +336,31 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
       </div>
 
       <div className="row between mt-md mb-sm" style={{ alignItems: 'center' }}>
-        <span className="fw6 text-sm">Líneas del gasto</span>
+        <span className="fw6 text-sm">{esCompra ? 'Líneas de la compra' : 'Líneas del gasto'}</span>
         <Btn variant="secondary" size="sm" icon="plus" onClick={addLinea}>Agregar línea</Btn>
       </div>
+
+      {esCompra && (
+        <div className="mb-sm">
+          <ProductoCombobox onSelect={addProducto} placeholder="Agregar producto del catálogo: nombre, SKU o categoría…" />
+          <div className="text-xs muted-3" style={{ marginTop: 5 }}>
+            {efecto === 'entrada'
+              ? 'Las líneas con producto suman al inventario al registrar, valorizadas al importe de la línea.'
+              : efecto === 'salida'
+                ? 'Las líneas con producto salen del inventario (devolución al proveedor). Si la nota es solo un descuento, usa líneas sin producto.'
+                : 'Este comprobante no mueve inventario: el producto queda solo como referencia.'}
+          </div>
+        </div>
+      )}
+
       <div className="tbl-wrap">
         <table className="tbl">
           <thead>
             <tr>
-              <th style={{ minWidth: 150 }}>Descripción</th>
+              <th style={{ minWidth: 170 }}>Descripción</th>
               <th className="num" style={{ width: 64 }}>Cant.</th>
-              <th style={{ width: 140 }}>Unidad</th>
+              <th style={{ width: 120 }}>Unidad</th>
+              <th style={{ width: 104 }} title="Bien o servicio: en el 606 van a campos distintos">Tipo</th>
               <th className="num" style={{ width: 104 }}>Importe</th>
               <th className="num" style={{ width: 96 }}>ITBIS</th>
               <th style={{ width: 36 }}></th>
@@ -295,6 +373,22 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
               <tr key={l.id} style={{ cursor: 'default' }}>
                 <td className={le?.description ? 'field-error' : undefined}>
                   <input className="input" style={{ padding: '5px 8px' }} value={l.description} onChange={(e) => updLinea(l.id, 'description', e.target.value)} placeholder="Concepto…" />
+                  {l.prodId && (
+                    <div className="cell-sub row gap-sm" style={{ alignItems: 'center', marginTop: 3 }}>
+                      <Icon name="package" size={12} />
+                      <span className="mono">{l.sku || 'Producto del catálogo'}</span>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        style={{ padding: 2 }}
+                        onClick={() => desvincular(l.id)}
+                        title="Quitar el producto: la línea queda libre y no mueve inventario"
+                        aria-label="Quitar el vínculo con el producto"
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  )}
                   {le?.description && <div className="err-msg">{le.description}</div>}
                 </td>
                 <td className={le?.quantity ? 'field-error' : undefined}>
@@ -304,6 +398,18 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
                 <td className={le?.unidad_medida ? 'field-error' : undefined}>
                   <UnidadMedidaSelect style={{ padding: '5px 8px' }} value={l.unidad_medida} onChange={(v) => updLinea(l.id, 'unidad_medida', v)} />
                   {le?.unidad_medida && <div className="err-msg">{le.unidad_medida}</div>}
+                </td>
+                <td>
+                  <select
+                    className="select"
+                    style={{ padding: '5px 8px' }}
+                    value={l.bien_servicio}
+                    onChange={(e) => updLinea(l.id, 'bien_servicio', Number(e.target.value))}
+                    aria-label="Bien o servicio (Reporte 606)"
+                  >
+                    <option value={1}>Bien</option>
+                    <option value={2}>Servicio</option>
+                  </select>
                 </td>
                 <td className={le?.amount ? 'field-error' : undefined}>
                   <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} />
@@ -329,7 +435,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
 
       <div className="row between mt-md" style={{ alignItems: 'center' }}>
         <Badge tone={recibido ? 'neutral' : 'accent'}>
-          {recibido ? 'Recibido · solo se registra' : 'Auto-emisión · se emite a DGII'}
+          {recibido ? 'Recibido · registro interno, no se envía a la DGII' : 'Auto-emisión · se emite a DGII'}
         </Badge>
         <div className="col" style={{ alignItems: 'flex-end', gap: 2 }}>
           <span className="text-xs muted">Subtotal <Money value={subtotal} cur={false} /> · ITBIS <Money value={itbis} cur={false} /></span>

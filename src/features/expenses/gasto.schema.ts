@@ -3,6 +3,9 @@
 // estado del form y producimos rutas amigables para errores en línea.
 import { z } from 'zod'
 
+/** e-NCF de Crédito Fiscal: E31 + 10 dígitos. Mismo formato que exige el backend. */
+const E31_RE = /^E31\d{10}$/
+
 const gastoLineaSchema = z.object({
   id: z.number(),
   description: z.string().trim().min(1, 'La descripción es obligatoria.'),
@@ -33,6 +36,8 @@ export const gastoFormSchema = z
       }
       if (val.recibido && !val.ncf.trim()) {
         ctx.addIssue({ code: 'custom', path: ['ncf'], message: `El tipo ${val.tipo} es recibido: digita el NCF que entregó el proveedor.` })
+      } else if (val.tipo === 'E31' && !E31_RE.test(val.ncf.trim().toUpperCase())) {
+        ctx.addIssue({ code: 'custom', path: ['ncf'], message: 'El e-NCF E31 lleva 10 dígitos después de E31 (ej. E310000000123).' })
       }
     }
   })

@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 export const gastoCategoriaSchema = z.enum(['gastos_menores', 'facturas_proveedores'])
 
-/** Auto-emitidos por la empresa: E41/E43/E47. Recibidos: E31/B01/E33/E34. */
+/** Auto-emitidos por la empresa: E41/E43/E47. Recibidos: E31/E33/E34 (B01 solo en filas históricas). */
 export const gastoTipoSchema = z.enum(['E43', 'E41', 'E47', 'E31', 'B01', 'E33', 'E34'])
 
 export const gastoItemSchema = z.object({
@@ -15,6 +15,10 @@ export const gastoItemSchema = z.object({
   subtotal: z.number().optional(),
   itbis_amount: z.number().optional(),
   unidad_medida: z.string().optional(),
+  /** Producto del catálogo. En compras mueve inventario (ver efectoInventario). */
+  product_id: z.number().int().positive().optional(),
+  /** 1 = Bien, 2 = Servicio. En el 606 separa bienes (campo 9) de servicios (campo 8). */
+  indicador_bien_servicio: z.union([z.literal(1), z.literal(2)]).optional(),
 })
 
 /**
@@ -32,7 +36,7 @@ export const createGastoSchema = z.object({
   tipo_bienes_servicios: tipoBienesServiciosSchema,
   rnc_proveedor: z.string(),
   nombre_proveedor: z.string(),
-  // Solo para tipos recibidos (E31/B01/E33/E34); en auto-emisión se ignora.
+  // Solo para tipos recibidos (E31/E33/E34); en auto-emisión se ignora.
   ncf: z.string().optional(),
   items: z.array(gastoItemSchema).min(1, 'Agrega al menos una línea con descripción e importe.'),
   fecha: z.string().optional(),

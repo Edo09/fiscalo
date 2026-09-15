@@ -611,6 +611,9 @@ export interface GastoItemRow {
   itbis_amount?: number | string | null
   indicador_facturacion?: number | null
   indicador_bien_servicio?: number | null
+  /** Producto del catálogo (migración 024); null = línea libre. */
+  product_id?: number | null
+  unidad_medida?: string | null
 }
 
 export interface GastoRow {

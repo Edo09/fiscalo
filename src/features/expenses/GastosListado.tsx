@@ -1,6 +1,6 @@
 // FISCALO — Listado de gastos de UNA categoría (compartido por dos vistas):
 //   Gastos  -> categoria="gastos_menores"      (E43, auto-emisión)
-//   Compras -> categoria="facturas_proveedores" (E41/E47 auto-emisión + E31/B01/E33/E34 recibidos)
+//   Compras -> categoria="facturas_proveedores" (E41/E47 auto-emisión + E31/E33/E34 recibidos)
 // GET /api/gastos?categoria=... + /api/gastos/stats (KPIs acotados a la categoría).
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
