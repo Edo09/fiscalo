@@ -27,9 +27,9 @@ const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_numb
  * vive aquí y no dentro de una vista: el que lo abre decide qué hacer con el
  * cliente creado vía `onCreated`.
  *
- * El backend exige email válido, nombre, empresa y teléfono; el RNC es
- * opcional (pero es lo que de verdad importa para facturar, por eso va primero
- * entre los opcionales).
+ * El backend exige nombre, empresa y teléfono. RNC y correo son opcionales: el
+ * RNC es lo que de verdad importa para facturar (por eso va primero entre los
+ * opcionales) y el correo, si se escribe, tiene que ser válido.
  */
 export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props) {
   const queryClient = useQueryClient()
@@ -46,8 +46,8 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     const e: Partial<Record<keyof Campos, string>> = {}
     if (!f.client_name.trim()) e.client_name = 'Requerido'
     if (!f.company_name.trim()) e.company_name = 'Requerido'
-    if (!f.email.trim()) e.email = 'Requerido'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Correo no válido'
+    // Opcional: solo se valida el formato si se escribió algo.
+    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Correo no válido'
     if (!f.phone_number.trim()) e.phone_number = 'Requerido'
     setErrores(e)
     return Object.keys(e).length === 0
@@ -60,7 +60,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
       const row = await createClient({
         client_name: f.client_name.trim(),
         company_name: f.company_name.trim(),
-        email: f.email.trim(),
+        ...(f.email.trim() ? { email: f.email.trim() } : {}),
         phone_number: f.phone_number.trim(),
         ...(f.rnc.trim() ? { rnc: f.rnc.trim() } : {}),
         // Condiciones comerciales: la factura las hereda al elegir este cliente.
@@ -113,7 +113,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
         {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL' })}
         {campo('rnc', 'RNC o cédula', { placeholder: '131000000', inputMode: 'numeric' }, false)}
         {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel' })}
-        {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email' })}
+        {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email' }, false)}
         {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
         <div className="field">
           <label>

@@ -8,13 +8,15 @@ export function listClients(params: ListParams = {}): Promise<ListResult<ClientR
 }
 
 /**
- * Alta de un cliente. El backend exige email valido, nombre de contacto,
- * empresa y telefono; el RNC es opcional. Devuelve el registro creado.
+ * Alta de un cliente. El backend exige nombre de contacto, empresa y telefono;
+ * RNC y correo son opcionales (el correo, si viene, debe ser valido). Devuelve
+ * el registro creado.
  */
 export interface NewClientInput {
   client_name: string
   company_name: string
-  email: string
+  /** Opcional: sin correo el cliente se guarda con el campo vacío. */
+  email?: string
   phone_number: string
   rnc?: string
   /** % de descuento por defecto de sus facturas (0-100). */
