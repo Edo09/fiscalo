@@ -703,6 +703,14 @@
 .fx-cond-item:last-child { flex: 1 1 auto; }
 .fx-cond-item > .text-sm { min-width: 0; }
 
+/* Pago va en columna: el selector arriba y, si aplica, el aviso de credito
+   debajo. El aviso NO cuenta para el ancho (width 0 + min-width 100%): toma el
+   del selector y parte en dos lineas. Si contara, Pago —que no se encoge—
+   crecia todo el texto y aplastaba el item del ITBIS en una columna estrecha. */
+.fx-cond-pago { flex-direction: column; align-items: flex-start; gap: 2px; }
+.fx-cond-pago-fila { display: flex; align-items: center; gap: 8px; }
+.fx-cond-nota { width: 0; min-width: 100%; line-height: 1.35; }
+
 @media (max-width: 620px) {
   .fx-cond { flex-wrap: wrap; }
 }

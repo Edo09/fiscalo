@@ -587,24 +587,28 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
         {/* --- Condiciones del documento --- */}
         <section className="fx-cond">
-          <span className="fx-cond-item">
-            <span className="fx-eyebrow">Pago</span>
-            <select
-              className="fx-cond-sel"
-              value={metodo}
-              onChange={(e) => setMetodo(e.target.value)}
-              aria-label="Método de pago"
-            >
-              {metodos.map((m) => (
-                // El crédito se deshabilita si el cliente no lo tiene permitido:
-                // vale más impedirlo aquí que dejar que la DGII lo rechace luego.
-                <option key={m} disabled={esMetodoCredito(m) && cliente != null && !cliente.permiteCredito}>
-                  {m}
-                </option>
-              ))}
-            </select>
+          {/* Pago en columna: el aviso de crédito va DEBAJO del selector. Como
+              hijo directo del item (una fila flex) quedaba al lado y lo ensanchaba. */}
+          <span className="fx-cond-item fx-cond-pago">
+            <span className="fx-cond-pago-fila">
+              <span className="fx-eyebrow">Pago</span>
+              <select
+                className="fx-cond-sel"
+                value={metodo}
+                onChange={(e) => setMetodo(e.target.value)}
+                aria-label="Método de pago"
+              >
+                {metodos.map((m) => (
+                  // El crédito se deshabilita si el cliente no lo tiene permitido:
+                  // vale más impedirlo aquí que dejar que la DGII lo rechace luego.
+                  <option key={m} disabled={esMetodoCredito(m) && cliente != null && !cliente.permiteCredito}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </span>
             {cliente && !cliente.permiteCredito && (
-              <span className="text-xs muted-3" style={{ display: 'block' }}>
+              <span className="fx-cond-nota text-xs muted-3">
                 Este cliente no tiene crédito habilitado
               </span>
             )}
