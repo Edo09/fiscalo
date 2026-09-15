@@ -8,7 +8,9 @@ import { toast } from 'sonner'
 import { Icon, Avatar, Btn, Spinner } from '@/components/ui'
 import { ApiError, createProveedor, listProveedores, mapProveedorRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { RncConsultaField } from '@/components/RncConsultaField'
 import type { Proveedor } from '@/types/domain'
+import { proveedorConRnc } from './rnc'
 
 interface ProveedorComboboxProps {
   value: Proveedor | null
@@ -69,8 +71,12 @@ export function ProveedorCombobox({ value, onChange, debounceMs = 250 }: Proveed
   const startCreate = () => {
     setCreating(true)
     setCreateError(null)
-    setNuevoNombre(input.trim())
-    setNuevoRnc('')
+    // Si lo que se buscó parece un RNC, va al campo de RNC, listo para
+    // Consultar; si no, es el nombre.
+    const texto = input.trim()
+    const pareceRnc = /^[\d\s-]+$/.test(texto)
+    setNuevoRnc(pareceRnc ? texto : '')
+    setNuevoNombre(pareceRnc ? '' : texto)
   }
 
   const submitCreate = async () => {
@@ -139,13 +145,22 @@ export function ProveedorCombobox({ value, onChange, debounceMs = 250 }: Proveed
                   <Icon name="alert-circle" size={14} /><span>{createError}</span>
                 </div>
               )}
-              <div className="field" style={{ marginBottom: 10 }}>
-                <label className="label">Razón social <span className="req">*</span></label>
-                <input className="input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Suplidora XYZ SRL" autoFocus />
+              <div style={{ marginBottom: 10 }}>
+                <RncConsultaField
+                  label="RNC / Cédula"
+                  opcional={false}
+                  value={nuevoRnc}
+                  onChange={setNuevoRnc}
+                  onEncontrado={(d) => setNuevoNombre(d.razon_social)}
+                  buscarExistente={proveedorConRnc}
+                  avisoExistente="Ya existe un proveedor con este RNC"
+                  placeholder="131880681"
+                  autoFocus
+                />
               </div>
               <div className="field" style={{ marginBottom: 10 }}>
-                <label className="label">RNC / Cédula <span className="req">*</span></label>
-                <input className="input mono" value={nuevoRnc} onChange={(e) => setNuevoRnc(e.target.value)} placeholder="131880681" />
+                <label className="label">Razón social <span className="req">*</span></label>
+                <input className="input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Suplidora XYZ SRL" />
               </div>
               <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
                 <Btn variant="ghost" size="sm" onClick={() => setCreating(false)}>Cancelar</Btn>

@@ -4,7 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Icon } from '@/components/ui'
 import { ApiError, createProveedor, updateProveedor, deleteProveedor } from '@/api'
+import { RncConsultaField } from '@/components/RncConsultaField'
 import type { Proveedor } from '@/types/domain'
+import { proveedorConRnc } from './rnc'
 
 interface ProveedorFormModalProps {
   /** null => crear; un Proveedor => editar. */
@@ -100,13 +102,20 @@ export function ProveedorFormModal({ proveedor, onClose }: ProveedorFormModalPro
       )}
 
       <div className="form-grid">
+        {/* RNC primero: "Consultar" trae la razón social de la DGII. */}
+        <RncConsultaField
+          label="RNC / Cédula"
+          value={rnc}
+          onChange={setRnc}
+          onEncontrado={(d) => setNombre(d.razon_social)}
+          buscarExistente={(r) => proveedorConRnc(r, proveedor?.id)}
+          avisoExistente="Ya tienes un proveedor con este RNC"
+          placeholder="131880681"
+          autoFocus={!editing}
+        />
         <div className="field full">
           <label className="label">Nombre / Razón social <span className="req">*</span></label>
-          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" autoFocus />
-        </div>
-        <div className="field">
-          <label className="label">RNC / Cédula <span className="opt">(opcional)</span></label>
-          <input className="input mono" value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="131880681" />
+          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" autoFocus={editing} />
         </div>
         <div className="field">
           <label className="label">Contacto <span className="opt">(opcional)</span></label>
@@ -116,7 +125,7 @@ export function ProveedorFormModal({ proveedor, onClose }: ProveedorFormModalPro
           <label className="label">Teléfono <span className="opt">(opcional)</span></label>
           <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="(809) 555-0000" />
         </div>
-        <div className="field">
+        <div className="field full">
           <label className="label">Correo <span className="opt">(opcional)</span></label>
           <input className="input" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="compras@proveedor.do" />
         </div>

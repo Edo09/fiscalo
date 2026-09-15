@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Btn, Icon, Modal } from '@/components/ui'
-import { ApiError, createClient, mapClientRow } from '@/api'
-import type { ClientRow } from '@/api'
+import { ApiError, createClient, listClients, mapClientRow } from '@/api'
+import type { ClientRow, ConsultaRnc } from '@/api'
+import { RncConsultaField } from '@/components/RncConsultaField'
 import type { Cliente } from '@/types/domain'
 
 interface Props {
@@ -20,6 +21,13 @@ type CamposTexto = Exclude<keyof Campos, 'permitir_credito'>
 
 const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: false }
 
+/** Cliente propio con este RNC, para avisar antes de crear otro (no bloquea). */
+async function clienteConRnc(rnc: string): Promise<string | null> {
+  const res = await listClients({ query: rnc, pageSize: 5 })
+  const igual = res.items.find((c) => (c.rnc ?? '').replace(/\D/g, '') === rnc)
+  return igual ? (igual.company_name || igual.client_name || `Cliente #${igual.id}`) : null
+}
+
 /**
  * Alta rápida de cliente (POST /api/clients).
  *
@@ -27,9 +35,10 @@ const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_numb
  * vive aquí y no dentro de una vista: el que lo abre decide qué hacer con el
  * cliente creado vía `onCreated`.
  *
- * El backend exige nombre, empresa y teléfono. RNC y correo son opcionales: el
- * RNC es lo que de verdad importa para facturar (por eso va primero entre los
- * opcionales) y el correo, si se escribe, tiene que ser válido.
+ * El RNC va primero: "Consultar" trae los datos de la DGII, así que el alta
+ * puede quedar en escribir el RNC y guardar. El backend solo exige nombre y
+ * empresa; RNC, teléfono y correo son opcionales (el correo, si se escribe,
+ * tiene que ser válido).
  */
 export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props) {
   const queryClient = useQueryClient()
@@ -48,9 +57,19 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     if (!f.company_name.trim()) e.company_name = 'Requerido'
     // Opcional: solo se valida el formato si se escribió algo.
     if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Correo no válido'
-    if (!f.phone_number.trim()) e.phone_number = 'Requerido'
     setErrores(e)
     return Object.keys(e).length === 0
+  }
+
+  /**
+   * Datos de la DGII. La razón social va a "Empresa" (el backend la copia a
+   * razon_social, que es lo que declara el e-CF) y el nombre comercial al
+   * contacto. DGII manda sobre lo que hubiera escrito; teléfono, correo,
+   * descuento y crédito no se tocan.
+   */
+  const rellenarDesdeDgii = (d: ConsultaRnc) => {
+    setF((prev) => ({ ...prev, company_name: d.razon_social, client_name: d.nombre_comercial || d.razon_social }))
+    setErrores((e) => ({ ...e, client_name: undefined, company_name: undefined }))
   }
 
   const guardar = async () => {
@@ -60,8 +79,8 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
       const row = await createClient({
         client_name: f.client_name.trim(),
         company_name: f.company_name.trim(),
+        ...(f.phone_number.trim() ? { phone_number: f.phone_number.trim() } : {}),
         ...(f.email.trim() ? { email: f.email.trim() } : {}),
-        phone_number: f.phone_number.trim(),
         ...(f.rnc.trim() ? { rnc: f.rnc.trim() } : {}),
         // Condiciones comerciales: la factura las hereda al elegir este cliente.
         descuento: Number(f.descuento) || 0,
@@ -78,7 +97,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     }
   }
 
-  // Solo los campos de texto: el checkbox de credito se renderiza aparte.
+  // Solo los campos de texto: el RNC y el checkbox de credito se renderizan aparte.
   const campo = (k: CamposTexto, label: string, extra: Record<string, unknown> = {}, req = true) => (
     <div className={'field' + (errores[k] ? ' field-error' : '')}>
       <label>{label} {req ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
@@ -109,10 +128,17 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
       }
     >
       <div className="form-grid">
-        {campo('client_name', 'Nombre de contacto', { placeholder: 'Juan Pérez', autoFocus: true })}
+        <RncConsultaField
+          value={f.rnc}
+          onChange={(v) => set('rnc', v)}
+          onEncontrado={rellenarDesdeDgii}
+          buscarExistente={clienteConRnc}
+          avisoExistente="Ya tienes un cliente con este RNC"
+          autoFocus
+        />
+        {campo('client_name', 'Nombre de contacto', { placeholder: 'Juan Pérez' })}
         {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL' })}
-        {campo('rnc', 'RNC o cédula', { placeholder: '131000000', inputMode: 'numeric' }, false)}
-        {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel' })}
+        {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel' }, false)}
         {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email' }, false)}
         {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
         <div className="field">
