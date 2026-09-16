@@ -5,6 +5,7 @@ import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead, type IconNa
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, listUbicaciones, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { BrandingSection } from './BrandingSection'
+import { ImpresoraSection } from './ImpresoraSection'
 import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
 
 /* FISCALO — Configuración */
@@ -75,6 +76,7 @@ export function SettingsView() {
     { id: 'fiscal', label: 'Configuración DGII', ic: 'landmark' },
     { id: 'numeracion', label: 'Numeraciones e-CF', ic: 'hash' },
     { id: 'plantillas', label: 'Plantillas PDF', ic: 'file-text' },
+    { id: 'impresora', label: 'Impresora de recibos', ic: 'printer' },
   ]
   return (
     <div className="page page-wide">
@@ -184,6 +186,7 @@ export function SettingsView() {
             </Card>
           )}
           {sec === 'plantillas' && <BrandingSection />}
+          {sec === 'impresora' && <ImpresoraSection />}
         </div>
       </div>
 

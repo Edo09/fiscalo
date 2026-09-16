@@ -8,6 +8,7 @@ import {
 } from '@/api'
 import type { DocKind, FormatoImpresion } from '@/api'
 import { presentDocument, printDocument } from '@/lib/file'
+import { useAnchoTirilla } from '@/stores/impresora'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
@@ -49,6 +50,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   // La clave distingue los dos PDF (carta y tirilla): con solo el DocKind los
   // dos botones mostraban "Abriendo…" a la vez.
   const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | null>(null)
+  const anchoTirilla = useAnchoTirilla()
 
   // Si el estado DGII pasa a un rechazo, refrescar los stats (la secuencia pudo
   // liberarse). Hooks ANTES del early return (rules-of-hooks).
@@ -273,7 +275,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           </Btn>
           {/* Mismo comprobante, papel de tirilla: lo que se entrega en mostrador. */}
           <Btn variant="secondary" icon="printer" onClick={() => openDoc('pdf', false, 'pos')} disabled={id == null || docBusy != null}>
-            {docBusy === 'pdf-pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
+            {docBusy === 'pdf-pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
           </Btn>
           <Btn variant="secondary" icon="code" onClick={() => openDoc(isRfce ? 'xml-rfce' : 'xml', true)} disabled={id == null || docBusy != null}>
             XML firmado

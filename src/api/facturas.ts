@@ -1,6 +1,7 @@
 // Servicio: facturas e-CF.
 import { getJson, postJson, getList, qs } from './http'
 import { createFacturaSchema } from './schemas/factura'
+import { parametroFormato } from './impresion'
 import type {
   CreateFacturaInput,
   CreateFacturaResponse,
@@ -44,7 +45,8 @@ export function previewFactura(
   input: Partial<CreateFacturaInput>,
   formato: FormatoImpresion = 'carta',
 ): Promise<DocBase64> {
-  return postJson<DocBase64>('/api/facturas/preview', { ...input, ...(formato === 'pos' ? { formato } : {}) })
+  const f = parametroFormato(formato)
+  return postJson<DocBase64>('/api/facturas/preview', { ...input, ...(f ? { formato: f } : {}) })
 }
 
 export function getEstado(id: number): Promise<EstadoData> {
@@ -61,7 +63,7 @@ export function getDocumentBase64(
   const path =
     kind === 'pdf'
       // `formato` solo aplica al PDF: el XML firmado no tiene papel.
-      ? `/api/facturas/${id}/pdf${qs({ format: 'base64', formato: formato === 'pos' ? 'pos' : undefined })}`
+      ? `/api/facturas/${id}/pdf${qs({ format: 'base64', formato: parametroFormato(formato) })}`
       : kind === 'xml-rfce'
         ? `/api/facturas/${id}/xml${qs({ type: 'rfce', format: 'base64' })}`
         : `/api/facturas/${id}/xml${qs({ format: 'base64' })}`

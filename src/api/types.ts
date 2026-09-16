@@ -197,11 +197,18 @@ export interface DocBase64 {
 
 /**
  * Papel de la representación impresa. 'carta' es la hoja 8½×11 de siempre;
- * 'pos' es la tirilla térmica de 80 mm de ancho y alto variable. El contenido
- * fiscal es idéntico en las dos — la DGII exige los mismos datos — así que la
- * elección es del usuario en el momento de imprimir, no un ajuste de la cuenta.
+ * 'pos' es la tirilla de rollo, de alto variable, en el ancho configurado en
+ * este equipo (ver AnchoTirilla). El contenido fiscal es idéntico en las dos —
+ * la DGII exige los mismos datos — así que la elección es del usuario en el
+ * momento de imprimir, no un ajuste de la cuenta.
  */
 export type FormatoImpresion = 'carta' | 'pos'
+
+/**
+ * Ancho del rollo de la impresora de recibos, en mm. Es de cada equipo, no de
+ * la empresa: ver src/stores/impresora.ts.
+ */
+export type AnchoTirilla = 72 | 76 | 80
 
 // ---------------------------------------------------------------------------
 // Reporte de ventas (gestión) — GET /api/reportes/ventas

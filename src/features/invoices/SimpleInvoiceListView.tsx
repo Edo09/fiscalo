@@ -9,6 +9,7 @@ import { ApiError, listFacturasSimples, deleteFacturaSimple, getFacturaSimplePdf
 import type { FacturaSimpleRow, FormatoImpresion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { presentDocument, printDocument } from '@/lib/file'
+import { useAnchoTirilla } from '@/stores/impresora'
 import type { Nav } from '@/config/navigation'
 
 const PAGE_SIZES = [10, 25, 50]
@@ -34,6 +35,7 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
   const [confirmDel, setConfirmDel] = useState<FacturaSimpleRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [pdfBusy, setPdfBusy] = useState<number | null>(null)
+  const anchoTirilla = useAnchoTirilla()
 
   // Búsqueda servida por el backend: se fija al dejar de teclear y vuelve a la
   // página 1. Enter la dispara al instante.
@@ -200,7 +202,7 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
                           variant="ghost" size="sm" icon="printer"
                           onClick={() => void verPdf(f, 'pos')}
                           disabled={pdfBusy === f.id}
-                          aria-label={`Imprimir recibo de 80 mm de ${f.no_factura}`}
+                          aria-label={`Imprimir recibo de ${anchoTirilla} mm de ${f.no_factura}`}
                         />
                         <Btn
                           variant="ghost" size="sm" icon="trash-2"

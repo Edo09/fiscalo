@@ -7,6 +7,7 @@
 // calcula el subtotal de cada línea, así que el formulario solo manda lo que el
 // usuario escribe. Ver src/Controllers/facturaSimpleController.php en la API.
 import { getJson, getList, postJson, request, qs } from './http'
+import { parametroFormato } from './impresion'
 import type {
   DocBase64,
   FacturaSimple,
@@ -55,9 +56,9 @@ export function deleteFacturaSimple(id: number): Promise<unknown> {
   return request(`/api/facturas-simples/${id}`, { method: 'DELETE' })
 }
 
-/** PDF de una factura ya guardada, en hoja carta o en tirilla POS de 80 mm. */
+/** PDF de una factura ya guardada, en hoja carta o en tirilla POS (ancho de este equipo). */
 export function getFacturaSimplePdf(id: number, formato: FormatoImpresion = 'carta'): Promise<DocBase64> {
-  return getJson<DocBase64>(`/api/facturas-simples/${id}/pdf${qs({ formato: formato === 'pos' ? 'pos' : undefined })}`)
+  return getJson<DocBase64>(`/api/facturas-simples/${id}/pdf${qs({ formato: parametroFormato(formato) })}`)
 }
 
 /** PDF previo, sin guardar nada. */
@@ -65,5 +66,6 @@ export function previewFacturaSimple(
   input: FacturaSimpleInput,
   formato: FormatoImpresion = 'carta',
 ): Promise<DocBase64> {
-  return postJson<DocBase64>('/api/facturas-simples/preview', { ...input, ...(formato === 'pos' ? { formato } : {}) })
+  const f = parametroFormato(formato)
+  return postJson<DocBase64>('/api/facturas-simples/preview', { ...input, ...(f ? { formato: f } : {}) })
 }

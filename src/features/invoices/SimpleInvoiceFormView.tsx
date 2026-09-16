@@ -12,6 +12,7 @@ import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { presentDocument, printDocument } from '@/lib/file'
+import { useAnchoTirilla } from '@/stores/impresora'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
@@ -99,6 +100,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [buscaProd, setBuscaProd] = useState('')
   const [cambiandoCliente, setCambiandoCliente] = useState(false)
   const [pdfBusy, setPdfBusy] = useState<FormatoImpresion | null>(null)
+  const anchoTirilla = useAnchoTirilla()
   /** Foto del documento tal como se cargó: sirve para marcar qué se tocó. */
   const [original, setOriginal] = useState<{ fecha: string; lineas: Linea[] } | null>(null)
 
@@ -599,7 +601,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           {/* Factura ya creada y sin tocar: lo util es ver el documento real.
               En cuanto se modifica algo, ese PDF ya no refleja la pantalla, asi
               que el boton pasa a ser la vista previa de lo editado. */}
-          {/* La tirilla de 80 mm sale del mismo sitio que la hoja: si la factura
+          {/* La tirilla sale del mismo sitio que la hoja: si la factura
               esta guardada y sin tocar, del documento real; si se esta editando,
               de la vista previa de lo que hay en pantalla. */}
           {editando && !hayCambios ? (
@@ -608,7 +610,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                 {pdfBusy === 'carta' ? 'Abriendo…' : 'Ver factura'}
               </Btn>
               <Btn variant="secondary" icon="printer" onClick={() => void verGuardada('pos')} disabled={pdfBusy != null}>
-                {pdfBusy === 'pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
+                {pdfBusy === 'pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
               </Btn>
             </>
           ) : (
@@ -617,7 +619,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                 {previaBusy === 'carta' ? 'Generando…' : 'Vista previa'}
               </Btn>
               <Btn variant="secondary" icon="printer" onClick={() => void vistaPrevia('pos')} disabled={previaBusy != null}>
-                {previaBusy === 'pos' ? 'Imprimiendo…' : 'Imprimir recibo 80 mm'}
+                {previaBusy === 'pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
               </Btn>
             </>
           )}
