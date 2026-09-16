@@ -541,7 +541,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                   : `Quedan ${rangoRestantes} números en el rango DGII.`}
               </span>
             ) : (
-              <span className="fx-aviso fx-aviso--suave">El backend confirma el e-NCF definitivo al emitir</span>
+              <span className="fx-aviso fx-aviso--suave">e-NCF automatico</span>
             )}
           </div>
         </header>
@@ -811,10 +811,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           </div>
         </section>
 
-        <footer className="fx-nota">
-          Secuencia e-NCF asignada automaticamente· firma y envío a la DGII automáticos ·
-          el monto fiscal definitivo lo calcula el backend al emitir
-        </footer>
+
       </article>
 
       {/* --- Acciones (fuera del papel) --- */}
