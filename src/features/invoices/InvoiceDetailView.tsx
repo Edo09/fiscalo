@@ -7,8 +7,9 @@ import {
   ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
 } from '@/api'
 import type { DocKind, FormatoImpresion } from '@/api'
-import { presentDocument, printDocument } from '@/lib/file'
+import { presentDocument } from '@/lib/file'
 import { useAnchoTirilla } from '@/stores/impresora'
+import { imprimirRecibo } from './imprimirRecibo'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
@@ -105,16 +106,16 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
       kind !== 'pdf' ? 'Obteniendo XML…' : esPos ? 'Generando recibo…' : 'Generando PDF…',
     )
     try {
-      const doc = await getDocumentBase64(id, kind, formato)
       // La tirilla va derecho al diálogo de impresión: es lo que se entrega en
       // mostrador, no algo que se abra para leer.
       if (esPos) {
-        const impreso = await printDocument(doc)
+        const impreso = await imprimirRecibo({ tipo: 'factura', id })
         toast.success(
           impreso ? 'Recibo enviado a la impresora.' : 'Recibo abierto: imprímelo con Ctrl+P.',
           { id: tid },
         )
       } else {
+        const doc = await getDocumentBase64(id, kind, formato)
         presentDocument(doc, { download })
         toast.success(download ? `Descargado ${doc.filename}.` : `Documento ${doc.filename} listo.`, { id: tid })
       }

@@ -6,13 +6,14 @@ import {
   ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple,
   getFacturaSimplePdf, listProducts, mapProductRow, previewFacturaSimple, updateFacturaSimple,
 } from '@/api'
-import type { FacturaSimpleItemInput, FormatoImpresion } from '@/api'
+import type { DocBase64, FacturaSimpleInput, FacturaSimpleItemInput, FormatoImpresion } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
-import { presentDocument, printDocument } from '@/lib/file'
+import { presentDocument } from '@/lib/file'
 import { useAnchoTirilla } from '@/stores/impresora'
+import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
@@ -306,18 +307,21 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     return {}
   }
 
-  /** PDF de la factura tal como está guardada (no la edición en curso). */
-  /** La tirilla va derecho a imprimir; la hoja se abre para verla. */
-  const mostrar = async (doc: Awaited<ReturnType<typeof getFacturaSimplePdf>>, formato: FormatoImpresion) => {
-    if (formato !== 'pos') { presentDocument(doc); return }
-    if (!(await printDocument(doc))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+  /**
+   * La tirilla va derecho a imprimir; la hoja se abre para verla. `recibo` dice
+   * de dónde sale la tirilla y `hoja` cómo pedir el PDF carta.
+   */
+  const mostrar = async (formato: FormatoImpresion, recibo: OrigenRecibo, hoja: () => Promise<DocBase64>) => {
+    if (formato !== 'pos') { presentDocument(await hoja()); return }
+    if (!(await imprimirRecibo(recibo))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
   }
 
+  /** La factura tal como está guardada (no la edición en curso). */
   const verGuardada = async (formato: FormatoImpresion = 'carta') => {
     if (facturaId == null) return
     setPdfBusy(formato)
     try {
-      await mostrar(await getFacturaSimplePdf(facturaId, formato), formato)
+      await mostrar(formato, { tipo: 'simple', id: facturaId }, () => getFacturaSimplePdf(facturaId))
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo abrir la factura.')
     } finally {
@@ -329,7 +333,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     if (lineasValidas.length === 0) { toast.error('Agrega al menos una línea con descripción.'); return }
     setPreviaBusy(formato)
     try {
-      await mostrar(await previewFacturaSimple({ ...clienteBody(true), date: fecha, items: items() }, formato), formato)
+      const input: FacturaSimpleInput = { ...clienteBody(true), date: fecha, items: items() }
+      await mostrar(formato, { tipo: 'simple-preview', input }, () => previewFacturaSimple(input))
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.')
     } finally {

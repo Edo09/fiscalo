@@ -11,6 +11,7 @@ export {
   previewFactura,
   getEstado,
   getDocumentBase64,
+  getReciboFactura,
   type DocKind,
 } from './facturas'
 export {
@@ -21,6 +22,8 @@ export {
   deleteFacturaSimple,
   getFacturaSimplePdf,
   previewFacturaSimple,
+  getReciboFacturaSimple,
+  previewReciboFacturaSimple,
 } from './facturasSimples'
 export { listClients, getClient, createClient, updateClient, deleteClient } from './clients'
 export type { NewClientInput } from './clients'

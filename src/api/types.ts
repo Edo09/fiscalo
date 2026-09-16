@@ -210,6 +210,42 @@ export type FormatoImpresion = 'carta' | 'pos'
  */
 export type AnchoTirilla = 72 | 76 | 80
 
+/**
+ * Cómo se manda la tirilla a la impresora. 'web': página HTML con el largo
+ * exacto del recibo (@page). 'pdf': el PDF de siempre, cuyo largo de papel
+ * decide el tamaño elegido en el driver.
+ */
+export type ModoImpresion = 'web' | 'pdf'
+
+/**
+ * Recibo de tirilla como datos (`?format=datos` en los endpoints de PDF), para
+ * imprimirlo como página web. Los textos llegan ya formateados por el backend
+ * con los mismos helpers que el PDF (ReciboPos::datos): aquí solo se dibujan.
+ */
+export interface ReciboDatos {
+  /** Nombre del documento sin extensión, p. ej. "Factura_E310000000011_POS80". */
+  nombre: string
+  /** Ancho de página y margen en mm: lo que imprime el driver, no lo que mide el rollo. */
+  papel: { opcion: AnchoTirilla; ancho_mm: number; margen_mm: number }
+  fuente: 'Arial' | 'Times' | 'Courier'
+  /** data URI (PNG/JPG) o null. */
+  logo: string | null
+  emisor: { razon_social: string; rnc: string; direccion: string; contacto: string }
+  titulo: string
+  /** Pares [etiqueta, valor]: e-NCF y fechas, o número y NCF en las simples. */
+  identificacion: [string, string][]
+  /** null cuando el comprobante no lleva comprador (E43). */
+  receptor: { pares: [string, string][]; contacto: string } | null
+  lineas: { descripcion: string; cantidad_precio: string; itbis: string; valor: string }[]
+  /** Motivo de nota E33/E34 que no cupo en una línea; '' si no aplica. */
+  motivo: string
+  totales: { etiqueta: string; valor: string; total: boolean }[]
+  /** null en facturas no electrónicas. */
+  timbre: { qr: string | null; aviso_preview: string; codigo_seguridad: string; fecha_firma: string } | null
+  leyenda_qr: string
+  gracias: string
+}
+
 // ---------------------------------------------------------------------------
 // Reporte de ventas (gestión) — GET /api/reportes/ventas
 // ---------------------------------------------------------------------------

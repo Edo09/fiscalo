@@ -9,6 +9,7 @@ import type {
   EstadoData,
   FormatoImpresion,
   FacturaListParams,
+  ReciboDatos,
   FacturaRow,
   ListResult,
 } from './types'
@@ -51,6 +52,14 @@ export function previewFactura(
 
 export function getEstado(id: number): Promise<EstadoData> {
   return getJson<EstadoData>(`/api/facturas/${id}/estado`)
+}
+
+/**
+ * Recibo de tirilla de una factura e-CF como datos, en el ancho de este equipo,
+ * para imprimirlo como página web.
+ */
+export function getReciboFactura(id: number): Promise<ReciboDatos> {
+  return getJson<ReciboDatos>(`/api/facturas/${id}/pdf${qs({ format: 'datos', formato: parametroFormato('pos') })}`)
 }
 
 export type DocKind = 'pdf' | 'xml' | 'xml-rfce'

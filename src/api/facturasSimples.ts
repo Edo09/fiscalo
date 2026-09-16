@@ -15,6 +15,7 @@ import type {
   FacturaSimpleInput,
   FacturaSimpleRow,
   ListResult,
+  ReciboDatos,
 } from './types'
 
 export interface FacturaSimpleListParams {
@@ -59,6 +60,16 @@ export function deleteFacturaSimple(id: number): Promise<unknown> {
 /** PDF de una factura ya guardada, en hoja carta o en tirilla POS (ancho de este equipo). */
 export function getFacturaSimplePdf(id: number, formato: FormatoImpresion = 'carta'): Promise<DocBase64> {
   return getJson<DocBase64>(`/api/facturas-simples/${id}/pdf${qs({ formato: parametroFormato(formato) })}`)
+}
+
+/** Recibo de tirilla de una factura guardada, como datos para imprimirlo como página web. */
+export function getReciboFacturaSimple(id: number): Promise<ReciboDatos> {
+  return getJson<ReciboDatos>(`/api/facturas-simples/${id}/pdf${qs({ format: 'datos', formato: parametroFormato('pos') })}`)
+}
+
+/** Recibo de tirilla de lo que hay en pantalla, sin guardar, como datos. */
+export function previewReciboFacturaSimple(input: FacturaSimpleInput): Promise<ReciboDatos> {
+  return postJson<ReciboDatos>('/api/facturas-simples/preview', { ...input, formato: parametroFormato('pos'), format: 'datos' })
 }
 
 /** PDF previo, sin guardar nada. */

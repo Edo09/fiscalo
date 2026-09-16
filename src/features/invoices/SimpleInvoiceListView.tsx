@@ -8,8 +8,9 @@ import {
 import { ApiError, listFacturasSimples, deleteFacturaSimple, getFacturaSimplePdf } from '@/api'
 import type { FacturaSimpleRow, FormatoImpresion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { presentDocument, printDocument } from '@/lib/file'
+import { presentDocument } from '@/lib/file'
 import { useAnchoTirilla } from '@/stores/impresora'
+import { imprimirRecibo } from './imprimirRecibo'
 import type { Nav } from '@/config/navigation'
 
 const PAGE_SIZES = [10, 25, 50]
@@ -64,12 +65,11 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
   const verPdf = async (f: FacturaSimpleRow, formato: FormatoImpresion = 'carta') => {
     setPdfBusy(f.id)
     try {
-      const doc = await getFacturaSimplePdf(f.id, formato)
       // La tirilla va derecho a imprimir; la hoja se abre para verla.
       if (formato === 'pos') {
-        if (!(await printDocument(doc))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+        if (!(await imprimirRecibo({ tipo: 'simple', id: f.id }))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
       } else {
-        presentDocument(doc)
+        presentDocument(await getFacturaSimplePdf(f.id))
       }
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar el PDF.')
