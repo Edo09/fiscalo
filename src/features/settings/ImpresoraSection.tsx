@@ -6,7 +6,7 @@ import { ANCHOS_TIRILLA, useImpresoraStore } from '@/stores/impresora'
 
 const INFO: Record<AnchoTirilla, string> = {
   80: 'El rollo estándar de las impresoras térmicas. Imprime 72 mm de ancho.',
-  76: 'El rollo de las impresoras de impacto (tipo Epson TM-U220). Imprime 64 mm de ancho.',
+  76: 'El rollo de las impresoras de impacto (tipo Epson TM-U220). Imprime 63,5 mm de ancho.',
   72: 'Rollo angosto. Imprime 64 mm de ancho.',
 }
 
