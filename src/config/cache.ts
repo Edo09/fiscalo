@@ -52,6 +52,8 @@ const POR_RECURSO: Record<string, number> = {
   warehouses: FRESCURA.NORMAL,
   cotizaciones: FRESCURA.NORMAL,
   users: FRESCURA.NORMAL,
+  // La bitácora crece sola mientras se mira (otros usuarios, DGII).
+  auditoria: FRESCURA.VOLATIL,
   roles: FRESCURA.NORMAL,
   branding: FRESCURA.NORMAL,
   emisor: FRESCURA.NORMAL,

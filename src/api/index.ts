@@ -26,6 +26,7 @@ export {
   previewReciboFacturaSimple,
 } from './facturasSimples'
 export { listClients, getClient, createClient, updateClient, deleteClient } from './clients'
+export { listAuditLogs, getAuditResumen, getAuditFacetas } from './auditoria'
 export type { NewClientInput } from './clients'
 export {
   listCotizaciones,

@@ -1,6 +1,6 @@
 import { Icon, Image } from '@/components/ui'
 import { NAV, type Nav } from '@/config/navigation'
-import { hasModule } from '@/config/permissions'
+import { esRolAdmin, hasModule } from '@/config/permissions'
 import { useSession } from '@/stores/auth'
 
 export interface SidebarProps {
@@ -17,6 +17,9 @@ export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile }: 
   // Visible si el item no exige módulo, o el rol lo tiene. Fail-open cuando no hay
   // lista de permisos (sesión previa a RBAC): el backend sigue siendo la barrera real.
   const canSee = (module?: string) => !module || !perms || hasModule(perms, module)
+  // Lo exclusivo del admin NO es fail-open: sin rol admin no se muestra.
+  const visible = (it: { module?: string; soloAdmin?: boolean }) =>
+    it.soloAdmin ? esRolAdmin(user?.role) : canSee(it.module)
 
   return (
     <>
@@ -28,7 +31,7 @@ export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile }: 
         </div>
         <div className="sidebar-scroll">
           {NAV.map((g) => {
-            const items = g.items.filter((it) => canSee(it.module))
+            const items = g.items.filter(visible)
             if (items.length === 0) return null
             return (
               <div className="nav-group" key={g.group}>

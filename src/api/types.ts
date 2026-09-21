@@ -217,6 +217,73 @@ export type AnchoTirilla = 72 | 76 | 80
  */
 export type ModoImpresion = 'web' | 'pdf'
 
+// ---------------------------------------------------------------------------
+// Bitácora de auditoría (/api/audit-logs)
+// ---------------------------------------------------------------------------
+
+/** Una fila de audit_logs, tal como la devuelve el backend. */
+export interface AuditLogRow {
+  id: number
+  tenant_id: number | null
+  /** null en eventos sin usuario: e-CF recibido, login de un usuario inexistente… */
+  user_id: number | null
+  username: string | null
+  email: string | null
+  /** Módulo del evento: 'facturas', 'auth', 'dgii-auth'… (o el módulo al que se intentó entrar, en ACCESS_DENIED). */
+  module: string
+  entity_type: string | null
+  /** id numérico o texto (e-NCF, track id), según la entidad. */
+  entity_id: string | null
+  /** CREATE, UPDATE, DELETE, EMIT, LOGIN_SUCCESS, ACCESS_DENIED… */
+  action: string
+  http_method: string | null
+  endpoint: string | null
+  ip_address: string | null
+  user_agent: string | null
+  browser: string | null
+  os: string | null
+  device_type: string | null
+  /** Estado previo (UPDATE/DELETE), ya decodificado. Secretos como '***REDACTED***'. */
+  old_values: unknown
+  /** Estado nuevo (CREATE/UPDATE) o detalle del evento, ya decodificado. */
+  new_values: unknown
+  description: string | null
+  success: boolean
+  error_message: string | null
+  /** 'YYYY-MM-DD HH:MM:SS' (hora del servidor). */
+  created_at: string
+}
+
+/** Filtros de la bitácora; los ausentes no filtran. */
+export interface AuditLogFiltros {
+  /** 'YYYY-MM-DD' inclusive. */
+  desde?: string
+  /** 'YYYY-MM-DD' inclusive (el backend toma el día completo). */
+  hasta?: string
+  userId?: number
+  modulo?: string
+  accion?: string
+  resultado?: 'exito' | 'fallo'
+  /** Texto libre: usuario, email, entidad, descripción, endpoint o IP. */
+  texto?: string
+}
+
+export interface AuditResumen {
+  total: number
+  fallidos: number
+  accesos_denegados: number
+  logins_fallidos: number
+  usuarios: number
+  top_usuarios: { user_id: number; username: string | null; email: string | null; total: number }[]
+  por_modulo: { module: string; total: number }[]
+}
+
+export interface AuditFacetas {
+  modulos: string[]
+  acciones: string[]
+  usuarios: { user_id: number; username: string | null; email: string | null }[]
+}
+
 /**
  * Recibo de tirilla como datos (`?format=datos` en los endpoints de PDF), para
  * imprimirlo como página web. Los textos llegan ya formateados por el backend

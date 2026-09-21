@@ -35,6 +35,7 @@ export type ViewId =
   | 'reportes-606'
   | 'reportes-607'
   | 'usuarios'
+  | 'bitacora'
   | 'configuracion'
 
 /** Señal del botón "Nueva" del navbar: abre el formulario de alta al llegar a la vista. */
@@ -93,6 +94,8 @@ export interface NavItem {
   /** Módulo RBAC requerido para ver este item (del catálogo en config/permissions).
       Sin `module` => siempre visible. Ver hasModule() / docs/roles-permisos.md. */
   module?: string
+  /** Solo para el rol admin (por nombre de rol, no por módulo). Ver esRolAdmin(). */
+  soloAdmin?: boolean
 }
 
 export interface NavGroup {
@@ -156,11 +159,17 @@ export const NAV: NavGroup[] = [
     group: 'Administración',
     items: [
       { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield', module: 'users' },
+      { id: 'bitacora', label: 'Bitácora', icon: 'history', soloAdmin: true },
       // 'configuracion' sin módulo RBAC propio → siempre visible.
       { id: 'configuracion', label: 'Configuración', icon: 'settings' },
     ],
   },
 ]
+
+/** ¿La vista es solo para el rol admin? */
+export function navSoloAdmin(view: ViewId): boolean {
+  return NAV.some((g) => g.items.some((i) => i.id === view && i.soloAdmin))
+}
 
 /** Módulo RBAC asociado a una vista (resolviendo subvistas a su item del menú).
     undefined => la vista no está gateada (siempre accesible). */
@@ -204,6 +213,7 @@ export const TITLES: Record<ViewId, string> = {
   'reportes-606': 'Reporte 606',
   'reportes-607': 'Reporte 607',
   usuarios: 'Usuarios',
+  bitacora: 'Bitácora',
   configuracion: 'Configuración',
   notificaciones: 'Notificaciones',
 }

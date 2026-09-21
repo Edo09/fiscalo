@@ -48,6 +48,17 @@ export function moduleLabel(id: string): string {
   return MODULE_CATALOG.find((m) => m.id === id)?.label ?? id
 }
 
+/**
+ * Rol de sistema con acceso a lo exclusivo de administración (la bitácora).
+ * Se compara el NOMBRE del rol, no `*`: el backend deja crear roles
+ * personalizados con todos los módulos, y esos no son el admin de la empresa.
+ */
+export const ROL_ADMIN = 'admin'
+
+export function esRolAdmin(role: string | null | undefined): boolean {
+  return (role ?? '').toLowerCase() === ROL_ADMIN
+}
+
 /** ¿El rol concede acceso al módulo? (`*` concede todo.) */
 export function hasModule(permissions: string[], moduleId: string): boolean {
   return permissions.includes(PERMISSION_ALL) || permissions.includes(moduleId)

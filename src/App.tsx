@@ -33,14 +33,15 @@ import { Reporte607View } from '@/features/reports/Reporte607View'
 import { VentasView } from '@/features/reports/VentasView'
 import { TreasuryView } from '@/features/treasury/TreasuryView'
 import { UsersView } from '@/features/users/UsersView'
+import { AuditLogView } from '@/features/audit/AuditLogView'
 import { SettingsView } from '@/features/settings/SettingsView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
-import { hasModule } from '@/config/permissions'
+import { esRolAdmin, hasModule } from '@/config/permissions'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
-import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, type ViewId } from '@/config/navigation'
+import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, navSoloAdmin, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -148,6 +149,8 @@ function AppShell() {
     const mod = navModuleFor(activeTop as ViewId)
     const perms = user?.permissions
     if (mod && perms && !hasModule(perms, mod)) nav('dashboard', null, { replace: true })
+    // Lo exclusivo del admin no es fail-open: sin rol admin, fuera.
+    else if (navSoloAdmin(activeTop as ViewId) && user && !esRolAdmin(user.role)) nav('dashboard', null, { replace: true })
   }, [activeTop, user, nav])
 
   const renderView = () => {
@@ -185,6 +188,7 @@ function AppShell() {
       case 'reportes-607': return <Reporte607View nav={nav} />
       case 'reportes-ventas': return <VentasView nav={nav} />
       case 'usuarios': return <UsersView />
+      case 'bitacora': return <AuditLogView nav={nav} />
       case 'configuracion': return <SettingsView />
       case 'notificaciones': return <NotificationsView />
       default: return <DashboardView nav={nav} />

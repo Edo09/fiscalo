@@ -13,7 +13,7 @@ import {
   Archive, Filter, Server, Save, AlertCircle, AlertTriangle, XCircle, Trash2,
   Wrench, Box, MapPin, CircleDot, HandCoins, Tag, Layers, Percent, Sheet,
   GitCompare, Key, Hash, Pause, Banknote, HelpCircle, Zap, EyeOff, LineChart,
-  ArrowLeft, Briefcase, File, Info,
+  ArrowLeft, Briefcase, File, Info, History,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -48,7 +48,7 @@ const ICONS = {
   percent: Percent, sheet: Sheet, 'git-compare': GitCompare, key: Key, hash: Hash,
   pause: Pause, banknote: Banknote, 'help-circle': HelpCircle, zap: Zap,
   'eye-off': EyeOff, 'line-chart': LineChart, 'arrow-left': ArrowLeft,
-  briefcase: Briefcase, file: File, info: Info,
+  briefcase: Briefcase, file: File, info: Info, history: History,
 } satisfies Record<string, LucideIcon>
 
 /** Nombres válidos. Añadir uno = importarlo arriba y agregarlo al mapa. */
