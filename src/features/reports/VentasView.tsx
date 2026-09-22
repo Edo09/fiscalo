@@ -95,7 +95,7 @@ export function VentasView({ nav }: { nav: Nav }) {
     <div className="page page-wide">
       <PageHead
         title={vista.titulo}
-        sub="Lo que vendiste en el período — no es un formato de la DGII"
+        sub="Lo que vendiste en el período"
         crumbs={[{ label: 'Reportes', onClick: () => nav('reportes') }, { label: 'Ventas' }]}
         actions={
           <div className="row" style={{ gap: 8, alignItems: 'center' }}>
