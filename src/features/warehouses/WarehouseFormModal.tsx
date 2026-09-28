@@ -1,6 +1,6 @@
 // FISCALO — Alta/edición/eliminación de un almacén (CRUD contra /api/warehouses).
-// El backend rechaza (400) borrar el Almacén Principal o uno con productos; ese
-// mensaje se muestra en el banner de error.
+// El backend rechaza (400) borrar el Almacén Principal, uno con productos o uno
+// con movimientos o ajustes de inventario; ese mensaje se muestra en el banner de error.
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'

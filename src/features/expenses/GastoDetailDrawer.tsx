@@ -7,6 +7,7 @@ import type { GastoRow } from '@/api'
 import { downloadBlob } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/config/gastos'
+import { avisoNoEnviado, enviadoADgii } from './envioDgii'
 
 /* FISCALO — Detalle de un gasto (líneas + estado DGII + XML) */
 export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose: () => void }) {
@@ -19,6 +20,10 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
     : typeof g.es_auto_emision === 'boolean'
       ? g.es_auto_emision
       : isAutoEmision(g.tipo_gasto)
+  // Solo un gasto que llegó a la DGII tiene estado y XML. Uno que quedó por
+  // emitir o con error respondía con un error técnico al abrir el detalle.
+  const enviado = auto && enviadoADgii(g)
+  const noEnviado = auto ? avisoNoEnviado(g, 'detalle') : null
 
   const [estadoBusy, setEstadoBusy] = useState(false)
   const [xmlBusy, setXmlBusy] = useState(false)
@@ -44,7 +49,7 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
   }
 
   useEffect(() => {
-    if (auto) {
+    if (enviado) {
       void consultarEstado()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,8 +93,8 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
-          {auto && <Btn variant="secondary" icon="refresh-cw" onClick={consultarEstado} disabled={estadoBusy}>{estadoBusy ? 'Consultando…' : 'Consultar estado'}</Btn>}
-          {auto && <Btn variant="primary" icon="code" onClick={descargarXml} disabled={xmlBusy}>{xmlBusy ? 'Descargando…' : 'XML'}</Btn>}
+          {enviado && <Btn variant="secondary" icon="refresh-cw" onClick={consultarEstado} disabled={estadoBusy}>{estadoBusy ? 'Consultando…' : 'Consultar estado'}</Btn>}
+          {enviado && <Btn variant="primary" icon="code" onClick={descargarXml} disabled={xmlBusy}>{xmlBusy ? 'Descargando…' : 'XML'}</Btn>}
         </>
       }
     >
@@ -99,9 +104,10 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
         </div>
       )}
 
-      {g.aviso && (
+      {/* Gasto que no llegó a la DGII: por qué no tiene estado ni XML. */}
+      {noEnviado && (
         <div className="card card-pad row gap-sm mb-md" style={{ background: 'var(--warning-soft)', borderColor: 'transparent', color: 'var(--warning)' }}>
-          <Icon name="clock" size={16} /><span className="text-sm">{g.aviso}</span>
+          <Icon name="clock" size={16} /><span className="text-sm">{noEnviado}</span>
         </div>
       )}
 

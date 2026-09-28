@@ -13,10 +13,12 @@ import { anchoVistaPreviaPx, reciboHtml } from './reciboHtml'
  * un recibo; para entregar uno hay que guardar, y el pie ofrece hacerlo.
  */
 export function VistaPreviaRecibo({
-  datos, puedeGuardar, onGuardarEImprimir, onClose,
+  datos, puedeGuardar, motivo = null, onGuardarEImprimir, onClose,
 }: {
   datos: ReciboDatos
   puedeGuardar: boolean
+  /** Por qué no se puede guardar todavía (se muestra junto al botón en gris). */
+  motivo?: string | null
   onGuardarEImprimir: () => void
   onClose: () => void
 }) {
@@ -30,8 +32,12 @@ export function VistaPreviaRecibo({
       onClose={onClose}
       footer={
         <>
+          {!puedeGuardar && motivo && <span className="fx-motivo" role="status">{motivo}</span>}
           <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
-          <Btn variant="primary" icon="printer" onClick={onGuardarEImprimir} disabled={!puedeGuardar}>
+          <Btn
+            variant="primary" icon="printer" onClick={onGuardarEImprimir}
+            disabled={!puedeGuardar} title={!puedeGuardar ? motivo ?? undefined : undefined}
+          >
             Guardar e imprimir {ancho} mm
           </Btn>
         </>

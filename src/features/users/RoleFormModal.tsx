@@ -10,6 +10,14 @@ import { ApiError, createRole, updateRole, deleteRole } from '@/api'
 import type { RoleRow } from '@/api'
 import { MODULE_CATALOG, PERMISSION_ALL, type ModuleDef } from '@/config/permissions'
 
+/**
+ * Mismo patrón que el backend (RoleModel): el nombre es un identificador, no un
+ * texto libre. Sin revisarlo aquí, "Cajero Principal" o "Diseño" volvían del
+ * servidor con un mensaje técnico. La descripción sí admite cualquier texto.
+ */
+const NOMBRE_ROL_RE = /^[a-z0-9_-]{2,40}$/i
+const PISTA_NOMBRE_ROL = 'Sin espacios, tildes ni ñ: letras, números, guion (-) o guion bajo (_), de 2 a 40 caracteres.'
+
 interface RoleFormModalProps {
   /** null => crear; un RoleRow => editar. */
   role: RoleRow | null
@@ -51,7 +59,11 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
   const save = async () => {
     if (readOnly) return
     const cleanName = name.trim()
-    if (!editing && !cleanName) { setError('El nombre del rol es obligatorio.'); return }
+    if (!editing && !cleanName) { setError('Escribe el nombre del rol.'); return }
+    if (!editing && !NOMBRE_ROL_RE.test(cleanName)) {
+      setError(`El nombre del rol no es válido. ${PISTA_NOMBRE_ROL} Ej.: cajero-principal.`)
+      return
+    }
     const permissions = allModules ? [PERMISSION_ALL] : Array.from(selected)
     if (permissions.length === 0) { setError('Selecciona al menos un módulo.'); return }
     setError(null)
@@ -151,8 +163,10 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
         <div className="field full">
           <label className="label">Nombre del rol {!editing && <span className="req">*</span>}</label>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)}
-            placeholder="Ej. Contador, Vendedor…" disabled={editing} autoFocus={!editing} />
-          {editing && <span className="text-sm muted-3" style={{ marginTop: 4 }}>El nombre no se puede cambiar.</span>}
+            placeholder="Ej. contador, cajero-principal" disabled={editing} autoFocus={!editing} maxLength={40} />
+          {editing
+            ? <span className="text-sm muted-3" style={{ marginTop: 4 }}>El nombre no se puede cambiar.</span>
+            : <span className="text-xs muted-3" style={{ marginTop: 4 }}>{PISTA_NOMBRE_ROL} Un nombre con espacios o tildes va en la descripción.</span>}
         </div>
         <div className="field full">
           <label className="label">Descripción <span className="opt">(opcional)</span></label>

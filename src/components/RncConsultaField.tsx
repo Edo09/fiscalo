@@ -33,6 +33,11 @@ interface RncConsultaFieldProps {
   autoFocus?: boolean
   /** false = muestra el asterisco de obligatorio. */
   opcional?: boolean
+  /**
+   * Error de validación del formulario que contiene el campo (p. ej. un RNC
+   * con dígitos de más al pulsar Guardar). Se pinta como el resto de errores.
+   */
+  error?: string
 }
 
 const soloDigitos = (v: string) => v.replace(/\D/g, '')
@@ -51,6 +56,7 @@ export function RncConsultaField({
   placeholder = '131000000',
   autoFocus = false,
   opcional = true,
+  error,
 }: RncConsultaFieldProps) {
   const [resultado, setResultado] = useState<Resultado>({ tipo: 'inicial' })
   // Cada consulta y cada tecla suben el turno: si el usuario cambia el RNC
@@ -83,7 +89,7 @@ export function RncConsultaField({
       // propio mensaje. Un 404 sin cuerpo JSON (backend aún sin desplegar, proxy
       // mal configurado) llega con el mensaje genérico del cliente HTTP, y eso es
       // "no disponible": decir "no inscrito" mandaría a revisar un RNC correcto.
-      const generico = e instanceof ApiError && /^(Respuesta no válida|Error HTTP)/.test(e.message)
+      const generico = e instanceof ApiError && !e.delServidor
       setResultado(
         status === 404 && !generico
           ? { tipo: 'no-encontrado' }
@@ -97,7 +103,7 @@ export function RncConsultaField({
   const consultando = resultado.tipo === 'consultando'
 
   return (
-    <div className="field full">
+    <div className={'field full' + (error ? ' field-error' : '')}>
       <label>
         {label} {opcional ? <span className="opt">(opcional)</span> : <span className="req">*</span>}
       </label>
@@ -124,7 +130,11 @@ export function RncConsultaField({
         </Btn>
       </div>
 
-      {resultado.tipo === 'inicial' && (
+      {/* El error del formulario reemplaza a la pista: al editar el número el
+          padre lo limpia y la pista vuelve. */}
+      {error ? (
+        <div className="err-msg"><Icon name="alert-circle" size={13} />{error}</div>
+      ) : resultado.tipo === 'inicial' && (
         <div className="text-xs muted-3" style={{ marginTop: 5 }}>
           Consulta el RNC para llenar los datos de la DGII automáticamente.
         </div>
@@ -159,7 +169,7 @@ export function RncConsultaField({
         </div>
       )}
 
-      {resultado.tipo === 'formato' && (
+      {resultado.tipo === 'formato' && !error && (
         <div className="err-msg">
           <Icon name="alert-circle" size={13} />
           El RNC lleva 9 dígitos y la cédula 11.

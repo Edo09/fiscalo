@@ -7,19 +7,24 @@ import {
   getBranding, getEmisor, listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel, updateClient,
 } from '@/api'
 import type {
-  CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, TipoEcf, StatsSecuencia,
+  CreateFacturaInput, FacturaItemInput, IndicadorFacturacion, InformacionReferencia, TipoEcf, StatsSecuencia,
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { ProductFormModal } from '@/features/products/ProductFormModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
+import { MSG_UNIDAD, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
-import { facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors } from './factura.schema'
+import {
+  facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors, type ReferenciaNotaForm,
+} from './factura.schema'
+import { NotaReferencia } from './NotaReferencia'
+import { montosLinea, totalesDocumento } from './montosLinea'
 import '@/styles/factura-doc.css'
 
 interface Linea {
@@ -132,11 +137,6 @@ function TipoDocSelect({
   )
 }
 
-/** Tasa de ITBIS según indicador_facturacion: 1=18%, 2=16%, 3 y 4 = 0%. */
-function itbisRate(ind: IndicadorFacturacion): number {
-  return ind === 1 ? 0.18 : ind === 2 ? 0.16 : 0
-}
-
 /** Deriva el indicador desde la tasa de ITBIS del producto (18→1, 16→2, resto→exento). */
 function indFactFromItbis(itbis: number): IndicadorFacturacion {
   return itbis === 18 ? 1 : itbis === 16 ? 2 : 4
@@ -173,11 +173,18 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       : null,
   )
   const [tipo, setTipo] = useState<TipoEcf>('32')
+  // Notas E33/E34: la factura que modifican (InformacionReferencia DGII). Se
+  // conserva al cambiar de tipo; solo viaja si el tipo es una nota.
+  const [referencia, setReferencia] = useState<ReferenciaNotaForm>({ original: null, codigo: '', razon: '' })
+  const esNota = tipo === '33' || tipo === '34'
+  /** Lo escrito en el buscador de clientes sin elegir un resultado (ver ClientCombobox). */
+  const [busquedaCliente, setBusquedaCliente] = useState('')
   const [metodo, setMetodo] = useState('Efectivo')
   const [obs, setObs] = useState('')
   // ¿Los precios de las líneas YA incluyen ITBIS? Las cotizaciones se cotizan
   // con impuesto incluido, así que al convertir arranca en true (editable).
-  // Mapea a indicador_monto_gravado: true => "0" (incluido), false => "1" (excluido).
+  // Solo cambia cómo se leen los precios escritos: a la DGII siempre viajan
+  // sin ITBIS (ver montosLinea).
   const [precioConItbis, setPrecioConItbis] = useState(prefill != null)
   const [lineas, setLineas] = useState<Linea[]>(() =>
     (prefill?.lineas ?? []).map((l, i) => ({
@@ -241,6 +248,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Capacidad del rango DGII vigente para este tipo (null = sin límite registrado).
   const seqTipo = stats.data?.secuencias.find((s) => s.type === `E${tipo}`)
   const rangoRestantes = seqTipo?.restantes != null ? Number(seqTipo.restantes) : null
+  /**
+   * Sin números para emitir este tipo. La pantalla ya lo avisaba, pero dejaba
+   * pulsar Emitir y el servidor respondía con un error técnico. Solo se decide
+   * con datos: si las secuencias no cargaron (o el servidor no pudo leerlas y
+   * mandó el resumen vacío), emitir sigue disponible y el servidor valida.
+   */
+  const sinNumeros = rangoRestantes === 0
+    ? 'Se acabaron los números autorizados para este comprobante. Registra un rango nuevo en Configuración › Numeraciones e-CF para poder emitir.'
+    : stats.data?.resumen != null && !stats.error && !seqTipo
+      ? 'No hay números autorizados para este comprobante. Registra un rango en Configuración › Numeraciones e-CF para poder emitir.'
+      : null
 
   // Catálogo de productos (GET /api/products) para el selector de líneas.
   // La búsqueda va al servidor: el catálogo tiene cientos de artículos y filtrar
@@ -263,6 +281,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Mismas claves de caché que Configuración y la factura simple.
   const { data: emisor } = useApiQuery(['emisor'], getEmisor)
   const { data: branding } = useApiQuery(['branding'], getBranding)
+  const unidades = useUnidadesMedida()
   const emisorNombre = emisor?.nombre_comercial || emisor?.razon_social || ''
   const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
   const [nuevoCliente, setNuevoCliente] = useState(false)
@@ -280,8 +299,16 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
    * método de pago vuelve a contado (el backend rechazaría la factura con 422).
    */
   const seleccionarCliente = (c: Cliente | null) => {
+    // La factura que modifica una nota es de ESTE cliente: con otro, deja de valer.
+    if (c?.id !== cliente?.id && referencia.original) {
+      setReferencia((r) => ({ ...r, original: null }))
+    }
     setCliente(c)
     if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined }))
+    // "Elige el cliente y luego la factura…" deja de aplicar al elegir cliente.
+    if (errors.referencia?.original || errors.referencia?.monto) {
+      setErrors((e) => ({ ...e, referencia: { ...e.referencia, original: undefined, monto: undefined } }))
+    }
     const pct = c?.descuento ?? 0
     setLineas((ls) => ls.map((l) => ({ ...l, desc: pct })))
     if (c && !c.permiteCredito && esMetodoCredito(metodo)) {
@@ -338,21 +365,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     clearLineaErr(id)
   }
 
-  const calc = (l: Linea) => {
-    const bruto = l.cant * l.precio * (1 - l.desc / 100)
-    const rate = itbisRate(l.indFact)
-    if (precioConItbis) {
-      // Precio con ITBIS incluido: se desglosa la base (bruto / 1.18) y el impuesto.
-      const base = bruto / (1 + rate)
-      return { base, itbis: bruto - base, importe: bruto }
-    }
-    return { base: bruto, itbis: bruto * rate, importe: bruto }
-  }
-  const subtotal = lineas.reduce((a, l) => a + calc(l).base, 0)
-  const itbisTotal = lineas.reduce((a, l) => a + calc(l).itbis, 0)
-  const descTotal = lineas.reduce((a, l) => a + l.cant * l.precio * (l.desc / 100), 0)
-  const total = subtotal + itbisTotal
+  // Montos con las reglas y redondeos del backend: los totales de pantalla son
+  // el MontoTotal que se va a firmar, también con precios con ITBIS.
+  const calc = (l: Linea) => montosLinea(l, precioConItbis)
+  const {
+    subtotal, itbis: itbisTotal, descuentos: descTotal, total,
+  } = totalesDocumento(lineas.map(calc))
 
+  // Las notas piden además el comprobante que modifican (bloque NotaReferencia).
   const tipos: { code: TipoEcf; n: string }[] = [
     { code: '31', n: 'Crédito Fiscal' },
     { code: '32', n: 'Consumo' },
@@ -378,10 +398,25 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
    * campo/línea y muestra un toast resumen. Devuelve true si el form es válido.
    */
   function validateForm(): boolean {
-    const res = facturaFormSchema.safeParse({ cliente, tipo, lineas })
-    if (!res.success) {
-      setErrors(mapFormIssues(res.error, lineas))
-      const n = res.error.issues.length
+    const res = facturaFormSchema.safeParse({ cliente, tipo, lineas, referencia, total })
+    const errs = res.success ? emptyFormErrors() : mapFormIssues(res.error, lineas)
+    let n = res.success ? 0 : res.error.issues.length
+    // Texto en el buscador sin elegir resultado: se ve como un cliente puesto,
+    // pero no viaja. En un E32 la factura salía a Consumidor final sin avisar.
+    if (!cliente && busquedaCliente) {
+      if (!errs.cliente) n += 1
+      errs.cliente = requiereCliente
+        ? `«${busquedaCliente}» no está elegido: elígelo de la lista o créalo con el botón +.`
+        : `«${busquedaCliente}» no está elegido: elígelo de la lista, o borra el texto si la factura es para consumidor final.`
+    }
+    // Unidad que no está en el catálogo DGII (productos migrados).
+    for (const l of lineas) {
+      if (unidadValida(l.unidadMedida, unidades)) continue
+      const bucket = (errs.lineas[l.id] ??= {})
+      if (!bucket.unidadMedida) { bucket.unidadMedida = MSG_UNIDAD; n += 1 }
+    }
+    if (n > 0) {
+      setErrors(errs)
       toast.error(n === 1 ? 'Revisa 1 campo del formulario.' : `Revisa ${n} campos del formulario.`)
       return false
     }
@@ -395,22 +430,45 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
    * está vacía. La longitud ya la garantiza la validación Zod (hard block).
    */
   function buildItems(): FacturaItemInput[] {
-    return lineas.map((l, i) => ({
-      numero_linea: i + 1,
-      // Vinculo con el catalogo: sin esto la venta no descuenta inventario.
-      ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
-      nombre_item: l.nombre.trim(),
-      ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
-      indicador_facturacion: l.indFact,
-      indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
-      cantidad: l.cant,
-      unidad_medida: String(l.unidadMedida),
-      precio_unitario: l.precio,
-      // La UI maneja el descuento en %, pero DGII lo quiere en monto por línea.
-      // Sin esto el descuento era solo visual: los totales de pantalla lo
-      // restaban y el comprobante emitido salía al precio completo.
-      ...(l.desc > 0 ? { descuento_monto: Math.round(l.cant * l.precio * l.desc) / 100 } : {}),
-    }))
+    return lineas.map((l, i) => {
+      const m = calc(l)
+      return {
+        numero_linea: i + 1,
+        // Vinculo con el catalogo: sin esto la venta no descuenta inventario.
+        ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
+        nombre_item: l.nombre.trim(),
+        ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
+        indicador_facturacion: l.indFact,
+        indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
+        cantidad: l.cant,
+        unidad_medida: String(l.unidadMedida),
+        // Sin ITBIS: con "precios incluyen ITBIS" ya viene desglosado. Mandar el
+        // precio con ITBIS hacía que el backend sumara el impuesto dos veces.
+        precio_unitario: m.precioUnitario,
+        // La UI maneja el descuento en %, pero DGII lo quiere en monto por línea.
+        // Sin esto el descuento era solo visual: los totales de pantalla lo
+        // restaban y el comprobante emitido salía al precio completo.
+        ...(m.descuentoMonto > 0 ? { descuento_monto: m.descuentoMonto } : {}),
+      }
+    })
+  }
+
+  /**
+   * InformacionReferencia de una nota, o undefined si no es una nota (o si el
+   * bloque está incompleto: validateForm ya lo habrá marcado). La fecha es la
+   * FechaEmision del e-CF original tal como la tiene la DGII.
+   */
+  function buildReferencia(): InformacionReferencia | undefined {
+    const { original, codigo, razon } = referencia
+    if (!esNota || !original || !codigo) return undefined
+    return {
+      ncf_modificado: original.e_ncf,
+      // Siempre vacío en las notas: con el RNC del comprador la DGII da error 614.
+      rnc_otro_contribuyente: null,
+      fecha_ncf_modificado: original.fecha_emision,
+      codigo_modificacion: codigo,
+      razon_modificacion: razon.trim(),
+    }
   }
 
   /** Construye el payload para POST /api/facturas (asume formulario ya validado). */
@@ -418,6 +476,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     // E32/E43 pueden emitirse sin cliente (consumidor final); el resto lo exige.
     if (!cliente && requiereCliente) return null
     const items = buildItems()
+    const informacionReferencia = buildReferencia()
     return {
       // Sin cliente (E32/E43) se omite client_id: el backend factura a consumidor final.
       ...(cliente ? { client_id: Number(cliente.id) } : {}),
@@ -428,15 +487,19 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       // El descuento de las líneas ya va en cada item; se manda explícito para
       // que el backend no vuelva a aplicar el del cliente encima.
       descuento: 0,
-      // "0" = el precio incluye ITBIS (DGII lo desglosa); "1" = se suma al precio.
-      indicador_monto_gravado: precioConItbis ? '0' : '1',
+      // XSD DGII: "0" = los montos de las líneas NO incluyen ITBIS, "1" = sí.
+      // Siempre "0": los precios viajan sin ITBIS (el backend lo suma encima).
+      // Antes iba al revés ("1" con precios sin ITBIS).
+      indicador_monto_gravado: '0',
       items,
+      // IndicadorNotaCredito (E34) lo calcula el backend con las dos fechas.
+      ...(informacionReferencia ? { informacion_referencia: informacionReferencia } : {}),
     }
   }
 
   // Acción única: un doble clic emitiría DOS e-CF y quemaria un NCF en la DGII.
   const emitir = useAccionUnica(async () => {
-    if (emitting) return
+    if (emitting || sinNumeros) return
     if (!validateForm()) return
     const payload = buildPayload()
     if (!payload) return
@@ -486,7 +549,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     const tid = toast.loading('Generando vista previa…')
     try {
       const items = buildItems()
-      const doc = await previewFactura({ ...(cliente ? { client_id: Number(cliente.id) } : {}), tipo_ecf: tipo, items })
+      const informacionReferencia = buildReferencia()
+      const doc = await previewFactura({
+        ...(cliente ? { client_id: Number(cliente.id) } : {}),
+        tipo_ecf: tipo,
+        items,
+        // La vista previa de una nota muestra a qué factura modifica.
+        ...(informacionReferencia ? { informacion_referencia: informacionReferencia } : {}),
+      })
       presentDocument(doc)
       toast.success('Vista previa generada.', { id: tid })
     } catch (e) {
@@ -533,12 +603,15 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               {stats.loading ? 'Cargando secuencia…' : proximoNcf ?? (stats.error ? 'Secuencia no disponible' : 'Sin secuencia')}
             </span>
 
-            {rangoRestantes != null && rangoRestantes <= 10 ? (
+            {sinNumeros ? (
               <span className="fx-aviso">
                 <Icon name="alert-triangle" size={13} />
-                {rangoRestantes === 0
-                  ? 'Rango DGII agotado: registra el próximo para poder emitir.'
-                  : `Quedan ${rangoRestantes} números en el rango DGII.`}
+                {sinNumeros}
+              </span>
+            ) : rangoRestantes != null && rangoRestantes <= 10 ? (
+              <span className="fx-aviso">
+                <Icon name="alert-triangle" size={13} />
+                {`Quedan ${rangoRestantes} números en el rango autorizado por la DGII.`}
               </span>
             ) : (
               <span className="fx-aviso fx-aviso--suave">e-NCF automatico</span>
@@ -559,6 +632,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               <ClientCombobox
                 value={cliente}
                 onChange={seleccionarCliente}
+                onBusquedaChange={(t) => {
+                  setBusquedaCliente(t)
+                  if (errors.cliente) setErrors((e) => ({ ...e, cliente: undefined }))
+                }}
+                invalido={errors.cliente != null}
               />
             </div>
             <button
@@ -572,6 +650,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             </button>
           </div>
           {errors.cliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errors.cliente}</span>}
+          {!cliente && !busquedaCliente && !requiereCliente && !errors.cliente && (
+            <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
+              Sin cliente, la factura sale a nombre de Consumidor final.
+            </span>
+          )}
           {faltaRnc && cliente && (
             <span className="fx-aviso fx-aviso--receptor">
               <Icon name="alert-triangle" size={13} />
@@ -624,6 +707,29 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           </span>
         </section>
         </div>
+
+        {/* --- Nota: comprobante que modifica (InformacionReferencia) --- */}
+        {esNota && (
+          <NotaReferencia
+            tipo={tipo}
+            clienteId={cliente?.id ?? null}
+            value={referencia}
+            errors={errors.referencia}
+            onChange={(patch) => {
+              setReferencia((r) => ({ ...r, ...patch }))
+              // Cambiar la factura también puede resolver el tope del monto.
+              if (errors.referencia) {
+                setErrors((e) => {
+                  const r = { ...e.referencia }
+                  if ('original' in patch) { delete r.original; delete r.monto }
+                  if ('codigo' in patch) delete r.codigo
+                  if ('razon' in patch) delete r.razon
+                  return { ...e, referencia: r }
+                })
+              }
+            }}
+          />
+        )}
 
         {/* --- Líneas --- */}
         <section className="fx-items" style={{ marginTop: 24 }}>
@@ -825,11 +931,13 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           <b><Money value={total} cur={false} /></b>
         </div>
         <div className="row gap-sm">
+          {/* Por qué Emitir está en gris; el detalle va en el aviso bajo el número. */}
+          {sinNumeros && !emitting && <span className="fx-motivo" role="status">Sin números autorizados para emitir este comprobante.</span>}
           <Btn variant="ghost" onClick={() => nav('facturas')}>Cancelar</Btn>
           <Btn variant="secondary" icon="eye" onClick={previsualizar} disabled={previewing}>
             {previewing ? 'Generando…' : 'Vista previa'}
           </Btn>
-          <Btn variant="primary" icon="send" onClick={emitir} disabled={emitting}>
+          <Btn variant="primary" icon="send" onClick={emitir} disabled={emitting || sinNumeros != null} title={sinNumeros ?? undefined}>
             {emitting ? 'Emitiendo…' : 'Emitir e-CF'}
           </Btn>
         </div>
@@ -873,6 +981,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       )}
       {nuevoCliente && (
         <NewClientModal
+          // Lo que ya escribió en el buscador no se vuelve a teclear.
+          nombreInicial={cliente ? '' : busquedaCliente}
           onClose={() => setNuevoCliente(false)}
           onCreated={(c) => seleccionarCliente(c)}
         />

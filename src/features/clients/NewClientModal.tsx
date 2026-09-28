@@ -2,16 +2,26 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Btn, Icon, Modal } from '@/components/ui'
-import { ApiError, createClient, listClients, mapClientRow } from '@/api'
-import type { ClientRow, ConsultaRnc } from '@/api'
+import { ApiError, CODIGO_CLIENTE_SIN_ELEGIR, createClient, listClients, mapClientRow } from '@/api'
+import type { ConsultaRnc, NewClientInput } from '@/api'
 import { RncConsultaField } from '@/components/RncConsultaField'
 import type { Cliente } from '@/types/domain'
+import {
+  LARGO, errorCorreo, errorDescuento, errorRnc, errorTelefono, errorTexto, soloDigitos,
+} from './validacion'
 
 interface Props {
   onClose: () => void
-  /** Se llama con el cliente ya creado (mapeado al dominio) tras guardar. */
-  onCreated?: (cliente: Cliente, row: ClientRow) => void
-  /** Prellena el nombre (p. ej. lo que el usuario ya había escrito al facturar). */
+  /**
+   * Se llama con el cliente ya creado (mapeado al dominio) tras guardar. Solo
+   * con un cliente de verdad (con id): si el alta se hizo pero no se pudo
+   * identificar el recién creado, no se llama y el modal lo dice.
+   */
+  onCreated?: (cliente: Cliente) => void
+  /**
+   * Lo que el usuario ya había escrito al facturar. Va al campo que corresponde:
+   * un RNC o cédula al RNC, un correo al correo y cualquier otra cosa al nombre.
+   */
   nombreInicial?: string
 }
 
@@ -20,6 +30,19 @@ type Campos = { client_name: string; company_name: string; email: string; phone_
 type CamposTexto = Exclude<keyof Campos, 'permitir_credito'>
 
 const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: false }
+
+/**
+ * Campos iniciales a partir de lo buscado. El buscador acepta nombre, RNC o
+ * correo, así que copiar siempre al nombre dejaba "40212345678" como nombre del
+ * contacto. Un RNC (9 dígitos) o cédula (11), con o sin guiones, va al RNC.
+ */
+function camposIniciales(texto: string): Campos {
+  const t = texto.trim()
+  const digitos = t.replace(/-/g, '')
+  if (/^\d+$/.test(digitos) && (digitos.length === 9 || digitos.length === 11)) return { ...VACIO, rnc: digitos }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return { ...VACIO, email: t }
+  return { ...VACIO, client_name: t }
+}
 
 /** Cliente propio con este RNC, para avisar antes de crear otro (no bloquea). */
 async function clienteConRnc(rnc: string): Promise<string | null> {
@@ -42,7 +65,7 @@ async function clienteConRnc(rnc: string): Promise<string | null> {
  */
 export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props) {
   const queryClient = useQueryClient()
-  const [f, setF] = useState<Campos>({ ...VACIO, client_name: nombreInicial })
+  const [f, setF] = useState<Campos>(() => camposIniciales(nombreInicial))
   const [errores, setErrores] = useState<Partial<Record<keyof Campos, string>>>({})
   const [guardando, setGuardando] = useState(false)
 
@@ -51,12 +74,21 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     if (errores[k]) setErrores((e) => ({ ...e, [k]: undefined }))
   }
 
+  /**
+   * Las mismas reglas que el backend, con el largo de cada columna: una razón
+   * social larga traída de la DGII, un teléfono con extensión o un RNC con un
+   * dígito de más fallaban al guardar con un texto en inglés.
+   */
   const validar = (): boolean => {
-    const e: Partial<Record<keyof Campos, string>> = {}
-    if (!f.client_name.trim()) e.client_name = 'Requerido'
-    if (!f.company_name.trim()) e.company_name = 'Requerido'
-    // Opcional: solo se valida el formato si se escribió algo.
-    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Correo no válido'
+    const todos: Partial<Record<keyof Campos, string | undefined>> = {
+      client_name: errorTexto(f.client_name, LARGO.nombreCliente, 'El nombre de contacto', 'Escribe el nombre de contacto.'),
+      company_name: errorTexto(f.company_name, LARGO.empresa, 'La empresa', 'Escribe la empresa o razón social.'),
+      rnc: errorRnc(f.rnc),
+      phone_number: errorTelefono(f.phone_number),
+      email: errorCorreo(f.email),
+      descuento: errorDescuento(f.descuento),
+    }
+    const e = Object.fromEntries(Object.entries(todos).filter(([, v]) => v)) as Partial<Record<keyof Campos, string>>
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -69,28 +101,40 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
    */
   const rellenarDesdeDgii = (d: ConsultaRnc) => {
     setF((prev) => ({ ...prev, company_name: d.razon_social, client_name: d.nombre_comercial || d.razon_social }))
-    setErrores((e) => ({ ...e, client_name: undefined, company_name: undefined }))
+    setErrores((e) => ({ ...e, client_name: undefined, company_name: undefined, rnc: undefined }))
   }
 
   const guardar = async () => {
     if (!validar() || guardando) return
     setGuardando(true)
+    const enviado: NewClientInput = {
+      client_name: f.client_name.trim(),
+      company_name: f.company_name.trim(),
+      ...(f.phone_number.trim() ? { phone_number: f.phone_number.trim() } : {}),
+      ...(f.email.trim() ? { email: f.email.trim() } : {}),
+      // Solo los dígitos: con guiones, un RNC de 9 no cabe en la columna de 11.
+      ...(f.rnc.trim() ? { rnc: soloDigitos(f.rnc) } : {}),
+      // Condiciones comerciales: la factura las hereda al elegir este cliente.
+      descuento: Number(f.descuento) || 0,
+      permitir_credito: f.permitir_credito ? 1 : 0,
+    }
     try {
-      const row = await createClient({
-        client_name: f.client_name.trim(),
-        company_name: f.company_name.trim(),
-        ...(f.phone_number.trim() ? { phone_number: f.phone_number.trim() } : {}),
-        ...(f.email.trim() ? { email: f.email.trim() } : {}),
-        ...(f.rnc.trim() ? { rnc: f.rnc.trim() } : {}),
-        // Condiciones comerciales: la factura las hereda al elegir este cliente.
-        descuento: Number(f.descuento) || 0,
-        permitir_credito: f.permitir_credito ? 1 : 0,
-      })
-      toast.success(`Cliente ${f.client_name.trim()} creado.`)
+      // createClient devuelve siempre el registro con su id (ver api/clients).
+      const row = await createClient(enviado)
+      toast.success(`Cliente ${enviado.client_name} creado.`)
       await queryClient.invalidateQueries({ queryKey: ['clients'] })
-      onCreated?.(mapClientRow(row), row)
+      onCreated?.(mapClientRow(row))
       onClose()
     } catch (err) {
+      // El alta SÍ se hizo, pero no se pudo identificar el cliente para
+      // elegirlo: se cierra igual (dejar el modal abierto invitaría a crearlo
+      // dos veces) y se dice cómo elegirlo.
+      if (err instanceof ApiError && err.codigo === CODIGO_CLIENTE_SIN_ELEGIR) {
+        void queryClient.invalidateQueries({ queryKey: ['clients'] })
+        toast.warning(err.message)
+        onClose()
+        return
+      }
       toast.error(err instanceof ApiError ? err.message : 'No se pudo crear el cliente.')
     } finally {
       setGuardando(false)
@@ -98,7 +142,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
   }
 
   // Solo los campos de texto: el RNC y el checkbox de credito se renderizan aparte.
-  const campo = (k: CamposTexto, label: string, extra: Record<string, unknown> = {}, req = true) => (
+  const campo = (k: Exclude<CamposTexto, 'rnc'>, label: string, extra: Record<string, unknown> = {}, req = true) => (
     <div className={'field' + (errores[k] ? ' field-error' : '')}>
       <label>{label} {req ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
       <input
@@ -132,14 +176,15 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
           value={f.rnc}
           onChange={(v) => set('rnc', v)}
           onEncontrado={rellenarDesdeDgii}
+          error={errores.rnc}
           buscarExistente={clienteConRnc}
           avisoExistente="Ya tienes un cliente con este RNC"
           autoFocus
         />
-        {campo('client_name', 'Nombre de contacto', { placeholder: 'Juan Pérez' })}
-        {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL' })}
-        {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel' }, false)}
-        {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email' }, false)}
+        {campo('client_name', 'Nombre de contacto', { placeholder: 'Juan Pérez', maxLength: LARGO.nombreCliente })}
+        {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL', maxLength: LARGO.empresa })}
+        {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel', maxLength: LARGO.telefono }, false)}
+        {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email', maxLength: LARGO.correo }, false)}
         {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
         <div className="field">
           <label>

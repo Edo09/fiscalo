@@ -172,6 +172,15 @@
   background: var(--accent-soft);
 }
 
+/* Cliente con problema al validar (sin elegir, o texto escrito que no se
+   eligió de la lista): mismo rojo que las líneas incompletas. */
+.fx-cliente .search-input--err,
+.fx-cliente .search-input--err:hover,
+.fx-cliente .search-input--err:focus-within {
+  border-bottom-color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .fx-cliente .search-input input {
   font-size: 15px;
   background: transparent;
@@ -388,6 +397,19 @@
   height: 7px;
   border-radius: 50%;
   background: var(--warning);
+}
+
+/* Por qué el botón de guardar está en gris. Va junto a los botones y no solo en
+   un title: un botón deshabilitado no muestra su tooltip de forma fiable. Tono
+   de pista, no de error: al abrir una factura nueva siempre hay algo pendiente. */
+.fx-motivo {
+  align-self: center;
+  max-width: 34ch;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--text-3);
+  text-wrap: pretty;
 }
 
 /* El nombre libre comparte la afordancia del campo de cliente. */
@@ -726,6 +748,7 @@
   .fx-acciones .btn { width: 100%; }
   .fx-split > .btn:first-child { flex: 1; width: auto; }
   .fx-split .btn-icon { width: auto; }
+  .fx-motivo { max-width: none; text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1146,3 +1169,82 @@
   cursor: pointer;
 }
 .fx-link-btn:hover { opacity: .8; }
+
+/* ---------- Nota E33/E34: comprobante que modifica ---------- */
+/* Franja propia entre la cabecera y las lineas: en una nota, a que factura
+   corrige es tan parte del documento como a quien va dirigida. */
+.fx-nota-ref {
+  margin-top: 22px;
+  padding: 14px 16px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.fx-nota-ref-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: 12px 22px;
+  align-items: start;
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .fx-nota-ref-grid { grid-template-columns: 1fr; }
+}
+
+.fx-nota-ref-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fx-nota-ref-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* Factura ya elegida: se lee como dato del documento, y al pulsarla se cambia. */
+.fx-nota-ref-elegida {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 0;
+  border-bottom: 1.5px solid var(--border-strong);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.fx-nota-ref-elegida:hover { background: var(--surface-hover); }
+.fx-nota-ref-elegida:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.fx-nota-ref-elegida--err { border-bottom-color: var(--danger); background: var(--danger-soft); }
+.fx-nota-ref-cambiar { font-size: 12px; margin-top: 2px; }
+
+.fx-nota-ref-elegir { margin-top: 0; align-self: flex-start; }
+.fx-nota-ref-elegir:disabled { opacity: 0.55; cursor: not-allowed; }
+.fx-nota-ref-elegir:disabled:hover { color: var(--text-2); border-color: var(--border-strong); background: transparent; }
+.fx-nota-ref-elegir--err { color: var(--danger); border-color: var(--danger); }
+
+.fx-nota-ref-campo .fx-cond-sel { width: 100%; }
+.fx-cond-sel--err { border-bottom-color: var(--danger); }
+.fx-nota-ref-razon .fx-contador { align-self: flex-end; }
+
+.fx-nota-ref-pie { margin: 10px 0 0; line-height: 1.4; }
+
+/* Filas del selector de facturas. */
+.fx-nota-ref-op { justify-content: space-between; padding: 9px 8px; }
+.fx-nota-ref-op[aria-current] { background: var(--accent-soft); }
+.fx-nota-ref-op:disabled { opacity: 0.55; cursor: not-allowed; }
+.fx-nota-ref-op:disabled:hover { background: transparent; }
+.fx-nota-ref-op-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.fx-nota-ref-op-montos { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }

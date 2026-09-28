@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Spinner } from '@/components/ui'
-import { ApiError, createClient, listClients, mapClientRow } from '@/api'
+import { ApiError, CODIGO_CLIENTE_SIN_ELEGIR, createClient, listClients, mapClientRow } from '@/api'
 import { hasModule } from '@/config/permissions'
 import { useSession } from '@/stores/auth'
 import type { Cliente } from '@/types/domain'
@@ -92,11 +92,19 @@ export function NombreClienteLibre({
         return
       }
       // El backend pide nombre y empresa; de un cliente de mostrador solo se sabe el nombre.
+      // createClient devuelve siempre el registro con su id (ver api/clients).
       const row = await createClient({ client_name: nombre, company_name: nombre })
       await queryClient.invalidateQueries({ queryKey: ['clients'] })
       toast.success(`${nombre} quedó guardado como cliente.`)
       onGuardado(mapClientRow(row))
     } catch (e) {
+      // El alta SÍ se hizo, pero no se pudo identificar para elegirlo. El campo
+      // no se toca: el nombre escrito sigue valiendo para esta factura.
+      if (e instanceof ApiError && e.codigo === CODIGO_CLIENTE_SIN_ELEGIR) {
+        void queryClient.invalidateQueries({ queryKey: ['clients'] })
+        toast.warning(e.message)
+        return
+      }
       toast.error('No se pudo guardar el cliente.', e instanceof ApiError ? { description: e.message } : undefined)
     } finally {
       setGuardando(false)

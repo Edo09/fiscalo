@@ -14,8 +14,19 @@ export function ApproveEcfModal({ ecf, onClose }: { ecf: EcfRecibidoRow; onClose
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const rechazar = decision === 'Rechazar'
+  // La respuesta a la DGII tiene que repetir la fecha y el monto del e-CF. Sin
+  // ellos se mandaba vacío (o 0), el servidor la rechazaba con un texto técnico
+  // y no había nada que el usuario pudiera corregir desde aquí.
+  const faltan = [
+    !ecf.fecha_emision ? 'fecha de emisión' : null,
+    ecf.monto_total == null || String(ecf.monto_total).trim() === '' ? 'monto total' : null,
+  ].filter(Boolean)
+  const sinDatos = faltan.length > 0
+    ? `Este comprobante llegó sin ${faltan.join(' ni ')}, así que no se puede responder a la DGII desde aquí.`
+    : null
 
   const confirm = async () => {
+    if (sinDatos) return
     if (rechazar && motivo.trim() === '') {
       setError('El motivo del rechazo es obligatorio.')
       return
@@ -61,7 +72,8 @@ export function ApproveEcfModal({ ecf, onClose }: { ecf: EcfRecibidoRow; onClose
             icon={rechazar ? 'x-circle' : 'check-circle'}
             style={rechazar ? { background: 'var(--danger)' } : undefined}
             onClick={confirm}
-            disabled={submitting}
+            disabled={submitting || sinDatos != null}
+            title={sinDatos ?? undefined}
           >
             {submitting ? 'Enviando…' : rechazar ? 'Rechazar e-CF' : 'Aprobar e-CF'}
           </Btn>
@@ -81,6 +93,11 @@ export function ApproveEcfModal({ ecf, onClose }: { ecf: EcfRecibidoRow; onClose
       {error && (
         <div className="row gap-sm" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', padding: '9px 12px', borderRadius: 'var(--r-sm)', marginBottom: 14, fontSize: 12.5, fontWeight: 500 }}>
           <Icon name="alert-circle" size={16} /><span>{error}</span>
+        </div>
+      )}
+      {sinDatos && (
+        <div className="row gap-sm" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '9px 12px', borderRadius: 'var(--r-sm)', marginBottom: 14, fontSize: 12.5, fontWeight: 500 }}>
+          <Icon name="alert-triangle" size={16} /><span>{sinDatos}</span>
         </div>
       )}
 

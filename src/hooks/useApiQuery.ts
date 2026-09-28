@@ -10,6 +10,15 @@
 // cuando todavía no hay dato —, así que refrescar en segundo plano no parpadea.
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { staleTimeFor } from '@/config/cache'
+import { ApiError } from '@/api/errores'
+
+/**
+ * Un error que no es ApiError es un fallo de la propia app (un TypeError al
+ * leer una respuesta con otra forma, por ejemplo) y su texto está en inglés
+ * ("Cannot read properties of undefined"). En pantalla va este; el original,
+ * a la consola (lo registra el queryFn, una vez por intento).
+ */
+const MSG_INESPERADO = 'Ocurrió un problema inesperado al mostrar los datos. Recarga la página; si sigue pasando, avisa a soporte.'
 
 export interface ApiQueryState<T> {
   data: T | null
@@ -30,7 +39,14 @@ export function useApiQuery<T>(
 ): ApiQueryState<T> {
   const q = useQuery({
     queryKey: key,
-    queryFn: fn,
+    queryFn: async () => {
+      try {
+        return await fn()
+      } catch (e) {
+        if (!(e instanceof ApiError)) console.error('[useApiQuery] error inesperado', key, e)
+        throw e
+      }
+    },
     // Frescura por recurso (config/cache.ts). `staleTime` explícito la sobrescribe
     // para un caso puntual sin tener que tocar la tabla.
     staleTime: opts.staleTime ?? staleTimeFor(key),
@@ -40,7 +56,7 @@ export function useApiQuery<T>(
   })
   return {
     data: q.data ?? null,
-    error: q.error ? (q.error instanceof Error ? q.error.message : String(q.error)) : null,
+    error: q.error ? (q.error instanceof ApiError ? q.error.message : MSG_INESPERADO) : null,
     loading: q.isPending,
     fetching: q.isFetching,
     reload: () => q.refetch(),

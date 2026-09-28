@@ -3,9 +3,11 @@
 // OJO: los endpoints /api/auth/* del backend usan un envoltorio
 // { success, data, error } — distinto al { status, data } del resto de la API —,
 // por eso este módulo no reutiliza request()/fetchBody() de http.ts: necesita
-// leer `success`/`error` para mostrar el mensaje real (ej. "Invalid email or password").
+// leer `success`/`error` para mostrar el motivo real del rechazo del login. Ese
+// texto pasa por la misma red de seguridad que el resto (errores.ts): uno claro
+// se muestra tal cual y uno técnico o en inglés se cambia por uno en español.
 import { API_BASE_URL } from './config'
-import { ApiError, networkError } from './http'
+import { errorDeRespuesta, networkError, textoError, type ContextoError } from './errores'
 import { getToken, type SessionUser } from '@/stores/auth'
 
 export interface LoginResult {
@@ -30,6 +32,9 @@ async function authPost<T>(path: string, payload: unknown, withAuth = false): Pr
     if (token) headers.Authorization = `Bearer ${token}`
   }
 
+  // El 401 del login es "usuario o clave equivocados", no "sesión expirada":
+  // errores.ts lo distingue por la ruta, por eso no se cierra sesión aquí.
+  const ctx: ContextoError = { metodo: 'POST', path }
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -39,23 +44,26 @@ async function authPost<T>(path: string, payload: unknown, withAuth = false): Pr
       body: JSON.stringify(payload),
     })
   } catch (e) {
-    throw networkError(e)
+    throw networkError(e, ctx)
   }
 
-  const raw = await res.text()
-  let body: AuthEnvelope<T> | null = null
-  if (raw) {
-    try {
-      body = JSON.parse(raw) as AuthEnvelope<T>
-    } catch {
-      throw new ApiError(`Respuesta no válida del servidor (HTTP ${res.status}).`, res.status)
-    }
-  }
-
+  const body = await leerSobre<T>(res, ctx)
   if (!body || body.success !== true) {
-    throw new ApiError(body?.error || `Error HTTP ${res.status}.`, res.status)
+    throw errorDeRespuesta(textoError(body), res.status, ctx)
   }
   return body
+}
+
+/** Cuerpo JSON del sobre (null si vino vacío). Un cuerpo que no es JSON lanza ApiError. */
+async function leerSobre<T>(res: Response, ctx: ContextoError): Promise<AuthEnvelope<T> | null> {
+  const raw = await res.text()
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as AuthEnvelope<T>
+  } catch {
+    console.warn('[API] respuesta que no es JSON', { ...ctx, status: res.status, inicio: raw.slice(0, 300) })
+    throw errorDeRespuesta(null, res.status, { ...ctx, ilegible: true })
+  }
 }
 
 /**
@@ -76,6 +84,7 @@ export async function login(emailOrUsername: string, password: string, tenantId?
  */
 export async function me(): Promise<SessionUser> {
   const token = getToken()
+  const ctx: ContextoError = { metodo: 'GET', path: '/api/auth/me' }
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}/api/auth/me`, {
@@ -90,19 +99,14 @@ export async function me(): Promise<SessionUser> {
       cache: 'no-store',
     })
   } catch (e) {
-    throw networkError(e)
+    throw networkError(e, ctx)
   }
-  const raw = await res.text()
-  let body: AuthEnvelope<{ user: SessionUser }> | null = null
-  if (raw) {
-    try {
-      body = JSON.parse(raw) as AuthEnvelope<{ user: SessionUser }>
-    } catch {
-      throw new ApiError(`Respuesta no válida del servidor (HTTP ${res.status}).`, res.status)
-    }
-  }
+  const body = await leerSobre<{ user: SessionUser }>(res, ctx)
   if (!body || body.success !== true || !body.data?.user) {
-    throw new ApiError(body?.error || `Error HTTP ${res.status}.`, res.status)
+    // Un 401 aquí da el texto de sesión expirada (nunca el del servidor). No se
+    // cierra la sesión: quien llama decide (App.tsx lo ignora y la próxima
+    // petición normal, si también da 401, la cierra).
+    throw errorDeRespuesta(textoError(body), res.status, ctx)
   }
   return body.data.user
 }

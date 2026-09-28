@@ -57,7 +57,7 @@ const ACCIONES: Record<string, string> = {
   ACCESS_DENIED: 'Acceso denegado',
   DGII_AUTH_IN_OK: 'Autenticación entrante',
   DGII_AUTH_IN_FAILED: 'Autenticación entrante rechazada',
-  DGII_AUTH_OUT_FAILED: 'La DGII negó el token',
+  DGII_AUTH_OUT_FAILED: 'La DGII rechazó la autenticación del sistema',
 }
 
 export function etiquetaAccion(accion: string): string {

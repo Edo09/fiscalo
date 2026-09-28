@@ -1,17 +1,16 @@
 // Cliente HTTP tipado para la API e-CF.
+//
+// Todo error sale como ApiError con un texto apto para el cajero: el del
+// servidor si es claro, o uno genérico si era técnico (ver errores.ts). Por eso
+// las pantallas pueden seguir haciendo `e instanceof ApiError ? e.message : …`.
 import { API_BASE_URL, API_KEY } from './config'
 import { getToken, clearSession } from '@/stores/auth'
+import { errorDeRespuesta, networkError, referenciaDe, sesionExpirada, textoError, type ContextoError } from './errores'
 import type { ListResult } from './types'
 
-/** Error normalizado de la API (con código HTTP cuando aplica). */
-export class ApiError extends Error {
-  readonly status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
-}
+// ApiError y networkError viven en errores.ts; se re-exportan aquí porque
+// siempre se importaron desde este módulo.
+export { ApiError, networkError } from './errores'
 
 /**
  * Timeouts por tipo de petición. Lecturas cortas; escrituras generosas porque
@@ -23,14 +22,6 @@ const TIMEOUT_READ_MS = 30_000
 const TIMEOUT_WRITE_MS = 90_000
 const TIMEOUT_BLOB_MS = 60_000
 
-/** Normaliza fallos de red/timeout de fetch a un ApiError con mensaje claro. */
-export function networkError(e: unknown): ApiError {
-  if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
-    return new ApiError('El servidor tardó demasiado en responder. Inténtalo de nuevo.', 0)
-  }
-  return new ApiError('No se pudo conectar con el servidor. ¿Está configurada la API?', 0)
-}
-
 function buildHeaders(extra?: HeadersInit): HeadersInit {
   const headers: Record<string, string> = { Accept: 'application/json' }
   // Auth de app: token de sesión del usuario (POST /api/auth/login) como Bearer.
@@ -41,11 +32,14 @@ function buildHeaders(extra?: HeadersInit): HeadersInit {
   return { ...headers, ...(extra as Record<string, string>) }
 }
 
-/** 401 => el token venció o es inválido: cerramos sesión para volver al login. */
-function handleUnauthorized(body: unknown, status: number): never {
+/**
+ * 401 => el token venció o es inválido: cerramos sesión para volver al login.
+ * El texto es siempre el del front: los del servidor (AuthMiddleware) están en
+ * inglés o hablan de cabeceras, y se comparten con los integradores.
+ */
+function handleUnauthorized(body: unknown, ctx: ContextoError): never {
   clearSession()
-  const msg = (body as { error?: string } | null)?.error || 'Tu sesión expiró. Vuelve a iniciar sesión.'
-  throw new ApiError(msg, status)
+  throw sesionExpirada(textoError(body), ctx)
 }
 
 /**
@@ -53,9 +47,10 @@ function handleUnauthorized(body: unknown, status: number): never {
  * (incluyendo hermanos del envoltorio como `pagination`). Lanza ApiError.
  */
 async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown> {
+  const ctx: ContextoError = { metodo: init.method ?? 'GET', path }
   let res: Response
   try {
-    const timeout = (init.method ?? 'GET') === 'GET' ? TIMEOUT_READ_MS : TIMEOUT_WRITE_MS
+    const timeout = ctx.metodo === 'GET' ? TIMEOUT_READ_MS : TIMEOUT_WRITE_MS
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       signal: init.signal ?? AbortSignal.timeout(timeout),
@@ -69,25 +64,35 @@ async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown>
       cache: 'no-store',
     })
   } catch (e) {
-    throw networkError(e)
+    throw networkError(e, ctx)
   }
 
   const raw = await res.text()
   let body: unknown = null
+  let ilegible = false
   if (raw) {
     try {
       body = JSON.parse(raw)
     } catch {
-      throw new ApiError(`Respuesta no válida del servidor (HTTP ${res.status}).`, res.status)
+      ilegible = true
     }
   }
 
-  if (res.status === 401) handleUnauthorized(body, res.status)
+  // El 401 va antes que el cuerpo: aunque la respuesta no sea JSON (un proxy),
+  // la sesión ya no sirve y hay que volver al login.
+  if (res.status === 401) handleUnauthorized(body, ctx)
+  if (ilegible) {
+    // Página HTML del hosting, un 413 de PHP, o dos JSON pegados. El comienzo
+    // va a la consola: es lo único que dice qué pasó.
+    console.warn('[API] respuesta que no es JSON', { ...ctx, status: res.status, inicio: raw.slice(0, 300) })
+    throw errorDeRespuesta(null, res.status, { ...ctx, ilegible: true })
+  }
   if (body && typeof body === 'object' && 'status' in body && (body as { status: unknown }).status === false) {
-    throw new ApiError((body as { error?: string }).error || `Error HTTP ${res.status}.`, res.status)
+    const texto = textoError(body)
+    throw errorDeRespuesta(texto, res.status, { ...ctx, referencia: referenciaDe(body, texto) }, (body as { data?: unknown }).data)
   }
   if (!res.ok) {
-    throw new ApiError(`Error HTTP ${res.status}.`, res.status)
+    throw errorDeRespuesta(null, res.status, ctx)
   }
   return body
 }
@@ -121,6 +126,15 @@ export function getJson<T>(path: string): Promise<T> {
  */
 export function getEnvelope<T>(path: string): Promise<T> {
   return fetchBody(path, { method: 'GET' }) as Promise<T>
+}
+
+/**
+ * Como `request`, pero devuelve el SOBRE completo, para cualquier método. Para
+ * respuestas cuya forma cambió entre versiones del backend (el id de un alta
+ * puede venir en `data` o al lado de `data`).
+ */
+export function requestEnvelope<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return fetchBody(path, init) as Promise<T>
 }
 
 /**
@@ -163,6 +177,7 @@ export async function getList<T>(path: string): Promise<ListResult<T>> {
 
 /** Descarga binaria (PDF/XML directo). Lanza ApiError ante fallos HTTP. */
 export async function getBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  const ctx: ContextoError = { metodo: 'GET', path }
   let res: Response
   try {
     // PDFs/XML pueden tardar más que un GET normal (el backend genera el documento).
@@ -172,19 +187,22 @@ export async function getBlob(path: string): Promise<{ blob: Blob; filename: str
       cache: 'no-store', // un PDF tambien es dato del tenant (ver fetchBody)
     })
   } catch (e) {
-    throw networkError(e)
+    throw networkError(e, ctx)
   }
   if (!res.ok) {
-    let msg = `Error HTTP ${res.status}.`
-    let errBody: { error?: string } | null = null
+    let errBody: unknown = null
     try {
-      errBody = (await res.json()) as { error?: string }
-      if (errBody?.error) msg = errBody.error
+      errBody = await res.json()
     } catch {
       /* respuesta no-JSON */
     }
-    if (res.status === 401) handleUnauthorized(errBody, res.status)
-    throw new ApiError(msg, res.status)
+    if (res.status === 401) handleUnauthorized(errBody, ctx)
+    const texto = textoError(errBody)
+    throw errorDeRespuesta(texto, res.status, {
+      ...ctx,
+      referencia: referenciaDe(errBody, texto),
+      ilegible: errBody === null,
+    })
   }
   const blob = await res.blob()
   const cd = res.headers.get('Content-Disposition') ?? ''

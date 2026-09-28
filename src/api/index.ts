@@ -2,11 +2,12 @@
 export * from './types'
 export { createFacturaSchema } from './schemas/factura'
 export { createGastoSchema } from './schemas/gasto'
-export { ApiError } from './http'
+export { ApiError, CODIGO_CLIENTE_SIN_ELEGIR, MSG_SESION_EXPIRADA } from './errores'
 export { DEFAULT_USER_ID } from './config'
 export {
   listFacturas,
   getFactura,
+  listFacturasModificables,
   createFactura,
   previewFactura,
   getEstado,

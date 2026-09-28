@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Badge, Icon, Spinner, type BadgeTone } from '@/components/ui'
 import { ApiError, listNcfRangos, registerNcfRango, formatApiDate } from '@/api'
+import type { NcfRango } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
 
@@ -14,6 +15,37 @@ const ESTADO_RANGO: Record<string, { label: string; tone: BadgeTone }> = {
   agotado: { label: 'Agotado', tone: 'danger' },
   vencido: { label: 'Vencido', tone: 'danger' },
   sin_limite: { label: 'Sin límite', tone: 'warning' },
+}
+
+/**
+ * Por qué no se puede registrar este rango con los que ya hay, o null. Es la
+ * misma regla del backend (ncfModel::registerRango), calculada con los rangos
+ * ya cargados en la tabla para decirlo antes de enviar y con el número exacto.
+ *
+ * El "Desde" tiene que quedar después de todo lo ya usado o autorizado del
+ * tipo. Excepción: la fila "sin límite" que el sistema siembra al crear la
+ * empresa, cuando el rango nuevo empieza donde ella; esa fila se convierte en
+ * el rango autorizado y su consumo no cuenta como tope.
+ */
+function problemaConExistentes(rangos: NcfRango[], tipo: string, desde: number, hasta: number): string | null {
+  const delTipo = rangos.filter((r) => r.type === tipo)
+  const sinLimite = [...delTipo].reverse().find((r) => r.numero_hasta == null)
+  const convertir = sinLimite != null && Number(sinLimite.numero_desde) === desde
+  let tope = 0
+  for (const r of delTipo) {
+    if (convertir && r.id === sinLimite.id) continue
+    tope = Math.max(tope, Number(r.current_value) || 0, Number(r.numero_hasta ?? 0) || 0)
+  }
+  if (desde <= tope) {
+    return `El número «Desde» tiene que ser mayor que ${tope}, que es el último ya usado o autorizado para ${tipo}.`
+  }
+  if (convertir) {
+    const usado = Math.max(Number(sinLimite.current_value) || 0, desde - 1)
+    if (usado > hasta) {
+      return `Ya se usaron números de ${tipo} hasta el ${usado}: el número «Hasta» tiene que ser ${usado} o más.`
+    }
+  }
+  return null
 }
 
 export function RangosNcfModal({ onClose }: { onClose: () => void }) {
@@ -34,8 +66,13 @@ export function RangosNcfModal({ onClose }: { onClose: () => void }) {
     setError(null)
     const d = Number(desde)
     const h = Number(hasta)
-    if (!d || !h || d < 1 || h < d) { setError('Indica un rango válido (desde ≥ 1, hasta ≥ desde).'); return }
-    if (!venc) { setError('Indica la fecha de vencimiento del rango.'); return }
+    if (!Number.isInteger(d) || d < 1) { setError('El número «Desde» tiene que ser un número entero de 1 o más.'); return }
+    if (!Number.isInteger(h) || h < d) { setError('El número «Hasta» no puede ser menor que «Desde».'); return }
+    if (!venc) { setError('Pon la fecha de vencimiento del rango.'); return }
+    // Con la tabla cargada se sabe si choca con lo que ya hay; si no cargó,
+    // decide el servidor.
+    const choque = rangos.data ? problemaConExistentes(rangos.data, tipo, d, h) : null
+    if (choque) { setError(choque); return }
     setSaving(true)
     try {
       await registerNcfRango({

@@ -13,8 +13,10 @@ interface State { error: Error | null }
  * reportar y sin forma de saber si fue la app, la red o su sesión. Es el mismo
  * problema que el 500 con el cuerpo vacío del API, en el otro extremo del cable.
  *
- * Se muestra el mensaje del error a propósito: quien lo usa está en producción
- * y sin consola abierta, y ese texto es lo único que puede copiar y mandar.
+ * El mensaje del error se conserva a propósito: quien lo usa está en producción
+ * y sin consola abierta, y ese texto es lo único que puede copiar y mandar. Pero
+ * va plegado bajo "Detalle técnico": sale en inglés y con jerga de JavaScript,
+ * y lo primero que se lee tiene que ser qué pasó y qué hacer.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null }
@@ -49,23 +51,26 @@ export class ErrorBoundary extends Component<Props, State> {
         <div style={{ maxWidth: 560, textAlign: 'center' }}>
           <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>La pantalla no se pudo mostrar</h1>
           <p style={{ margin: '0 0 16px', opacity: 0.75, lineHeight: 1.5 }}>
-            Los datos que ya guardaste no se han perdido. Recarga para volver a intentarlo; si
-            vuelve a pasar, copia el detalle de abajo y mándalo.
+            Algo falló dentro de la aplicación. Lo que ya guardaste no se ha perdido. Recarga para
+            volver a intentarlo; si vuelve a pasar, avisa a soporte y mándales el detalle técnico.
           </p>
-          <pre
-            style={{
-              textAlign: 'left',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              background: 'var(--surface-2, #ececee)',
-              padding: 12,
-              borderRadius: 8,
-              fontSize: 12,
-              margin: '0 0 16px',
-            }}
-          >
-            {error.message || String(error)}
-          </pre>
+          <details style={{ textAlign: 'left', margin: '0 0 16px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, opacity: 0.75 }}>Detalle técnico (para soporte)</summary>
+            <pre
+              style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                background: 'var(--surface-2, #ececee)',
+                padding: 12,
+                borderRadius: 8,
+                fontSize: 12,
+                margin: '8px 0 0',
+                userSelect: 'all',
+              }}
+            >
+              {error.message || String(error)}
+            </pre>
+          </details>
           <button
             type="button"
             onClick={() => window.location.reload()}

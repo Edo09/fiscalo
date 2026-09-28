@@ -4,9 +4,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
+import { unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
 import { ApiError, createProduct, updateProduct, deleteProduct, listCategories, listWarehouses } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Producto } from '@/types/domain'
+
+/** Largo máximo del nombre (columna products.nombre). */
+const MAX_NOMBRE = 150
 
 /** Valores con los que abrir el alta (p. ej. la línea de factura que se convierte). */
 export interface ProductoInicial {
@@ -66,6 +70,7 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
   const whQ = useApiQuery(['warehouses', 'list'], () => listWarehouses({ pageSize: 100 }))
   const categories = useMemo(() => catsQ.data?.items ?? [], [catsQ.data])
   const warehouses = useMemo(() => whQ.data?.items ?? [], [whQ.data])
+  const unidades = useUnidadesMedida()
 
   // Al crear, preseleccionar el Almacén Principal (o el primero) cuando carguen.
   useEffect(() => {
@@ -75,7 +80,17 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
   }, [warehouses, editing, warehouseId])
 
   const save = async () => {
-    if (!nombre.trim()) { setError('El nombre es obligatorio.'); return }
+    // Las reglas del backend, antes de enviar. El campo numérico deja teclear
+    // un signo menos, y un precio negativo volvía del servidor como error.
+    const n = nombre.trim()
+    const problema =
+      !n ? 'Escribe el nombre del producto o servicio.'
+      : n.length > MAX_NOMBRE ? `El nombre no puede pasar de ${MAX_NOMBRE} caracteres.`
+      : Number(precio) < 0 ? 'El precio no puede ser negativo.'
+      : Number(costo) < 0 ? 'El costo no puede ser negativo.'
+      : !unidadValida(unidadMedida, unidades) ? 'Elige la unidad de medida: la que tenía no está en el catálogo de la DGII.'
+      : null
+    if (problema) { setError(problema); return }
     setError(null)
     setSaving(true)
     const payload = {
@@ -178,7 +193,7 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
       <div className="form-grid">
         <div className="field full">
           <label className="label">Nombre <span className="req">*</span></label>
-          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto o servicio" autoFocus />
+          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto o servicio" autoFocus maxLength={MAX_NOMBRE} />
         </div>
         <div className="field">
           <label className="label">SKU <span className="opt">(opcional)</span></label>

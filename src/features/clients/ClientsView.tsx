@@ -8,6 +8,9 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Cliente } from '@/types/domain'
 import { NewClientModal } from './NewClientModal'
+import {
+  LARGO, errorCorreo, errorDescuento, errorRnc, errorTelefono, errorTexto, soloDigitos,
+} from './validacion'
 
 const PAGE_SIZES = [10, 25, 50]
 const SEARCH_DEBOUNCE_MS = 350
@@ -191,7 +194,9 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
   const queryClient = useQueryClient()
   const cliente: Cliente = mapClientRow(client)
   const { data: ubicaciones } = useApiQuery(['ubicaciones'], listUbicaciones)
-  const [form, setForm] = useState({
+  // Foto del registro al abrir: se compara contra ella para mandar solo lo que
+  // cambió (ver save).
+  const [inicial] = useState(() => ({
     client_name: client.client_name ?? '',
     company_name: client.company_name ?? '',
     razon_social: client.razon_social ?? '',
@@ -201,16 +206,22 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     direccion: client.direccion ?? '',
     municipio: client.municipio ?? '',
     provincia: client.provincia ?? '',
-    // Condiciones comerciales. Van en el form porque el PUT manda el registro
-    // completo: si no viajaran, guardar aqui las pondria en 0.
+    // Condiciones comerciales del cliente (descuento y crédito).
     descuento: String(client.descuento ?? 0),
     permitir_credito: Number(client.permitir_credito ?? 0) === 1,
-  })
+  }))
+  const [form, setForm] = useState(inicial)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errores, setErrores] = useState<Partial<Record<keyof typeof form, string>>>({})
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [k]: e.target.value })
+    if (errores[k]) setErrores((er) => ({ ...er, [k]: undefined }))
+  }
+  const claseCampo = (k: keyof typeof form, extra = '') => 'field' + extra + (errores[k] ? ' field-error' : '')
+  const errorDe = (k: keyof typeof form) =>
+    errores[k] && <div className="err-msg"><Icon name="alert-circle" size={13} />{errores[k]}</div>
 
   // Codigo de 2 digitos de la provincia elegida: filtra los municipios. Sale del
   // catalogo, o de los 2 primeros digitos del codigo guardado como respaldo.
@@ -218,16 +229,45 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     (ubicaciones ?? []).find((u) => u.tipo === 'PROVINCIA' && u.codigo === form.provincia)?.provincia_codigo
     ?? form.provincia.slice(0, 2)
 
+  /**
+   * Solo viaja lo que cambió: el PUT es parcial y el backend conserva el resto.
+   * Mandar el registro entero hacía fallar a los clientes migrados sin contacto
+   * o sin empresa en cuanto se tocaba cualquier otro dato (p. ej. el descuento).
+   * Por lo mismo, solo se valida lo que cambió, con las reglas del alta.
+   */
   const save = async () => {
+    const cambiados = (Object.keys(form) as (keyof typeof form)[]).filter((k) => form[k] !== inicial[k])
+    if (cambiados.length === 0) { toast.info('No hay cambios que guardar.'); onClose(); return }
+    const reglas: Partial<Record<keyof typeof form, () => string | undefined>> = {
+      client_name: () => errorTexto(form.client_name, LARGO.nombreCliente, 'El nombre de contacto', 'Escribe el nombre de contacto.'),
+      company_name: () => errorTexto(form.company_name, LARGO.empresa, 'La empresa', 'Escribe la empresa.'),
+      razon_social: () => errorTexto(form.razon_social, LARGO.razonSocial, 'La razón social'),
+      rnc: () => errorRnc(form.rnc),
+      email: () => errorCorreo(form.email),
+      phone_number: () => errorTelefono(form.phone_number),
+      direccion: () => errorTexto(form.direccion, LARGO.direccion, 'La dirección'),
+      descuento: () => errorDescuento(form.descuento),
+    }
+    const e: Partial<Record<keyof typeof form, string>> = {}
+    for (const k of cambiados) {
+      const msg = reglas[k]?.()
+      if (msg) e[k] = msg
+    }
+    setErrores(e)
+    if (Object.keys(e).length > 0) return
+
+    const cambios: Record<string, string | number> = {}
+    for (const k of cambiados) {
+      if (k === 'permitir_credito') cambios[k] = form.permitir_credito ? 1 : 0
+      else if (k === 'descuento') cambios[k] = Number(form.descuento) || 0
+      // Solo los dígitos: con guiones, un RNC de 9 no cabe en la columna de 11.
+      else if (k === 'rnc') cambios[k] = soloDigitos(form.rnc)
+      else cambios[k] = form[k].trim()
+    }
     setSaving(true)
     setError(null)
     try {
-      await updateClient({
-        ...form,
-        id: client.id,
-        descuento: Number(form.descuento) || 0,
-        permitir_credito: form.permitir_credito ? 1 : 0,
-      })
+      await updateClient({ ...cambios, id: client.id })
       void queryClient.invalidateQueries({ queryKey: ['clients'] })
       toast.success('Cliente actualizado.')
       onClose()
@@ -262,13 +302,13 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
       )}
 
       <div className="form-grid">
-        <div className="field"><label className="label">Razón social</label><input className="input" value={form.razon_social} onChange={set('razon_social')} /></div>
-        <div className="field"><label className="label">Empresa</label><input className="input" value={form.company_name} onChange={set('company_name')} /></div>
-        <div className="field"><label className="label">Contacto</label><input className="input" value={form.client_name} onChange={set('client_name')} /></div>
-        <div className="field"><label className="label">RNC / Cédula</label><input className="input mono" value={form.rnc} onChange={set('rnc')} /></div>
-        <div className="field"><label className="label">Correo</label><input className="input" type="email" value={form.email} onChange={set('email')} /></div>
-        <div className="field"><label className="label">Teléfono</label><input className="input" value={form.phone_number} onChange={set('phone_number')} /></div>
-        <div className="field full"><label className="label">Dirección</label><input className="input" value={form.direccion} onChange={set('direccion')} /></div>
+        <div className={claseCampo('razon_social')}><label className="label">Razón social</label><input className="input" value={form.razon_social} onChange={set('razon_social')} maxLength={LARGO.razonSocial} />{errorDe('razon_social')}</div>
+        <div className={claseCampo('company_name')}><label className="label">Empresa</label><input className="input" value={form.company_name} onChange={set('company_name')} maxLength={LARGO.empresa} />{errorDe('company_name')}</div>
+        <div className={claseCampo('client_name')}><label className="label">Contacto</label><input className="input" value={form.client_name} onChange={set('client_name')} maxLength={LARGO.nombreCliente} />{errorDe('client_name')}</div>
+        <div className={claseCampo('rnc')}><label className="label">RNC / Cédula</label><input className="input mono" value={form.rnc} onChange={set('rnc')} inputMode="numeric" />{errorDe('rnc')}</div>
+        <div className={claseCampo('email')}><label className="label">Correo</label><input className="input" type="email" value={form.email} onChange={set('email')} maxLength={LARGO.correo} />{errorDe('email')}</div>
+        <div className={claseCampo('phone_number')}><label className="label">Teléfono</label><input className="input" value={form.phone_number} onChange={set('phone_number')} maxLength={LARGO.telefono} />{errorDe('phone_number')}</div>
+        <div className={claseCampo('direccion', ' full')}><label className="label">Dirección</label><input className="input" value={form.direccion} onChange={set('direccion')} maxLength={LARGO.direccion} />{errorDe('direccion')}</div>
         <div className="field">
           <label className="label">Provincia</label>
           <select
@@ -300,7 +340,7 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
             ))}
           </select>
         </div>
-        <div className="field"><label className="label">Descuento por defecto (%)</label><input className="input" inputMode="decimal" value={form.descuento} onChange={set('descuento')} /></div>
+        <div className={claseCampo('descuento')}><label className="label">Descuento por defecto (%)</label><input className="input" inputMode="decimal" value={form.descuento} onChange={set('descuento')} />{errorDe('descuento')}</div>
         <div className="field">
           <label className="label">Crédito</label>
           <label className="text-sm">

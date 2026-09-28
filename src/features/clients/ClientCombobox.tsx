@@ -13,6 +13,15 @@ interface ClientComboboxProps {
   onChange: (cliente: Cliente | null) => void
   /** ms de espera tras la última tecla antes de consultar la API. */
   debounceMs?: number
+  /**
+   * Texto que hay en el buscador sin haber elegido ningún resultado ('' si no
+   * hay). Ese texto parece un cliente puesto, pero el formulario no lo recibe:
+   * con esto quien valida puede decir "«Juan» no está elegido" en vez de
+   * "Elige un cliente" mientras el usuario ve su texto escrito.
+   */
+  onBusquedaChange?: (texto: string) => void
+  /** Marca el buscador en rojo (el formulario encontró un problema con el cliente). */
+  invalido?: boolean
 }
 
 /** Nombre principal (persona/contacto) que se muestra en negrita. */
@@ -29,8 +38,15 @@ function clientSub(r: ClientRow): string {
     .join('  ·  ')
 }
 
-export function ClientCombobox({ value, onChange, debounceMs = 250 }: ClientComboboxProps) {
-  const [input, setInput] = useState('')
+export function ClientCombobox({
+  value, onChange, debounceMs = 250, onBusquedaChange, invalido = false,
+}: ClientComboboxProps) {
+  const [input, setInputState] = useState('')
+  // Todo cambio del texto pasa por aquí para que el padre se entere.
+  const setInput = (v: string) => {
+    setInputState(v)
+    onBusquedaChange?.(v.trim())
+  }
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -97,10 +113,11 @@ export function ClientCombobox({ value, onChange, debounceMs = 250 }: ClientComb
 
   return (
     <div ref={ref} className="combobox">
-      <div className="search-input" style={{ width: '100%' }}>
+      <div className={'search-input' + (invalido ? ' search-input--err' : '')} style={{ width: '100%' }}>
         <Icon name="search" />
         <input
           ref={inputRef}
+          aria-invalid={invalido || undefined}
           placeholder="Buscar cliente por nombre, RNC o correo…"
           value={input}
           onChange={(e) => { setInput(e.target.value); setOpen(true) }}

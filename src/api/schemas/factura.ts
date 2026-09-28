@@ -58,12 +58,25 @@ export const totalesSchema = z.object({
   total_isr_retencion: z.number().optional(),
 })
 
+/**
+ * Código de modificación DGII (CodigoModificacionType): 1 = anula, 2 = corrige
+ * texto, 3 = corrige montos, 4 = reemplaza un e-CF de contingencia,
+ * 5 = referencia una factura de consumo. Etiquetas en config/ecf.ts.
+ */
+export const codigoModificacionSchema = z.enum(['1', '2', '3', '4', '5'])
+
+/**
+ * Comprobante que modifica una nota E33/E34 (InformacionReferencia). Mismas
+ * reglas que el XSD de la DGII y que el backend (InformacionReferencia.php).
+ */
 export const informacionReferenciaSchema = z.object({
-  ncf_modificado: z.string(),
+  // e-NCF (13) o NCF (11 a 19) del comprobante modificado.
+  ncf_modificado: z.string().min(11, 'El número de la factura modificada no es válido.').max(19, 'El número de la factura modificada no es válido.'),
+  // Vacío en E33/E34: con el RNC del comprador la DGII responde error 614.
   rnc_otro_contribuyente: z.string().nullable(),
-  fecha_ncf_modificado: z.string(),
-  codigo_modificacion: z.string(),
-  razon_modificacion: z.string(),
+  fecha_ncf_modificado: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, 'La fecha de la factura modificada no es válida.'),
+  codigo_modificacion: codigoModificacionSchema,
+  razon_modificacion: z.string().max(90, 'La razón de la nota puede tener hasta 90 caracteres.'),
 })
 
 export const createFacturaSchema = z.object({
@@ -72,12 +85,12 @@ export const createFacturaSchema = z.object({
   tipo_ecf: tipoEcfSchema,
   items: z.array(facturaItemSchema).min(1, 'Agrega al menos un producto o servicio.'),
   user_id: z.number().int().optional(),
-  fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD).').optional(),
+  fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha no es válida.').optional(),
   tipo_pago: z.number().optional(),
   // % de descuento del documento. Si se omite, el backend aplica el del cliente
   // (clients.descuento). El formulario manda 0 porque ya baja el descuento a
   // cada línea como `descuento_monto`: lo que se ve es lo que se emite.
-  descuento: z.number().min(0).max(100).optional(),
+  descuento: z.number().min(0, 'El descuento debe estar entre 0 y 100.').max(100, 'El descuento debe estar entre 0 y 100.').optional(),
   tipo_ingresos: z.string().optional(),
   indicador_monto_gravado: z.string().optional(),
   indicador_nota_credito: z.string().optional(),
@@ -85,6 +98,15 @@ export const createFacturaSchema = z.object({
   totales: totalesSchema.optional(),
   informacion_referencia: informacionReferenciaSchema.optional(),
   e_ncf: z.string().optional(),
+}).superRefine((v, ctx) => {
+  // Sin la factura que modifican, la DGII rechaza la nota: mejor cortar aquí.
+  if ((v.tipo_ecf === '33' || v.tipo_ecf === '34') && !v.informacion_referencia) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['informacion_referencia'],
+      message: 'Elige la factura que modifica esta nota.',
+    })
+  }
 })
 
 // Tipos inferidos — fuente única de verdad para el contrato de la API.
@@ -94,5 +116,6 @@ export type IndicadorBienServicio = z.infer<typeof indicadorBienServicioSchema>
 export type FacturaItemInput = z.infer<typeof facturaItemSchema>
 export type CompradorInput = z.infer<typeof compradorSchema>
 export type TotalesInput = z.infer<typeof totalesSchema>
+export type CodigoModificacion = z.infer<typeof codigoModificacionSchema>
 export type InformacionReferencia = z.infer<typeof informacionReferenciaSchema>
 export type CreateFacturaInput = z.infer<typeof createFacturaSchema>

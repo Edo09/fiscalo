@@ -54,6 +54,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
   const [prodQuery, setProdQuery] = useState('')
   const [errorForm, setErrorForm] = useState<string | null>(null)
   const [errorCliente, setErrorCliente] = useState<string | null>(null)
+  /** Lo escrito en el buscador de clientes sin elegir un resultado (ver ClientCombobox). */
+  const [busquedaCliente, setBusquedaCliente] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -131,7 +133,11 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     setErrorCliente(null)
     setErrorForm(null)
     if (!cliente) {
-      setErrorCliente('Selecciona un cliente.')
+      // Con texto en el buscador, el usuario ve "su" cliente puesto: se le dice
+      // que falta elegirlo, no que no hay cliente.
+      setErrorCliente(busquedaCliente
+        ? `«${busquedaCliente}» no está elegido: elígelo de la lista o créalo con el botón +.`
+        : 'Elige un cliente de la lista o créalo con el botón +.')
       return null
     }
     const items = lineas
@@ -261,6 +267,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
                 <ClientCombobox
                   value={cliente}
                   onChange={(c) => { setCliente(c); setErrorCliente(null) }}
+                  onBusquedaChange={(t) => { setBusquedaCliente(t); setErrorCliente(null) }}
+                  invalido={errorCliente != null}
                 />
               </div>
               <button
@@ -413,6 +421,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
 
       {nuevoCliente && (
         <NewClientModal
+          // Lo que ya escribió en el buscador no se vuelve a teclear.
+          nombreInicial={cliente ? '' : busquedaCliente}
           onClose={() => setNuevoCliente(false)}
           onCreated={(c) => { setCliente(c); setErrorCliente(null); setNuevoCliente(false) }}
         />

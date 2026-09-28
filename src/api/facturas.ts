@@ -1,4 +1,5 @@
 // Servicio: facturas e-CF.
+import { errorDeValidacion, type TextosCampos } from './errores'
 import { getJson, postJson, getList, qs } from './http'
 import { createFacturaSchema } from './schemas/factura'
 import { parametroFormato } from './impresion'
@@ -11,6 +12,7 @@ import type {
   FacturaListParams,
   ReciboDatos,
   FacturaRow,
+  FacturaModificableRow,
   ListResult,
 } from './types'
 
@@ -35,11 +37,49 @@ export async function getFactura(id: number): Promise<FacturaRow | null> {
   return data ?? null
 }
 
-export function createFactura(input: CreateFacturaInput): Promise<CreateFacturaResponse> {
+/**
+ * Facturas del cliente que una nota E33/E34 puede modificar (aceptadas por la
+ * DGII, de venta), de la más reciente a la más vieja. `query` filtra por parte
+ * del e-NCF.
+ */
+export function listFacturasModificables(clientId: number, query?: string): Promise<FacturaModificableRow[]> {
+  return getJson<FacturaModificableRow[]>(`/api/facturas/modificables${qs({ client_id: clientId, query })}`)
+}
+
+/**
+ * Qué decirle al usuario por campo cuando el esquema no trae un texto propio
+ * (Zod pone el suyo, en inglés). Ver errorDeValidacion.
+ */
+const TEXTOS_FACTURA: TextosCampos = {
+  client_id: 'El cliente elegido no es válido. Búscalo de nuevo en la lista y elígelo.',
+  tipo_ecf: 'Elige el tipo de comprobante.',
+  items: 'Agrega al menos un producto o servicio.',
+  nombre_item: 'Escribe el nombre del producto o servicio.',
+  descripcion: 'Revisa la descripción.',
+  indicador_facturacion: 'Elige la tasa de ITBIS.',
+  indicador_bien_servicio: 'Indica si es un bien o un servicio.',
+  cantidad: 'Escribe una cantidad mayor que 0.',
+  unidad_medida: 'Elige la unidad de medida.',
+  precio_unitario: 'Escribe un precio válido.',
+  descuento_monto: 'Revisa el descuento.',
+  product_id: 'El producto elegido no es válido. Quítalo y vuelve a agregarlo.',
+  fecha_emision: 'La fecha no es válida.',
+  tipo_pago: 'Elige la forma de pago.',
+  descuento: 'El descuento debe estar entre 0 y 100.',
+  comprador: 'Revisa los datos del comprador.',
+  informacion_referencia: 'Faltan los datos del comprobante que se modifica.',
+  '*linea': 'Revisa los datos de esta línea.',
+  '*': 'Hay un dato de la factura que no es válido. Revisa el formulario e inténtalo de nuevo.',
+}
+
+export async function createFactura(input: CreateFacturaInput): Promise<CreateFacturaResponse> {
   // Validación de frontera: garantiza que un payload malformado nunca llegue a la
-  // DGII, incluso si un futuro llamador omite la validación del formulario.
-  const body = createFacturaSchema.parse(input)
-  return postJson<CreateFacturaResponse>('/api/facturas', body)
+  // DGII, incluso si un futuro llamador omite la validación del formulario. El
+  // fallo sale como ApiError con un texto claro: un ZodError no es ApiError, y
+  // las pantallas solo mostraban su respaldo genérico ("No se pudo emitir…").
+  const r = createFacturaSchema.safeParse(input)
+  if (!r.success) throw errorDeValidacion(r.error.issues, TEXTOS_FACTURA, { metodo: 'POST', path: '/api/facturas' })
+  return postJson<CreateFacturaResponse>('/api/facturas', r.data)
 }
 
 export function previewFactura(

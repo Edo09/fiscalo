@@ -15,6 +15,7 @@ export type {
   FacturaItemInput,
   CompradorInput,
   TotalesInput,
+  CodigoModificacion,
   InformacionReferencia,
   CreateFacturaInput,
 } from './schemas/factura'
@@ -117,6 +118,26 @@ export interface FacturaItemRow {
   itbis_amount?: number | string | null
   /** 1=ITBIS 18%, 2=16%, 3=tasa cero, 4=exento. */
   indicador_facturacion?: number | null
+}
+
+/**
+ * Factura que una nota (E33/E34) puede modificar: de venta y aceptada por la
+ * DGII (GET /api/facturas/modificables?client_id=).
+ */
+export interface FacturaModificableRow {
+  id: number
+  client_id: number | null
+  tipo_ecf: string
+  e_ncf: string
+  /** Fecha de emisión del e-CF (dd-mm-aaaa): la que va en FechaNCFModificado. */
+  fecha_emision: string
+  estado_dgii: string
+  total: number
+  /** Suma de las notas de crédito ya emitidas contra esta factura (sin rechazadas). */
+  notas_credito: number
+  notas_debito: number
+  /** total + notas de débito − notas de crédito: el tope de una nota de crédito nueva. */
+  saldo: number
 }
 
 export interface ListParams {

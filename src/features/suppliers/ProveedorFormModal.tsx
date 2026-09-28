@@ -7,6 +7,7 @@ import { ApiError, createProveedor, updateProveedor, deleteProveedor } from '@/a
 import { RncConsultaField } from '@/components/RncConsultaField'
 import type { Proveedor } from '@/types/domain'
 import { proveedorConRnc } from './rnc'
+import { LARGO, errorCorreo, errorRnc, errorTelefono, errorTexto, soloDigitos } from '@/features/clients/validacion'
 
 interface ProveedorFormModalProps {
   /** null => crear; un Proveedor => editar. */
@@ -31,12 +32,22 @@ export function ProveedorFormModal({ proveedor, onClose }: ProveedorFormModalPro
   const [error, setError] = useState<string | null>(null)
 
   const save = async () => {
-    if (!nombre.trim()) { setError('El nombre es obligatorio.'); return }
+    // Las reglas del backend, antes de enviar: el RNC no se revisaba aquí (sí en
+    // el buscador de proveedores) y el error volvía del servidor en inglés.
+    const problema =
+      errorTexto(nombre, LARGO.nombreProveedor, 'El nombre', 'Escribe el nombre o la razón social del proveedor.')
+      ?? errorRnc(rnc)
+      ?? errorTexto(contacto, LARGO.contactoProveedor, 'El contacto')
+      ?? errorTelefono(telefono)
+      ?? errorCorreo(correo)
+      ?? errorTexto(direccion, LARGO.direccionProveedor, 'La dirección')
+    if (problema) { setError(problema); return }
     setError(null)
     setSaving(true)
     const payload = {
       nombre: nombre.trim(),
-      rnc: rnc.trim() || undefined,
+      // Solo los dígitos: con guiones no cabe en la columna de 11.
+      rnc: soloDigitos(rnc) || undefined,
       contacto: contacto.trim() || undefined,
       telefono: telefono.trim() || undefined,
       correo: correo.trim() || undefined,
@@ -115,23 +126,23 @@ export function ProveedorFormModal({ proveedor, onClose }: ProveedorFormModalPro
         />
         <div className="field full">
           <label className="label">Nombre / Razón social <span className="req">*</span></label>
-          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" autoFocus={editing} />
+          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Suplidora XYZ SRL" autoFocus={editing} maxLength={LARGO.nombreProveedor} />
         </div>
         <div className="field">
           <label className="label">Contacto <span className="opt">(opcional)</span></label>
-          <input className="input" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Nombre de la persona" />
+          <input className="input" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Nombre de la persona" maxLength={LARGO.contactoProveedor} />
         </div>
         <div className="field">
           <label className="label">Teléfono <span className="opt">(opcional)</span></label>
-          <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="(809) 555-0000" />
+          <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="(809) 555-0000" maxLength={LARGO.telefono} />
         </div>
         <div className="field full">
           <label className="label">Correo <span className="opt">(opcional)</span></label>
-          <input className="input" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="compras@proveedor.do" />
+          <input className="input" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="compras@proveedor.do" maxLength={LARGO.correo} />
         </div>
         <div className="field full">
           <label className="label">Dirección <span className="opt">(opcional)</span></label>
-          <input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle, sector, ciudad" />
+          <input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle, sector, ciudad" maxLength={LARGO.direccionProveedor} />
         </div>
         <div className="field full">
           <span className="row gap-sm" style={{ alignItems: 'center', cursor: 'pointer' }} onClick={() => setActivo(!activo)}>

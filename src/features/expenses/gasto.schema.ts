@@ -5,6 +5,8 @@ import { z } from 'zod'
 
 /** e-NCF de Crédito Fiscal: E31 + 10 dígitos. Mismo formato que exige el backend. */
 const E31_RE = /^E31\d{10}$/
+/** Lo que entrega un <input type="date"> completo; vacío si se borró o quedó a medias. */
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const gastoLineaSchema = z.object({
   id: z.number(),
@@ -25,10 +27,18 @@ export const gastoFormSchema = z
     tipoBienes: z.string().regex(/^\d{2}$/, 'Elige el tipo de costo o gasto.'),
     proveedor: z.any(),
     ncf: z.string(),
+    fecha: z.string(),
     lineas: z.array(gastoLineaSchema).min(1, 'Agrega al menos una línea con descripción e importe.'),
   })
   .superRefine((val, ctx) => {
     if (val.esCompra) {
+      // La compra recibida viaja con la fecha de la factura del proveedor; vacía,
+      // el servidor fallaba con un error técnico. Solo se exige cuando el campo se
+      // ve (tipos recibidos): en las auto-emitidas está oculto y un error ahí no se
+      // podría corregir; si llega vacía, el servidor pone la de hoy.
+      if (val.recibido && !FECHA_RE.test(val.fecha)) {
+        ctx.addIssue({ code: 'custom', path: ['fecha'], message: 'Pon la fecha de la factura del proveedor.' })
+      }
       if (!val.proveedor) {
         ctx.addIssue({ code: 'custom', path: ['proveedor'], message: 'Selecciona un proveedor del directorio o crea uno nuevo.' })
       } else if (!val.proveedor.rnc) {
@@ -47,6 +57,7 @@ export interface GastoFormErrors {
   proveedor?: string
   ncf?: string
   tipoBienes?: string
+  fecha?: string
   /** Error a nivel de formulario (ej. sin líneas). */
   form?: string
   lineas: Record<number, GastoLineaErrors>
@@ -76,6 +87,8 @@ export function mapGastoIssues(error: z.ZodError, lineas: { id: number }[]): Gas
       out.tipoBienes ??= issue.message
     } else if (head === 'ncf') {
       out.ncf ??= issue.message
+    } else if (head === 'fecha') {
+      out.fecha ??= issue.message
     } else if (head === 'lineas') {
       if (typeof idx === 'number' && typeof field === 'string') {
         const lineId = lineas[idx]?.id

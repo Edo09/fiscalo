@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState, ErrorState, Dropdown, MenuItem } from '@/components/ui'
 import {
-  ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple, getFacturaSimplePdf,
-  listProducts, mapProductRow, previewFacturaSimple, previewReciboFacturaSimple, updateFacturaSimple,
+  ApiError, createFacturaSimple, getBranding, getClient, getEmisor, getFacturaSimple, getFacturaSimplePdf,
+  listProducts, mapClientRow, mapProductRow, previewFacturaSimple, previewReciboFacturaSimple, updateFacturaSimple,
 } from '@/api'
 import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
@@ -95,7 +95,18 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [metodo, setMetodo] = useState('Efectivo')
   const [clienteActual, setClienteActual] = useState<string | null>(null)
+  /**
+   * Ficha del cliente de la factura que se edita (con sus condiciones). En
+   * edición el cliente se muestra solo como texto, y sin su ficha se podía
+   * elegir crédito para un cliente que ya no lo tiene: el backend lo rechazaba.
+   */
+  const [clienteGuardado, setClienteGuardado] = useState<Cliente | null>(null)
   const [clienteLibre, setClienteLibre] = useState('')
+  /** Lo escrito en el buscador de clientes sin elegir un resultado (ver ClientCombobox). */
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  /** Ya se intentó seguir con un problema: desde ahí los campos se marcan en rojo. */
+  const [intentoFallido, setIntentoFallido] = useState(false)
+  const clienteCajaRef = useRef<HTMLDivElement | null>(null)
   const [fecha, setFecha] = useState(hoyLocal)
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
   const [guardando, setGuardando] = useState(false)
@@ -155,6 +166,13 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         if (!vivo) return
         setNumero(f.no_factura)
         setClienteActual(f.client_name || f.company_name || null)
+        // Sus condiciones (crédito) llegan aparte. Si fallan no se bloquea nada:
+        // el backend sigue validando el crédito al guardar.
+        if (f.client_id) {
+          getClient(f.client_id)
+            .then((row) => { if (vivo && row) setClienteGuardado(mapClientRow(row)) })
+            .catch(() => {})
+        }
         // El backend solo guarda contado/credito: cualquier cobro de contado
         // vuelve como Efectivo.
         const metodoCargado = Number(f.tipo_pago ?? 1) === 2 ? METODOS_CREDITO[0] : 'Efectivo'
@@ -295,8 +313,33 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     }))
 
   const clienteResuelto = cliente != null || clienteLibre.trim() !== '' || clienteActual != null
-  const puedeGuardar = clienteResuelto && lineasValidas.length > 0 && lineasIncompletas.length === 0
-    && !guardando && (!editando || hayCambios)
+
+  // --- Qué impide guardar, dicho con palabras ---------------------------
+  // Los botones se deshabilitan, así que cada motivo se muestra junto a ellos:
+  // antes quedaban en gris sin que se supiera por qué.
+
+  // Texto en el buscador sin elegir resultado: se ve como un cliente puesto,
+  // pero no viaja. Cuenta aunque haya cliente actual (edición): quien lo
+  // escribió quería cambiarlo, y guardar con el anterior sería un cambio mudo.
+  const busquedaPendiente = cliente == null && clienteLibre.trim() === '' ? busquedaCliente : ''
+  const problemaCliente = busquedaPendiente
+    ? `«${busquedaPendiente}» no está elegido: elígelo de la lista o escríbelo como nombre.`
+    : !clienteResuelto ? 'Elige un cliente de la lista o escribe su nombre abajo.' : null
+  // Una fecha vacía llegaba al servidor y fallaba al guardar con un error técnico.
+  const problemaFecha = fecha ? null : 'Pon la fecha de la factura.'
+  // El crédito lo decide el cliente elegido o, al editar sin cambiarlo, el de
+  // la factura: el backend valida contra ese aunque se escriba un nombre libre.
+  const clienteCredito = cliente ?? (editando ? clienteGuardado : null)
+  const sinCredito = clienteCredito != null && !clienteCredito.permiteCredito
+  const problemaCredito = sinCredito && esMetodoCredito(metodo)
+    ? 'Este cliente no tiene crédito habilitado: cambia el pago a contado.'
+    : null
+  const motivoBloqueo = problemaCliente ?? problemaFecha ?? problemaCredito
+    ?? (lineasValidas.length === 0 ? 'Agrega al menos una línea con descripción.' : null)
+    ?? (lineasIncompletas.length > 0 ? 'Completa o quita las líneas marcadas en rojo.' : null)
+    ?? (editando && !hayCambios ? 'No hay cambios que guardar.' : null)
+  const puedeGuardar = motivoBloqueo == null && !guardando
+  const marcarCliente = intentoFallido && problemaCliente != null
 
   const items = (): FacturaSimpleItemInput[] =>
     lineasValidas.map((l) => ({
@@ -346,7 +389,19 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
    * como PDF; la tirilla se ve dentro de la app, sellada (ver VistaPreviaRecibo).
    */
   const vistaPrevia = async (formato: FormatoImpresion) => {
-    if (lineasValidas.length === 0) { toast.error('Agrega al menos una línea con descripción.'); return }
+    // Lo mismo que exige guardar (salvo las líneas a medias, que la vista previa
+    // simplemente no muestra). Sin esto el servidor respondía con un texto técnico.
+    const problema = problemaCliente ?? problemaFecha
+      ?? (lineasValidas.length === 0 ? 'Agrega al menos una línea con descripción.' : null)
+    if (problema) {
+      setIntentoFallido(true)
+      toast.error(problema)
+      if (problemaCliente) clienteCajaRef.current?.querySelector<HTMLInputElement>('input')?.focus()
+      return
+    }
+    // Pasó la revisión: la marca roja del cliente vale para el último intento, no
+    // para siempre (si después se quita el cliente, no debe salir marcado de golpe).
+    setIntentoFallido(false)
     setPreviaBusy(formato)
     try {
       const input = { ...clienteBody(true), date: fecha, items: items() }
@@ -419,8 +474,16 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     // Ya guardada: si la impresión falla, la factura queda y se reimprime
     // desde el listado, que es donde ya está el usuario.
     const recibo = imprimir === 'pos'
+    const noImpresa = recibo
+      ? 'La factura se guardó, pero no se pudo imprimir el recibo. Imprímelo desde el listado.'
+      : 'La factura se guardó, pero no se pudo imprimir. Imprímela desde el listado.'
+    if (id == null) {
+      // Sin el id no hay de dónde pedir el documento; la factura sí quedó.
+      console.warn('[factura simple] la respuesta del guardado no trae el id; no se imprime')
+      toast.error(noImpresa)
+      return
+    }
     try {
-      if (id == null) throw new Error('la respuesta no trae el id de la factura')
       const conDialogo = recibo
         ? await imprimirRecibo({ tipo: 'simple', id })
         : await printDocument(await getFacturaSimplePdf(id, 'carta'))
@@ -428,12 +491,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     } catch (e) {
       // El motivo del servidor va en su propia línea: trae su puntuación (y a
       // veces su propio consejo), y pegado a la frase quedaba "de nuevo.. Imprímela".
-      toast.error(
-        recibo
-          ? 'La factura se guardó, pero no se pudo imprimir el recibo. Imprímelo desde el listado.'
-          : 'La factura se guardó, pero no se pudo imprimir. Imprímela desde el listado.',
-        e instanceof ApiError ? { description: e.message } : undefined,
-      )
+      toast.error(noImpresa, e instanceof ApiError ? { description: e.message } : undefined)
     }
   })
 
@@ -481,12 +539,14 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             <label className="fx-eyebrow" htmlFor="fx-fecha">Fecha</label>
             <input
               id="fx-fecha"
-              className={'fx-field' + marca(fechaCambiada)}
+              className={'fx-field' + marca(fechaCambiada) + (problemaFecha ? ' fx-field--err' : '')}
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
               style={{ textAlign: 'right', width: 'auto' }}
+              aria-invalid={problemaFecha ? true : undefined}
             />
+            {problemaFecha && <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaFecha}</span>}
           </div>
         </header>
 
@@ -494,7 +554,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
 
         {/* --- Receptor --- */}
         <section className="fx-a-quien">
-          <span className="fx-eyebrow">Facturar a</span>
+          <span className="fx-eyebrow">Facturar a <span className="req">*</span></span>
 
           {clienteActual && !cliente && !cambiandoCliente ? (
             <div className="fx-cliente-actual">
@@ -506,8 +566,13 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           ) : (
           <>
           <div className="fx-cliente-row">
-            <div className="fx-cliente">
-              <ClientCombobox value={cliente} onChange={seleccionarCliente} />
+            <div className="fx-cliente" ref={clienteCajaRef}>
+              <ClientCombobox
+                value={cliente}
+                onChange={seleccionarCliente}
+                onBusquedaChange={setBusquedaCliente}
+                invalido={marcarCliente}
+              />
             </div>
             <button
               type="button"
@@ -529,6 +594,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           )}
           </>
           )}
+          {marcarCliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaCliente}</span>}
           <div style={{ marginTop: 12 }}>
             <span className="fx-eyebrow">Pago</span>
             <select
@@ -538,10 +604,14 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               aria-label="Método de pago"
             >
               {METODOS_PAGO.map((m) => (
-                <option key={m} disabled={esMetodoCredito(m) && cliente != null && !cliente.permiteCredito}>{m}</option>
+                <option key={m} disabled={esMetodoCredito(m) && sinCredito}>{m}</option>
               ))}
             </select>
-            {cliente && !cliente.permiteCredito && (
+            {/* Factura a crédito de un cliente que ya no lo tiene (al editar):
+                no se cambia sola a contado, pero así no se puede guardar. */}
+            {problemaCredito ? (
+              <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaCredito}</span>
+            ) : sinCredito && (
               <span className="text-xs muted-3" style={{ display: 'block' }}>
                 Este cliente no tiene crédito habilitado
               </span>
@@ -688,10 +758,16 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               <Btn variant="secondary" icon="printer" onClick={() => void verGuardada('pos')} disabled={pdfBusy != null}>
                 {pdfBusy === 'pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
               </Btn>
-              <Btn variant="primary" icon="check" disabled>Guardar cambios</Btn>
+              <span className="fx-motivo">No hay cambios que guardar.</span>
+              <Btn variant="primary" icon="check" disabled title="No hay cambios que guardar.">Guardar cambios</Btn>
             </>
           ) : (
             <>
+              {motivoBloqueo && !guardando && (
+                // Sin role="status": el motivo cambia con cada tecla del buscador y un
+                // lector de pantalla lo repetiría entero; el botón lo lleva en su title.
+                <span className="fx-motivo">{motivoBloqueo}</span>
+              )}
               <Dropdown
                 align="right"
                 width={200}
@@ -708,14 +784,20 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               {/* Lo de todos los días (guardar e imprimir la tirilla) va a un clic;
                   las variantes, en el menú del mismo botón. */}
               <div className="fx-split">
-                <Btn variant="primary" icon="printer" onClick={() => void guardar('pos')} disabled={!puedeGuardar}>
+                <Btn
+                  variant="primary" icon="printer" onClick={() => void guardar('pos')}
+                  disabled={!puedeGuardar} title={motivoBloqueo ?? undefined}
+                >
                   {guardando ? 'Guardando…' : `Guardar e imprimir ${anchoTirilla} mm`}
                 </Btn>
                 <Dropdown
                   align="right"
                   width={250}
                   trigger={
-                    <Btn variant="primary" icon="chevron-down" disabled={!puedeGuardar} aria-label="Otras formas de guardar" />
+                    <Btn
+                      variant="primary" icon="chevron-down" disabled={!puedeGuardar}
+                      aria-label="Otras formas de guardar" title={motivoBloqueo ?? 'Otras formas de guardar'}
+                    />
                   }
                 >
                   <MenuItem icon="file" onClick={() => void guardar('carta')}>Guardar e imprimir en hoja carta</MenuItem>
@@ -733,6 +815,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         <VistaPreviaRecibo
           datos={previaRecibo}
           puedeGuardar={puedeGuardar}
+          motivo={guardando ? null : motivoBloqueo}
           onGuardarEImprimir={() => { setPreviaRecibo(null); void guardar('pos') }}
           onClose={() => setPreviaRecibo(null)}
         />
@@ -789,7 +872,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
 
       {nuevoCliente && (
         <NewClientModal
-          nombreInicial={clienteLibre.trim()}
+          // Lo que ya escribió (como nombre libre o en el buscador) no se vuelve a teclear.
+          nombreInicial={clienteLibre.trim() || busquedaPendiente}
           onClose={() => setNuevoCliente(false)}
           onCreated={(c) => { seleccionarCliente(c); setClienteLibre('') }}
         />

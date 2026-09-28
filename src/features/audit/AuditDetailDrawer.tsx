@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge, Btn, Drawer } from '@/components/ui'
+import { ApiError } from '@/api'
 import type { AuditLogRow } from '@/api'
 import type { Nav } from '@/config/navigation'
 import { etiquetaAccion, etiquetaCampo, etiquetaModulo, fechaHora, quien, tonoAccion } from './etiquetas'
@@ -116,7 +117,9 @@ export function AuditDetailDrawer({ row, onClose, nav }: { row: AuditLogRow; onC
       await destino.abrir(nav)
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo abrir el documento.')
+      // Solo los textos de la API: un error de JavaScript saldría en inglés.
+      if (!(e instanceof ApiError)) console.error('[bitácora] abrir documento', e)
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo abrir el documento.')
     } finally {
       setAbriendo(false)
     }

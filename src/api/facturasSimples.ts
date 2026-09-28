@@ -6,7 +6,8 @@
 // es la suma de los subtotales. El backend genera el número (`0001-230826`) y
 // calcula el subtotal de cada línea, así que el formulario solo manda lo que el
 // usuario escribe. Ver src/Controllers/facturaSimpleController.php en la API.
-import { ApiError, getJson, getList, postJson, request, qs } from './http'
+import { ApiError } from './errores'
+import { getJson, getList, postJson, request, qs } from './http'
 import { parametroFormato } from './impresion'
 import type {
   DocBase64,
@@ -46,7 +47,9 @@ export async function getFacturaSimpleStats(): Promise<FacturaSimpleStats> {
   const d = await getJson<unknown>('/api/facturas-simples/stats')
   const o = d as Partial<FacturaSimpleStats> | null
   if (!o || typeof o !== 'object' || Array.isArray(o) || !Array.isArray(o.por_mes) || !Array.isArray(o.por_dia)) {
-    throw new ApiError('El servidor todavía no tiene las estadísticas de facturas simples.', 404)
+    throw new ApiError('Las estadísticas de facturas simples todavía no están disponibles.', 404, {
+      original: 'GET /api/facturas-simples/stats no devolvió por_mes/por_dia (backend anterior al endpoint)',
+    })
   }
   return o as FacturaSimpleStats
 }

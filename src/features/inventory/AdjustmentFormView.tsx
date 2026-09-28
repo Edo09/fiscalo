@@ -29,6 +29,12 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
   const queryClient = useQueryClient()
   const [motivo, setMotivo] = useState<MotivoAjuste>('CONTEO_FISICO')
   const [nota, setNota] = useState('')
+  /**
+   * Líneas cuya cantidad ya se dejó (el campo perdió el foco). Un producto recién
+   * agregado empieza en 0 y marcarlo en rojo en ese instante sería regañar antes
+   * de que se pueda escribir; el motivo del botón en gris sí se ve desde el inicio.
+   */
+  const [tocadas, setTocadas] = useState<Set<number>>(() => new Set())
   const [lineas, setLineas] = useState<Linea[]>([])
   const [guardando, setGuardando] = useState(false)
   const [picker, setPicker] = useState(false)
@@ -80,11 +86,20 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
   const totalDe = (l: Linea) => Math.round(deltaDe(l) * l.costo * 100) / 100
   const total = lineas.reduce((a, l) => a + totalDe(l), 0)
 
-  const lineasValidas = lineas.filter((l) => l.cantidad > 0)
+  // Un producto con cantidad 0 no ajusta nada. Antes esas líneas se descartaban
+  // sin avisar y, si todas estaban en 0, "Guardar ajuste" quedaba en gris sin
+  // explicación. Ahora se marcan y bloquean hasta completarlas o quitarlas.
+  const lineasEnCero = lineas.filter((l) => !(l.cantidad > 0))
+  const marcarCero = (l: Linea) => !(l.cantidad > 0) && tocadas.has(l.id)
   // Dejar el almacén en negativo casi siempre es un error de captura, pero no lo
   // bloqueamos: el sistema permite saldo negativo y a veces refleja la realidad.
-  const negativos = lineasValidas.filter((l) => finalDe(l) < 0)
-  const puedeGuardar = lineasValidas.length > 0 && !guardando
+  const negativos = lineas.filter((l) => l.cantidad > 0 && finalDe(l) < 0)
+  const motivoBloqueo = lineas.length === 0
+    ? 'Agrega al menos un producto para ajustar.'
+    : lineasEnCero.length > 0
+      ? 'Falta la cantidad en algún producto.'
+      : null
+  const puedeGuardar = motivoBloqueo == null && !guardando
 
   // Acción única: un doble clic crearia dos ajustes y moveria el stock el doble.
   const guardar = useAccionUnica(async () => {
@@ -94,7 +109,7 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       const payload = {
         motivo,
         nota: nota.trim() || undefined,
-        lineas: lineasValidas.map<CrearAjusteLinea>((l) => ({
+        lineas: lineas.map<CrearAjusteLinea>((l) => ({
           product_id: l.productId,
           tipo: l.tipo,
           cantidad: l.cantidad,
@@ -182,12 +197,13 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
                         <option value="DISMINUCION">Disminución</option>
                       </select>
                     </td>
-                    <td>
+                    <td className={marcarCero(l) ? 'field-error' : undefined}>
                       <input
                         className="input" type="number" min={0} step={1} inputMode="numeric"
                         style={{ textAlign: 'right' }}
                         value={l.cantidad}
                         onChange={(e) => updLinea(l.id, { cantidad: Math.max(0, Math.round(Number(e.target.value))) })}
+                        onBlur={() => setTocadas((t) => (t.has(l.id) ? t : new Set(t).add(l.id)))}
                         aria-label={`Cantidad a ajustar de ${l.nombre}`}
                       />
                     </td>
@@ -224,6 +240,15 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
           </span>
         </div>
 
+        {lineasEnCero.some(marcarCero) && (
+          <div className="row gap-sm text-sm" style={{ marginTop: 12, color: 'var(--danger)', alignItems: 'center' }} role="alert">
+            <Icon name="alert-circle" size={14} />
+            <span>
+              Escribe una cantidad mayor que 0 en cada producto, o quítalo con la ✕.
+            </span>
+          </div>
+        )}
+
         {negativos.length > 0 && (
           <div className="card card-pad row gap-sm" style={{ marginTop: 12, background: 'var(--warning-soft)', borderColor: 'transparent' }}>
             <Icon name="alert-triangle" size={16} />
@@ -238,9 +263,11 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       </Card>
       </div>
 
-      <div className="row" style={{ justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+      <div className="row" style={{ justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 18 }}>
+        {/* Por qué está en gris: un botón deshabilitado no muestra su title de forma fiable. */}
+        {motivoBloqueo && !guardando && <span className="text-xs muted-3" role="status">{motivoBloqueo}</span>}
         <Btn variant="secondary" onClick={() => nav('ajustes')}>Cancelar</Btn>
-        <Btn variant="primary" icon="check" onClick={() => void guardar()} disabled={!puedeGuardar}>
+        <Btn variant="primary" icon="check" onClick={() => void guardar()} disabled={!puedeGuardar} title={motivoBloqueo ?? undefined}>
           {guardando ? 'Guardando…' : 'Guardar ajuste'}
         </Btn>
       </div>

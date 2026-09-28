@@ -1,5 +1,6 @@
 // Servicio: almacenes de inventario (/api/warehouses). Ver docs/inventario.md.
-// Guardas de borrado (400): Almacén Principal, o almacén con productos asignados.
+// Guardas de borrado (400): Almacén Principal, almacén con productos asignados,
+// o con movimientos o ajustes de inventario registrados.
 import { getList, getJson, postJson, request, qs } from './http'
 import type { CreateWarehouseInput, ListParams, ListResult, WarehouseRow } from './types'
 

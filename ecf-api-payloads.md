@@ -282,7 +282,7 @@ Todo lo demás (`fecha_emision`, `tipo_pago`, `tipo_ingresos`, `totales`, `compr
 | `fecha_emision` | no | string | hoy | Formato `DD-MM-YYYY` |
 | `tipo_pago` | no | int | `1` | `1`=Contado, `2`=Crédito, `3`=Gratuito, `4`=Permuta, `5`=Otros |
 | `tipo_ingresos` | no | string | `"01"` | `"01"` Operaciones (no aplica a E43/E47) |
-| `indicador_monto_gravado` | no | string | `"0"` | `"0"`=precio incluye ITBIS, `"1"`=lo excluye (E31/32/33/34/41/45) |
+| `indicador_monto_gravado` | no | string | `"0"` | Siempre `"0"` (XSD: `"0"` = los montos de las líneas **no** incluyen ITBIS, `"1"` = sí); el backend lo fuerza. `precio_unitario` va **sin ITBIS**: con "Los precios incluyen ITBIS" el formulario lo desglosa antes (ver `src/features/invoices/montosLinea.ts`) |
 | `comprador` | no | object | del cliente | Sobrescribe datos del comprador (ver abajo) |
 | `totales` | no | object | calculado | Sobrescribe tasas/totales (ver abajo) |
 | `e_ncf` | no | string | autodispensado | Forzar un e-NCF específico (normalmente NO enviar) |
@@ -472,7 +472,10 @@ Modifica (aumenta) una factura E31 previa. Requiere `informacion_referencia`.
 **Notas:**
 - `ncf_modificado`: e-NCF del E31 original (debe estar ACEPTADO en DGII)
 - `rnc_otro_contribuyente`: **siempre null** en ambiente certecf — si se envía el RNC, DGII retorna error 614
-- `codigo_modificacion`: `"1"`=Anulación, `"2"`=Corrección monto, `"3"`=Descuento, `"4"`=Otros
+- `fecha_ncf_modificado`: `FechaEmision` del e-CF original (`dd-mm-aaaa`), tal como la devuelve `GET /api/facturas/modificables`
+- `codigo_modificacion` (catálogo DGII): `"1"`=Anula el NCF modificado, `"2"`=Corrige texto, `"3"`=Corrige montos, `"4"`=Reemplazo de un NCF emitido en contingencia, `"5"`=Referencia factura de consumo electrónica
+- `razon_modificacion`: máx. 90 caracteres (el formulario la pide; sale impresa en la nota)
+- El formulario elige la factura de `GET /api/facturas/modificables?client_id=` (aceptadas, de venta, con su saldo)
 
 ---
 
@@ -517,9 +520,9 @@ Modifica (reduce) una factura E31 previa.
 ```
 
 **Notas:**
-- `indicador_nota_credito`: `"0"`=Monto parcial, `"1"`=Anulación total
+- `indicador_nota_credito`: `"0"` = emitida dentro de los 30 días calendario de la factura modificada, `"1"` = después. El formulario no lo manda: lo calcula el backend con las dos fechas
 - `rnc_otro_contribuyente`: **siempre null** (igual que E33)
-- El monto del item debe ser menor al saldo disponible del E31 referenciado
+- El total de la nota no puede pasar del `saldo` de la factura referenciada (total + notas de débito − notas de crédito previas); el backend responde 422 si pasa
 
 ---
 

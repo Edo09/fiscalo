@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Icon, Btn, Image } from '@/components/ui'
 import { login } from '@/api/auth'
+import { ApiError } from '@/api'
 import { TENANT_ID } from '@/api/config'
 import { setSession } from '@/stores/auth'
 
@@ -38,7 +39,9 @@ export function LoginView() {
       setSession(res.token, res.user)
       // En éxito, setSession re-renderiza App y desmonta esta vista (no tocar estado).
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Ocurrió un error inesperado.')
+      // Solo los textos de la API (ya en español); un error de JavaScript saldría en inglés.
+      if (!(err instanceof ApiError)) console.error('[login]', err)
+      setServerError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesión. Inténtalo de nuevo.')
       setLoading(false)
     }
   }

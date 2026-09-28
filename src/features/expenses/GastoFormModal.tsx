@@ -10,9 +10,11 @@ import { CATEGORIA_TIPOS, GASTO_TIPOS, efectoInventario, isAutoEmision } from '@
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import { ProductoCombobox } from '@/features/products/ProductoCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
+import { MSG_UNIDAD, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
 import { TipoBienesServiciosSelect } from '@/components/TipoBienesServiciosSelect'
 import type { Producto, Proveedor } from '@/types/domain'
 import { gastoFormSchema, mapGastoIssues, emptyGastoErrors, type GastoFormErrors } from './gasto.schema'
+import { avisoNoEnviado } from './envioDgii'
 
 interface Linea {
   id: number
@@ -69,10 +71,25 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   // Próximo NCF (informativo): misma query cacheada que la página de Gastos;
   // se invalida al crear, así que siempre refleja la secuencia vigente.
   const stats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
+  const unidades = useUnidadesMedida()
   const seqE43 = stats.data?.secuencias.find((s) => s.type === 'E43')
   const proximoNcf = seqE43 != null ? `E43${String(seqE43.secuencia_actual + 1).padStart(10, '0')}` : null
   const seqCompra = (!recibido && esCompra) ? stats.data?.secuencias.find((s) => s.type === tipo) : undefined
   const proximoNcfCompra = seqCompra != null ? `${tipo}${String(seqCompra.secuencia_actual + 1).padStart(10, '0')}` : null
+
+  /**
+   * Auto-emisión sin números autorizados. El modal ya mostraba "Sin secuencia"
+   * y aun así dejaba registrar: el servidor guardaba el gasto con error y
+   * respondía con un aviso técnico. Solo se decide con datos reales (con el
+   * resumen vacío el servidor no pudo leer las secuencias): si no, registra y
+   * el servidor valida como siempre.
+   */
+  const tipoAuto: GastoTipo | null = esGastoMenor ? 'E43' : !recibido ? tipo : null
+  const seqAuto = esGastoMenor ? seqE43 : seqCompra
+  const sinNumeros = tipoAuto != null && stats.data?.resumen != null && !stats.error
+    && (seqAuto == null || (seqAuto.restantes != null && Number(seqAuto.restantes) === 0))
+    ? `No hay números autorizados para ${GASTO_TIPOS[tipoAuto].label} (${tipoAuto}). Registra un rango en Configuración › Numeraciones e-CF antes de registrar ${esCompra ? 'la compra' : 'el gasto'}.`
+    : null
 
   // Limpia los errores en línea de una fila al editarla (o al eliminarla).
   const clearLineaErr = (id: number) =>
@@ -139,10 +156,17 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
    */
   function validateForm(): boolean {
     const validables = lineasConContenido()
-    const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, tipoBienes, proveedor, ncf, lineas: validables })
-    if (!res.success) {
-      setErrors(mapGastoIssues(res.error, validables))
-      const n = res.error.issues.length
+    const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, tipoBienes, proveedor, ncf, fecha, lineas: validables })
+    const errs = res.success ? emptyGastoErrors() : mapGastoIssues(res.error, validables)
+    let n = res.success ? 0 : res.error.issues.length
+    // Unidad que no está en el catálogo DGII (producto migrado): el e-CF fallaba al emitir.
+    for (const l of validables) {
+      if (unidadValida(l.unidad_medida, unidades)) continue
+      const bucket = (errs.lineas[l.id] ??= {})
+      if (!bucket.unidad_medida) { bucket.unidad_medida = MSG_UNIDAD; n += 1 }
+    }
+    if (n > 0) {
+      setErrors(errs)
       toast.error(n === 1 ? 'Revisa 1 campo del formulario.' : `Revisa ${n} campos del formulario.`)
       return false
     }
@@ -152,6 +176,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
 
   const submit = async () => {
     setError(null)
+    if (sinNumeros) return
     if (!validateForm()) return
     const items = lineasConContenido()
 
@@ -181,7 +206,9 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     try {
       const g = await createGasto(payload)
       toast.success(`${esCompra ? 'Compra registrada' : 'Gasto registrado'}${g.ncf ? ` · ${g.ncf}` : ''}.`)
-      if (g.aviso) toast.warning(g.aviso)
+      // Auto-emisión que no llegó a la DGII: qué pasó y qué hacer (ver avisoNoEnviado).
+      const noEnviado = !recibido ? avisoNoEnviado(g, 'guardado') : null
+      if (noEnviado) toast.warning(noEnviado)
       // Las líneas con producto movieron existencias: los listados de productos
       // y el inventario quedaron viejos.
       if (efecto && items.some((l) => l.prodId !== '')) {
@@ -208,7 +235,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-          <Btn variant="primary" icon="check" onClick={submit} disabled={saving}>
+          <Btn variant="primary" icon="check" onClick={submit} disabled={saving || sinNumeros != null} title={sinNumeros ?? undefined}>
             {saving ? 'Guardando…' : 'Registrar'}
           </Btn>
         </>
@@ -217,6 +244,11 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
       {error && (
         <div className="card card-pad row gap-sm mb-md" style={{ background: 'var(--danger-soft)', borderColor: 'transparent', color: 'var(--danger)' }}>
           <Icon name="alert-circle" size={16} /><span className="fw6 text-sm">{error}</span>
+        </div>
+      )}
+      {sinNumeros && (
+        <div className="card card-pad row gap-sm mb-md" style={{ background: 'var(--warning-soft)', borderColor: 'transparent', color: 'var(--warning)' }}>
+          <Icon name="alert-triangle" size={16} /><span className="text-sm">{sinNumeros}</span>
         </div>
       )}
 
@@ -325,9 +357,13 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
               {errors.proveedor && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.proveedor}</div>}
             </div>
             {recibido && (
-              <div className="field">
-                <label>Fecha</label>
-                <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <div className={'field' + (errors.fecha ? ' field-error' : '')}>
+                <label>Fecha <span className="req">*</span></label>
+                <input
+                  className="input" type="date" value={fecha}
+                  onChange={(e) => { setFecha(e.target.value); if (errors.fecha) setErrors((er) => ({ ...er, fecha: undefined })) }}
+                />
+                {errors.fecha && <div className="err-msg"><Icon name="alert-circle" size={13} />{errors.fecha}</div>}
               </div>
             )}
           </>

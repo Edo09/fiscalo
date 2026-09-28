@@ -4,6 +4,8 @@ import { toast } from 'sonner'
 import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead, type IconName } from '@/components/ui'
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, listUbicaciones, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { hasModule } from '@/config/permissions'
+import { useSession } from '@/stores/auth'
 import { BrandingSection } from './BrandingSection'
 import { ImpresoraSection } from './ImpresoraSection'
 import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
@@ -23,6 +25,11 @@ const AMBIENTES: Record<string, string> = {
 
 export function SettingsView() {
   const queryClient = useQueryClient()
+  const { user } = useSession()
+  // GET /api/branding lo puede leer cualquier rol (el logo sale en la factura),
+  // pero subir/quitar el logo y cambiar la plantilla exigen el módulo: sin él
+  // el backend responde 403, así que ni se ofrecen.
+  const puedeEditarBranding = !user?.permissions || hasModule(user.permissions, 'branding')
   const fileRef = useRef<HTMLInputElement>(null)
   const [sec, setSec] = useState('empresa')
   const [logoBusy, setLogoBusy] = useState(false)
@@ -71,13 +78,14 @@ export function SettingsView() {
       setLogoBusy(false)
     }
   }
-  const secs: { id: string; label: string; ic: IconName }[] = [
+  const todasSecs: { id: string; label: string; ic: IconName }[] = [
     { id: 'empresa', label: 'Datos de empresa', ic: 'building-2' },
     { id: 'fiscal', label: 'Configuración DGII', ic: 'landmark' },
     { id: 'numeracion', label: 'Numeraciones e-CF', ic: 'hash' },
     { id: 'plantillas', label: 'Plantillas PDF', ic: 'file-text' },
     { id: 'impresora', label: 'Impresora de recibos', ic: 'printer' },
   ]
+  const secs = todasSecs.filter((s) => s.id !== 'plantillas' || puedeEditarBranding)
   return (
     <div className="page page-wide">
       <PageHead title="Configuración" sub="Ajustes generales y fiscales del sistema" />
@@ -96,19 +104,25 @@ export function SettingsView() {
                 <ErrorState title="No se pudieron cargar los datos del emisor" onRetry={reload}>{error}</ErrorState>
               ) : emisor && (
                 <>
-                  <div className="row gap-md mb-lg" style={{ alignItems: 'center' }}>
-                    <input ref={fileRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={(e) => void onLogoPick(e)} />
-                    {branding?.logo_data_uri ? (
-                      <img src={branding.logo_data_uri} alt="Logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
-                    ) : null}
-                    <Btn variant="secondary" size="sm" icon="upload" onClick={() => fileRef.current?.click()} disabled={logoBusy}>
-                      {branding?.has_custom_logo ? 'Cambiar logo' : 'Subir logo'}
-                    </Btn>
-                    {branding?.has_custom_logo && (
-                      <Btn variant="ghost" size="sm" icon="trash-2" onClick={() => void removeLogo()} disabled={logoBusy}>Quitar</Btn>
-                    )}
-                    <span className="text-xs muted-3">PNG o JPG, máx. 2 MB</span>
-                  </div>
+                  {(puedeEditarBranding || branding?.logo_data_uri) && (
+                    <div className="row gap-md mb-lg" style={{ alignItems: 'center' }}>
+                      {branding?.logo_data_uri ? (
+                        <img src={branding.logo_data_uri} alt="Logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
+                      ) : null}
+                      {puedeEditarBranding && (
+                        <>
+                          <input ref={fileRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={(e) => void onLogoPick(e)} />
+                          <Btn variant="secondary" size="sm" icon="upload" onClick={() => fileRef.current?.click()} disabled={logoBusy}>
+                            {branding?.has_custom_logo ? 'Cambiar logo' : 'Subir logo'}
+                          </Btn>
+                          {branding?.has_custom_logo && (
+                            <Btn variant="ghost" size="sm" icon="trash-2" onClick={() => void removeLogo()} disabled={logoBusy}>Quitar</Btn>
+                          )}
+                          <span className="text-xs muted-3">PNG o JPG, máx. 2 MB</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="form-grid">
                     <div className="field"><label>Razón social</label><input className="input" readOnly value={emisor.razon_social} /></div>
                     <div className="field"><label>Nombre comercial</label><input className="input" readOnly value={emisor.nombre_comercial ?? '—'} /></div>
@@ -185,7 +199,8 @@ export function SettingsView() {
               )}
             </Card>
           )}
-          {sec === 'plantillas' && <BrandingSection />}
+          {/* Guarda también aquí: /auth/me puede quitar el módulo con la sección abierta. */}
+          {sec === 'plantillas' && puedeEditarBranding && <BrandingSection />}
           {sec === 'impresora' && <ImpresoraSection />}
         </div>
       </div>

@@ -4,7 +4,7 @@
 // cotización) se abre ese documento; para el resto se va al módulo, porque
 // esos listados no se abren por id. Una eliminación no ofrece nada: el
 // documento ya no existe.
-import { getFactura, listFacturas, mapFacturaRow } from '@/api'
+import { ApiError, getFactura, listFacturas, mapFacturaRow } from '@/api'
 import type { AuditLogRow } from '@/api'
 import { TITLES, type Nav, type ViewId } from '@/config/navigation'
 
@@ -46,7 +46,10 @@ async function abrirFacturaEcf(nav: Nav, id: string): Promise<void> {
   }
   const res = await listFacturas({ query: id, pageSize: 5 })
   const fila = res.items.find((r) => r.e_ncf === id)
-  if (!fila) throw new Error(`No se encontró la factura ${id}.`)
+  // ApiError (y no Error): la bitácora solo muestra textos de ese tipo; un
+  // error de JavaScript cae en su mensaje genérico. El id puede ser el interno,
+  // que no le dice nada a nadie, así que no se repite.
+  if (!fila) throw new ApiError('No encontramos esa factura. Puede que se haya eliminado.', 404)
   nav('factura-ver', mapFacturaRow(fila))
 }
 
