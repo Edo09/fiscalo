@@ -1,6 +1,6 @@
 import { Btn, Modal } from '@/components/ui'
 import type { ReciboDatos } from '@/api'
-import { reciboHtml, ZOOM_VISTA_PREVIA } from './reciboHtml'
+import { anchoVistaPreviaPx, reciboHtml } from './reciboHtml'
 
 /**
  * La tirilla de una factura SIN guardar, vista dentro de la app.
@@ -42,8 +42,9 @@ export function VistaPreviaRecibo({
           title={`Vista previa del recibo de ${ancho} mm`}
           sandbox=""
           srcDoc={reciboHtml(datos, { vistaPrevia: true })}
-          // Ancho del papel ya aumentado, más la barra de desplazamiento.
-          style={{ width: `calc(${ancho}mm * ${ZOOM_VISTA_PREVIA} + 18px)` }}
+          // Si el diálogo es más angosto (teléfono), max-width lo recorta y el
+          // recibo se ve a tamaño real (ver anchoVistaPreviaPx).
+          style={{ width: anchoVistaPreviaPx(ancho) }}
         />
       </div>
     </Modal>

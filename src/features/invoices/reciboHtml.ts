@@ -41,7 +41,17 @@ function pares(lista: [string, string][]): string {
 const SEPARADOR = '<hr class="sep">'
 
 /** Aumento de la vista previa en pantalla: a tamaño real, 7 pt no se leen. */
-export const ZOOM_VISTA_PREVIA = 1.3
+const ZOOM_VISTA_PREVIA = 1.3
+
+/**
+ * Ancho en px que necesita la vista previa aumentada, con sitio para la barra de
+ * desplazamiento. El iframe se pide de este ancho y el aumento solo se aplica si
+ * lo consigue: en un teléfono el diálogo es más angosto, y aumentado el papel
+ * taparía la columna de los montos. A tamaño real sí cabe.
+ */
+export function anchoVistaPreviaPx(anchoMm: number): number {
+  return Math.ceil((anchoMm * ZOOM_VISTA_PREVIA * 96) / 25.4) + 20
+}
 
 const SELLO = '<div class="sello">VISTA PREVIA · NO VÁLIDA COMO FACTURA</div>'
 
@@ -142,7 +152,7 @@ export function reciboHtml(d: ReciboDatos, opts: OpcionesRecibo = {}): string {
   .codigo { font-size: 8pt; line-height: 3.6mm; }
   .pie { font-size: 6pt; line-height: 2.8mm; text-align: center; }
   .pie + .pie { margin-top: 1mm; }${previa ? `
-  @media screen { html { zoom: ${ZOOM_VISTA_PREVIA}; } }
+  @media screen and (min-width: ${anchoVistaPreviaPx(ancho)}px) { html { zoom: ${ZOOM_VISTA_PREVIA}; } }
   .recibo { background-image: ${MARCA_AGUA}; }
   .sello { border: 0.3mm solid #000; text-align: center; font-weight: bold; font-size: 7.5pt; line-height: 3.4mm; padding: 1mm; margin: 1mm 0 2mm; }
   .sello:last-child { margin: 2mm 0 0; }` : ''}

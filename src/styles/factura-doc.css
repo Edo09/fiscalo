@@ -216,6 +216,49 @@
   color: var(--text);
 }
 
+/* Cliente escrito a mano. Al terminar de escribirlo aparece "Guardar" dentro
+   del propio campo, a la derecha: guardarlo es seguir con el mismo gesto, no
+   ir a otro formulario (ver NombreClienteLibre). */
+.fx-libre { position: relative; margin-top: 8px; }
+.fx-libre .fx-field { font-size: 15px; }
+/* Sitio para el botón, solo mientras se ve: si no, un nombre largo se cortaría. */
+.fx-libre--accion .fx-field { padding-right: 112px; }
+
+.fx-libre-guardar {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: fx-libre-entra 200ms cubic-bezier(.2, .8, .2, 1);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.fx-libre-guardar:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+.fx-libre-guardar:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.fx-libre-guardar:disabled { cursor: progress; }
+.fx-libre-guardar .spinner { width: 13px; height: 13px; }
+
+@keyframes fx-libre-entra {
+  from { opacity: 0; transform: translate(6px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-libre-guardar { animation: none; }
+}
+
 /* Factura ya creada: el cliente se muestra como dato firme del documento, con
    un enlace discreto para cambiarlo. Antes salia de placeholder (gris) y se
    leia como si el campo estuviera vacio. */

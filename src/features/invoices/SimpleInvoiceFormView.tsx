@@ -9,6 +9,7 @@ import {
 import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
+import { NombreClienteLibre } from '@/features/clients/NombreClienteLibre'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
@@ -425,10 +426,14 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         : await printDocument(await getFacturaSimplePdf(id, 'carta'))
       if (!conDialogo) toast.info(recibo ? 'Recibo abierto: imprímelo con Ctrl+P.' : 'Factura abierta: imprímela con Ctrl+P.')
     } catch (e) {
-      const motivo = e instanceof ApiError ? `: ${e.message}` : ''
-      toast.error(recibo
-        ? `La factura se guardó, pero no se pudo imprimir el recibo${motivo}. Imprímelo desde el listado.`
-        : `La factura se guardó, pero no se pudo imprimir${motivo}. Imprímela desde el listado.`)
+      // El motivo del servidor va en su propia línea: trae su puntuación (y a
+      // veces su propio consejo), y pegado a la frase quedaba "de nuevo.. Imprímela".
+      toast.error(
+        recibo
+          ? 'La factura se guardó, pero no se pudo imprimir el recibo. Imprímelo desde el listado.'
+          : 'La factura se guardó, pero no se pudo imprimir. Imprímela desde el listado.',
+        e instanceof ApiError ? { description: e.message } : undefined,
+      )
     }
   })
 
@@ -515,13 +520,11 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             </button>
           </div>
           {!cliente && (
-            <input
-              className={'fx-field fx-field-visible' + marca(clienteCambiado && clienteLibre.trim() !== '')}
-              style={{ marginTop: 8, fontSize: 15 }}
-              placeholder="o escribe un nombre…"
+            <NombreClienteLibre
               value={clienteLibre}
-              onChange={(e) => setClienteLibre(e.target.value)}
-              aria-label="Nombre del cliente si no está registrado"
+              onChange={setClienteLibre}
+              onGuardado={(c) => { seleccionarCliente(c); setClienteLibre('') }}
+              className={marca(clienteCambiado && clienteLibre.trim() !== '')}
             />
           )}
           </>

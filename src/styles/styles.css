@@ -701,6 +701,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .menu { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-lg); padding: 5px; min-width: 190px; z-index: 90; animation: pop .12s ease; }
 .menu-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--r-xs); font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s; }
 .menu-item:hover { background: var(--surface-hover); }
+/* MenuItem es un <button> (se usa con teclado): sin el aspecto de botón nativo. */
+button.menu-item { width: 100%; border: 0; background: none; font: inherit; font-size: 13px; text-align: left; }
+button.menu-item:focus-visible { background: var(--surface-hover); }
 .menu-item .lucide { width: 15px; height: 15px; color: var(--text-2); }
 .menu-item.danger { color: var(--danger); }
 .menu-item.danger .lucide { color: var(--danger); }
