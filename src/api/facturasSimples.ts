@@ -84,6 +84,15 @@ export function getReciboFacturaSimple(id: number): Promise<ReciboDatos> {
   return getJson<ReciboDatos>(`/api/facturas-simples/${id}/pdf${qs({ format: 'datos', formato: parametroFormato('pos') })}`)
 }
 
+/**
+ * Tirilla de lo que hay en pantalla, sin guardar, como datos. Solo para verla
+ * DENTRO de la app con el sello de vista previa (ver VistaPreviaRecibo): una
+ * tirilla sin guardar que se pueda imprimir limpia parece una venta y no lo es.
+ */
+export function previewReciboFacturaSimple(input: FacturaSimpleInput): Promise<ReciboDatos> {
+  return postJson<ReciboDatos>('/api/facturas-simples/preview', { ...input, formato: parametroFormato('pos'), format: 'datos' })
+}
+
 /** PDF previo, sin guardar nada. */
 export function previewFacturaSimple(
   input: FacturaSimpleInput,

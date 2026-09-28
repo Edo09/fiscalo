@@ -23,6 +23,7 @@ export {
   getFacturaSimplePdf,
   previewFacturaSimple,
   getReciboFacturaSimple,
+  previewReciboFacturaSimple,
   getFacturaSimpleStats,
 } from './facturasSimples'
 export { listClients, getClient, createClient, updateClient, deleteClient } from './clients'

@@ -1,21 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState, ErrorState } from '@/components/ui'
+import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState, ErrorState, Dropdown, MenuItem } from '@/components/ui'
 import {
-  ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple,
-  getFacturaSimplePdf, listProducts, mapProductRow, previewFacturaSimple, updateFacturaSimple,
+  ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple, getFacturaSimplePdf,
+  listProducts, mapProductRow, previewFacturaSimple, previewReciboFacturaSimple, updateFacturaSimple,
 } from '@/api'
-import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion } from '@/api'
+import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
-import { presentDocument } from '@/lib/file'
+import { presentDocument, printDocument } from '@/lib/file'
 import { hoyLocal } from '@/lib/date'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
+import { VistaPreviaRecibo } from './VistaPreviaRecibo'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
@@ -96,9 +97,10 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [clienteLibre, setClienteLibre] = useState('')
   const [fecha, setFecha] = useState(hoyLocal)
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
-  /** Qué botón está guardando: el de solo guardar o el de guardar e imprimir. */
-  const [guardando, setGuardando] = useState<'guardar' | 'imprimir' | null>(null)
-  const [previaBusy, setPreviaBusy] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [previaBusy, setPreviaBusy] = useState<FormatoImpresion | null>(null)
+  /** Tirilla sin guardar abierta en pantalla (ver VistaPreviaRecibo). */
+  const [previaRecibo, setPreviaRecibo] = useState<ReciboDatos | null>(null)
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [catalogoAbierto, setCatalogoAbierto] = useState(false)
   const [buscaProd, setBuscaProd] = useState('')
@@ -338,16 +340,21 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     }
   }
 
-  /** Hoja carta de lo que hay en pantalla, sin guardar, para revisarla. */
-  const vistaPrevia = async () => {
+  /**
+   * Lo que hay en pantalla, sin guardar, para revisarlo. La hoja carta se abre
+   * como PDF; la tirilla se ve dentro de la app, sellada (ver VistaPreviaRecibo).
+   */
+  const vistaPrevia = async (formato: FormatoImpresion) => {
     if (lineasValidas.length === 0) { toast.error('Agrega al menos una línea con descripción.'); return }
-    setPreviaBusy(true)
+    setPreviaBusy(formato)
     try {
-      presentDocument(await previewFacturaSimple({ ...clienteBody(true), date: fecha, items: items() }))
+      const input = { ...clienteBody(true), date: fecha, items: items() }
+      if (formato === 'pos') setPreviaRecibo(await previewReciboFacturaSimple(input))
+      else presentDocument(await previewFacturaSimple(input))
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.')
     } finally {
-      setPreviaBusy(false)
+      setPreviaBusy(null)
     }
   }
 
@@ -360,7 +367,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       ? `Los cambios de la factura ${numero ?? ''} no se han guardado. Si sales ahora, se pierden.`
       : 'Esta factura no se ha guardado: no tiene número, no descontó inventario y no aparecerá en las ventas. Si sales ahora, se pierde.',
     // Mientras se guarda no se pregunta: la navegación espera a que termine.
-    guardando != null,
+    guardando,
   )
 
   // El guardado sigue aunque la pantalla se cierre a mitad (p. ej. la sesión
@@ -379,10 +386,12 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
    * pantalla era igual a una venta de verdad, pero sin número, sin descontar
    * inventario y sin quedar en ventas: se entregaba al cliente y la factura no
    * se guardaba nunca.
+   *
+   * @param imprimir Formato en que se imprime al terminar; null = solo guardar.
    */
-  const guardar = useAccionUnica(async (imprimir: boolean) => {
+  const guardar = useAccionUnica(async (imprimir: FormatoImpresion | null) => {
     if (!puedeGuardar) return
-    setGuardando(imprimir ? 'imprimir' : 'guardar')
+    setGuardando(true)
     let id: number | undefined
     try {
       if (editando && facturaId != null) {
@@ -402,18 +411,24 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la factura.')
       return
     } finally {
-      setGuardando(null)
+      setGuardando(false)
     }
-    if (!imprimir) return
+    if (imprimir == null) return
 
     // Ya guardada: si la impresión falla, la factura queda y se reimprime
     // desde el listado, que es donde ya está el usuario.
+    const recibo = imprimir === 'pos'
     try {
       if (id == null) throw new Error('la respuesta no trae el id de la factura')
-      if (!(await imprimirRecibo({ tipo: 'simple', id }))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+      const conDialogo = recibo
+        ? await imprimirRecibo({ tipo: 'simple', id })
+        : await printDocument(await getFacturaSimplePdf(id, 'carta'))
+      if (!conDialogo) toast.info(recibo ? 'Recibo abierto: imprímelo con Ctrl+P.' : 'Factura abierta: imprímela con Ctrl+P.')
     } catch (e) {
       const motivo = e instanceof ApiError ? `: ${e.message}` : ''
-      toast.error(`La factura se guardó, pero no se pudo imprimir el recibo${motivo}. Imprímelo desde el listado.`)
+      toast.error(recibo
+        ? `La factura se guardó, pero no se pudo imprimir el recibo${motivo}. Imprímelo desde el listado.`
+        : `La factura se guardó, pero no se pudo imprimir${motivo}. Imprímela desde el listado.`)
     }
   })
 
@@ -656,7 +671,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           )}
           <b><Money value={total} cur={false} /></b>
         </div>
-        <div className="row gap-sm">
+        <div className="row gap-sm fx-acciones">
           {/* Factura ya creada y sin tocar: lo util es ver el documento real.
               En cuanto se modifica algo, ese PDF ya no refleja la pantalla, asi
               que el boton pasa a ser la vista previa de lo editado. */}
@@ -670,24 +685,55 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
               <Btn variant="secondary" icon="printer" onClick={() => void verGuardada('pos')} disabled={pdfBusy != null}>
                 {pdfBusy === 'pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
               </Btn>
+              <Btn variant="primary" icon="check" disabled>Guardar cambios</Btn>
             </>
           ) : (
             <>
-              <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previaBusy}>
-                {previaBusy ? 'Generando…' : 'Vista previa'}
-              </Btn>
-              <Btn variant="secondary" icon="printer" onClick={() => void guardar(true)} disabled={!puedeGuardar}>
-                {guardando === 'imprimir'
-                  ? 'Guardando…'
-                  : `${editando ? 'Guardar' : 'Crear'} e imprimir recibo ${anchoTirilla} mm`}
-              </Btn>
+              <Dropdown
+                align="right"
+                width={200}
+                trigger={
+                  <Btn variant="secondary" icon="eye" iconRight="chevron-down" disabled={previaBusy != null}>
+                    {previaBusy ? 'Generando…' : 'Vista previa'}
+                  </Btn>
+                }
+              >
+                <MenuItem icon="file" onClick={() => void vistaPrevia('carta')}>Hoja carta</MenuItem>
+                <MenuItem icon="receipt" onClick={() => void vistaPrevia('pos')}>Recibo {anchoTirilla} mm</MenuItem>
+              </Dropdown>
+
+              {/* Lo de todos los días (guardar e imprimir la tirilla) va a un clic;
+                  las variantes, en el menú del mismo botón. */}
+              <div className="fx-split">
+                <Btn variant="primary" icon="printer" onClick={() => void guardar('pos')} disabled={!puedeGuardar}>
+                  {guardando ? 'Guardando…' : `Guardar e imprimir ${anchoTirilla} mm`}
+                </Btn>
+                <Dropdown
+                  align="right"
+                  width={250}
+                  trigger={
+                    <Btn variant="primary" icon="chevron-down" disabled={!puedeGuardar} aria-label="Otras formas de guardar" />
+                  }
+                >
+                  <MenuItem icon="file" onClick={() => void guardar('carta')}>Guardar e imprimir en hoja carta</MenuItem>
+                  <MenuItem icon="check" onClick={() => void guardar(null)}>
+                    {editando ? 'Solo guardar los cambios' : 'Solo guardar'}
+                  </MenuItem>
+                </Dropdown>
+              </div>
             </>
           )}
-          <Btn variant="primary" icon="check" onClick={() => void guardar(false)} disabled={!puedeGuardar}>
-            {guardando === 'guardar' ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear factura'}
-          </Btn>
         </div>
       </div>
+
+      {previaRecibo && (
+        <VistaPreviaRecibo
+          datos={previaRecibo}
+          puedeGuardar={puedeGuardar}
+          onGuardarEImprimir={() => { setPreviaRecibo(null); void guardar('pos') }}
+          onClose={() => setPreviaRecibo(null)}
+        />
+      )}
 
       {catalogoAbierto && (
         <Modal

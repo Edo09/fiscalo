@@ -613,6 +613,39 @@
   color: var(--text);
 }
 
+/* Botón dividido: la acción de todos los días a un clic y sus variantes en el
+   menú pegado a ella. Las dos mitades comparten borde y las separa una línea. */
+.fx-split { display: inline-flex; }
+.fx-split > .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.fx-split .btn-icon {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in srgb, var(--on-accent) 30%, transparent);
+  padding-inline: 9px;
+}
+/* El salto al pasar el ratón (bold.css) despegaría una mitad de la otra. */
+.fx-split .btn:not(:disabled):hover,
+.fx-split .btn:not(:disabled):active { transform: none; }
+
+/* Vista previa de la tirilla: el papel centrado sobre la mesa; lo que no cabe
+   se desplaza dentro del papel, no en el diálogo. El alto deja sitio a la
+   cabecera, el pie y los rellenos del .modal (max-height 90vh): ~236 px. */
+.fx-previa-recibo {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+}
+.fx-previa-recibo iframe {
+  display: block;
+  max-width: 100%;
+  height: clamp(200px, calc(90vh - 236px), 640px);
+  border: 0;
+  background: #fff;
+  box-shadow: var(--sh-md);
+}
+
 /* ---------- Angosto ------------------------------------------ */
 @media (max-width: 720px) {
   .fx-head { grid-template-columns: 1fr; }
@@ -642,6 +675,14 @@
 
   .fx-gutter { opacity: 1; justify-self: end; }
   .fx-bar { flex-direction: column; align-items: stretch; }
+
+  /* Factura simple: en un teléfono las acciones no caben lado a lado. Cada una
+     va en su renglón y la principal queda abajo, a mano del pulgar. */
+  .fx-acciones { flex-wrap: wrap; }
+  .fx-acciones > * { flex: 1 1 100%; }
+  .fx-acciones .btn { width: 100%; }
+  .fx-split > .btn:first-child { flex: 1; width: auto; }
+  .fx-split .btn-icon { width: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

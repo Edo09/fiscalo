@@ -40,8 +40,30 @@ function pares(lista: [string, string][]): string {
 
 const SEPARADOR = '<hr class="sep">'
 
-export function reciboHtml(d: ReciboDatos): string {
+/** Aumento de la vista previa en pantalla: a tamaño real, 7 pt no se leen. */
+export const ZOOM_VISTA_PREVIA = 1.3
+
+const SELLO = '<div class="sello">VISTA PREVIA · NO VÁLIDA COMO FACTURA</div>'
+
+/** En diagonal y repetida en todo el papel: no hay recorte que la quite. */
+const MARCA_AGUA = `url("data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='170' height='100'>"
+  + "<text x='85' y='55' text-anchor='middle' transform='rotate(-28 85 50)' font-family='Arial'"
+  + " font-size='17' font-weight='bold' fill='rgba(0,0,0,0.09)'>VISTA PREVIA</text></svg>",
+)}")`
+
+export interface OpcionesRecibo {
+  /**
+   * Tirilla de algo SIN guardar, para verla en pantalla: sello arriba y abajo y
+   * marca de agua en todo el papel. Si aun así se imprimiera, sale marcada: no
+   * se puede entregar como si fuera una venta.
+   */
+  vistaPrevia?: boolean
+}
+
+export function reciboHtml(d: ReciboDatos, opts: OpcionesRecibo = {}): string {
   const { ancho_mm: ancho, margen_mm: margen } = d.papel
+  const previa = opts.vistaPrevia === true
 
   const emisor = [
     imagen(d.logo, 'logo', 'Logo'),
@@ -119,11 +141,16 @@ export function reciboHtml(d: ReciboDatos): string {
   .etiqueta { font-weight: bold; font-size: 6.5pt; }
   .codigo { font-size: 8pt; line-height: 3.6mm; }
   .pie { font-size: 6pt; line-height: 2.8mm; text-align: center; }
-  .pie + .pie { margin-top: 1mm; }
+  .pie + .pie { margin-top: 1mm; }${previa ? `
+  @media screen { html { zoom: ${ZOOM_VISTA_PREVIA}; } }
+  .recibo { background-image: ${MARCA_AGUA}; }
+  .sello { border: 0.3mm solid #000; text-align: center; font-weight: bold; font-size: 7.5pt; line-height: 3.4mm; padding: 1mm; margin: 1mm 0 2mm; }
+  .sello:last-child { margin: 2mm 0 0; }` : ''}
 </style>
 </head>
 <body>
 <main class="recibo">
+  ${previa ? SELLO : ''}
   ${emisor}
   ${SEPARADOR}
   <div class="titulo">${esc(d.titulo)}</div>
@@ -140,6 +167,7 @@ export function reciboHtml(d: ReciboDatos): string {
   ${timbre}
   ${d.leyenda_qr ? `<div class="pie">${esc(d.leyenda_qr)}</div>` : ''}
   <div class="pie">${esc(d.gracias)}</div>
+  ${previa ? SELLO : ''}
 </main>
 </body>
 </html>`
