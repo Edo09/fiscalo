@@ -5,6 +5,7 @@ import { Icon, Btn, Money, Modal, Badge, Checkbox } from '@/components/ui'
 import { ApiError, createGasto, getGastoStats } from '@/api'
 import type { CreateGastoInput, GastoCategoria, GastoItemInput, GastoRow, GastoTipo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { hoyLocal } from '@/lib/date'
 import { CATEGORIA_TIPOS, GASTO_TIPOS, efectoInventario, isAutoEmision } from '@/config/gastos'
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import { ProductoCombobox } from '@/features/products/ProductoCombobox'
@@ -28,8 +29,6 @@ interface Linea {
   /** 1 = Bien, 2 = Servicio. En el 606 separa bienes (campo 9) de servicios (campo 8). */
   bien_servicio: 1 | 2
 }
-
-const hoy = () => new Date().toISOString().slice(0, 10)
 
 /* FISCALO — Registrar gasto/compra (POST /api/gastos).
    La categoría la fija la página que abre el modal:
@@ -55,7 +54,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
   // Tipo de Costos y Gastos (campo 3 del 606). Arranca vacio a proposito: es un
   // dato que se declara a la DGII y nadie deberia heredarlo de un default.
   const [tipoBienes, setTipoBienes] = useState('')
-  const [fecha, setFecha] = useState(hoy())
+  const [fecha, setFecha] = useState(hoyLocal)
   const [conProveedor, setConProveedor] = useState(false)
   const [lineas, setLineas] = useState<Linea[]>(() => [lineaVacia(1)])
   const [error, setError] = useState<string | null>(null)

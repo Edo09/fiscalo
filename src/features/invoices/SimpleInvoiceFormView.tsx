@@ -13,6 +13,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument } from '@/lib/file'
+import { hoyLocal } from '@/lib/date'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
 import type { Cliente, Producto } from '@/types/domain'
@@ -93,7 +94,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [metodo, setMetodo] = useState('Efectivo')
   const [clienteActual, setClienteActual] = useState<string | null>(null)
   const [clienteLibre, setClienteLibre] = useState('')
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(hoyLocal)
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
   /** Qué botón está guardando: el de solo guardar o el de guardar e imprimir. */
   const [guardando, setGuardando] = useState<'guardar' | 'imprimir' | null>(null)

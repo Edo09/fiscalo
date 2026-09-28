@@ -8,6 +8,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { getReporteVentas, downloadReporteVentas, ApiError } from '@/api'
 import type { AgrupacionVentas, FormatoExportacion, VentaDocumento, VentaGrupo } from '@/api'
 import { downloadBlob } from '@/lib/file'
+import { hoyLocal } from '@/lib/date'
 import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Reportes > Ventas (gestión, no fiscal) */
@@ -31,10 +32,6 @@ function inicioDeMes(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 /** '2026-09-05 14:30:00' -> '05/09/2026'. */
 function fmtFecha(s: string): string {
   if (!s) return '—'
@@ -56,7 +53,7 @@ function tonoEstado(estado: string | undefined | null): 'success' | 'danger' | '
 
 export function VentasView({ nav }: { nav: Nav }) {
   const [desde, setDesde] = useState(inicioDeMes)
-  const [hasta, setHasta] = useState(hoy)
+  const [hasta, setHasta] = useState(hoyLocal)
   const [agrupar, setAgrupar] = useState<AgrupacionVentas>('documento')
   // Guarda QUÉ formato se está generando: con un booleano los dos botones
   // decían "Generando…" a la vez.

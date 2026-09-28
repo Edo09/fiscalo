@@ -10,6 +10,7 @@ import type { CotizacionItemInput } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { presentDocument } from '@/lib/file'
+import { ahoraLocal } from '@/lib/date'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
@@ -156,7 +157,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     try {
       const payload = {
         ...base,
-        date: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        date: ahoraLocal(),
         user_id: user?.id,
         sent_email: enviarCorreo,
       }

@@ -7,6 +7,7 @@ import {
 import { getAuditFacetas, getAuditResumen, listAuditLogs } from '@/api'
 import type { AuditLogFiltros, AuditLogRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { isoLocal } from '@/lib/date'
 import type { Nav } from '@/config/navigation'
 import { etiquetaAccion, etiquetaModulo, fechaHora, quien, tonoAccion } from './etiquetas'
 import { AuditDetailDrawer } from './AuditDetailDrawer'
@@ -42,12 +43,6 @@ const ATAJOS: { id: string; label: string; sel: Seleccion }[] = [
 
 const mismaSeleccion = (a: Seleccion, b: Seleccion) =>
   (a.modulo ?? '') === (b.modulo ?? '') && (a.accion ?? '') === (b.accion ?? '') && (a.resultado ?? '') === (b.resultado ?? '')
-
-/** Fecha local 'YYYY-MM-DD' (no toISOString: esa es UTC y de noche daría mañana). */
-function isoLocal(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
 
 function rangoDe(periodo: Periodo, desde: string, hasta: string): { desde?: string; hasta?: string } {
   const hoy = new Date()

@@ -6,6 +6,7 @@ import {
 import { getValorInventario, listMovimientos, listWarehouses, listCategories } from '@/api'
 import type { EstadoValorInv, MovimientoRow, ValorInventarioRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { hoyLocal } from '@/lib/date'
 import { motivoLabel } from './motivos'
 
 /* FISCALO — Inventario > Valor de inventario.
@@ -152,7 +153,7 @@ export function InventoryValueView() {
         <span className="text-xs muted-3">Hasta</span>
         <input
           type="date" className="input" style={{ maxWidth: 155 }} value={hasta}
-          max={new Date().toISOString().slice(0, 10)}
+          max={hoyLocal()}
           onChange={(e) => filtrar(() => setHasta(e.target.value))}
           aria-label="Existencias hasta esta fecha"
           title="Deja la fecha vacía para ver la existencia de hoy"
