@@ -730,6 +730,11 @@
 
 .fx-cond-sel:focus-visible { outline: none; border-bottom-color: var(--accent); }
 
+/* .fx-cond-sel va despues de .fx-mod y le pisaria el fondo: se repite la marca
+   con mas especificidad. El foco conserva el acento, como en .fx-field. */
+.fx-cond-sel.fx-mod { background: var(--warning-soft); border-bottom-color: var(--warning); }
+.fx-cond-sel.fx-mod:focus-visible { border-bottom-color: var(--accent); }
+
 /* Receptor y condiciones, lado a lado: son los dos bloques de cabecera del
    documento y juntos ocupan una sola banda. Los ajustes van scoped al wrapper
    para no tocar como se ven esos mismos bloques en la factura simple. */

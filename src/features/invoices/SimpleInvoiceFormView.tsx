@@ -6,11 +6,12 @@ import {
   ApiError, createFacturaSimple, getBranding, getEmisor, getFacturaSimple,
   getFacturaSimplePdf, listProducts, mapProductRow, previewFacturaSimple, updateFacturaSimple,
 } from '@/api'
-import type { DocBase64, FacturaSimpleInput, FacturaSimpleItemInput, FormatoImpresion } from '@/api'
+import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
+import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument } from '@/lib/file'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
@@ -94,8 +95,9 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [clienteLibre, setClienteLibre] = useState('')
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
-  const [guardando, setGuardando] = useState(false)
-  const [previaBusy, setPreviaBusy] = useState<FormatoImpresion | null>(null)
+  /** Qué botón está guardando: el de solo guardar o el de guardar e imprimir. */
+  const [guardando, setGuardando] = useState<'guardar' | 'imprimir' | null>(null)
+  const [previaBusy, setPreviaBusy] = useState(false)
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [catalogoAbierto, setCatalogoAbierto] = useState(false)
   const [buscaProd, setBuscaProd] = useState('')
@@ -103,7 +105,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [pdfBusy, setPdfBusy] = useState<FormatoImpresion | null>(null)
   const anchoTirilla = useAnchoTirilla()
   /** Foto del documento tal como se cargó: sirve para marcar qué se tocó. */
-  const [original, setOriginal] = useState<{ fecha: string; lineas: Linea[] } | null>(null)
+  const [original, setOriginal] = useState<{ fecha: string; metodo: string; lineas: Linea[] } | null>(null)
 
   // Identidad del emisor: el papel muestra los mismos datos que se van a
   // imprimir. Misma clave de caché que Configuración, así no se repite la
@@ -149,7 +151,10 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         if (!vivo) return
         setNumero(f.no_factura)
         setClienteActual(f.client_name || f.company_name || null)
-        if (Number(f.tipo_pago ?? 1) === 2) setMetodo(METODOS_CREDITO[0])
+        // El backend solo guarda contado/credito: cualquier cobro de contado
+        // vuelve como Efectivo.
+        const metodoCargado = Number(f.tipo_pago ?? 1) === 2 ? METODOS_CREDITO[0] : 'Efectivo'
+        setMetodo(metodoCargado)
         if (f.date) setFecha(String(f.date).slice(0, 10))
         const cargadas: Linea[] = (f.items ?? []).map((it, i) => ({
           id: i + 1,
@@ -163,7 +168,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             : 0,
         }))
         setLineas(cargadas)
-        setOriginal({ fecha: String(f.date ?? '').slice(0, 10), lineas: cargadas })
+        setOriginal({ fecha: String(f.date ?? '').slice(0, 10), metodo: metodoCargado, lineas: cargadas })
         setErrorCarga(null)
       })
       .catch((e) => { if (vivo) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la factura.') })
@@ -243,13 +248,16 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   }
   const clienteCambiado = original != null && (cliente != null || clienteLibre.trim() !== '')
   const fechaCambiada = original != null && original.fecha !== fecha
+  // Solo cuenta pasar de contado a credito o al reves: Efectivo, Transferencia,
+  // Tarjeta y Cheque se guardan igual (tipo_pago=1).
+  const metodoCambiado = original != null && esMetodoCredito(original.metodo) !== esMetodoCredito(metodo)
   const lineasBorradas = original != null && original.lineas.some((o) => !lineas.some((l) => l.id === o.id))
   const lineasCambiadas = original != null && (
     lineasBorradas ||
     lineas.some((l) => esLineaNueva(l.id) ||
       (['descripcion', 'cantidad', 'precio', 'desc'] as const).some((k) => campoCambiado(l, k)))
   )
-  const hayCambios = clienteCambiado || fechaCambiada || lineasCambiadas
+  const hayCambios = clienteCambiado || fechaCambiada || metodoCambiado || lineasCambiadas
   const marca = (cond: boolean) => (cond ? ' fx-mod' : '')
 
   const esValida = (l: Linea) => l.descripcion.trim() !== '' && l.cantidad > 0
@@ -329,37 +337,82 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     }
   }
 
-  const vistaPrevia = async (formato: FormatoImpresion = 'carta') => {
+  /** Hoja carta de lo que hay en pantalla, sin guardar, para revisarla. */
+  const vistaPrevia = async () => {
     if (lineasValidas.length === 0) { toast.error('Agrega al menos una línea con descripción.'); return }
-    setPreviaBusy(formato)
+    setPreviaBusy(true)
     try {
-      const input: FacturaSimpleInput = { ...clienteBody(true), date: fecha, items: items() }
-      await mostrar(formato, { tipo: 'simple-preview', input }, () => previewFacturaSimple(input))
+      presentDocument(await previewFacturaSimple({ ...clienteBody(true), date: fecha, items: items() }))
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo generar la vista previa.')
     } finally {
-      setPreviaBusy(null)
+      setPreviaBusy(false)
     }
   }
 
-  // Acción única: un doble clic crearia la misma factura dos veces.
-  const guardar = useAccionUnica(async () => {
+  // Salir con la factura a medias pide confirmación. Una nueva cuenta en cuanto
+  // tiene algo escrito; una existente, cuando se tocó algo.
+  const hayAlgoEscrito = cliente != null || clienteLibre.trim() !== '' || lineas.some((l) => !estaEnBlanco(l))
+  const salida = useAvisoSalida(
+    editando ? hayCambios : hayAlgoEscrito,
+    editando
+      ? `Los cambios de la factura ${numero ?? ''} no se han guardado. Si sales ahora, se pierden.`
+      : 'Esta factura no se ha guardado: no tiene número, no descontó inventario y no aparecerá en las ventas. Si sales ahora, se pierde.',
+    // Mientras se guarda no se pregunta: la navegación espera a que termine.
+    guardando != null,
+  )
+
+  // El guardado sigue aunque la pantalla se cierre a mitad (p. ej. la sesión
+  // venció): en ese caso no debe navegar ni imprimir desde una vista que ya no está.
+  const montado = useRef(false)
+  useEffect(() => {
+    montado.current = true
+    return () => { montado.current = false }
+  }, [])
+
+  /**
+   * Acción única: un doble clic crearia la misma factura dos veces. Guardar e
+   * imprimir comparten el candado porque imprimir también guarda.
+   *
+   * La tirilla sale siempre de la factura ya guardada. Una impresa desde la
+   * pantalla era igual a una venta de verdad, pero sin número, sin descontar
+   * inventario y sin quedar en ventas: se entregaba al cliente y la factura no
+   * se guardaba nunca.
+   */
+  const guardar = useAccionUnica(async (imprimir: boolean) => {
     if (!puedeGuardar) return
-    setGuardando(true)
+    setGuardando(imprimir ? 'imprimir' : 'guardar')
+    let id: number | undefined
     try {
       if (editando && facturaId != null) {
         await updateFacturaSimple(facturaId, { ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
+        id = facturaId
         toast.success('Factura simple actualizada.')
       } else {
         const creada = await createFacturaSimple({ ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
+        id = creada?.id
         toast.success(`Factura simple ${creada?.no_factura ?? ''} creada.`)
       }
       await queryClient.invalidateQueries({ queryKey: ['facturas-simples'] })
+      if (!montado.current) return
+      salida.liberar()
       nav('facturas-simples', null, { replace: true })
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la factura.')
+      return
     } finally {
-      setGuardando(false)
+      setGuardando(null)
+    }
+    if (!imprimir) return
+
+    // Ya guardada: si la impresión falla, la factura queda y se reimprime
+    // desde el listado, que es donde ya está el usuario.
+    try {
+      if (id == null) throw new Error('la respuesta no trae el id de la factura')
+      if (!(await imprimirRecibo({ tipo: 'simple', id }))) toast.info('Recibo abierto: imprímelo con Ctrl+P.')
+    } catch (e) {
+      const motivo = e instanceof ApiError ? `: ${e.message}` : ''
+      toast.error(`La factura se guardó, pero no se pudo imprimir el recibo${motivo}. Imprímelo desde el listado.`)
     }
   })
 
@@ -460,7 +513,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           <div style={{ marginTop: 12 }}>
             <span className="fx-eyebrow">Pago</span>
             <select
-              className="fx-cond-sel"
+              className={'fx-cond-sel' + marca(metodoCambiado)}
               value={metodo}
               onChange={(e) => setMetodo(e.target.value)}
               aria-label="Método de pago"
@@ -606,9 +659,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           {/* Factura ya creada y sin tocar: lo util es ver el documento real.
               En cuanto se modifica algo, ese PDF ya no refleja la pantalla, asi
               que el boton pasa a ser la vista previa de lo editado. */}
-          {/* La tirilla sale del mismo sitio que la hoja: si la factura
-              esta guardada y sin tocar, del documento real; si se esta editando,
-              de la vista previa de lo que hay en pantalla. */}
+          {/* La tirilla sale siempre de la factura guardada: sin tocar, se
+              imprime tal cual; nueva o con cambios, se guarda primero (ver guardar). */}
           {editando && !hayCambios ? (
             <>
               <Btn variant="secondary" icon="download" onClick={() => void verGuardada()} disabled={pdfBusy != null}>
@@ -620,16 +672,18 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
             </>
           ) : (
             <>
-              <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previaBusy != null}>
-                {previaBusy === 'carta' ? 'Generando…' : 'Vista previa'}
+              <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previaBusy}>
+                {previaBusy ? 'Generando…' : 'Vista previa'}
               </Btn>
-              <Btn variant="secondary" icon="printer" onClick={() => void vistaPrevia('pos')} disabled={previaBusy != null}>
-                {previaBusy === 'pos' ? 'Imprimiendo…' : `Imprimir recibo ${anchoTirilla} mm`}
+              <Btn variant="secondary" icon="printer" onClick={() => void guardar(true)} disabled={!puedeGuardar}>
+                {guardando === 'imprimir'
+                  ? 'Guardando…'
+                  : `${editando ? 'Guardar' : 'Crear'} e imprimir recibo ${anchoTirilla} mm`}
               </Btn>
             </>
           )}
-          <Btn variant="primary" icon="check" onClick={() => void guardar()} disabled={!puedeGuardar}>
-            {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear factura'}
+          <Btn variant="primary" icon="check" onClick={() => void guardar(false)} disabled={!puedeGuardar}>
+            {guardando === 'guardar' ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear factura'}
           </Btn>
         </div>
       </div>

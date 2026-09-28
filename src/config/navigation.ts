@@ -77,6 +77,12 @@ export interface NavOptions {
    * volvería a ella y redirigiría otra vez.
    */
   replace?: boolean
+  /**
+   * Sale aunque la vista tenga algo sin guardar, sin preguntar (ver
+   * hooks/useAvisoSalida). Para cuando quedarse no es opción: una vista sin
+   * permiso tampoco podría guardar.
+   */
+  forzar?: boolean
 }
 
 /** Cambia de vista, con un payload opcional (factura, tipo e-CF…). Cada cambio

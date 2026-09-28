@@ -1,8 +1,12 @@
 import { Btn, RefreshButton, Money, EstadoBadge, Card, KPI, BarChart, Donut, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
-import { getStats, getGastoStats, listFacturas, listGastos, mapFacturaRow, formatMonthKey, dgiiLabel } from '@/api'
+import {
+  getStats, getGastoStats, getFacturaSimpleStats, listFacturas, listFacturasSimples, listGastos,
+  mapFacturaRow, formatApiDate, formatMonthKey, dgiiLabel,
+} from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
 import { gastoEstadoLabel } from '@/config/gastos'
+import { hasModule } from '@/config/permissions'
 import type { Nav } from '@/config/navigation'
 
 /** Saludo según la hora local. */
@@ -18,14 +22,30 @@ function deltaPct(cur: number, prev: number): { delta: string; dir: 'up' | 'down
   return { delta: `${Math.abs(p).toFixed(1)}%`, dir: p >= 0 ? 'up' : 'down' }
 }
 
-/* FISCALO — Dashboard (stats de facturas + gastos, métricas del día/mes e ITBIS) */
+/** Fila de "Últimas facturas": e-CF y facturas simples en la misma tabla. */
+interface UltimaFactura {
+  key: string
+  /** Id en `facturas`: e-CF y simples comparten tabla, así que ordena por creación. */
+  id: number
+  numero: string
+  fecha: string
+  cliente: string
+  simple: boolean
+  /** Estado DGII del e-CF ('—' si no tiene); no aplica a una simple. */
+  dgii: string
+  total: number
+  abrir: () => void
+}
+
+/* FISCALO — Dashboard (stats de facturas + gastos, métricas del día/mes e ITBIS).
+   Las ventas suman e-CF y facturas simples: las de mostrador también son ventas. */
 export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus' }) {
   const { user } = useSession()
 
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const gastoStats = useApiQuery(['gastos', 'stats'], () => getGastoStats())
-  // El backend no expone métricas diarias ni ITBIS en /stats: se derivan de las
-  // facturas/gastos recientes (hasta 100) filtrando por el mes/día en curso.
+  // El backend no expone el ITBIS en /stats: se deriva de las facturas/gastos
+  // recientes (hasta 100) filtrando por el mes en curso.
   const mesFacturas = useApiQuery(
     ['facturas', 'list', { page: 1, pageSize: 100, estado: 'aprobado' }],
     () => listFacturas({ page: 1, pageSize: 100, estado: 'aprobado' }),
@@ -36,7 +56,35 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
     () => listGastos({ page: 1, pageSize: 100, categoria: 'facturas_proveedores' }),
   )
   const ultimasReq = useApiQuery(['facturas', 'list', { page: 1, pageSize: 6 }], () => listFacturas({ page: 1, pageSize: 6 }))
-  const ultimas = (ultimasReq.data?.items ?? []).map(mapFacturaRow)
+
+  // Facturas simples: /stats solo cuenta e-CF. Sin el módulo no se piden (el
+  // backend respondería 403 y cada visita quedaría en la bitácora). Si fallan,
+  // el dashboard sigue con lo de e-CF: no son motivo para tumbarlo.
+  const verSimples = !user?.permissions || hasModule(user.permissions, 'facturas-simples')
+  const simplesStats = useApiQuery(
+    ['facturas-simples', 'stats', { verSimples }],
+    () => (verSimples ? getFacturaSimpleStats() : Promise.resolve(null)),
+  )
+  const ultimasSimplesReq = useApiQuery(
+    ['facturas-simples', 'list', { page: 1, pageSize: 6, verSimples }],
+    () => (verSimples ? listFacturasSimples({ page: 1, pageSize: 6 }) : Promise.resolve(null)),
+  )
+  const s = simplesStats.data
+
+  const ultimas: UltimaFactura[] = [
+    ...(ultimasReq.data?.items ?? []).map((r): UltimaFactura => {
+      const f = mapFacturaRow(r)
+      return {
+        key: `ecf-${r.id}`, id: r.id, numero: f.ncf, fecha: f.fecha, cliente: f.cliente, simple: false,
+        dgii: f.dgii, total: f.total, abrir: () => nav('factura-ver', f),
+      }
+    }),
+    ...(ultimasSimplesReq.data?.items ?? []).map((r): UltimaFactura => ({
+      key: `simple-${r.id}`, id: r.id, numero: r.no_factura, fecha: formatApiDate(r.date),
+      cliente: r.client_name || r.company_name || '—', simple: true, dgii: '—', total: Number(r.total ?? 0),
+      abrir: () => nav('factura-simple-editar', { kind: 'factura-simple', id: r.id }),
+    })),
+  ].sort((a, b) => b.id - a.id).slice(0, 6)
   const ultimasGastosReq = useApiQuery(['gastos', 'list', { page: 1, pageSize: 6 }], () => listGastos({ page: 1, pageSize: 6 }))
   const ultimasGastos = ultimasGastosReq.data?.items ?? []
 
@@ -50,22 +98,44 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const pk = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
 
+  // Ventas de un mes: e-CF más facturas simples. Las de e-CF salen de
+  // ventas_por_mes, no de por_mes: por_mes suma todos los tipos, así que metería
+  // las compras (E41/E43/E47) y sumaría las notas de crédito en vez de restarlas.
+  // ventas_por_mes / ventas_por_dia son nuevos: un backend anterior no los manda
+  // y, sin respaldo, las ventas en e-CF saldrían en 0 hasta desplegarlo. Mientras
+  // tanto se usa lo de antes (por_mes y las aprobadas del día).
+  const ecfPorMes = d?.ventas_por_mes ?? d?.por_mes ?? []
+  const ventasDelMes = (key: string) =>
+    (ecfPorMes.find((m) => m.mes === key)?.monto_total ?? 0)
+    + (s?.por_mes.find((m) => m.mes === key)?.monto_total ?? 0)
+
   // Ventas/gastos del mes desde los stats mensuales del backend.
-  const ventasMes = d?.por_mes.find((m) => m.mes === mk)?.monto_total ?? 0
-  const ventasMesPrev = d?.por_mes.find((m) => m.mes === pk)?.monto_total ?? 0
+  const ventasMes = ventasDelMes(mk)
+  const ventasMesPrev = ventasDelMes(pk)
   const gastosMes = gastoStats.data?.por_mes.find((m) => m.mes === mk)?.monto_total ?? 0
   const gastosMesPrev = gastoStats.data?.por_mes.find((m) => m.mes === pk)?.monto_total ?? 0
 
-  // Métricas derivadas de las facturas aprobadas del mes (día e ITBIS).
+  // ITBIS derivado de las facturas aprobadas del mes (y, con un backend
+  // anterior, las ventas e-CF del día).
   const facMes = (mesFacturas.data?.items ?? []).filter((r) => (r.fecha_emision_dgii ?? r.date ?? '').startsWith(mk))
-  const ventasDia = facMes
-    .filter((r) => (r.fecha_emision_dgii ?? r.date ?? '').startsWith(dk))
-    .reduce((a, r) => a + Number(r.total ?? 0), 0)
+
+  // Ventas de hoy con las mismas reglas que las del mes: e-CF de ventas_por_dia
+  // más facturas simples.
+  const ecfDia = d?.ventas_por_dia
+    ? (d.ventas_por_dia.find((x) => x.dia === dk)?.monto_total ?? 0)
+    : facMes
+      .filter((r) => (r.fecha_emision_dgii ?? r.date ?? '').startsWith(dk))
+      .reduce((a, r) => a + Number(r.total ?? 0), 0)
+  const ventasDia = ecfDia + (s?.por_dia.find((x) => x.dia === dk)?.monto_total ?? 0)
+
   const itbisCobrado = facMes.reduce((a, r) => a + Number(r.total_itbis ?? 0), 0)
   // Pagado: ITBIS de las compras (facturas de proveedores) del mes en curso.
   const itbisPagado = (mesCompras.data?.items ?? [])
     .filter((g) => (g.fecha ?? '').startsWith(mk))
     .reduce((a, g) => a + Number(g.itbis ?? 0), 0)
+
+  const totalEcf = resumen?.total_ecf ?? 0
+  const totalSimples = s?.resumen?.total ?? 0
 
   const dVentas = deltaPct(ventasMes, ventasMesPrev)
   const dGastos = deltaPct(gastosMes, gastosMesPrev)
@@ -73,7 +143,10 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
   const kpiDefs: KpiProps[] = [
     { label: 'Ventas del día', value: ventasDia, money: true, icon: 'trending-up', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)', foot: 'hoy' },
     { label: 'Ventas del mes', value: ventasMes, money: true, icon: 'calendar', iconBg: 'var(--success-soft)', iconColor: 'var(--success)', delta: dVentas?.delta, deltaDir: dVentas?.dir, foot: 'vs mes anterior' },
-    { label: 'Total facturas', value: resumen?.total_ecf ?? 0, icon: 'file-text', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)', foot: 'emitidas' },
+    {
+      label: 'Total facturas', value: totalEcf + totalSimples, icon: 'file-text', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)',
+      foot: totalSimples > 0 ? `${totalEcf} e-CF · ${totalSimples} simples` : 'emitidas',
+    },
     { label: 'ITBIS cobrado', value: itbisCobrado, money: true, icon: 'landmark', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)', foot: 'este mes' },
     { label: 'ITBIS pagado', value: itbisPagado, money: true, icon: 'hand-coins', iconBg: 'var(--warning-soft)', iconColor: 'var(--warning)', foot: 'este mes' },
     { label: 'Gastos del mes', value: gastosMes, money: true, icon: 'trending-down', iconBg: 'var(--danger-soft)', iconColor: 'var(--danger)', delta: dGastos?.delta, deltaDir: dGastos?.dir, foot: 'vs mes anterior' },
@@ -85,21 +158,25 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
     return {
       mes: formatMonthKey(key),
-      ventas: d?.por_mes.find((m) => m.mes === key)?.monto_total ?? 0,
+      ventas: ventasDelMes(key),
       gastos: gastoStats.data?.por_mes.find((m) => m.mes === key)?.monto_total ?? 0,
     }
   })
 
-  const maxMonto = Math.max(1, ...(d?.por_tipo ?? []).map((t) => t.monto_total))
+  const montoSimples = s?.resumen?.monto_total ?? 0
+  const maxMonto = Math.max(1, montoSimples, ...(d?.por_tipo ?? []).map((t) => t.monto_total))
   const fechaLarga = now.toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <div className="page">
       <PageHead
         title={`${saludo()}${user?.name ? `, ${user.name.split(' ')[0]}` : ''}`}
-        sub={`Resumen de tu facturación electrónica · ${fechaLarga}`}
+        sub={`Resumen de tu facturación · ${fechaLarga}`}
         actions={
-          <RefreshButton onRefresh={() => Promise.all([stats.reload(), gastoStats.reload(), mesFacturas.reload(), mesCompras.reload(), ultimasReq.reload(), ultimasGastosReq.reload()])} />
+          <RefreshButton onRefresh={() => Promise.all([
+            stats.reload(), gastoStats.reload(), mesFacturas.reload(), mesCompras.reload(), ultimasReq.reload(),
+            ultimasGastosReq.reload(), simplesStats.reload(), ultimasSimplesReq.reload(),
+          ])} />
         }
       />
 
@@ -168,20 +245,36 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
               <div className="card-pad">
                 {stats.loading ? (
                   <div className="row" style={{ justifyContent: 'center', padding: 12 }}><Spinner /></div>
-                ) : (d?.por_tipo ?? []).length > 0 ? (
-                  d!.por_tipo.map((t) => (
-                    <div key={t.tipo_ecf} className="mb-md">
-                      <div className="row between mb-sm">
-                        <span className="row gap-sm text-sm fw5"><span className="ecf-tag">{t.tipo_ecf}</span>{t.nombre}</span>
-                        <span className="fw6 text-sm num">{t.total}</span>
+                ) : (d?.por_tipo ?? []).length > 0 || totalSimples > 0 ? (
+                  <>
+                    {(d?.por_tipo ?? []).map((t) => (
+                      <div key={t.tipo_ecf} className="mb-md">
+                        <div className="row between mb-sm">
+                          <span className="row gap-sm text-sm fw5"><span className="ecf-tag">{t.tipo_ecf}</span>{t.nombre}</span>
+                          <span className="fw6 text-sm num">{t.total}</span>
+                        </div>
+                        <Progress value={(t.monto_total / maxMonto) * 100} />
+                        <div className="row gap-sm mt-sm text-xs muted-3">
+                          <span>{dgiiLabel('ACEPTADO')}: {t.aceptados}</span>
+                          {t.rechazados > 0 && <span style={{ color: 'var(--danger)' }}>Rechazados: {t.rechazados}</span>}
+                        </div>
                       </div>
-                      <Progress value={(t.monto_total / maxMonto) * 100} />
-                      <div className="row gap-sm mt-sm text-xs muted-3">
-                        <span>{dgiiLabel('ACEPTADO')}: {t.aceptados}</span>
-                        {t.rechazados > 0 && <span style={{ color: 'var(--danger)' }}>Rechazados: {t.rechazados}</span>}
+                    ))}
+                    {/* Las simples no son comprobantes fiscales, pero sí ventas:
+                        van aparte, sin estado DGII. */}
+                    {totalSimples > 0 && (
+                      <div className="mb-md">
+                        <div className="row between mb-sm">
+                          <span className="row gap-sm text-sm fw5"><span className="ecf-tag">FS</span>Factura simple</span>
+                          <span className="fw6 text-sm num">{totalSimples}</span>
+                        </div>
+                        <Progress value={(montoSimples / maxMonto) * 100} />
+                        <div className="row gap-sm mt-sm text-xs muted-3">
+                          <span>Documento interno · no se envía a la DGII</span>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    )}
+                  </>
                 ) : (
                   <div className="text-sm muted">Sin datos por tipo.</div>
                 )}
@@ -195,7 +288,7 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
               actions={<Btn variant="ghost" size="sm" iconRight="arrow-right" onClick={() => nav('facturas')}>Ver todas</Btn>}
               noPad
             >
-              {ultimasReq.loading ? (
+              {ultimasReq.loading || ultimasSimplesReq.loading ? (
                 <div className="row" style={{ justifyContent: 'center', padding: 32 }}><Spinner /></div>
               ) : ultimas.length > 0 ? (
                 <div className="tbl-wrap">
@@ -205,10 +298,14 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
                     </thead>
                     <tbody>
                       {ultimas.map((f) => (
-                        <tr key={f.id} onClick={() => nav('factura-ver', f)}>
-                          <td><span className="mono text-sm fw6">{f.ncf}</span><div className="cell-sub">{f.fecha}</div></td>
+                        <tr key={f.key} onClick={f.abrir}>
+                          <td><span className="mono text-sm fw6">{f.numero}</span><div className="cell-sub">{f.fecha}</div></td>
                           <td><span className="cell-main">{f.cliente}</span></td>
-                          <td>{f.dgii !== '—' ? <EstadoBadge estado={f.dgii} /> : <span className="muted-3">—</span>}</td>
+                          <td>
+                            {f.simple
+                              ? <span className="text-xs muted-3" title="Documento interno: no se envía a la DGII">Factura simple</span>
+                              : f.dgii !== '—' ? <EstadoBadge estado={f.dgii} /> : <span className="muted-3">—</span>}
+                          </td>
                           <td className="num fw6"><Money value={f.total} cur={false} /></td>
                         </tr>
                       ))}
@@ -216,7 +313,7 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
                   </table>
                 </div>
               ) : (
-                <div className="text-sm muted" style={{ padding: 24 }}>Aún no hay comprobantes emitidos.</div>
+                <div className="text-sm muted" style={{ padding: 24 }}>Aún no hay facturas.</div>
               )}
             </Card>
 

@@ -12,10 +12,12 @@ export interface NavbarProps {
   onToggleTheme: () => void
   onOpenSearch: () => void
   onOpenMobileNav: () => void
+  /** Pregunta antes de cerrar sesión si la vista tiene algo sin guardar (ver useHistoryNav). */
+  confirmarSalida: (accion: () => void) => void
 }
 
 export function Navbar({
-  nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav,
+  nav, theme, onToggleTheme, onOpenSearch, onOpenMobileNav, confirmarSalida,
 }: NavbarProps) {
   const { user } = useSession()
   const userName = user?.name || 'Usuario'
@@ -77,7 +79,7 @@ export function Navbar({
           <div className="menu-label">{userEmail}</div>
           <MenuItem icon="settings" onClick={() => nav('configuracion')}>Configuración</MenuItem>
           <div className="menu-sep"></div>
-          <MenuItem icon="log-out" danger onClick={handleLogout}>Cerrar sesión</MenuItem>
+          <MenuItem icon="log-out" danger onClick={() => confirmarSalida(() => void handleLogout())}>Cerrar sesión</MenuItem>
         </Dropdown>
       </div>
     </header>

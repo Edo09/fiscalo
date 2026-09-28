@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
+import { Btn, Modal } from '@/components/ui'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
 import { SearchPalette } from '@/components/layout/SearchPalette'
@@ -90,7 +91,7 @@ function AppShell() {
   // Vista actual enlazada al historial del navegador: atrás/adelante se mueven
   // entre vistas de la app. Cualquier cambio de vista, venga de un clic o del
   // navegador, cierra el menú móvil y la búsqueda y sube el scroll.
-  const { view, payload, nav } = useHistoryNav({
+  const { view, payload, nav, salidaPendiente, confirmarSalida } = useHistoryNav({
     inicial: restoreView,
     sinPayload: VIEW_SIN_PAYLOAD,
     onCambio: () => {
@@ -100,6 +101,11 @@ function AppShell() {
       if (c) c.scrollTop = 0
     },
   })
+
+  // Un cambio de vista detenido no pasa por onCambio, y el menú móvil (z-index
+  // por encima de los modales) taparía la pregunta. Solo el menú: subir el
+  // scroll perdería el sitio en el formulario si el usuario se queda.
+  useEffect(() => { if (salidaPendiente) setMobileNav(false) }, [salidaPendiente])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -144,13 +150,15 @@ function AppShell() {
   // Si el rol no tiene el módulo de la vista actual, volver al dashboard (evita
   // quedar en una página que el backend va a rechazar con 403). Fail-open sin permisos.
   // Reemplaza en vez de apilar: si no, "atrás" volvería a la vista prohibida y
-  // la redirección se repetiría, dejando al usuario atrapado.
+  // la redirección se repetiría, dejando al usuario atrapado. Forzada: el
+  // efecto no se repite, y un aviso de "sin guardar" la cancelaría para siempre
+  // (sin el módulo, lo escrito tampoco se podría guardar).
   useEffect(() => {
     const mod = navModuleFor(activeTop as ViewId)
     const perms = user?.permissions
-    if (mod && perms && !hasModule(perms, mod)) nav('dashboard', null, { replace: true })
+    if (mod && perms && !hasModule(perms, mod)) nav('dashboard', null, { replace: true, forzar: true })
     // Lo exclusivo del admin no es fail-open: sin rol admin, fuera.
-    else if (navSoloAdmin(activeTop as ViewId) && user && !esRolAdmin(user.role)) nav('dashboard', null, { replace: true })
+    else if (navSoloAdmin(activeTop as ViewId) && user && !esRolAdmin(user.role)) nav('dashboard', null, { replace: true, forzar: true })
   }, [activeTop, user, nav])
 
   const renderView = () => {
@@ -160,9 +168,13 @@ function AppShell() {
       case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
-      case 'factura-simple-nueva': return <SimpleInvoiceFormView nav={nav} facturaId={null} />
-      case 'factura-simple-editar':
-        return <SimpleInvoiceFormView nav={nav} facturaId={isFacturaSimpleRef(payload) ? payload.id : null} />
+      // Con key: pasar de una factura a otra (o de nueva a editar) monta un
+      // formulario limpio en vez de heredar el cliente y el aviso de salida del anterior.
+      case 'factura-simple-nueva': return <SimpleInvoiceFormView key="nueva" nav={nav} facturaId={null} />
+      case 'factura-simple-editar': {
+        const id = isFacturaSimpleRef(payload) ? payload.id : null
+        return <SimpleInvoiceFormView key={id ?? 'sin-id'} nav={nav} facturaId={id} />
+      }
       case 'recurrentes': return <RecurringView nav={nav} />
       case 'cotizaciones': return <CotizacionesView nav={nav} />
       case 'cotizacion-nueva':
@@ -212,11 +224,30 @@ function AppShell() {
           onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
           onOpenSearch={() => setSearch(true)}
           onOpenMobileNav={() => setMobileNav(true)}
+          confirmarSalida={confirmarSalida}
         />
         <div className="content">{renderView()}</div>
       </div>
 
       {search && <SearchPalette nav={nav} onClose={() => setSearch(false)} />}
+      {/* key: cada pregunta es un Modal nuevo. El Modal fija su Escape al montar,
+          y uno reciclado cerraría con las acciones del diálogo anterior. */}
+      {salidaPendiente && (
+        <Modal
+          key={salidaPendiente.id}
+          title="¿Salir sin guardar?"
+          icon="alert-triangle"
+          onClose={salidaPendiente.quedarse}
+          footer={
+            <>
+              <Btn variant="danger" onClick={salidaPendiente.salir}>Salir sin guardar</Btn>
+              <Btn variant="primary" onClick={salidaPendiente.quedarse} autoFocus>Seguir editando</Btn>
+            </>
+          }
+        >
+          <p className="text-sm">{salidaPendiente.mensaje}</p>
+        </Modal>
+      )}
       <Toaster theme={theme} position="top-right" richColors closeButton />
     </div>
   )

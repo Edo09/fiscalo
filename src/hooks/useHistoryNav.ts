@@ -7,8 +7,14 @@
 //
 // Debajo de la primera vista queda una entrada "tope": llegar a ella significa
 // que ya no hay adónde volver dentro de la app, y en vez de salir se recarga.
+//
+// Si la vista en pantalla tiene algo sin guardar (hooks/useAvisoSalida), el
+// cambio de vista se detiene hasta que el usuario confirme (`salidaPendiente`).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isNuevoSignal, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+import {
+  isCotizacionRef, isFacturaSimpleRef, isNuevoSignal, type Nav, type NavOptions, type NavPayload, type ViewId,
+} from '@/config/navigation'
+import { descartarSinGuardar, guardandoAhora, haySinGuardar, mensajeSinGuardar } from './useAvisoSalida'
 
 interface EntradaVista {
   fiscalo: 'vista'
@@ -47,13 +53,47 @@ interface Opciones {
   onCambio?: () => void
 }
 
+/**
+ * Cambio de vista detenido porque la vista actual tiene algo sin guardar (ver
+ * hooks/useAvisoSalida). El shell lo muestra como diálogo.
+ */
+export interface SalidaPendiente {
+  /** Distinto en cada diálogo: el shell lo usa de key para no reciclar el anterior. */
+  id: number
+  mensaje: string
+  /** Salir sin guardar: se completa el cambio de vista. */
+  salir: () => void
+  /** Seguir en la vista (y deshacer lo que el navegador ya movió, si fue atrás). */
+  quedarse: () => void
+}
+
+/**
+ * Dos destinos muestran lo mismo. Los payloads se comparan por lo que abren y
+ * no por identidad: cada clic en una factura arma un objeto nuevo, y "atrás" a
+ * otra entrada de la misma factura no es salir de ella.
+ */
+function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayload): boolean {
+  if (v1 !== v2) return false
+  if (p1 === p2) return true
+  if (isFacturaSimpleRef(p1) && isFacturaSimpleRef(p2)) return p1.id === p2.id
+  if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
+  return false
+}
+
 export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
   view: ViewId
   payload: NavPayload
   nav: Nav
+  salidaPendiente: SalidaPendiente | null
+  /** Salida que no es un cambio de vista (cerrar sesión): pregunta igual que nav(). */
+  confirmarSalida: (accion: () => void) => void
 } {
   const [view, setView] = useState<ViewId>(inicial)
   const [payload, setPayload] = useState<NavPayload>(null)
+  const [salidaPendiente, setSalidaPendiente] = useState<SalidaPendiente | null>(null)
+  /** El diálogo vigente, para que uno viejo no actúe (ver abrirSalida). */
+  const pendiente = useRef<SalidaPendiente | null>(null)
+  const ultimoId = useRef(0)
 
   // nav() y los listeners se crean una sola vez: leen el estado vigente de aquí.
   const actual = useRef<{ view: ViewId; payload: NavPayload }>({ view, payload })
@@ -71,12 +111,53 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
   // misma regla que ya aplica restoreView.
   const payloads = useRef(new Map<string, NavPayload>())
 
+  const cerrarSalida = useCallback(() => {
+    pendiente.current = null
+    setSalidaPendiente(null)
+  }, [])
+
+  /**
+   * Pregunta antes de salir. Las acciones solo valen mientras el diálogo siga
+   * siendo el vigente: el Escape del Modal llega tras su animación, y para
+   * entonces otro diálogo o un cambio de vista (el guardado que termina) pudo
+   * haberlo dejado sin objeto.
+   */
+  const abrirSalida = useCallback((acciones: { salir: () => void; quedarse: () => void }) => {
+    const dialogo: SalidaPendiente = {
+      id: ++ultimoId.current,
+      mensaje: mensajeSinGuardar(),
+      salir: () => {
+        if (pendiente.current !== dialogo) return
+        // Se empezó a guardar con el diálogo abierto (el teclado llega al
+        // formulario de detrás): ya no hay nada que descartar, así que es quedarse.
+        if (guardandoAhora()) {
+          cerrarSalida()
+          acciones.quedarse()
+          return
+        }
+        descartarSinGuardar()
+        cerrarSalida()
+        acciones.salir()
+      },
+      quedarse: () => {
+        if (pendiente.current !== dialogo) return
+        cerrarSalida()
+        acciones.quedarse()
+      },
+    }
+    pendiente.current = dialogo
+    setSalidaPendiente(dialogo)
+  }, [cerrarSalida])
+
   const aplicar = useCallback((v: ViewId, p: NavPayload) => {
     actual.current = { view: v, payload: p }
+    // La pregunta era por la vista que se va: si se cambió de vista por otro
+    // camino (el guardado navega al terminar), ya no aplica.
+    cerrarSalida()
     setView(v)
     setPayload(p)
     onCambioRef.current?.()
-  }, [])
+  }, [cerrarSalida])
 
   const crearEntrada = useCallback((v: ViewId, p: NavPayload): EntradaVista => {
     const key = nuevaKey()
@@ -100,7 +181,7 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
     window.history.pushState(crearEntrada(v, p), '')
   }, [crearEntrada])
 
-  const nav = useCallback<Nav>((v, p = null, opts) => {
+  const navegar = useCallback((v: ViewId, p: NavPayload, opts?: NavOptions) => {
     const s: unknown = window.history.state
     // Volver a pulsar la vista en la que ya se está no apila otra copia: si no,
     // "atrás" parecería no hacer nada hasta gastarlas.
@@ -119,6 +200,32 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
     aplicar(v, p)
   }, [aplicar, armar, crearEntrada])
 
+  const nav = useCallback<Nav>((v, p = null, opts) => {
+    if (opts?.forzar) {
+      descartarSinGuardar()
+      navegar(v, p, opts)
+      return
+    }
+    // Mismo destino que lo que hay en pantalla: la vista no se desmonta y no se
+    // pierde nada, así que no hay qué preguntar.
+    if (!mismoDestino(v, p, actual.current.view, actual.current.payload)) {
+      // Guardando: al terminar, el guardado cambia de vista él mismo; si falla,
+      // lo escrito sigue en pantalla. El clic se ignora.
+      if (guardandoAhora()) return
+      if (haySinGuardar()) {
+        abrirSalida({ salir: () => navegar(v, p, opts), quedarse: () => {} })
+        return
+      }
+    }
+    navegar(v, p, opts)
+  }, [abrirSalida, navegar])
+
+  const confirmarSalida = useCallback((accion: () => void) => {
+    if (guardandoAhora()) return
+    if (haySinGuardar()) abrirSalida({ salir: accion, quedarse: () => {} })
+    else accion()
+  }, [abrirSalida])
+
   useEffect(() => {
     // Tras recargar a mitad del historial la vista sale de restoreView y el
     // payload ya no está: la entrada se alinea con lo que de verdad se muestra.
@@ -127,20 +234,55 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
       window.history.replaceState({ ...s, view: actual.current.view, conPayload: false }, '')
     }
 
-    const alVolver = (e: PopStateEvent) => {
-      const entrada: unknown = e.state
-      if (!esVista(entrada)) {
-        // El tope (o una entrada que no es de la app): ya no hay adónde volver.
-        window.location.reload()
-        return
-      }
+    /** Adónde lleva una entrada del historial; null = el tope (o una entrada ajena). */
+    const destinoDe = (entrada: unknown) => {
+      if (!esVista(entrada)) return null
       const perdido = entrada.conPayload && !payloads.current.has(entrada.key)
       const guardado = payloads.current.get(entrada.key) ?? null
       // "Nueva → Gasto" abre el formulario al llegar; al volver no se repite.
       const p = isNuevoSignal(guardado) ? null : guardado
       const v = perdido ? (sinPayloadRef.current[entrada.view] ?? entrada.view) : entrada.view
-      if (perdido) window.history.replaceState({ ...entrada, view: v, conPayload: false }, '')
-      aplicar(v, p)
+      return { entrada, v, p, perdido }
+    }
+
+    const irA = (d: ReturnType<typeof destinoDe>) => {
+      if (d == null) {
+        // El tope (o una entrada que no es de la app): ya no hay adónde volver.
+        window.location.reload()
+        return
+      }
+      if (d.perdido) window.history.replaceState({ ...d.entrada, view: d.v, conPayload: false }, '')
+      aplicar(d.v, d.p)
+    }
+
+    const alVolver = (e: PopStateEvent) => {
+      const d = destinoDe(e.state)
+      if (!haySinGuardar() && !guardandoAhora()) {
+        irA(d)
+        return
+      }
+      const { view: v, payload: p } = actual.current
+      // Con el diálogo abierto se volvió a la entrada de la vista en pantalla
+      // (adelante), o a otra entrada de la misma factura: es quedarse.
+      if (d != null && mismoDestino(d.v, d.p, v, p)) {
+        cerrarSalida()
+        return
+      }
+      // El navegador ya cambió de entrada y eso no se cancela: la vista sigue en
+      // pantalla. Para quedarse se vuelve a apilar su entrada.
+      const reponer = () => {
+        // Si se había vuelto hasta el tope, el clic en el diálogo ya la
+        // apiló (ver armar): otra copia haría que "atrás" no hiciera nada.
+        const s: unknown = window.history.state
+        const yaEsta = esVista(s) && mismoDestino(s.view, payloads.current.get(s.key) ?? null, v, p)
+        if (!yaEsta) window.history.pushState(crearEntrada(v, p), '')
+      }
+      // Guardando: como en nav(), se espera a que termine.
+      if (guardandoAhora()) {
+        reponer()
+        return
+      }
+      abrirSalida({ salir: () => irA(d), quedarse: reponer })
     }
 
     const alInteractuar = (e: Event) => {
@@ -157,7 +299,7 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
       window.removeEventListener('pointerup', alInteractuar, true)
       window.removeEventListener('keydown', alInteractuar, true)
     }
-  }, [aplicar, armar])
+  }, [abrirSalida, aplicar, armar, cerrarSalida, crearEntrada])
 
-  return { view, payload, nav }
+  return { view, payload, nav, salidaPendiente, confirmarSalida }
 }

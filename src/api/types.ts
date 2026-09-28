@@ -400,6 +400,13 @@ export interface StatsPorMes {
   monto_total: number
 }
 
+export interface StatsPorDia {
+  /** YYYY-MM-DD */
+  dia: string
+  total: number
+  monto_total: number
+}
+
 export interface StatsSecuencia {
   type: string
   nombre: string
@@ -415,7 +422,16 @@ export interface StatsData {
   resumen: StatsResumen
   por_tipo: StatsPorTipo[]
   por_estado: StatsPorEstado[]
+  /** e-CF emitidos por mes, de TODOS los tipos (compras incluidas): no son ventas. */
   por_mes: StatsPorMes[]
+  /**
+   * Ventas en e-CF por mes (últimos 12), con las reglas del reporte de ventas:
+   * la nota de crédito (E34) resta y E41/E43/E47 no entran. Sin facturas simples.
+   * Opcional: un backend anterior no lo trae.
+   */
+  ventas_por_mes?: StatsPorMes[]
+  /** Igual que `ventas_por_mes`, por día (últimos 31). */
+  ventas_por_dia?: StatsPorDia[]
   secuencias: StatsSecuencia[]
 }
 
@@ -1093,6 +1109,19 @@ export interface FacturaSimpleRow {
   tipo_pago?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
+}
+
+/**
+ * Resumen de facturas simples para el dashboard (GET /api/facturas-simples/stats).
+ * Mismos campos que los stats de e-CF, para sumarlos tal cual. Los meses y días
+ * sin facturas no vienen.
+ */
+export interface FacturaSimpleStats {
+  resumen: { total: number; monto_total: number } | null
+  /** Últimos 12 meses (`mes` = YYYY-MM). */
+  por_mes: StatsPorMes[]
+  /** Últimos 31 días (`dia` = YYYY-MM-DD). */
+  por_dia: StatsPorDia[]
 }
 
 /** Detalle (GET /api/facturas-simples/{id}), con sus lineas. */

@@ -6,7 +6,7 @@
 // es la suma de los subtotales. El backend genera el número (`0001-230826`) y
 // calcula el subtotal de cada línea, así que el formulario solo manda lo que el
 // usuario escribe. Ver src/Controllers/facturaSimpleController.php en la API.
-import { getJson, getList, postJson, request, qs } from './http'
+import { ApiError, getJson, getList, postJson, request, qs } from './http'
 import { parametroFormato } from './impresion'
 import type {
   DocBase64,
@@ -14,6 +14,7 @@ import type {
   FormatoImpresion,
   FacturaSimpleInput,
   FacturaSimpleRow,
+  FacturaSimpleStats,
   ListResult,
   ReciboDatos,
 } from './types'
@@ -32,6 +33,22 @@ export function listFacturasSimples(
     pageSize: params.pageSize,
     query: params.query,
   })}`)
+}
+
+/**
+ * Cuántas facturas simples hay y cuánto suman, por mes y por día (dashboard).
+ *
+ * Se valida la forma: un backend anterior a este endpoint no da 404, trata
+ * "stats" como el listado y responde 200 con un arreglo de facturas. Sin la
+ * validación, el dashboard leería `por_mes` de ese arreglo y se caería entero.
+ */
+export async function getFacturaSimpleStats(): Promise<FacturaSimpleStats> {
+  const d = await getJson<unknown>('/api/facturas-simples/stats')
+  const o = d as Partial<FacturaSimpleStats> | null
+  if (!o || typeof o !== 'object' || Array.isArray(o) || !Array.isArray(o.por_mes) || !Array.isArray(o.por_dia)) {
+    throw new ApiError('El servidor todavía no tiene las estadísticas de facturas simples.', 404)
+  }
+  return o as FacturaSimpleStats
 }
 
 export function getFacturaSimple(id: number): Promise<FacturaSimple> {
@@ -65,11 +82,6 @@ export function getFacturaSimplePdf(id: number, formato: FormatoImpresion = 'car
 /** Recibo de tirilla de una factura guardada, como datos para imprimirlo como página web. */
 export function getReciboFacturaSimple(id: number): Promise<ReciboDatos> {
   return getJson<ReciboDatos>(`/api/facturas-simples/${id}/pdf${qs({ format: 'datos', formato: parametroFormato('pos') })}`)
-}
-
-/** Recibo de tirilla de lo que hay en pantalla, sin guardar, como datos. */
-export function previewReciboFacturaSimple(input: FacturaSimpleInput): Promise<ReciboDatos> {
-  return postJson<ReciboDatos>('/api/facturas-simples/preview', { ...input, formato: parametroFormato('pos'), format: 'datos' })
 }
 
 /** PDF previo, sin guardar nada. */
