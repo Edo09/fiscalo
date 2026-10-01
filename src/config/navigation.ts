@@ -1,6 +1,7 @@
 // Navegación de la aplicación: vistas, grupos del sidebar y títulos.
 import type { IconName } from '@/components/ui/Icon'
 import type { Factura, EcfTipo, FacturaPrefill } from '@/types/domain'
+import { esRolAdmin, hasModule } from '@/config/permissions'
 
 export type ViewId =
   | 'dashboard'
@@ -172,19 +173,71 @@ export const NAV: NavGroup[] = [
   },
 ]
 
-/** ¿La vista es solo para el rol admin? */
+/**
+ * Subvistas (formularios, detalles, sub-reportes) → item del menú al que
+ * pertenecen. El sidebar resalta ese item y la subvista hereda su módulo RBAC
+ * y su restricción de admin. Una vista que no esté en NAV ni aquí queda SIN
+ * gatear: toda vista nueva de un módulo tiene que entrar en uno de los dos.
+ */
+const SUBVISTA_DE: Partial<Record<ViewId, ViewId>> = {
+  'factura-nueva': 'facturas',
+  'factura-ver': 'facturas',
+  recurrentes: 'facturas',
+  'factura-simple-nueva': 'facturas-simples',
+  'factura-simple-editar': 'facturas-simples',
+  'cotizacion-nueva': 'cotizaciones',
+  'ajuste-nuevo': 'ajustes',
+  'ecf-tipo': 'ecf',
+  'bandeja-dgii': 'ecf',
+  'reportes-fiscales': 'reportes',
+  'reportes-ventas': 'reportes',
+  'reportes-606': 'reportes',
+  'reportes-607': 'reportes',
+}
+
+/** Item del menú de una vista: ella misma, o el de su grupo si es una subvista. */
+export function navTopFor(view: ViewId): ViewId {
+  return SUBVISTA_DE[view] ?? view
+}
+
+/** ¿La vista (o su item del menú) es solo para el rol admin? */
 export function navSoloAdmin(view: ViewId): boolean {
-  return NAV.some((g) => g.items.some((i) => i.id === view && i.soloAdmin))
+  const top = navTopFor(view)
+  return NAV.some((g) => g.items.some((i) => i.id === top && i.soloAdmin))
 }
 
 /** Módulo RBAC asociado a una vista (resolviendo subvistas a su item del menú).
     undefined => la vista no está gateada (siempre accesible). */
 export function navModuleFor(view: ViewId): string | undefined {
+  const top = navTopFor(view)
   for (const g of NAV) {
-    const it = g.items.find((i) => i.id === view)
+    const it = g.items.find((i) => i.id === top)
     if (it) return it.module
   }
   return undefined
+}
+
+/** Lo que hace falta de la sesión para decidir qué se muestra (ver stores/auth). */
+export interface SesionNav {
+  role?: string
+  permissions?: string[]
+}
+
+/**
+ * ¿La sesión puede ver el item? Único criterio para el sidebar, el buscador, el
+ * botón "Nueva" y la redirección de App. Fail-open cuando no hay lista de
+ * permisos (sesión previa a RBAC): el backend sigue siendo la barrera real. Lo
+ * exclusivo del admin NO es fail-open: sin rol admin no se muestra.
+ */
+export function puedeVerItem(user: SesionNav | null | undefined, it: { module?: string; soloAdmin?: boolean }): boolean {
+  if (it.soloAdmin) return esRolAdmin(user?.role)
+  const perms = user?.permissions
+  return !it.module || !perms || hasModule(perms, it.module)
+}
+
+/** ¿La sesión puede abrir la vista? Las subvistas heredan el permiso de su item del menú. */
+export function puedeVerVista(user: SesionNav | null | undefined, view: ViewId): boolean {
+  return puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view) })
 }
 
 export const TITLES: Record<ViewId, string> = {

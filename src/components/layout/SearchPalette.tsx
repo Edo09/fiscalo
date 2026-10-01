@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon, type IconName } from '@/components/ui'
-import { NAV, type Nav } from '@/config/navigation'
+import { NAV, puedeVerItem, type Nav } from '@/config/navigation'
+import { useSession } from '@/stores/auth'
 
 interface Result {
   type: string
@@ -10,11 +11,15 @@ interface Result {
 }
 
 export function SearchPalette({ nav, onClose }: { nav: Nav; onClose: () => void }) {
+  const { user } = useSession()
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
 
-  const pages: Result[] = NAV.flatMap((g) => g.items).map((i) => ({ type: 'Página', label: i.label, icon: i.icon, action: () => nav(i.id) }))
+  // Solo las páginas que el sidebar mostraría: mismo criterio de permisos.
+  const pages: Result[] = NAV.flatMap((g) => g.items)
+    .filter((i) => puedeVerItem(user, i))
+    .map((i) => ({ type: 'Página', label: i.label, icon: i.icon, action: () => nav(i.id) }))
   const results = q ? pages.filter((r) => r.label.toLowerCase().includes(q.toLowerCase())).slice(0, 8) : pages.slice(0, 6)
 
   return (

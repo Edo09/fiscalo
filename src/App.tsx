@@ -40,9 +40,8 @@ import { NotificationsView } from '@/features/notifications/NotificationsView'
 import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
-import { esRolAdmin, hasModule } from '@/config/permissions'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
-import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navModuleFor, navSoloAdmin, type ViewId } from '@/config/navigation'
+import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista, type ViewId } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -133,32 +132,19 @@ function AppShell() {
     return () => window.removeEventListener('keydown', h)
   }, [])
 
-  // Ojo con el orden: 'facturas-simples' y 'factura-simple-*' tambien empiezan
-  // por 'factura', asi que se resuelven ANTES del prefijo generico.
-  const activeTop: string = view.startsWith('factura-simple') || view === 'facturas-simples'
-    ? 'facturas-simples'
-    : view.startsWith('factura')
-    ? 'facturas'
-    : view === 'recurrentes'
-      ? 'facturas'
-      : view === 'ecf-tipo'
-        ? 'ecf'
-        : view.startsWith('reportes')
-          ? 'reportes'
-          : view
+  // Item del menú de la vista actual: las subvistas (formularios, detalles)
+  // marcan el de su grupo y heredan su permiso (ver SUBVISTA_DE en navigation).
+  const activeTop = navTopFor(view)
 
-  // Si el rol no tiene el módulo de la vista actual, volver al dashboard (evita
-  // quedar en una página que el backend va a rechazar con 403). Fail-open sin permisos.
+  // Si el rol no puede ver la vista actual, volver al dashboard (evita quedar
+  // en una página que el backend va a rechazar con 403). Mismo criterio que el
+  // sidebar: fail-open sin permisos, lo soloAdmin no (ver puedeVerItem).
   // Reemplaza en vez de apilar: si no, "atrás" volvería a la vista prohibida y
   // la redirección se repetiría, dejando al usuario atrapado. Forzada: el
   // efecto no se repite, y un aviso de "sin guardar" la cancelaría para siempre
   // (sin el módulo, lo escrito tampoco se podría guardar).
   useEffect(() => {
-    const mod = navModuleFor(activeTop as ViewId)
-    const perms = user?.permissions
-    if (mod && perms && !hasModule(perms, mod)) nav('dashboard', null, { replace: true, forzar: true })
-    // Lo exclusivo del admin no es fail-open: sin rol admin, fuera.
-    else if (navSoloAdmin(activeTop as ViewId) && user && !esRolAdmin(user.role)) nav('dashboard', null, { replace: true, forzar: true })
+    if (!puedeVerVista(user, activeTop)) nav('dashboard', null, { replace: true, forzar: true })
   }, [activeTop, user, nav])
 
   const renderView = () => {

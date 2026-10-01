@@ -1,10 +1,19 @@
 import { useState } from 'react'
-import { Icon, Btn, Avatar, Dropdown, MenuItem } from '@/components/ui'
+import { Icon, Btn, Avatar, Dropdown, MenuItem, type IconName } from '@/components/ui'
 import { getEmisor } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession } from '@/stores/auth'
 import { logout } from '@/api/auth'
-import type { Nav } from '@/config/navigation'
+import { puedeVerVista, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
+
+// Accesos del botón "Nueva". Cada uno se muestra solo si el rol puede abrir su
+// vista (mismo criterio que el sidebar, ver puedeVerVista).
+const NUEVOS: { view: ViewId; payload?: NavPayload; icon: IconName; label: string }[] = [
+  { view: 'factura-nueva', icon: 'file-text', label: 'Factura' },
+  { view: 'gastos', payload: { kind: 'nuevo' }, icon: 'receipt', label: 'Gasto menor' },
+  { view: 'compras', payload: { kind: 'nuevo' }, icon: 'shopping-cart', label: 'Compra' },
+  { view: 'cotizacion-nueva', icon: 'file-plus', label: 'Cotización' },
+]
 
 export interface NavbarProps {
   nav: Nav
@@ -24,6 +33,7 @@ export function Navbar({
   const userEmail = user?.email || ''
   const userRole = user?.role || ''
   const [loggingOut, setLoggingOut] = useState(false)
+  const nuevos = NUEVOS.filter((n) => puedeVerVista(user, n.view))
 
   // Empresa real del tenant (GET /api/emisor) — misma caché que Configuración.
   const emisorQ = useApiQuery(['emisor'], getEmisor)
@@ -61,14 +71,16 @@ export function Navbar({
       <div className="navbar-spacer"></div>
       <div className="navbar-actions">
         <button className="icon-btn mobile-only" onClick={onOpenSearch}><Icon name="search" /></button>
-        <Dropdown align="right" width={210} className="desktop-only" trigger={
-          <Btn variant="primary" size="sm" icon="plus">Nueva</Btn>
-        }>
-          <MenuItem icon="file-text" onClick={() => nav('factura-nueva')}>Factura</MenuItem>
-          <MenuItem icon="receipt" onClick={() => nav('gastos', { kind: 'nuevo' })}>Gasto menor</MenuItem>
-          <MenuItem icon="shopping-cart" onClick={() => nav('compras', { kind: 'nuevo' })}>Compra</MenuItem>
-          <MenuItem icon="file-plus" onClick={() => nav('cotizacion-nueva')}>Cotización</MenuItem>
-        </Dropdown>
+        {/* Sin ningún acceso permitido no hay botón: un menú vacío no lleva a nada. */}
+        {nuevos.length > 0 && (
+          <Dropdown align="right" width={210} className="desktop-only" trigger={
+            <Btn variant="primary" size="sm" icon="plus">Nueva</Btn>
+          }>
+            {nuevos.map((n) => (
+              <MenuItem key={n.view} icon={n.icon} onClick={() => nav(n.view, n.payload)}>{n.label}</MenuItem>
+            ))}
+          </Dropdown>
+        )}
         <button className="icon-btn" onClick={onToggleTheme} title="Cambiar tema">
           <Icon name={theme === 'light' ? 'moon' : 'sun'} />
         </button>
