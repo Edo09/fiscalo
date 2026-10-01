@@ -2,6 +2,7 @@
 // Los tipos de CreateGastoInput y derivados se infieren de aquí (z.infer) y se
 // re-exportan desde ../types para no duplicar definiciones.
 import { z } from 'zod'
+import { decimalesDe } from '@/lib/format'
 
 export const gastoCategoriaSchema = z.enum(['gastos_menores', 'facturas_proveedores'])
 
@@ -44,6 +45,19 @@ export const createGastoSchema = z.object({
   itbis: z.number().optional(),
   total: z.number().optional(),
   user_id: z.number().optional(),
+}).superRefine((v, ctx) => {
+  // Auto-emitidos (E41/E43/E47): van a la DGII, y su XML admite 2 decimales en
+  // la cantidad y 4 en el precio. Recibidos: 3 en la cantidad, lo que guarda la
+  // base. El formulario ya redondea; esto ataja a cualquier otro llamador.
+  const maxCantidad = v.tipo_gasto === 'E41' || v.tipo_gasto === 'E43' || v.tipo_gasto === 'E47' ? 2 : 3
+  v.items.forEach((it, i) => {
+    if (it.quantity != null && decimalesDe(it.quantity) > maxCantidad) {
+      ctx.addIssue({ code: 'custom', path: ['items', i, 'quantity'], message: `La cantidad admite hasta ${maxCantidad} decimales.` })
+    }
+    if (decimalesDe(it.amount) > 4) {
+      ctx.addIssue({ code: 'custom', path: ['items', i, 'amount'], message: 'El precio admite hasta 4 decimales.' })
+    }
+  })
 })
 
 // Tipos inferidos — fuente única de verdad para el contrato de la API.

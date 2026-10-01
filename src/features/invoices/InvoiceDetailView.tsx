@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/components/ui'
@@ -6,10 +6,12 @@ import '@/styles/factura-doc.css'
 import {
   ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
 } from '@/api'
-import type { DocKind, FormatoImpresion } from '@/api'
+import type { DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
 import { presentDocument } from '@/lib/file'
+import { aNumero, fmtCantidad, fmtPrecio } from '@/lib/format'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo } from './imprimirRecibo'
+import { lineaQueCuadra, type ItemFirmado } from './montosLinea'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
@@ -34,6 +36,58 @@ const IND_FACT_LABEL: Record<number, string> = {
   2: 'ITBIS 16%',
   3: 'Tasa 0%',
   4: 'Exento',
+}
+
+/**
+ * Lee los Item de DetallesItems del e-CF firmado, en su orden, con los montos
+ * que usa lineaQueCuadra (CantidadItem, PrecioUnitarioItem y MontoItem). null
+ * si no hay XML o no se deja leer: entonces se deriva de la fila.
+ */
+function itemsFirmados(xml: string | null | undefined): ItemFirmado[] | null {
+  if (!xml) return null
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    if (doc.getElementsByTagName('parsererror').length > 0) return null
+    const detalles = doc.getElementsByTagName('DetallesItems')[0]
+    if (!detalles) return null
+    const num = (item: Element, tag: string): number | null => {
+      const t = item.getElementsByTagName(tag)[0]?.textContent?.trim() ?? ''
+      const n = Number(t)
+      return t !== '' && Number.isFinite(n) ? n : null
+    }
+    // Solo los Item hijos directos de DetallesItems, en su orden (= NumeroLinea).
+    return Array.from(detalles.childNodes)
+      .filter((n): n is Element => n.nodeType === 1 && (n as Element).localName === 'Item')
+      .map((el) => ({
+        cantidad: num(el, 'CantidadItem'), precio: num(el, 'PrecioUnitarioItem'), monto: num(el, 'MontoItem'),
+      }))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Cantidad y precio que se muestran de cada línea, de modo que cantidad ×
+ * precio − descuento dé su importe. Las filas de antes de la migración 025
+ * guardaron la cantidad como entero y el precio con 2 decimales, y la hoja decía
+ * "3 × 84.75 = 254.24". Manda lo firmado ante la DGII: el XML trae los valores
+ * exactos, y sus Item van en el orden de las filas (solo si son tantos como
+ * ellas). Sin XML, se deriva lo que explica el importe con la misma regla que
+ * la representación impresa (lineaQueCuadra en modo 'ecf' =
+ * EcfDocumento::resolverLinea con MODO_ECF): la pantalla dice lo del papel.
+ */
+function lineasImpresas(items: FacturaItemRow[], xml: string | null | undefined) {
+  const firmados = itemsFirmados(xml)
+  const delXml = firmados != null && firmados.length === items.length ? firmados : null
+  return items.map((l, i) => {
+    const descuento = aNumero(l.descuento_monto)
+    const importe = l.subtotal == null || l.subtotal === '' ? null : aNumero(l.subtotal)
+    // Sin cantidad cuenta 1, como en el backend.
+    const { cantidad, precio } = lineaQueCuadra(
+      aNumero(l.quantity ?? 1), aNumero(l.amount), importe, descuento, 'ecf', delXml?.[i] ?? null,
+    )
+    return { cantidad, precio, descuento }
+  })
 }
 
 /* FISCALO — Facturación: ver factura (detalle + estado DGII en vivo + PDF/XML).
@@ -66,6 +120,12 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
     }
   }, [estado.data, f, queryClient])
 
+  // Parsear el XML firmado no es gratis: solo cuando cambia el detalle.
+  const impresas = useMemo(
+    () => lineasImpresas(detalle.data?.items ?? [], detalle.data?.xml_firmado),
+    [detalle.data],
+  )
+
   if (!f) {
     return (
       <div className="page">
@@ -91,11 +151,11 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const clienteNombre = cliente?.razon_social || cliente?.company_name || cliente?.client_name || f.cliente
   const clienteContacto = cliente?.client_name && cliente.client_name !== clienteNombre ? cliente.client_name : ''
   const clienteRnc = cliente?.rnc || f.rnc || ''
-  const total = Number(det?.total ?? f.total)
+  const total = aNumero(det?.total ?? f.total)
   // ITBIS y subtotal son a nivel de factura (el backend no los desglosa por línea).
-  const itbisTotal = Number(det?.total_itbis ?? f.itbis ?? 0)
-  const subtotalGravado = Number(det?.monto_gravado ?? f.subtotal ?? 0)
-  const montoExento = Number(det?.monto_exento ?? 0)
+  const itbisTotal = aNumero(det?.total_itbis ?? f.itbis ?? 0)
+  const subtotalGravado = aNumero(det?.monto_gravado ?? f.subtotal ?? 0)
+  const montoExento = aNumero(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
 
   const openDoc = async (kind: DocKind, download = false, formato: FormatoImpresion = 'carta') => {
@@ -226,11 +286,20 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
                     <div className="fx-linea-tasa">{IND_FACT_LABEL[l.indicador_facturacion]}</div>
                   )}
                 </div>
-                <span className="fx-num fx-cell" data-label="Cant.">{Number(l.quantity ?? 0)}</span>
-                <span className="fx-num fx-cell" data-label="Precio"><Money value={Number(l.amount ?? 0)} cur={false} /></span>
-                <span className="fx-num fx-cell" data-label="ITBIS"><Money value={Number(l.itbis_amount ?? 0)} cur={false} /></span>
+                {/* Cantidad sin ceros de relleno ("3", no "3.000") y precio con
+                    sus 4 decimales si los tiene: Money lo cortaba a 2. */}
+                <span className="fx-num fx-cell" data-label="Cant.">{fmtCantidad(impresas[i]?.cantidad ?? l.quantity)}</span>
+                <span className="fx-num fx-cell" data-label="Precio"><span className="num">{fmtPrecio(impresas[i]?.precio ?? l.amount)}</span></span>
+                <span className="fx-num fx-cell" data-label="ITBIS"><Money value={aNumero(l.itbis_amount)} cur={false} /></span>
                 <span className="fx-importe fx-cell" data-label="Importe">
-                  <Money value={Number(l.subtotal ?? l.amount ?? 0)} cur={false} />
+                  <Money value={aNumero(l.subtotal ?? l.amount)} cur={false} />
+                  {/* El importe ya viene neto del descuento: sin mostrarlo, la
+                      línea no daba cantidad × precio. */}
+                  {(impresas[i]?.descuento ?? 0) > 0 && (
+                    <span className="fx-contador" style={{ display: 'block' }}>
+                      Desc. −<Money value={impresas[i].descuento} cur={false} />
+                    </span>
+                  )}
                 </span>
               </div>
             ))

@@ -7,6 +7,7 @@ import {
 import { ApiError, listAjustes, getAjuste, anularAjuste } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
+import { aNumero, fmtCantidad } from '@/lib/format'
 import type { Nav } from '@/config/navigation'
 import { MOTIVOS, motivoLabel } from './motivos'
 
@@ -236,20 +237,25 @@ function AjusteDrawer({ id, onClose, onAnulado }: { id: number; onClose: () => v
                 </tr>
               </thead>
               <tbody>
-                {ajuste.lineas.map((l) => (
-                  <tr key={l.id}>
-                    <td>
-                      <span className="cell-main">{l.producto_nombre ?? `#${l.product_id}`}</span>
-                      {l.sku && <div className="cell-sub mono">{l.sku}</div>}
-                    </td>
-                    <td style={{ textAlign: 'right' }} className="muted">{l.cantidad_anterior}</td>
-                    <td style={{ textAlign: 'right', color: Number(l.cantidad) < 0 ? 'var(--danger)' : 'var(--success)' }}>
-                      {Number(l.cantidad) > 0 ? '+' : ''}{l.cantidad}
-                    </td>
-                    <td style={{ textAlign: 'right' }} className="fw6">{l.cantidad_nueva}</td>
-                    <td style={{ textAlign: 'right' }}><Money value={Number(l.valor_movimiento ?? 0)} /></td>
-                  </tr>
-                ))}
+                {ajuste.lineas.map((l) => {
+                  // Las cantidades son DECIMAL(12,3) y llegan como texto ("12.000",
+                  // "-2.500"): impresas tal cual saldrían con los ceros de relleno.
+                  const cant = aNumero(l.cantidad)
+                  return (
+                    <tr key={l.id}>
+                      <td>
+                        <span className="cell-main">{l.producto_nombre ?? `#${l.product_id}`}</span>
+                        {l.sku && <div className="cell-sub mono">{l.sku}</div>}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="muted">{fmtCantidad(l.cantidad_anterior)}</td>
+                      <td style={{ textAlign: 'right', color: cant < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                        {cant > 0 ? '+' : ''}{fmtCantidad(cant)}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="fw6">{fmtCantidad(l.cantidad_nueva)}</td>
+                      <td style={{ textAlign: 'right' }}><Money value={aNumero(l.valor_movimiento)} /></td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

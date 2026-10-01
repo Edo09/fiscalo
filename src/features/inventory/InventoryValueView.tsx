@@ -7,6 +7,7 @@ import { getValorInventario, listMovimientos, listWarehouses, listCategories } f
 import type { EstadoValorInv, MovimientoRow, ValorInventarioRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { hoyLocal } from '@/lib/date'
+import { aNumero, fmtCantidad } from '@/lib/format'
 import { motivoLabel } from './motivos'
 
 /* FISCALO — Inventario > Valor de inventario.
@@ -96,9 +97,10 @@ export function InventoryValueView() {
 
       <div className="kpi-grid compact" style={{ marginBottom: 16 }}>
         <KPI label="Productos" value={totales?.productos ?? 0} icon="package" />
+        {/* Como texto: el KPI formatea los números sin decimales y 12.5 kg salía como 13. */}
         <KPI
           label="Unidades en existencia"
-          value={totales?.existencia ?? 0}
+          value={fmtCantidad(totales?.existencia ?? 0)}
           icon="box"
           iconBg="var(--warning-soft)"
           iconColor="var(--warning)"
@@ -210,14 +212,14 @@ export function InventoryValueView() {
                       </div>
                     </td>
                     <td className="num text-sm" style={r.entradas > 0 ? { color: 'var(--success)' } : undefined}>
-                      {r.entradas || '—'}
+                      {r.entradas ? fmtCantidad(r.entradas) : '—'}
                     </td>
                     <td className="num text-sm" style={r.salidas > 0 ? { color: 'var(--danger)' } : undefined}>
-                      {r.salidas || '—'}
+                      {r.salidas ? fmtCantidad(r.salidas) : '—'}
                     </td>
                     {/* Un saldo negativo es un descuadre real, no un cero: se marca. */}
                     <td className="num fw6" style={r.existencia < 0 ? { color: 'var(--danger)' } : undefined}>
-                      {r.existencia.toLocaleString('es-DO')}
+                      {fmtCantidad(r.existencia)}
                     </td>
                     <td className="num text-sm">
                       <Money value={r.costo_promedio} cur={false} />
@@ -292,7 +294,7 @@ function MovimientosDrawer({ producto, onClose }: { producto: ValorInventarioRow
         <div className="row between">
           <span className="text-sm muted">Existencia</span>
           <span className="fw6" style={producto.existencia < 0 ? { color: 'var(--danger)' } : undefined}>
-            {producto.existencia.toLocaleString('es-DO')}
+            {fmtCantidad(producto.existencia)}
           </span>
         </div>
         <div className="row between mt-sm">
@@ -333,7 +335,8 @@ function MovimientosDrawer({ producto, onClose }: { producto: ValorInventarioRow
             </thead>
             <tbody>
               {movs.map((m) => {
-                const cant = Number(m.cantidad)
+                // DECIMAL(12,3): llega como texto ("-2.500"); se muestra sin los ceros de relleno.
+                const cant = aNumero(m.cantidad)
                 return (
                   <tr key={m.id} style={{ cursor: 'default' }}>
                     <td className="muted text-sm">{fmtFecha(m.created_at)}</td>
@@ -342,14 +345,14 @@ function MovimientosDrawer({ producto, onClose }: { producto: ValorInventarioRow
                       {m.ajuste_codigo && <div className="cell-sub mono">{m.ajuste_codigo}</div>}
                     </td>
                     <td className="num fw6" style={cant > 0 ? { color: 'var(--success)' } : undefined}>
-                      {cant > 0 ? cant : '—'}
+                      {cant > 0 ? fmtCantidad(cant) : '—'}
                     </td>
                     <td className="num fw6" style={cant < 0 ? { color: 'var(--danger)' } : undefined}>
-                      {cant < 0 ? -cant : '—'}
+                      {cant < 0 ? fmtCantidad(-cant) : '—'}
                     </td>
-                    <td className="num">{Number(m.cantidad_nueva).toLocaleString('es-DO')}</td>
-                    <td className="num text-sm muted"><Money value={Number(m.costo_unitario)} cur={false} /></td>
-                    <td className="num text-sm"><Money value={Number(m.valor_movimiento)} cur={false} /></td>
+                    <td className="num">{fmtCantidad(m.cantidad_nueva)}</td>
+                    <td className="num text-sm muted"><Money value={aNumero(m.costo_unitario)} cur={false} /></td>
+                    <td className="num text-sm"><Money value={aNumero(m.valor_movimiento)} cur={false} /></td>
                   </tr>
                 )
               })}

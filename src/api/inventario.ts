@@ -7,6 +7,14 @@ import type {
   AjusteRow, Ajuste, MovimientoRow, CrearAjusteInput, ListParams, ListResult,
   ValorInventarioParams, ValorInventarioRow, ValorInventarioTotales,
 } from './types'
+import { aNumero } from '@/lib/format'
+
+/** Lo que manda la API: los campos numéricos pueden venir como texto DECIMAL. */
+type ConTexto<T, K extends keyof T> = Omit<T, K> & { [P in K]: number | string }
+type ValorInventarioRowApi = ConTexto<
+  ValorInventarioRow, 'entradas' | 'salidas' | 'existencia' | 'costo_promedio' | 'valor_inventario'
+>
+type ValorInventarioTotalesApi = ConTexto<ValorInventarioTotales, 'productos' | 'existencia' | 'valor'>
 
 /**
  * Valor del inventario producto por producto a una fecha de corte.
@@ -28,12 +36,28 @@ export async function getValorInventario(
     hasta: params.hasta,
   })
   const res = await getEnvelope<{
-    data: ValorInventarioRow[]
-    totales: ValorInventarioTotales
+    data: ValorInventarioRowApi[]
+    totales: ValorInventarioTotalesApi
     hasta: string
     pagination: { total: number }
   }>(`/api/inventario/valor${query}`)
-  return { items: res.data, total: res.pagination.total, totales: res.totales, hasta: res.hasta }
+  // Existencias con decimales (kg, metro): si llegaran como texto ("12.500"),
+  // `r.entradas > 0` y la suma de la vista trabajarían sobre texto. Se
+  // convierten aquí, una vez, y las pantallas reciben siempre números.
+  const items = res.data.map<ValorInventarioRow>((r) => ({
+    ...r,
+    entradas: aNumero(r.entradas),
+    salidas: aNumero(r.salidas),
+    existencia: aNumero(r.existencia),
+    costo_promedio: aNumero(r.costo_promedio),
+    valor_inventario: aNumero(r.valor_inventario),
+  }))
+  const totales: ValorInventarioTotales = {
+    productos: aNumero(res.totales.productos),
+    existencia: aNumero(res.totales.existencia),
+    valor: aNumero(res.totales.valor),
+  }
+  return { items, total: res.pagination.total, totales, hasta: res.hasta }
 }
 
 export function listAjustes(

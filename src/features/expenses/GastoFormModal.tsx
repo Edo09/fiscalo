@@ -10,8 +10,11 @@ import { CATEGORIA_TIPOS, GASTO_TIPOS, efectoInventario, isAutoEmision } from '@
 import { ProveedorCombobox } from '@/features/suppliers/ProveedorCombobox'
 import { ProductoCombobox } from '@/features/products/ProductoCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
-import { MSG_UNIDAD, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
+import {
+  MSG_UNIDAD, admiteDecimales, problemaCantidad, unidadValida, useUnidadesMedida,
+} from '@/components/unidadesMedida'
 import { TipoBienesServiciosSelect } from '@/components/TipoBienesServiciosSelect'
+import { r2, redondear } from '@/features/invoices/montosLinea'
 import type { Producto, Proveedor } from '@/types/domain'
 import { gastoFormSchema, mapGastoIssues, emptyGastoErrors, type GastoFormErrors } from './gasto.schema'
 import { avisoNoEnviado } from './envioDgii'
@@ -139,11 +142,19 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     clearLineaErr(id)
   }
 
+  /**
+   * Decimales de la cantidad: 2 si el comprobante lo emite la empresa (E41/E43/
+   * E47), el tope de CantidadItem en el XML de la DGII; 3 si es recibido (solo
+   * se registra). Cantidad y precio se redondean como los guarda la base, y el
+   * subtotal de cada línea igual que gastoModel (round(cantidad × precio, 2)):
+   * sumando sin redondear, el total de pantalla podía diferir un centavo.
+   */
+  const maxDecimales: 2 | 3 = recibido ? 3 : 2
   const { subtotal, itbis, total } = useMemo(() => {
-    const sub = lineas.reduce((a, l) => a + l.amount * l.quantity, 0)
-    const itb = lineas.reduce((a, l) => a + l.itbis_amount, 0)
-    return { subtotal: sub, itbis: itb, total: sub + itb }
-  }, [lineas])
+    const sub = r2(lineas.reduce((a, l) => a + r2(redondear(l.quantity, maxDecimales) * redondear(l.amount, 4)), 0))
+    const itb = r2(lineas.reduce((a, l) => a + l.itbis_amount, 0))
+    return { subtotal: sub, itbis: itb, total: r2(sub + itb) }
+  }, [lineas, maxDecimales])
 
   // Líneas con algún contenido (las completamente vacías se ignoran). Gastos
   // menores (E43): proveedor opcional; el backend pone fecha/etiqueta por defecto.
@@ -159,11 +170,19 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
     const res = gastoFormSchema.safeParse({ esCompra, recibido, tipo, tipoBienes, proveedor, ncf, fecha, lineas: validables })
     const errs = res.success ? emptyGastoErrors() : mapGastoIssues(res.error, validables)
     let n = res.success ? 0 : res.error.issues.length
-    // Unidad que no está en el catálogo DGII (producto migrado): el e-CF fallaba al emitir.
     for (const l of validables) {
-      if (unidadValida(l.unidad_medida, unidades)) continue
-      const bucket = (errs.lineas[l.id] ??= {})
-      if (!bucket.unidad_medida) { bucket.unidad_medida = MSG_UNIDAD; n += 1 }
+      // Unidad que no está en el catálogo DGII (producto migrado): el e-CF fallaba al emitir.
+      if (!unidadValida(l.unidad_medida, unidades)) {
+        const bucket = (errs.lineas[l.id] ??= {})
+        if (!bucket.unidad_medida) { bucket.unidad_medida = MSG_UNIDAD; n += 1 }
+      }
+      // Cantidad según la unidad de la línea (sin fracciones en unidad o caja)
+      // y el tope de decimales del comprobante. Mismo texto que el backend.
+      const mal = problemaCantidad(l.quantity, { unidadId: l.unidad_medida, catalogo: unidades, maxDecimales })
+      if (mal) {
+        const bucket = (errs.lineas[l.id] ??= {})
+        if (!bucket.quantity) { bucket.quantity = mal; n += 1 }
+      }
     }
     if (n > 0) {
       setErrors(errs)
@@ -192,8 +211,10 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
         // Vínculo con el catálogo: sin esto la compra no mueve inventario.
         ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
         description: l.description.trim(),
-        amount: l.amount,
-        quantity: l.quantity,
+        // Los mismos valores con los que se calculó el subtotal en pantalla; en
+        // una auto-emisión, lo que imprime el XML (precio a 4 decimales).
+        amount: redondear(l.amount, 4),
+        quantity: redondear(l.quantity, maxDecimales),
         itbis_amount: l.itbis_amount,
         unidad_medida: String(l.unidad_medida),
         indicador_bien_servicio: l.bien_servicio,
@@ -393,7 +414,7 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
           <thead>
             <tr>
               <th style={{ minWidth: 170 }}>Descripción</th>
-              <th className="num" style={{ width: 64 }}>Cant.</th>
+              <th className="num" style={{ width: 84 }}>Cant.</th>
               <th style={{ width: 120 }}>Unidad</th>
               <th style={{ width: 104 }} title="Bien o servicio: en el 606 van a campos distintos">Tipo</th>
               <th className="num" style={{ width: 104 }}>Importe</th>
@@ -427,7 +448,18 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
                   {le?.description && <div className="err-msg">{le.description}</div>}
                 </td>
                 <td className={le?.quantity ? 'field-error' : undefined}>
-                  <input className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 56 }} type="number" value={l.quantity} onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)} />
+                  {/* Paso y teclado según la unidad: metros o kilos admiten
+                      fracciones; unidades o cajas se cuentan enteras. Más ancho
+                      para que quepa "12.375". */}
+                  <input
+                    className="input" style={{ padding: '5px 8px', textAlign: 'right', width: 76 }}
+                    type="number" min={0}
+                    step={admiteDecimales(l.unidad_medida, unidades) ? 'any' : 1}
+                    inputMode={admiteDecimales(l.unidad_medida, unidades) ? 'decimal' : 'numeric'}
+                    value={l.quantity}
+                    onChange={(e) => updLinea(l.id, 'quantity', +e.target.value || 0)}
+                    aria-label="Cantidad"
+                  />
                   {le?.quantity && <div className="err-msg">{le.quantity}</div>}
                 </td>
                 <td className={le?.unidad_medida ? 'field-error' : undefined}>
@@ -447,11 +479,11 @@ export function GastoFormModal({ categoria, onClose, onCreated }: {
                   </select>
                 </td>
                 <td className={le?.amount ? 'field-error' : undefined}>
-                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} />
+                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" min={0} step="any" inputMode="decimal" value={l.amount} onChange={(e) => updLinea(l.id, 'amount', +e.target.value || 0)} />
                   {le?.amount && <div className="err-msg">{le.amount}</div>}
                 </td>
                 <td className={le?.itbis_amount ? 'field-error' : undefined}>
-                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" value={l.itbis_amount} onChange={(e) => updLinea(l.id, 'itbis_amount', +e.target.value || 0)} />
+                  <input className="input num" style={{ padding: '5px 8px', textAlign: 'right' }} type="number" min={0} step="any" inputMode="decimal" value={l.itbis_amount} onChange={(e) => updLinea(l.id, 'itbis_amount', +e.target.value || 0)} />
                   {le?.itbis_amount && <div className="err-msg">{le.itbis_amount}</div>}
                 </td>
                 <td><Btn variant="ghost" size="sm" icon="trash-2" onClick={() => delLinea(l.id)} /></td>

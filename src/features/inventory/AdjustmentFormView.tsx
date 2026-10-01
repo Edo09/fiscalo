@@ -6,6 +6,9 @@ import { ApiError, crearAjuste, listProducts, mapProductRow } from '@/api'
 import type { CrearAjusteLinea, MotivoAjuste } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
+import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/components/unidadesMedida'
+import { r2, redondear } from '@/features/invoices/montosLinea'
+import { decimalesDe, fmtCantidad } from '@/lib/format'
 import type { Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import { MOTIVOS } from './motivos'
@@ -15,6 +18,8 @@ interface Linea {
   productId: number
   nombre: string
   sku: string
+  /** Unidad de medida del producto (código DGII): decide si la cantidad admite fracciones. */
+  unidadMedida: number
   /** Existencia al momento de agregar la línea (foto, no se recalcula sola). */
   cantidadActual: number
   tipo: 'INCREMENTO' | 'DISMINUCION'
@@ -68,7 +73,8 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       productId: Number(p.id),
       nombre: p.nombre,
       sku: p.sku ?? '',
-      cantidadActual: Number(p.stock ?? 0),
+      unidadMedida: p.unidadMedida,
+      cantidadActual: p.stock ?? 0,
       tipo: 'INCREMENTO',
       cantidad: 0,
       costo: Number(p.costo ?? 0),
@@ -83,14 +89,47 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
 
   const deltaDe = (l: Linea) => (l.tipo === 'DISMINUCION' ? -l.cantidad : l.cantidad)
   const finalDe = (l: Linea) => l.cantidadActual + deltaDe(l)
-  const totalDe = (l: Linea) => Math.round(deltaDe(l) * l.costo * 100) / 100
-  const total = lineas.reduce((a, l) => a + totalDe(l), 0)
+  // Mismo cálculo que el backend (inventoryModel: costo a 2 decimales y luego
+  // round(cantidad × costo, 2)), con el redondeo de PHP: con cantidades
+  // fraccionadas Math.round sobre el binario se desviaba un centavo.
+  const totalDe = (l: Linea) => r2(deltaDe(l) * r2(l.costo))
+  const total = r2(lineas.reduce((a, l) => a + totalDe(l), 0))
 
   // Un producto con cantidad 0 no ajusta nada. Antes esas líneas se descartaban
   // sin avisar y, si todas estaban en 0, "Guardar ajuste" quedaba en gris sin
   // explicación. Ahora se marcan y bloquean hasta completarlas o quitarlas.
   const lineasEnCero = lineas.filter((l) => !(l.cantidad > 0))
   const marcarCero = (l: Linea) => !(l.cantidad > 0) && tocadas.has(l.id)
+  // Si la cantidad puede llevar decimales lo decide la unidad del producto
+  // (kg o metro sí, unidad o caja no), con hasta 3 decimales, igual que el
+  // backend. Esto se marca en cuanto se escribe, sin esperar a que el campo
+  // pierda el foco: el usuario ya escribió la cantidad, no es un campo recién
+  // agregado. El 0 lo sigue cubriendo marcarCero.
+  const unidades = useUnidadesMedida()
+  // Excepción, igual que el backend (inventoryModel::dejaExistenciaEntera): un
+  // producto por «Unidad» puede tener 8,5 en existencia (una línea de factura o
+  // de gasto vendida en metros mueve 1,5). La fracción que la deja entera
+  // (disminuir 0,5 o aumentar 0,5) es la corrección y no se juzga con la unidad;
+  // solo cuenta el tope de 3 decimales. Una fracción nueva sigue rechazada. Se
+  // redondea como PHP para decidir lo mismo que el servidor, que es quien manda
+  // si la existencia cambió después de agregar la línea.
+  const dejaEntera = (l: Linea) => {
+    const antes = redondear(l.cantidadActual, 3)
+    const delta = redondear(l.cantidad, 3) * (l.tipo === 'DISMINUCION' ? -1 : 1)
+    return decimalesDe(antes) > 0 && decimalesDe(redondear(antes + delta, 3)) === 0
+  }
+  // Admite fracción la línea cuya unidad las admite o cuya existencia ya trae una.
+  const fraccionable = (l: Linea) => admiteDecimales(l.unidadMedida, unidades) || decimalesDe(l.cantidadActual) > 0
+  const problemaFraccion = (l: Linea) =>
+    l.cantidad > 0
+      ? problemaCantidad(l.cantidad, {
+          // null = sin unidad que juzgar (admiteDecimales da true).
+          unidadId: dejaEntera(l) ? null : l.unidadMedida,
+          catalogo: unidades,
+          maxDecimales: 3,
+        })
+      : null
+  const lineasConFraccionMala = lineas.filter((l) => problemaFraccion(l) != null)
   // Dejar el almacén en negativo casi siempre es un error de captura, pero no lo
   // bloqueamos: el sistema permite saldo negativo y a veces refleja la realidad.
   const negativos = lineas.filter((l) => l.cantidad > 0 && finalDe(l) < 0)
@@ -98,7 +137,9 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
     ? 'Agrega al menos un producto para ajustar.'
     : lineasEnCero.length > 0
       ? 'Falta la cantidad en algún producto.'
-      : null
+      : lineasConFraccionMala.length > 0
+        ? 'Revisa la cantidad marcada en rojo.'
+        : null
   const puedeGuardar = motivoBloqueo == null && !guardando
 
   // Acción única: un doble clic crearia dos ajustes y moveria el stock el doble.
@@ -185,7 +226,7 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
                       <span className="cell-main">{l.nombre}</span>
                       {l.sku && <div className="cell-sub mono">{l.sku}</div>}
                     </td>
-                    <td style={{ textAlign: 'right' }} className="muted">{l.cantidadActual}</td>
+                    <td style={{ textAlign: 'right' }} className="muted">{fmtCantidad(l.cantidadActual)}</td>
                     <td>
                       <select
                         className="input"
@@ -197,15 +238,21 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
                         <option value="DISMINUCION">Disminución</option>
                       </select>
                     </td>
-                    <td className={marcarCero(l) ? 'field-error' : undefined}>
+                    <td className={marcarCero(l) || problemaFraccion(l) ? 'field-error' : undefined}>
+                      {/* Sin Math.round: antes 0.5 kg se convertía en 1 al teclearlo. La
+                          cantidad queda como se escribe y problemaFraccion avisa si no va. */}
                       <input
-                        className="input" type="number" min={0} step={1} inputMode="numeric"
+                        className="input" type="number" min={0}
+                        step={fraccionable(l) ? 'any' : 1}
+                        inputMode={fraccionable(l) ? 'decimal' : 'numeric'}
                         style={{ textAlign: 'right' }}
                         value={l.cantidad}
-                        onChange={(e) => updLinea(l.id, { cantidad: Math.max(0, Math.round(Number(e.target.value))) })}
+                        onChange={(e) => updLinea(l.id, { cantidad: Math.max(0, Number(e.target.value) || 0) })}
                         onBlur={() => setTocadas((t) => (t.has(l.id) ? t : new Set(t).add(l.id)))}
                         aria-label={`Cantidad a ajustar de ${l.nombre}`}
+                        aria-invalid={marcarCero(l) || problemaFraccion(l) != null || undefined}
                       />
+                      {problemaFraccion(l) && <div className="err-msg">{problemaFraccion(l)}</div>}
                     </td>
                     <td>
                       <input
@@ -217,7 +264,8 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
                       />
                     </td>
                     <td style={{ textAlign: 'right' }} className="fw6">
-                      <span style={{ color: finalDe(l) < 0 ? 'var(--danger)' : undefined }}>{finalDe(l)}</span>
+                      {/* fmtCantidad también limpia el ruido binario (10.1 − 0.3 = 9.799999…). */}
+                      <span style={{ color: finalDe(l) < 0 ? 'var(--danger)' : undefined }}>{fmtCantidad(finalDe(l))}</span>
                     </td>
                     <td style={{ textAlign: 'right' }}><Money value={totalDe(l)} /></td>
                     <td>
@@ -300,7 +348,7 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
                         {p.sku && <div className="cell-sub mono">{p.sku}</div>}
                       </td>
                       <td style={{ textAlign: 'right' }} className="muted text-sm">
-                        {p.stock ?? 0} en existencia
+                        {fmtCantidad(p.stock ?? 0)} en existencia
                       </td>
                     </tr>
                   ))}

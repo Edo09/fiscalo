@@ -6,7 +6,7 @@ import {
   ApiError, createFacturaSimple, getBranding, getClient, getEmisor, getFacturaSimple, getFacturaSimplePdf,
   listProducts, mapClientRow, mapProductRow, previewFacturaSimple, previewReciboFacturaSimple, updateFacturaSimple,
 } from '@/api'
-import type { DocBase64, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
+import type { DocBase64, FacturaSimpleInput, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { NombreClienteLibre } from '@/features/clients/NombreClienteLibre'
@@ -15,9 +15,12 @@ import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument, printDocument } from '@/lib/file'
 import { hoyLocal } from '@/lib/date'
+import { aNumero } from '@/lib/format'
+import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/components/unidadesMedida'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
 import { VistaPreviaRecibo } from './VistaPreviaRecibo'
+import { lineaQueCuadra, r2, redondear } from './montosLinea'
 import type { Cliente, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
@@ -69,9 +72,33 @@ interface Linea {
   precio: number
   /** Descuento de la linea en %, igual que en la factura con comprobante. */
   desc: number
+  /**
+   * Unidad DGII de la linea: la del producto del catalogo. null = no se sabe
+   * (linea libre, o linea vieja guardada con la Unidad por defecto): no viaja y
+   * el backend usa la del producto, si lo hay.
+   */
+  unidadMedida: number | null
 }
 
-const lineaVacia = (id: number, desc = 0): Linea => ({ id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc })
+const lineaVacia = (id: number, desc = 0): Linea => ({
+  id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc, unidadMedida: null,
+})
+
+/**
+ * % de descuento que reproduce el monto guardado. Con 2 decimales a veces no
+ * sale (7.77 sobre 254.24 da 3.06% → 7.78) y reabrir la factura cambiaba el
+ * descuento en un centavo al guardar; se usan los decimales que hagan falta.
+ */
+function pctDescuento(monto: number, cantidad: number, precio: number): number {
+  const bruto = r2(cantidad * precio)
+  if (!(monto > 0) || !(bruto > 0)) return 0
+  const exacto = (monto / (cantidad * precio)) * 100
+  for (let d = 2; d <= 6; d++) {
+    const pct = redondear(exacto, d)
+    if (Math.min(bruto, r2((cantidad * precio * pct) / 100)) === monto) return pct
+  }
+  return redondear(exacto, 2)
+}
 
 /**
  * Metodos de pago que son venta a CREDITO (tipo_pago=2). Igual que en la factura
@@ -127,6 +154,8 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // petición al navegar entre las dos pantallas.
   const { data: emisor } = useApiQuery(['emisor'], getEmisor)
   const { data: branding } = useApiQuery(['branding'], getBranding)
+  // Qué unidades admiten fracciones (metro, kilo) y cuáles se cuentan enteras.
+  const unidades = useUnidadesMedida()
 
   // La busqueda del catalogo va al servidor: hay cientos de articulos y filtrar
   // solo la primera pagina dejaria fuera la mayoria. Con el buscador vacio se
@@ -178,17 +207,36 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
         const metodoCargado = Number(f.tipo_pago ?? 1) === 2 ? METODOS_CREDITO[0] : 'Efectivo'
         setMetodo(metodoCargado)
         if (f.date) setFecha(String(f.date).slice(0, 10))
-        const cargadas: Linea[] = (f.items ?? []).map((it, i) => ({
-          id: i + 1,
-          prodId: it.product_id ? String(it.product_id) : '',
-          descripcion: it.description ?? '',
-          cantidad: Number(it.quantity ?? 1),
-          precio: Number(it.amount ?? 0),
-          // El backend guarda el descuento en monto; la UI lo maneja en %.
-          desc: Number(it.amount ?? 0) * Number(it.quantity ?? 1) > 0
-            ? Math.round((Number(it.descuento_monto ?? 0) / (Number(it.amount ?? 0) * Number(it.quantity ?? 1))) * 10000) / 100
-            : 0,
-        }))
+        const cargadas: Linea[] = (f.items ?? []).map((it, i) => {
+          // Llegan como texto DECIMAL ("1.500", "84.7500"). En las filas de antes
+          // de la migración 025 la cantidad (INT) o el precio (2 decimales) ya no
+          // son los que dieron el importe: se toman los que lo explican, o
+          // guardar cualquier otro cambio reescribía la línea (1.5 m guardado
+          // como 2 × 100 = 150 pasaba a 200, y el inventario con él). Modo
+          // 'simple': la misma regla con la que el backend imprime esta factura.
+          const descuento = aNumero(it.descuento_monto)
+          const { cantidad, precio } = lineaQueCuadra(
+            aNumero(it.quantity ?? 1),
+            aNumero(it.amount),
+            it.subtotal == null || it.subtotal === '' ? null : aNumero(it.subtotal),
+            descuento,
+            'simple',
+          )
+          // La Unidad (43) es también lo que se guardaba cuando el formulario no
+          // mandaba unidad: en una línea vieja no dice nada. Sin unidad no viaja
+          // y el backend toma la del producto.
+          const unidad = Number(it.unidad_medida ?? 0)
+          return {
+            id: i + 1,
+            prodId: it.product_id ? String(it.product_id) : '',
+            descripcion: it.description ?? '',
+            cantidad,
+            precio,
+            // El backend guarda el descuento en monto; la UI lo maneja en %.
+            desc: pctDescuento(descuento, cantidad, precio),
+            unidadMedida: unidad > 0 && unidad !== 43 ? unidad : null,
+          }
+        })
         setLineas(cargadas)
         setOriginal({ fecha: String(f.date ?? '').slice(0, 10), metodo: metodoCargado, lineas: cargadas })
         setErrorCarga(null)
@@ -230,6 +278,9 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       cantidad: 1,
       precio: p.precio,
       desc: cliente?.descuento ?? 0,
+      // Sin esto toda línea se imprimía como UND, también el cable por metro, y
+      // no había con qué saber si la cantidad admite fracciones.
+      unidadMedida: p.unidadMedida || 43,
     })
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
@@ -252,9 +303,17 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   // Neto de descuento: el backend guarda el subtotal ya rebajado, asi que la
   // pantalla tiene que mostrar lo mismo. Sin impuestos: la factura simple es un
   // documento interno, no se emite a la DGII y no lleva ITBIS.
-  const descuentoDe = (l: Linea) => Math.round(l.cantidad * l.precio * l.desc) / 100
-  const subtotalDe = (l: Linea) => Math.round(l.cantidad * l.precio * 100) / 100 - descuentoDe(l)
-  const subtotal = lineas.reduce((c, l) => c + subtotalDe(l), 0)
+  //
+  // Mismas cuentas que facturaModel::normalizeSimpleItems y con su redondeo (r2
+  // imita el round() de PHP 8.3): con Math.round, 0.5 × 19.99 se veía 9.99 y se
+  // guardaba 10.00. Cantidad a 3 decimales y precio a 4, lo que guarda la base.
+  const cantDe = (l: Linea) => redondear(l.cantidad, 3)
+  const precioDe = (l: Linea) => redondear(l.precio, 4)
+  const brutoDe = (l: Linea) => r2(cantDe(l) * precioDe(l))
+  const descuentoDe = (l: Linea) =>
+    l.desc > 0 ? Math.min(brutoDe(l), r2((cantDe(l) * precioDe(l) * l.desc) / 100)) : 0
+  const subtotalDe = (l: Linea) => r2(brutoDe(l) - descuentoDe(l))
+  const subtotal = r2(lineas.reduce((c, l) => c + subtotalDe(l), 0))
   const total = subtotal
 
   // --- Qué se tocó respecto al documento cargado -------------------------
@@ -312,6 +371,34 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       motivo: l.descripcion.trim() === '' ? 'falta la descripción' : 'la cantidad debe ser mayor que 0',
     }))
 
+  /**
+   * Cantidad heredada: la misma que tenía, al abrir la factura, una línea del
+   * mismo producto. Una factura vieja pudo guardar 1.5 en un producto que hoy
+   * se cuenta entero; el backend no le aplica la regla de la unidad a esa
+   * línea mientras la cantidad no cambie (facturaModel::problemaCantidadesSimples
+   * con las líneas guardadas), así que aquí tampoco se marca. `original` trae
+   * la cantidad ya resuelta, la misma que el backend deriva de la fila.
+   */
+  const cantidadHeredada = (l: Linea) => original != null
+    && original.lineas.some((o) => o.prodId === l.prodId && Math.abs(o.cantidad - l.cantidad) < 1e-9)
+
+  /**
+   * Cantidades que el backend rechazaría: fracciones en una unidad que se cuenta
+   * entera (la del producto: unidad, caja) o más de 3 decimales. Una línea libre
+   * no tiene unidad, así que ahí solo cuenta el tope de decimales; una cantidad
+   * heredada, tampoco (mayor que 0 y hasta 3 decimales sí). Mismos textos que
+   * el backend.
+   */
+  const problemaCantidadDe = (l: Linea) => problemaCantidad(l.cantidad, {
+    unidadId: l.prodId && !cantidadHeredada(l) ? l.unidadMedida : null, catalogo: unidades, maxDecimales: 3,
+  })
+  const cantidadesMal = lineas
+    .map((l, i) => ({ n: i + 1, id: l.id, motivo: esValida(l) ? problemaCantidadDe(l) : null }))
+    .filter((x): x is { n: number; id: number; motivo: string } => x.motivo != null)
+  const cantidadMal = (l: Linea) => cantidadesMal.some((x) => x.id === l.id)
+  const textoCantidadMal = (x: { n: number; motivo: string }) =>
+    `Línea ${x.n}: ${x.motivo.charAt(0).toLowerCase()}${x.motivo.slice(1)}`
+
   const clienteResuelto = cliente != null || clienteLibre.trim() !== '' || clienteActual != null
 
   // --- Qué impide guardar, dicho con palabras ---------------------------
@@ -337,6 +424,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const motivoBloqueo = problemaCliente ?? problemaFecha ?? problemaCredito
     ?? (lineasValidas.length === 0 ? 'Agrega al menos una línea con descripción.' : null)
     ?? (lineasIncompletas.length > 0 ? 'Completa o quita las líneas marcadas en rojo.' : null)
+    ?? (cantidadesMal.length > 0 ? 'Corrige la cantidad de las líneas marcadas en rojo.' : null)
     ?? (editando && !hayCambios ? 'No hay cambios que guardar.' : null)
   const puedeGuardar = motivoBloqueo == null && !guardando
   const marcarCliente = intentoFallido && problemaCliente != null
@@ -345,8 +433,10 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     lineasValidas.map((l) => ({
       ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
       description: l.descripcion.trim(),
-      quantity: l.cantidad,
-      amount: l.precio,
+      // Los mismos valores con los que se calculó el importe en pantalla.
+      quantity: cantDe(l),
+      amount: precioDe(l),
+      ...(l.unidadMedida != null ? { unidad_medida: String(l.unidadMedida) } : {}),
       ...(l.desc > 0 ? { descuento_monto: descuentoDe(l) } : {}),
     }))
 
@@ -393,6 +483,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     // simplemente no muestra). Sin esto el servidor respondía con un texto técnico.
     const problema = problemaCliente ?? problemaFecha
       ?? (lineasValidas.length === 0 ? 'Agrega al menos una línea con descripción.' : null)
+      ?? (cantidadesMal.length > 0 ? textoCantidadMal(cantidadesMal[0]) : null)
     if (problema) {
       setIntentoFallido(true)
       toast.error(problema)
@@ -404,7 +495,12 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
     setIntentoFallido(false)
     setPreviaBusy(formato)
     try {
-      const input = { ...clienteBody(true), date: fecha, items: items() }
+      // En edición viaja el id de la factura: el backend juzga las cantidades
+      // contra sus líneas guardadas, igual que al guardar (ver cantidadHeredada).
+      // Sin él, una línea vieja que sí se deja guardar no se dejaba ver.
+      const input: FacturaSimpleInput & { factura_id?: number } = {
+        ...clienteBody(true), date: fecha, items: items(), ...(facturaId != null ? { factura_id: facturaId } : {}),
+      }
       if (formato === 'pos') setPreviaRecibo(await previewReciboFacturaSimple(input))
       else presentDocument(await previewFacturaSimple(input))
     } catch (e) {
@@ -633,7 +729,7 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
           {lineas.map((l, i) => (
             <div
               className={'fx-grid fx-row' + (esLineaNueva(l.id) ? ' fx-row-nueva' : '')
-                + (!esValida(l) && !estaEnBlanco(l) ? ' fx-row-incompleta' : '')}
+                + ((!esValida(l) && !estaEnBlanco(l)) || cantidadMal(l) ? ' fx-row-incompleta' : '')}
               key={l.id}
             >
               <button
@@ -658,10 +754,15 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                 aria-label={`Descripción de la línea ${i + 1}`}
               />
 
+              {/* Paso y teclado según la unidad del producto: un producto por
+                  unidad o caja se cuenta entero; uno por metro o kilo, no. */}
               <input
                 className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'cantidad'))
-                  + (l.cantidad <= 0 && !estaEnBlanco(l) ? ' fx-field--err' : '')} data-label="Cant."
-                type="number" min={0} step="any" inputMode="decimal"
+                  + ((l.cantidad <= 0 && !estaEnBlanco(l)) || cantidadMal(l) ? ' fx-field--err' : '')} data-label="Cant."
+                type="number" min={0}
+                step={l.prodId && !admiteDecimales(l.unidadMedida, unidades) ? 1 : 'any'}
+                inputMode={l.prodId && !admiteDecimales(l.unidadMedida, unidades) ? 'numeric' : 'decimal'}
+                aria-invalid={cantidadMal(l) ? true : undefined}
                 value={l.cantidad}
                 onChange={(e) => updLinea(l.id, { cantidad: Number(e.target.value) })}
                 aria-label={`Cantidad de la línea ${i + 1}`}
@@ -709,6 +810,14 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
                   : `Estas líneas no se guardarán: ${lineasIncompletas.map((x) => `${x.n} (${x.motivo})`).join(', ')}.`}
                 {' '}Complétalas o quítalas con la ✕.
               </span>
+            </div>
+          )}
+          {/* Cantidades que no se pueden guardar así (fracción en una unidad
+              que se cuenta entera, o demasiados decimales): bloquean el guardado. */}
+          {cantidadesMal.length > 0 && (
+            <div className="fx-incompletas" role="alert">
+              <Icon name="alert-circle" size={14} />
+              <span>{cantidadesMal.map(textoCantidadMal).join(' ')}</span>
             </div>
           )}
         </section>

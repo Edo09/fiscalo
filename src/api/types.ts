@@ -86,6 +86,12 @@ export interface FacturaRow {
   cliente?: ClientRow | null
   /** Solo en GET /api/facturas?id=: configuración del emisor (emisor_config). */
   emisor?: EmisorRow | null
+  /**
+   * Solo en GET /api/facturas?id= (f.*): el e-CF tal como se firmó. Sus Item
+   * van en el orden de `items` y traen la cantidad y el precio exactos que las
+   * filas viejas ya no guardan (ver InvoiceDetailView).
+   */
+  xml_firmado?: string | null
 }
 
 /** Configuración del emisor (emisor_config; también vía GET /api/emisor). */
@@ -107,17 +113,28 @@ export interface EmisorRow {
   fuente?: string
 }
 
-/** esquema gratexdb.factura_items */
+/**
+ * esquema gratexdb.factura_items. Las columnas DECIMAL llegan como texto
+ * ("3.000", "84.7500"): leerlas con aNumero y mostrarlas con fmtCantidad/fmtPrecio.
+ */
 export interface FacturaItemRow {
   id?: number
   factura_id?: number
+  product_id?: number | null
   description?: string | null
+  /** Precio unitario sin ITBIS (DECIMAL(18,4) desde la migración 025). */
   amount?: number | string | null
+  /** DECIMAL(12,3) desde la migración 025 (antes INT). */
   quantity?: number | string | null
+  /** MontoItem: cantidad × precio − descuento, sin ITBIS. */
   subtotal?: number | string | null
+  descuento_monto?: number | string | null
   itbis_amount?: number | string | null
   /** 1=ITBIS 18%, 2=16%, 3=tasa cero, 4=exento. */
   indicador_facturacion?: number | null
+  indicador_bien_servicio?: number | null
+  /** Código DGII de la unidad de medida (43 = Unidad). */
+  unidad_medida?: string | null
 }
 
 /**
@@ -501,8 +518,12 @@ export interface ProductRow {
   precio?: number | string | null
   costo?: number | string | null
   unidad_medida?: string | null
-  stock?: number | null
-  stock_minimo?: number | null
+  /**
+   * DECIMAL(12,3) desde la migración 025: llega como texto ("12.500"). Se
+   * convierte en mapProductRow; compararlo o sumarlo crudo fallaría en silencio.
+   */
+  stock?: number | string | null
+  stock_minimo?: number | string | null
   activo?: number | boolean | null
 }
 
@@ -518,6 +539,7 @@ export interface CreateProductInput {
   precio?: number
   costo?: number
   unidad_medida?: string
+  /** Hasta 3 decimales, y solo si la unidad admite fracciones (kg, metro…). */
   stock?: number | null
   stock_minimo?: number | null
   activo?: boolean | number
@@ -551,8 +573,12 @@ export interface CotizacionRow {
 
 export interface CotizacionItemInput {
   description: string
+  /** Precio con ITBIS incluido, hasta 4 decimales. */
   amount: number
+  /** Hasta 2 decimales: la cotización se convierte en e-CF (CantidadItem de la DGII). */
   quantity: number
+  /** round(cantidad × precio, 2): el backend lo guarda tal cual en cotizacion_items. */
+  subtotal?: number
 }
 
 export interface CreateCotizacionInput {
@@ -720,6 +746,11 @@ export interface UnidadMedida {
   id: number
   codigo: string
   descripcion: string
+  /**
+   * La cantidad puede llevar decimales en esta unidad (metro, kg, litro, hora).
+   * null/ausente = la master aún no tiene la marca (migración 010): no bloquea.
+   */
+  permite_decimales?: boolean | null
 }
 
 // ---------------------------------------------------------------------------
@@ -1089,10 +1120,14 @@ export interface FacturaSimpleItemInput {
   /** Producto del catálogo; ausente = línea libre (no mueve inventario). */
   product_id?: number
   description: string
+  /** Hasta 3 decimales (DECIMAL(12,3)); sin fracciones si la unidad no las admite. */
   quantity: number
+  /** Hasta 4 decimales (DECIMAL(18,4)). */
   amount: number
   /** Descuento de la línea EN MONTO. El backend deja el subtotal neto de él. */
   descuento_monto?: number
+  /** Unidad DGII del producto. Ausente = el backend usa la del producto, o ninguna en una línea libre. */
+  unidad_medida?: string
 }
 
 export interface FacturaSimpleInput {
@@ -1104,17 +1139,22 @@ export interface FacturaSimpleInput {
   items: FacturaSimpleItemInput[]
 }
 
-/** Linea tal como la devuelve el backend. */
+/**
+ * Linea tal como la devuelve el backend. Las columnas DECIMAL llegan como texto
+ * ("1.500", "84.7500"): con `+` se concatenarían, así que se leen con aNumero.
+ */
 export interface FacturaSimpleItem {
   id?: number
   /** Producto del catálogo del que salió la línea (null = línea libre). */
   product_id?: number | null
   description: string
-  quantity: number
-  amount: number
-  subtotal: number
+  quantity: number | string
+  amount: number | string
+  subtotal: number | string
   /** Descuento aplicado a la línea; `subtotal` ya viene neto de él. */
-  descuento_monto?: number
+  descuento_monto?: number | string | null
+  /** Código DGII de la unidad ('43' = Unidad, también el valor por defecto). */
+  unidad_medida?: string | null
 }
 
 /** Fila del listado (GET /api/facturas-simples). */
@@ -1195,7 +1235,11 @@ export interface ValorInventarioParams {
   hasta?: string
 }
 
-/** Una fila del reporte de valor: un producto a la fecha de corte. */
+/**
+ * Una fila del reporte de valor: un producto a la fecha de corte. Los campos
+ * numéricos ya vienen convertidos a number por getValorInventario, aunque la API
+ * los mande como texto DECIMAL.
+ */
 export interface ValorInventarioRow {
   id: number
   sku: string
@@ -1203,7 +1247,10 @@ export interface ValorInventarioRow {
   categoria: string
   almacen: string
   activo: boolean
-  /** Cantidades acumuladas hasta el corte, no número de movimientos. */
+  /**
+   * Cantidades acumuladas hasta el corte, no número de movimientos. Pueden
+   * traer hasta 3 decimales (kg, metro…): mostrarlas con fmtCantidad.
+   */
   entradas: number
   salidas: number
   existencia: number
@@ -1231,7 +1278,10 @@ export interface MovimientoRow {
   tipo_movimiento: 'AJUSTE' | 'VENTA' | 'COMPRA' | 'DEVOLUCION' | string
   referencia_tipo?: string | null
   referencia_id?: number | null
-  /** Con signo: positivo suma al stock, negativo resta. */
+  /**
+   * Con signo: positivo suma al stock, negativo resta. DECIMAL(12,3): llega
+   * como texto ("-2.500"); parsear con aNumero y mostrar con fmtCantidad.
+   */
   cantidad: number | string
   cantidad_anterior: number | string
   cantidad_nueva: number | string
@@ -1250,7 +1300,10 @@ export interface Ajuste extends AjusteRow {
 export interface CrearAjusteLinea {
   product_id: number
   tipo: 'INCREMENTO' | 'DISMINUCION'
-  /** Siempre positiva: el signo lo decide `tipo`. */
+  /**
+   * Siempre positiva: el signo lo decide `tipo`. Hasta 3 decimales, y solo si
+   * la unidad del producto admite fracciones.
+   */
   cantidad: number
   /** Valoriza el movimiento. Si se omite, usa el costo del producto. */
   costo_unitario?: number

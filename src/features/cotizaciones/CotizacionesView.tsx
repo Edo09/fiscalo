@@ -5,6 +5,7 @@ import { ApiError, listCotizaciones, getCotizacionPdf, formatApiDate } from '@/a
 import type { CotizacionRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { presentDocument } from '@/lib/file'
+import { aNumero } from '@/lib/format'
 import type { Nav } from '@/config/navigation'
 import type { FacturaPrefill } from '@/types/domain'
 
@@ -19,10 +20,12 @@ function toFacturaPrefill(c: CotizacionRow): FacturaPrefill {
     origen: c.code || `#${c.id}`,
     lineas: (c.items ?? [])
       .filter((it) => (it.description ?? '').trim() !== '')
+      // Llegan como texto DECIMAL. La cantidad pasa tal cual (0.5 ya no sube a
+      // 1): si no sirve para el e-CF, la factura lo marca en la línea al emitir.
       .map((it) => ({
         nombre: (it.description ?? '').trim(),
-        cantidad: Math.max(1, Number(it.quantity ?? 1)),
-        precio: Number(it.amount ?? 0),
+        cantidad: aNumero(it.quantity ?? 1),
+        precio: aNumero(it.amount),
       })),
   }
 }

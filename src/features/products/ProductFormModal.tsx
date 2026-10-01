@@ -4,13 +4,58 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
-import { unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
+import { admiteDecimales, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
 import { ApiError, createProduct, updateProduct, deleteProduct, listCategories, listWarehouses } from '@/api'
+import type { UnidadMedida } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { redondear } from '@/features/invoices/montosLinea'
+import { decimalesDe } from '@/lib/format'
 import type { Producto } from '@/types/domain'
 
 /** Largo máximo del nombre (columna products.nombre). */
 const MAX_NOMBRE = 150
+
+/** Decimales que guarda products.stock / stock_minimo (DECIMAL(15,3)). */
+const MAX_DECIMALES_STOCK = 3
+
+/** Tope de products.stock / stock_minimo: DECIMAL(15,3) llega a 999,999,999,999.999. */
+const MAX_EXISTENCIA = 1e12
+
+/**
+ * Qué está mal en la existencia o el stock mínimo, o null si está bien. Mismo
+ * criterio que problemaCantidad (la unidad decide si hay fracciones, hasta 3
+ * decimales), pero aquí el 0 vale y la existencia puede venir negativa: el
+ * libro deja vender sin existencia, y bloquearla impediría editar el producto.
+ *
+ * `sinCambio`: al editar, el valor y la unidad son los que ya tenía el
+ * producto. Entonces no se juzgan los decimales ni la unidad, igual que el
+ * backend (productController::problemaExistencias): el libro puede dejar 8,5 en
+ * un producto por «Unidad» (una línea de factura vendida en metros) y, si se
+ * juzgara, no se podría guardar ni un cambio de precio. Lo demás sí se revisa.
+ */
+function problemaExistencia(
+  valor: string,
+  campo: 'la existencia' | 'el stock mínimo',
+  unidadId: number,
+  catalogo: UnidadMedida[],
+  sinCambio = false,
+): string | null {
+  if (valor.trim() === '') return null
+  const n = Number(valor)
+  const alInicio = campo.charAt(0).toUpperCase() + campo.slice(1)
+  if (!Number.isFinite(n)) return `${alInicio} tiene que ser un número.`
+  if (campo === 'el stock mínimo' && n < 0) return 'El stock mínimo no puede ser negativo.'
+  // Se mira lo que se guarda (3 decimales), como el backend.
+  if (Math.abs(redondear(n, MAX_DECIMALES_STOCK)) >= MAX_EXISTENCIA) return `${alInicio} es demasiado grande.`
+  const dec = decimalesDe(Math.abs(n))
+  if (dec === 0 || sinCambio) return null
+  if (!admiteDecimales(unidadId, catalogo)) {
+    const u = catalogo.find((x) => x.id === unidadId)
+    return `Con la unidad «${u?.descripcion ?? 'Unidad'}» ${campo} va sin decimales: quítalos o cambia la unidad.`
+  }
+  if (dec > MAX_DECIMALES_STOCK) return `${alInicio} admite hasta ${MAX_DECIMALES_STOCK} decimales.`
+  return null
+}
 
 /** Valores con los que abrir el alta (p. ej. la línea de factura que se convierte). */
 export interface ProductoInicial {
@@ -71,6 +116,21 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
   const categories = useMemo(() => catsQ.data?.items ?? [], [catsQ.data])
   const warehouses = useMemo(() => whQ.data?.items ?? [], [whQ.data])
   const unidades = useUnidadesMedida()
+  // Existencia en kg o metros puede llevar fracción; en unidades o cajas no.
+  // Se revisa mientras se escribe y al cambiar la unidad, no solo al guardar:
+  // antes 12.5 se guardaba como 12 sin decir nada.
+  const fracciona = admiteDecimales(unidadMedida, unidades)
+  // Al editar, un valor que no se tocó y con la misma unidad no se juzga por
+  // decimales (ver problemaExistencia). La misma tolerancia que el backend.
+  const sinCambio = (valor: string, original: number | null | undefined) =>
+    editing && product != null && unidadMedida === product.unidadMedida && original != null &&
+    valor.trim() !== '' && Number.isFinite(Number(valor)) && Math.abs(Number(valor) - original) < 0.0005
+  const problemaStock = tipo === 'Bien'
+    ? problemaExistencia(stock, 'la existencia', unidadMedida, unidades, sinCambio(stock, product?.stock))
+    : null
+  const problemaMin = tipo === 'Bien'
+    ? problemaExistencia(stockMin, 'el stock mínimo', unidadMedida, unidades, sinCambio(stockMin, product?.min))
+    : null
 
   // Al crear, preseleccionar el Almacén Principal (o el primero) cuando carguen.
   useEffect(() => {
@@ -89,7 +149,7 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
       : Number(precio) < 0 ? 'El precio no puede ser negativo.'
       : Number(costo) < 0 ? 'El costo no puede ser negativo.'
       : !unidadValida(unidadMedida, unidades) ? 'Elige la unidad de medida: la que tenía no está en el catálogo de la DGII.'
-      : null
+      : problemaStock ?? problemaMin
     if (problema) { setError(problema); return }
     setError(null)
     setSaving(true)
@@ -238,13 +298,23 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
         </div>
         {tipo === 'Bien' && (
           <>
-            <div className="field">
+            <div className={'field' + (problemaStock ? ' field-error' : '')}>
               <label className="label">Existencia</label>
-              <input className="input num" type="number" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—" />
+              <input
+                className="input num" type="number" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
+                value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—"
+                aria-invalid={problemaStock != null || undefined}
+              />
+              {problemaStock && <div className="err-msg">{problemaStock}</div>}
             </div>
-            <div className="field">
+            <div className={'field' + (problemaMin ? ' field-error' : '')}>
               <label className="label">Stock mínimo</label>
-              <input className="input num" type="number" value={stockMin} onChange={(e) => setStockMin(e.target.value)} placeholder="—" />
+              <input
+                className="input num" type="number" min="0" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
+                value={stockMin} onChange={(e) => setStockMin(e.target.value)} placeholder="—"
+                aria-invalid={problemaMin != null || undefined}
+              />
+              {problemaMin && <div className="err-msg">{problemaMin}</div>}
             </div>
           </>
         )}

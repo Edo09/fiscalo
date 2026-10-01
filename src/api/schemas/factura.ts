@@ -2,6 +2,7 @@
 // Los tipos de CreateFacturaInput y derivados se infieren de aquí (z.infer) y se
 // re-exportan desde ../types para no duplicar definiciones.
 import { z } from 'zod'
+import { decimalesDe } from '@/lib/format'
 
 /** Tipos de comprobante fiscal electrónico (DGII). */
 export const tipoEcfSchema = z.enum(['31', '32', '33', '34', '41', '43', '44', '45', '46', '47'])
@@ -26,9 +27,16 @@ export const facturaItemSchema = z.object({
   descripcion: z.string().max(1000, 'La descripción no puede superar 1000 caracteres (límite DGII).').optional(),
   indicador_facturacion: indicadorFacturacionSchema,
   indicador_bien_servicio: indicadorBienServicioSchema,
-  cantidad: z.number().positive('La cantidad debe ser mayor que 0.'),
+  // XSD DGII: CantidadItem admite hasta 2 decimales (Decimal18D1or2) y
+  // PrecioUnitarioItem hasta 4 (Decimal20D1or4). Con más, el XML los recortaba y
+  // MontoItem dejaba de ser cantidad × precio. El formulario ya los redondea
+  // (montosLinea); esto ataja a cualquier otro llamador. Se cuentan con
+  // decimalesDe y no con multipleOf, que falla por el ruido binario (0.1 + 0.2).
+  cantidad: z.number().positive('La cantidad debe ser mayor que 0.')
+    .refine((n) => decimalesDe(n) <= 2, 'La cantidad admite hasta 2 decimales.'),
   unidad_medida: z.string().min(1, 'La unidad de medida es obligatoria.'),
-  precio_unitario: z.number().nonnegative('El precio no puede ser negativo.'),
+  precio_unitario: z.number().nonnegative('El precio no puede ser negativo.')
+    .refine((n) => decimalesDe(n) <= 4, 'El precio admite hasta 4 decimales.'),
   // Descuento de la línea EN MONTO (no en %), que es como lo pide DGII
   // (<DescuentoMonto>). El backend resta esto del MontoItem y calcula el ITBIS
   // sobre el neto, así que el total del documento coincide con lo que se ve.

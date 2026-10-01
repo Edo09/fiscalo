@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon, Money, Spinner } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { fmtCantidad } from '@/lib/format'
 import type { Producto } from '@/types/domain'
 
 interface ProductoComboboxProps {
@@ -86,7 +87,7 @@ export function ProductoCombobox({
                 <div style={{ minWidth: 0 }}>
                   <div className="cell-main">{p.nombre}</div>
                   <div className="cell-sub mono">
-                    {[p.sku, p.cat !== '—' ? p.cat : '', p.tipo === 'Servicio' ? 'Servicio' : `Existencia ${p.stock ?? 0}`]
+                    {[p.sku, p.cat !== '—' ? p.cat : '', p.tipo === 'Servicio' ? 'Servicio' : `Existencia ${fmtCantidad(p.stock ?? 0)}`]
                       .filter(Boolean)
                       .join('  ·  ')}
                   </div>

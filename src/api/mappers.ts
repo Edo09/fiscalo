@@ -1,7 +1,7 @@
 // Conversión de filas de la API a los tipos de dominio de la UI.
 import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserRow } from './types'
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
-import { colorFor } from '@/lib/format'
+import { aNumero, colorFor } from '@/lib/format'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
 export function formatApiDate(value?: string | null): string {
@@ -91,8 +91,11 @@ export function mapProductRow(r: ProductRow): Producto {
   // Tasa de ITBIS derivada del indicador: 1=18%, 2=16%, lo demás (3/4/0)=exento.
   const itbis = ind === 1 ? 18 : ind === 2 ? 16 : 0
   const tipo = Number(r.indicador_bien_servicio ?? 1) === 2 ? 'Servicio' : 'Producto'
-  const stock = r.stock ?? null
-  const min = r.stock_minimo ?? null
+  // Desde la migración 025 stock y stock_minimo son DECIMAL y llegan como texto
+  // ("10.000"). Sin convertirlos, `stock <= min` comparaba dos textos letra por
+  // letra ("10.000" <= "9.000" da true) y el producto salía como Bajo sin estarlo.
+  const stock = r.stock == null || r.stock === '' ? null : aNumero(r.stock)
+  const min = r.stock_minimo == null || r.stock_minimo === '' ? null : aNumero(r.stock_minimo)
   const activo = r.activo === undefined || r.activo === null ? true : Boolean(Number(r.activo))
 
   let estado: string

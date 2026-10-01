@@ -13,7 +13,9 @@ import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { ProductFormModal } from '@/features/products/ProductFormModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
-import { MSG_UNIDAD, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
+import {
+  MSG_UNIDAD, admiteDecimales, problemaCantidad, unidadValida, useUnidadesMedida,
+} from '@/components/unidadesMedida'
 import { presentDocument } from '@/lib/file'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
@@ -409,11 +411,20 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         ? `«${busquedaCliente}» no está elegido: elígelo de la lista o créalo con el botón +.`
         : `«${busquedaCliente}» no está elegido: elígelo de la lista, o borra el texto si la factura es para consumidor final.`
     }
-    // Unidad que no está en el catálogo DGII (productos migrados).
     for (const l of lineas) {
-      if (unidadValida(l.unidadMedida, unidades)) continue
-      const bucket = (errs.lineas[l.id] ??= {})
-      if (!bucket.unidadMedida) { bucket.unidadMedida = MSG_UNIDAD; n += 1 }
+      // Unidad que no está en el catálogo DGII (productos migrados).
+      if (!unidadValida(l.unidadMedida, unidades)) {
+        const bucket = (errs.lineas[l.id] ??= {})
+        if (!bucket.unidadMedida) { bucket.unidadMedida = MSG_UNIDAD; n += 1 }
+      }
+      // La cantidad según su unidad: sin fracciones en unidades que se cuentan
+      // (unidad, caja) y hasta 2 decimales, el tope de CantidadItem en el XSD de
+      // la DGII. Mismo texto que el backend, que también lo revisa.
+      const mal = problemaCantidad(l.cant, { unidadId: l.unidadMedida, catalogo: unidades, maxDecimales: 2 })
+      if (mal) {
+        const bucket = (errs.lineas[l.id] ??= {})
+        if (!bucket.cant) { bucket.cant = mal; n += 1 }
+      }
     }
     if (n > 0) {
       setErrors(errs)
@@ -440,7 +451,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
         indicador_facturacion: l.indFact,
         indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
-        cantidad: l.cant,
+        // La misma cantidad con la que se calcularon los montos (a 2 decimales):
+        // con la escrita, el XML y lo guardado podían no dar el MontoItem.
+        cantidad: m.cantidad,
         unidad_medida: String(l.unidadMedida),
         // Sin ITBIS: con "precios incluyen ITBIS" ya viene desglosado. Mandar el
         // precio con ITBIS hacía que el backend sumara el impuesto dos veces.
@@ -809,9 +822,13 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                 </div>
 
                 <div className="fx-cell" data-label="Cant.">
+                  {/* Paso y teclado según la unidad: metros o kilos admiten
+                      fracciones; unidades o cajas se cuentan enteras. */}
                   <input
                     className={'fx-field fx-num' + (le?.cant ? ' fx-field--err' : '')}
-                    type="number" inputMode="decimal"
+                    type="number" min={0}
+                    step={admiteDecimales(l.unidadMedida, unidades) ? 'any' : 1}
+                    inputMode={admiteDecimales(l.unidadMedida, unidades) ? 'decimal' : 'numeric'}
                     value={l.cant}
                     onChange={(e) => updLinea(l.id, 'cant', +e.target.value || 0)}
                     aria-label={`Cantidad del ítem ${i + 1}`}
@@ -831,7 +848,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                 <div className="fx-cell" data-label="Precio">
                   <input
                     className={'fx-field fx-num' + (le?.precio ? ' fx-field--err' : '')}
-                    type="number" inputMode="decimal"
+                    type="number" min={0} step="any" inputMode="decimal"
                     value={l.precio}
                     onChange={(e) => updLinea(l.id, 'precio', +e.target.value || 0)}
                     aria-label={`Precio del ítem ${i + 1}`}

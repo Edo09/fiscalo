@@ -5,6 +5,8 @@ import { Icon, Btn, Money, EstadoBadge, Drawer, Spinner } from '@/components/ui'
 import { ApiError, getGasto, getGastoEstado, getGastoXml, isRechazo } from '@/api'
 import type { GastoRow } from '@/api'
 import { downloadBlob } from '@/lib/file'
+import { aNumero, fmtCantidad } from '@/lib/format'
+import { r2 } from '@/features/invoices/montosLinea'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { categoriaLabel, gastoEstadoLabel, isAutoEmision, tipoLabel } from '@/config/gastos'
 import { avisoNoEnviado, enviadoADgii } from './envioDgii'
@@ -142,9 +144,10 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
                         .join(' · ')}
                     </div>
                   </td>
-                  <td className="num">{Number(l.quantity ?? 0)}</td>
-                  <td className="num muted"><Money value={Number(l.itbis_amount ?? 0)} cur={false} /></td>
-                  <td className="num fw6"><Money value={Number(l.subtotal ?? Number(l.amount ?? 0) * Number(l.quantity ?? 1))} cur={false} /></td>
+                  {/* Texto DECIMAL ("3.000"): sin ceros de relleno y con separador de miles. */}
+                  <td className="num">{fmtCantidad(l.quantity)}</td>
+                  <td className="num muted"><Money value={aNumero(l.itbis_amount)} cur={false} /></td>
+                  <td className="num fw6"><Money value={l.subtotal != null ? aNumero(l.subtotal) : r2(aNumero(l.amount) * aNumero(l.quantity ?? 1))} cur={false} /></td>
                 </tr>
               ))}
             </tbody>
@@ -154,10 +157,10 @@ export function GastoDetailDrawer({ gasto, onClose }: { gasto: GastoRow; onClose
 
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
         <div style={{ width: 240 }}>
-          <div className="row between mb-sm text-sm"><span className="muted">Subtotal</span><Money value={Number(g.subtotal ?? 0)} cur={false} /></div>
-          <div className="row between mb-sm text-sm"><span className="muted">ITBIS</span><Money value={Number(g.itbis ?? 0)} cur={false} /></div>
+          <div className="row between mb-sm text-sm"><span className="muted">Subtotal</span><Money value={aNumero(g.subtotal)} cur={false} /></div>
+          <div className="row between mb-sm text-sm"><span className="muted">ITBIS</span><Money value={aNumero(g.itbis)} cur={false} /></div>
           <div className="divider" style={{ margin: '8px 0' }}></div>
-          <div className="row between" style={{ fontSize: 17, fontWeight: 700 }}><span>Total</span><Money value={Number(g.total ?? 0)} /></div>
+          <div className="row between" style={{ fontSize: 17, fontWeight: 700 }}><span>Total</span><Money value={aNumero(g.total)} /></div>
         </div>
       </div>
     </Drawer>

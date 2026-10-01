@@ -9,8 +9,11 @@ import {
 import type { CotizacionItemInput } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
+import { problemaCantidad } from '@/components/unidadesMedida'
+import { r2, redondear } from '@/features/invoices/montosLinea'
 import { presentDocument } from '@/lib/file'
 import { ahoraLocal } from '@/lib/date'
+import { aNumero } from '@/lib/format'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
@@ -36,6 +39,15 @@ interface Linea {
 
 const LINEA_VACIA = (): Linea => ({ id: Date.now() + Math.random(), description: '', quantity: 1, amount: 0 })
 
+// La cotización se convierte en e-CF: la cantidad admite los mismos 2 decimales
+// que CantidadItem, para que convertirla no la cambie. No lleva unidad, así que
+// no hay regla de fracciones (esa la aplica la factura al convertir).
+const cantidadMal = (l: Linea) => problemaCantidad(l.quantity, { catalogo: [], maxDecimales: 2 })
+// Mismo redondeo que el backend (PHP 8.3) y lo que guarda cotizacion_items.
+const cantDe = (l: Linea) => redondear(l.quantity, 2)
+const precioDe = (l: Linea) => redondear(l.amount, 4)
+const importeDe = (l: Linea) => r2(cantDe(l) * precioDe(l))
+
 export function CotizacionFormView({ nav, cotizacionId = null }: {
   nav: Nav
   /** null => nueva; un id => se carga y se edita. */
@@ -54,6 +66,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
   const [prodQuery, setProdQuery] = useState('')
   const [errorForm, setErrorForm] = useState<string | null>(null)
   const [errorCliente, setErrorCliente] = useState<string | null>(null)
+  /** Cantidad inválida por línea (id → texto), tras intentar guardar. */
+  const [errCant, setErrCant] = useState<Record<number, string>>({})
   /** Lo escrito en el buscador de clientes sin elegir un resultado (ver ClientCombobox). */
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -79,11 +93,13 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     cargada.current = true
     setCodigo(row.code || `#${row.id}`)
     setLineas(
+      // Texto DECIMAL ("1.500") desde la migración 025. Ya no se sube a 1: una
+      // cotización de 0.5 se abría como 1 y se guardaba así.
       (row.items ?? []).map((it, i) => ({
         id: i + 1,
         description: it.description ?? '',
-        quantity: Math.max(1, Number(it.quantity ?? 1)),
-        amount: Number(it.amount ?? 0),
+        quantity: aNumero(it.quantity ?? 1),
+        amount: aNumero(it.amount),
       })),
     )
   }, [detalle.data])
@@ -117,16 +133,22 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     setErrorForm(null)
   }
   const addLineaLibre = () => { setLineas((ls) => [...ls, LINEA_VACIA()]); setErrorForm(null) }
-  const delLinea = (id: number) => setLineas((ls) => ls.filter((l) => l.id !== id))
+  const quitarErrCant = (id: number) =>
+    setErrCant((e) => {
+      if (!(id in e)) return e
+      const n = { ...e }
+      delete n[id]
+      return n
+    })
+  const delLinea = (id: number) => { setLineas((ls) => ls.filter((l) => l.id !== id)); quitarErrCant(id) }
   const updLinea = (id: number, patch: Partial<Linea>) => {
     setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
     setErrorForm(null)
+    quitarErrCant(id)
   }
 
-  const total = useMemo(
-    () => lineas.reduce((a, l) => a + l.amount * Math.max(1, l.quantity), 0),
-    [lineas],
-  )
+  // Suma de importes redondeados por línea, como los guarda el backend.
+  const total = useMemo(() => r2(lineas.reduce((a, l) => a + importeDe(l), 0)), [lineas])
 
   /** Valida y arma el cuerpo que espera el API. null => hay un error en pantalla. */
   const construir = () => {
@@ -140,19 +162,33 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
         : 'Elige un cliente de la lista o créalo con el botón +.')
       return null
     }
-    const items = lineas
-      .filter((l) => l.description.trim() !== '' && l.amount > 0)
-      .map<CotizacionItemInput>((l) => ({
-        description: l.description.trim(),
-        amount: l.amount,
-        // El backend guarda la cantidad como entero.
-        quantity: Math.max(1, Math.round(l.quantity)),
-      }))
+    const validas = lineas.filter((l) => l.description.trim() !== '' && l.amount > 0)
+    // Antes la cantidad se redondeaba a entero en silencio (1.5 viajaba como 2)
+    // mientras el total usaba 1.5. Ahora se guarda la escrita, o se dice qué falla.
+    const malas: Record<number, string> = {}
+    for (const l of validas) {
+      const m = cantidadMal(l)
+      if (m) malas[l.id] = m
+    }
+    const nMalas = Object.keys(malas).length
+    setErrCant(malas)
+    if (nMalas > 0) {
+      setErrorForm(nMalas === 1 ? 'Revisa la cantidad de la línea marcada en rojo.' : 'Revisa la cantidad de las líneas marcadas en rojo.')
+      return null
+    }
+    const items = validas.map<CotizacionItemInput>((l) => ({
+      description: l.description.trim(),
+      amount: precioDe(l),
+      quantity: cantDe(l),
+      // El backend guarda el subtotal que recibe: el mismo redondeo que la pantalla.
+      subtotal: importeDe(l),
+    }))
     if (items.length === 0) {
       setErrorForm('Agrega al menos una línea con descripción e importe.')
       return null
     }
-    return { client_id: Number(cliente.id), items, total }
+    // El total que se guarda es el de las líneas que se guardan.
+    return { client_id: Number(cliente.id), items, total: r2(validas.reduce((a, l) => a + importeDe(l), 0)) }
   }
 
   // Acción única: un doble clic crearía la misma cotización dos veces.
@@ -336,13 +372,17 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
                 </div>
 
                 <div className="fx-cell" data-label="Cant.">
+                  {/* Admite decimales (0.5, 1.25): vaciar el campo o escribir "0"
+                      para llegar a 0.5 ya no lo devuelve a 1. Se valida al guardar. */}
                   <input
-                    className="fx-field fx-num"
-                    type="number" inputMode="numeric" min="1"
+                    className={'fx-field fx-num' + (errCant[l.id] ? ' fx-field--err' : '')}
+                    type="number" inputMode="decimal" min={0} step="any"
                     value={l.quantity}
-                    onChange={(e) => updLinea(l.id, { quantity: +e.target.value || 1 })}
+                    onChange={(e) => updLinea(l.id, { quantity: +e.target.value || 0 })}
                     aria-label={`Cantidad de la línea ${i + 1}`}
+                    aria-invalid={errCant[l.id] ? true : undefined}
                   />
+                  {errCant[l.id] && <span className="fx-err">{errCant[l.id]}</span>}
                 </div>
 
                 <div className="fx-cell" data-label="Precio">
@@ -356,7 +396,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
                 </div>
 
                 <div className="fx-importe" data-label="Importe">
-                  <Money value={l.amount * Math.max(1, l.quantity)} cur={false} />
+                  <Money value={importeDe(l)} cur={false} />
                 </div>
               </div>
             ))

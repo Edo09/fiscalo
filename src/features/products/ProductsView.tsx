@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, PageHead, LoadingState, ErrorState, EmptyState } from '@/components/ui'
 import { listCategories, listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { fmtCantidad } from '@/lib/format'
 import { ProductFormModal } from './ProductFormModal'
 import type { Producto } from '@/types/domain'
 
@@ -102,7 +103,7 @@ export function ProductsView() {
                     <td className="text-sm">{p.cat}</td>
                     <td className="num muted">{p.costo ? <Money value={p.costo} cur={false} /> : '—'}</td>
                     <td className="num fw6"><Money value={p.precio} cur={false} /></td>
-                    <td className="num">{p.stock === null ? <span className="muted-3">N/A</span> : p.stock}</td>
+                    <td className="num">{p.stock === null ? <span className="muted-3">N/A</span> : fmtCantidad(p.stock)}</td>
                     <td><EstadoBadge estado={p.estado} /></td>
                   </tr>
                 ))}
