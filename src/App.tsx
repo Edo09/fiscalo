@@ -41,7 +41,10 @@ import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
-import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista, type ViewId } from '@/config/navigation'
+import {
+  isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista,
+  type ViewId,
+} from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -156,7 +159,16 @@ function AppShell() {
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
       // Con key: pasar de una factura a otra (o de nueva a editar) monta un
       // formulario limpio en vez de heredar el cliente y el aviso de salida del anterior.
-      case 'factura-simple-nueva': return <SimpleInvoiceFormView key="nueva" nav={nav} facturaId={null} />
+      // El borrador de una cotización convertida solo llega a la factura NUEVA,
+      // con su propia key: no se mezcla con una nueva en blanco ni con otra conversión.
+      case 'factura-simple-nueva': {
+        const prefill = isFacturaSimplePrefill(payload) ? payload : null
+        return (
+          <SimpleInvoiceFormView
+            key={prefill ? `cotizacion-${prefill.origen}` : 'nueva'} nav={nav} facturaId={null} prefill={prefill}
+          />
+        )
+      }
       case 'factura-simple-editar': {
         const id = isFacturaSimpleRef(payload) ? payload.id : null
         return <SimpleInvoiceFormView key={id ?? 'sin-id'} nav={nav} facturaId={id} />
