@@ -827,3 +827,34 @@ The Gratex prefill sends none of these.
 - **Rounding differs between PHP versions.** Covered by the `Redondeo` helper and the shared fixtures.
 - **Factura-simple prices with ITBIS folded in** differ from the quote's TOTAL by a few cents. This is
   accepted.
+
+## 13. Implementation notes (from planning, 2026-10-02)
+
+These supersede the earlier text where they differ:
+
+- **`validarForma` signature.** It is
+  `FerreteriaFormato::validarForma(object $body, callable $problemaCantidad, callable $unidadValida): array`.
+  It returns `['ok' => true, 'cot' => …]` or `['ok' => false, 'error' => …]`. Production passes
+  `unidadMedidaModel::problemaCantidad` and `::isValid`, and the CLI test passes fakes.
+- **Descriptions.**
+  - The Ferretería form already collapses line breaks.
+  - `FerreteriaFormato::limpiarDescripcion()` also turns runs of control characters (and U+2028/U+2029) into
+    one space, both in validation and in the PDF, so a row can no longer outgrow a page.
+  - Characters outside ISO-8859-1 print as `?`, as in every other FPDF document in the repo.
+- **Price input.** The Precio column in the Ferretería form is a numeric input. `fmtPrecio` is used where
+  prices are displayed (catalog search, read-only totals).
+- **Lint gate.** `npx eslint src scripts` replaces `npm run lint`, which already fails on the vendored
+  `ds-bundle/`.
+- **No local database (user decision).**
+  - The §9.1 before/after HTTP checks on a local DB are replaced by an old-vs-new controller comparison over
+    fake models (Task 6) and an offline snapshot-order checker (Task 2).
+  - The migrations and `tests/test_cotizaciones_ferreteria.http` are run by the user on a server before
+    go-live. That covers numbering under concurrency, 026 run twice on dumps of both tenant DBs, page breaks
+    and the Gratex legacy save.
+- **Client messages.** A missing, nonexistent or deleted client all answer 422 "Elige un cliente para la
+  cotización.", including when an existing quote's client was deleted.
+- **Known limits, accepted:**
+  - When the retención rounds to 0.00 (Sub-total under RD$0.10), nothing is stored, so the box reloads
+    unchecked.
+  - A stored date that is NULL or zero, which only legacy rows have, makes the edit form ask for a date
+    before saving.
