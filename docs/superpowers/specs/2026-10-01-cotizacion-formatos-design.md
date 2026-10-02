@@ -259,6 +259,10 @@ ferreteria/conversion.ts     toFacturaPrefill / toFacturaSimplePrefill for Ferre
     `{ formato, cargando, error }`.
   - `formato` is `data.cotizacion_formato` when that's a registry key. It's `'gratex'` only when branding
     **loaded** and the field is missing (backend not deployed yet) or unknown.
+  - A branding **409** counts as loaded, with `'gratex'` and no error. It comes from a single-tenant
+    install (`MULTI_TENANT_ENABLED=false`): there is no tenant, so branding always answers 409, and the
+    backend falls back to Gratex (`CotizacionFormatos::delTenant()`). `useApiQuery` exposes the status as
+    `errorStatus`. Every other failure is `error`.
 - **`CotizacionEditor`**
   - `App.tsx` renders `<CotizacionEditor key={cotizacionId ?? 'nueva'} nav={nav} cotizacionId={...} />`
     for `cotizacion-nueva`. The key remounts the editor cleanly when the user goes from one quote to a new
@@ -703,12 +707,22 @@ The Gratex prefill sends none of these.
 - **Files not edited by this work:** `CotizacionPdfGenerator.php`, `CotizacionFormView.tsx`, and the legacy
   `saveCotizacion` / `updateCotizacion` / `sendCotizacionPdfEmail`. This is checked with
   `git diff --stat` against the branch base.
-- **Deliberate Gratex differences** (each one only adds something or fixes an edge case):
+- **Deliberate Gratex differences** (each one adds something, fixes an edge case, or is required by 5.3 or
+  8.3):
   - extra keys in the GET responses;
   - list ties ordered by id;
   - the editor shows a loading state before the form;
   - "Esta cotización ya no existe" for a deleted id, where today it showed an empty sheet;
-  - a clean remount when going from one quote to a new one.
+  - a clean remount when going from one quote to a new one;
+  - a Gratex Facturar for a client with `descuento > 0` adds 8.3's line "Se aplicó el descuento fijo del
+    cliente (X%): el total difiere del de la cotización." under the banner;
+  - the banner now sits in a column wrapper (`div.col`) so that line and the avisos stack under it; the
+    banner text doesn't change;
+  - the list waits for `GET /api/branding` as well as the rows, and uses the Gratex columns if branding
+    fails (5.3);
+  - a new quote waits for `GET /api/branding` too. If it fails and nothing is cached, the editor shows "No
+    se pudo preparar la cotización" with Reintentar instead of the form (5.3). A single-tenant install,
+    where branding always answers 409, counts as Gratex and opens the form.
 - **HTTP regression checks.** Run them against a local Gratex-shaped DB (XAMPP: build it from
   `tenant_schema.sql` plus sample rows), both before and after the change:
   1. **Reads:** diff the JSON of `GET /api/cotizaciones?page=1`, `GET ?id=<x>` and

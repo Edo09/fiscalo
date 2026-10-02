@@ -45,7 +45,7 @@ const fila: CotizacionRow = {
   numero: 12,
   subtotal: '15064.25',
   itbis: '2686.17',
-  // 15,064.25 + 2,686.17 + cargos 100.00 + mano de obra 1,500.00 (the same row as Task 16's mock COT-000012).
+  // Sub-total 15,064.25 + ITBIS 2,686.17 + cargos bancarios 100.00 + mano de obra 1,500.00.
   total: '19350.42',
   // Retención y abono no son cargos: no pasan a la factura ni generan aviso.
   ajustes: { cargos_bancarios: '100.00', mano_obra: '1500.00', abono: '1000.00', retencion_isr: '753.21' },

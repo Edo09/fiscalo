@@ -23,6 +23,9 @@ const MSG_INESPERADO = 'Ocurrió un problema inesperado al mostrar los datos. Re
 export interface ApiQueryState<T> {
   data: T | null
   error: string | null
+  /** Código HTTP del error (0 = sin respuesta del servidor), para la pantalla
+      que trata un código distinto; null si no hay error o no vino de la API. */
+  errorStatus: number | null
   /** true solo cuando no hay dato aún (primer fetch); con caché no parpadea. */
   loading: boolean
   /** true mientras hay un fetch en vuelo, aunque haya datos cacheados visibles. */
@@ -57,6 +60,7 @@ export function useApiQuery<T>(
   return {
     data: q.data ?? null,
     error: q.error ? (q.error instanceof ApiError ? q.error.message : MSG_INESPERADO) : null,
+    errorStatus: q.error instanceof ApiError ? q.error.status : null,
     loading: q.isPending,
     fetching: q.isFetching,
     reload: () => q.refetch(),

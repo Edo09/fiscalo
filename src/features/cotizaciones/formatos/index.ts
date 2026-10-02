@@ -7,9 +7,13 @@
 // expuesto en GET /api/branding) y el de una cotización guardada, su columna
 // `formato`. Este registro solo dice qué formulario va con cada uno.
 //
-// Un formato nuevo: su carpeta aquí, una entrada en FORMATOS y su clase en
-// api-gratex src/Utils/Cotizacion/ (CotizacionFormatos). Las pantallas
-// compartidas (editor, listado) no cambian.
+// Un formato nuevo: su carpeta aquí, una entrada en FormatoId y en FORMATOS, y
+// su clase en api-gratex src/Utils/Cotizacion/ (CotizacionFormatos). El editor
+// lo toma de este registro, pero el listado no: CotizacionesView elige las
+// columnas y las acciones de cada fila por formato, y una fila de un formato
+// que no esté allí sale con el Facturar de Gratex (precios con ITBIS incluido).
+// Los pasos completos: api-gratex docs/modules/cotizaciones-formatos.md,
+// "Agregar un formato para un tenant nuevo".
 import type { ComponentType } from 'react'
 import { getBranding } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
@@ -55,17 +59,24 @@ export function formatoDeFila(row: { formato?: string | null } | null | undefine
  *   porque montar un formulario y cambiarlo por otro al llegar el dato
  *   perdería lo escrito.
  * - `formato`: 'gratex' solo si branding llegó sin el campo (backend sin
- *   desplegar) o con uno que este front no conoce.
+ *   desplegar) o con uno que este front no conoce, o si respondió 409 (abajo).
  * - `error`: no se pudo saber el formato (branding falló y no hay nada en
  *   caché). Un refresco fallido con el dato ya en caché no cuenta: el formato
  *   se sigue sabiendo.
+ *
+ * El 409 es el de una instalación single-tenant (MULTI_TENANT_ENABLED=false):
+ * el branding vive en master.tenants y sin tenant GET /api/branding responde
+ * 409 siempre, así que reintentar no cambia nada. Sin tenant el backend cotiza
+ * con Gratex (CotizacionFormatos::delTenant): el 409 es una respuesta y no un
+ * fallo, y la cotización nueva se abre con Gratex, como antes de los formatos.
  */
 export function useCotizacionFormato(): { formato: FormatoId; cargando: boolean; error: string | null } {
-  const { data, loading, error } = useApiQuery(['branding'], getBranding)
+  const { data, loading, error, errorStatus } = useApiQuery(['branding'], getBranding)
+  const sinTenant = data == null && errorStatus === 409
   const crudo = data?.cotizacion_formato
   return {
     formato: esFormato(crudo) ? crudo : 'gratex',
     cargando: loading,
-    error: data != null ? null : error,
+    error: data != null || sinTenant ? null : error,
   }
 }

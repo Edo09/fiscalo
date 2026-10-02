@@ -65,6 +65,8 @@ de factura no cambia ese cuerpo:
 - **Frontend:** `src/features/cotizaciones/formatos/` (registro `FORMATOS`). Para
   una cotización nueva, `useCotizacionFormato()` lee `cotizacion_formato` de
   `GET /api/branding`; una guardada se abre con el formulario de su formato.
+  En single-tenant ese GET responde 409 y la cotización es `gratex`, igual que
+  en el backend.
 - **Se cambia solo por SQL** (no hay pantalla ni `PUT /api/branding` para esto):
   `UPDATE tenants SET cotizacion_formato = 'ferreteria' WHERE id = <id>;`
 - Arquitectura y cómo agregar el formato de otro tenant:
