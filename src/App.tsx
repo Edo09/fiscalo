@@ -17,7 +17,7 @@ import { ApproveEcfView } from '@/features/ecf/ApproveEcfView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
-import { CotizacionFormView } from '@/features/cotizaciones/CotizacionFormView'
+import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -163,8 +163,13 @@ function AppShell() {
       }
       case 'recurrentes': return <RecurringView nav={nav} />
       case 'cotizaciones': return <CotizacionesView nav={nav} />
-      case 'cotizacion-nueva':
-        return <CotizacionFormView nav={nav} cotizacionId={isCotizacionRef(payload) ? payload.id : null} />
+      // El editor elige el formulario del formato (Gratex, Ferretería…). Con
+      // key: pasar de una cotización a otra, o a una nueva, monta un editor
+      // limpio en vez de heredar las líneas y el aviso de salida del anterior.
+      case 'cotizacion-nueva': {
+        const id = isCotizacionRef(payload) ? payload.id : null
+        return <CotizacionEditor key={id ?? 'nueva'} nav={nav} cotizacionId={id} />
+      }
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />
