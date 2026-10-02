@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Icon, Btn, RefreshButton, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
+import {
+  Icon, Btn, RefreshButton, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState, Dropdown, MenuItem,
+} from '@/components/ui'
 import { ApiError, listCotizaciones, getCotizacionPdf, formatApiDate } from '@/api'
 import type { CotizacionRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { presentDocument } from '@/lib/file'
 import { aNumero } from '@/lib/format'
-import type { Nav } from '@/config/navigation'
+import { useSession } from '@/stores/auth'
+import { puedeVerVista, type Nav } from '@/config/navigation'
 import type { FacturaPrefill } from '@/types/domain'
+import { formatoDeFila, useCotizacionFormato, type FormatoId } from './formatos'
+import { ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill } from './formatos/ferreteria/conversion'
 
 const PAGE_SIZE = 15
 
@@ -36,6 +41,17 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
   const [pdfBusy, setPdfBusy] = useState<number | null>(null)
+  const { user } = useSession()
+
+  // Las columnas siguen el formato del tenant; las acciones, el de cada fila
+  // (una cotización guardada con otro formato se factura con sus reglas). Si
+  // branding falla se usan las columnas de Gratex: es un listado de solo
+  // lectura y no hay nada que se pueda guardar mal.
+  const formatoTenant = useCotizacionFormato()
+  const columnas: FormatoId = formatoTenant.error != null ? 'gratex' : formatoTenant.formato
+  // Facturar ofrece solo los destinos que el rol puede abrir (mismo criterio que el sidebar).
+  const puedeEcf = puedeVerVista(user, 'factura-nueva')
+  const puedeSimple = puedeVerVista(user, 'factura-simple-nueva')
 
   // Crear y editar viven en su propia pantalla (el editor "en papel", igual que
   // el de factura), no en un modal.
@@ -84,7 +100,9 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
       </div>
 
       <Card noPad>
-        {loading ? (
+        {/* Espera también al formato: sin él no se sabe qué columnas van, y
+            montar unas para cambiarlas al momento se ve como un salto. */}
+        {loading || formatoTenant.cargando ? (
           <LoadingState rows={6} />
         ) : error ? (
           <ErrorState title="No se pudieron cargar las cotizaciones" onRetry={reload}>{error}</ErrorState>
@@ -96,13 +114,26 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
         ) : (
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>Código</th><th>Cliente</th><th>Descripción</th><th>Fecha</th><th className="num">Total</th><th style={{ width: 190 }}></th></tr></thead>
+              {/* Ferretería: Número | Cliente | Fecha | Total (su hoja no tiene
+                  resumen de descripciones). Gratex, como siempre. */}
+              <thead>
+                <tr>
+                  <th>{columnas === 'gratex' ? 'Código' : 'Número'}</th>
+                  <th>Cliente</th>
+                  {columnas === 'gratex' && <th>Descripción</th>}
+                  <th>Fecha</th>
+                  <th className="num">Total</th>
+                  <th style={{ width: columnas === 'gratex' ? 190 : 210 }}></th>
+                </tr>
+              </thead>
               <tbody>
                 {rows.map((c) => (
                   <tr key={c.id} onClick={() => abrir(c)}>
                     <td><span className="mono text-sm fw6">{c.code || `#${c.id}`}</span></td>
                     <td><div className="row gap-sm"><Avatar name={c.client_name || '—'} size={28} /><span className="cell-main">{c.client_name || '—'}</span></div></td>
-                    <td className="text-sm muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description || '—'}</td>
+                    {columnas === 'gratex' && (
+                      <td className="text-sm muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description || '—'}</td>
+                    )}
                     <td className="muted text-sm">{formatApiDate(c.date)}</td>
                     <td className="num fw6"><Money value={Number(c.total ?? 0)} cur={false} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
@@ -110,10 +141,37 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
                         <Btn variant="ghost" size="sm" icon="printer" onClick={() => openPdf(c)} disabled={pdfBusy === c.id}>
                           {pdfBusy === c.id ? '…' : 'PDF'}
                         </Btn>
-                        <Btn variant="secondary" size="sm" icon="file-text" title="Convertir a factura e-CF"
-                          onClick={() => nav('factura-nueva', toFacturaPrefill(c))}>
-                          Facturar
-                        </Btn>
+                        {formatoDeFila(c) === 'ferreteria' ? (
+                          // Ferretería factura a e-CF o a factura simple. Cada destino
+                          // sale solo si el rol puede abrirlo; sin ninguno, no hay botón.
+                          (puedeEcf || puedeSimple) && (
+                            <Dropdown
+                              align="right"
+                              width={220}
+                              trigger={
+                                <Btn variant="secondary" size="sm" icon="file-text" iconRight="chevron-down" title="Convertir en factura">
+                                  Facturar
+                                </Btn>
+                              }
+                            >
+                              {puedeEcf && (
+                                <MenuItem icon="file-text" onClick={() => nav('factura-nueva', ferreteriaAFacturaPrefill(c))}>
+                                  Factura electrónica (e-CF)
+                                </MenuItem>
+                              )}
+                              {puedeSimple && (
+                                <MenuItem icon="file" onClick={() => nav('factura-simple-nueva', ferreteriaAFacturaSimplePrefill(c))}>
+                                  Factura simple
+                                </MenuItem>
+                              )}
+                            </Dropdown>
+                          )
+                        ) : (
+                          <Btn variant="secondary" size="sm" icon="file-text" title="Convertir a factura e-CF"
+                            onClick={() => nav('factura-nueva', toFacturaPrefill(c))}>
+                            Facturar
+                          </Btn>
+                        )}
                       </div>
                     </td>
                   </tr>
