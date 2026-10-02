@@ -36,7 +36,7 @@ del texto sobre el acento lo decide `BrandingResolver::contrastText()`
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
-| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, available_templates}` |
+| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, logo_data_uri, available_templates, cotizacion_formato}`. `cotizacion_formato` (`gratex` \| `ferreteria`) elige la pantalla de cotización (`src/features/cotizaciones/formatos/`); solo lectura, se cambia por SQL en `master.tenants` |
 | PUT | `/api/branding` | `{template?, accent_color?}` | 422 si plantilla desconocida o hex inválido. `accent_color: null` limpia. |
 | POST | `/api/branding/logo` | multipart `logo` | PNG/JPG real (getimagesize), máx 2 MB. Guarda `logos/<tenant_id>.<ext>`. |
 | DELETE | `/api/branding/logo` | — | Borra el logo; vuelve al global. |
