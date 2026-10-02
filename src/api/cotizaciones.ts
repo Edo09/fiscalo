@@ -1,7 +1,7 @@
 // Servicio: cotizaciones (/api/cotizaciones).
 import { getList, getJson, postJson, request, qs } from './http'
 import type {
-  CotizacionRow, CreateCotizacionInput, DocBase64, ListParams, ListResult,
+  CotizacionFerreteriaInput, CotizacionRow, CreateCotizacionInput, DocBase64, ListParams, ListResult,
 } from './types'
 
 export function listCotizaciones(params: ListParams = {}): Promise<ListResult<CotizacionRow>> {
@@ -16,11 +16,19 @@ export async function getCotizacion(id: number | string): Promise<CotizacionRow 
   return data ?? null
 }
 
-export function createCotizacion(input: CreateCotizacionInput): Promise<{ id: number; code: string; message: string }> {
+/**
+ * Crea una cotización en el formato del cuerpo. Gratex responde `message`;
+ * Ferretería, `numero` y el `total` que calculó el backend.
+ */
+export function createCotizacion(
+  input: CreateCotizacionInput | CotizacionFerreteriaInput,
+): Promise<{ id: number; code: string; message?: string; numero?: number; total?: number }> {
   return postJson('/api/cotizaciones', input)
 }
 
-export function updateCotizacion(input: CreateCotizacionInput & { id: number | string }): Promise<unknown> {
+export function updateCotizacion(
+  input: (CreateCotizacionInput | CotizacionFerreteriaInput) & { id: number | string },
+): Promise<unknown> {
   return request('/api/cotizaciones', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -41,7 +49,12 @@ export function getCotizacionPdf(id: number | string): Promise<DocBase64> {
   return getJson<DocBase64>(`/api/cotizaciones/${id}/pdf${qs({ format: 'base64' })}`)
 }
 
-/** Vista previa del PDF SIN guardar la cotización. */
-export function previewCotizacion(input: Omit<CreateCotizacionInput, 'user_id' | 'sent_email'>): Promise<DocBase64> {
+/**
+ * Vista previa del PDF SIN guardar la cotización. En Ferretería, `id` (al
+ * editar) hace que el PDF salga con el formato y el código de esa fila.
+ */
+export function previewCotizacion(
+  input: Omit<CreateCotizacionInput, 'user_id' | 'sent_email'> | (CotizacionFerreteriaInput & { id?: number }),
+): Promise<DocBase64> {
   return postJson<DocBase64>('/api/cotizaciones/preview', input)
 }

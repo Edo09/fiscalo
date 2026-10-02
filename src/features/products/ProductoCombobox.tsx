@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon, Money, Spinner } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { fmtCantidad } from '@/lib/format'
+import { fmtCantidad, fmtPrecio } from '@/lib/format'
 import type { Producto } from '@/types/domain'
 
 interface ProductoComboboxProps {
@@ -15,12 +15,18 @@ interface ProductoComboboxProps {
   placeholder?: string
   /** ms de espera tras la última tecla antes de consultar la API. */
   debounceMs?: number
+  /**
+   * Muestra el precio de venta en vez del costo. Un gasto se piensa en lo que
+   * cuesta el artículo; una cotización, en lo que paga el cliente.
+   */
+  mostrarPrecio?: boolean
 }
 
 export function ProductoCombobox({
   onSelect,
   placeholder = 'Buscar producto por nombre, SKU o categoría…',
   debounceMs = 250,
+  mostrarPrecio = false,
 }: ProductoComboboxProps) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
@@ -93,7 +99,10 @@ export function ProductoCombobox({
                   </div>
                 </div>
                 <span className="text-xs muted" style={{ whiteSpace: 'nowrap' }}>
-                  Costo <Money value={p.costo} cur={false} />
+                  {/* El precio con sus decimales (hasta 4): es el que se copia a la línea. */}
+                  {mostrarPrecio
+                    ? <>Precio <span className="num">{fmtPrecio(p.precio)}</span></>
+                    : <>Costo <Money value={p.costo} cur={false} /></>}
                 </span>
               </div>
             ))

@@ -1,8 +1,10 @@
 # Plantillas de Factura (Representación Impresa) por Tenant
 
-Cada tenant elige cómo se ve su factura PDF (y su cotización): una plantilla
-predefinida + un color de acento + su logo. Para clientes que pidan un diseño
-totalmente a la medida existe la vía `custom:*` (sección final).
+Cada tenant elige cómo se ve su factura PDF: una plantilla predefinida + un
+color de acento + su logo. Para clientes que pidan un diseño totalmente a la
+medida existe la vía `custom:*` (sección final). La cotización no sigue esta
+plantilla: la arma el formato de cotización del tenant (sección
+"Cotizaciones: las define el formato, no la plantilla").
 
 ## Arquitectura
 
@@ -36,7 +38,7 @@ del texto sobre el acento lo decide `BrandingResolver::contrastText()`
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
-| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, available_templates}` |
+| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, logo_data_uri, available_templates, cotizacion_formato}`. `cotizacion_formato` (`gratex` \| `ferreteria`) elige la pantalla de cotización (`src/features/cotizaciones/formatos/`); solo lectura, se cambia por SQL en `master.tenants` |
 | PUT | `/api/branding` | `{template?, accent_color?}` | 422 si plantilla desconocida o hex inválido. `accent_color: null` limpia. |
 | POST | `/api/branding/logo` | multipart `logo` | PNG/JPG real (getimagesize), máx 2 MB. Guarda `logos/<tenant_id>.<ext>`. |
 | DELETE | `/api/branding/logo` | — | Borra el logo; vuelve al global. |
@@ -45,6 +47,31 @@ del texto sobre el acento lo decide `BrandingResolver::contrastText()`
 La herramienta de operaciones `public/upload_logo.php` (token propio) sigue
 funcionando y puede fijar el logo de cualquier tenant (útil en onboarding de
 integración). Ambas vías comparten `src/Utils/LogoStorage.php`.
+
+## Cotizaciones: las define el formato, no la plantilla
+
+El cuerpo de la cotización (título, columnas, totales, pie) y su formulario los
+define el **formato de cotización** del tenant: `master.tenants.cotizacion_formato`,
+`gratex` por defecto y `ferreteria` para FERREHERRAMIENTAS VENTURA. La plantilla
+de factura no cambia ese cuerpo:
+
+- **`gratex`:** `CotizacionPdfGenerator.php`, como siempre. De la plantilla del
+  tenant solo toma el membrete (`drawCompanyHeader(..., 'cotizacion')`).
+- **`ferreteria`:** `FerreteriaCotizacionPdf.php`, con el formato de su hoja de
+  Excel. Del branding usa solo el logo (`BrandingResolver::logoPath()`): cambiar
+  `pdf_template` o `pdf_accent_color` no la cambia.
+- Una cotización guardada conserva su formato (`cotizaciones.formato`; NULL =
+  gratex) aunque el tenant cambie de formato después.
+- **Frontend:** `src/features/cotizaciones/formatos/` (registro `FORMATOS`). Para
+  una cotización nueva, `useCotizacionFormato()` lee `cotizacion_formato` de
+  `GET /api/branding`; una guardada se abre con el formulario de su formato.
+  En single-tenant ese GET responde 409 y la cotización es `gratex`, igual que
+  en el backend.
+- **Se cambia solo por SQL** (no hay pantalla ni `PUT /api/branding` para esto):
+  `UPDATE tenants SET cotizacion_formato = 'ferreteria' WHERE id = <id>;`
+- Arquitectura y cómo agregar el formato de otro tenant:
+  `api-gratex/docs/modules/cotizaciones-formatos.md`. Contrato del API:
+  `api-gratex/docs/api/cotizaciones.md`.
 
 ## Diseños a la medida (`custom:*`)
 
@@ -56,7 +83,8 @@ Cuando un cliente pide su propio formato de factura:
    `Tenant<id>Template.php` (snake_case → StudlyCaps + `Template`).
 2. **Diseñar** sobreescribiendo los hooks:
    - `drawCompanyHeader($pdf, $emisor, $logoPath, $variant)` — identidad del
-     emisor (corre en cada página; `$variant` es `factura` o `cotizacion`).
+     emisor (corre en cada página; `$variant` es `factura` o `cotizacion`; la
+     variante `cotizacion` solo la usa el formato `gratex`).
    - `drawFooter($pdf)` — firmas/sello (el motor agrega la paginación después).
    - `drawItemsTableHeader($pdf, $widths, $labels)` — banda de la tabla
      (anchos y etiquetas los fija el motor: no se puede quitar una columna).

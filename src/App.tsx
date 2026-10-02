@@ -17,7 +17,7 @@ import { ApproveEcfView } from '@/features/ecf/ApproveEcfView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
-import { CotizacionFormView } from '@/features/cotizaciones/CotizacionFormView'
+import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -41,7 +41,10 @@ import { LoginView } from '@/features/auth/LoginView'
 import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
-import { isCotizacionRef, isFacturaPrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista, type ViewId } from '@/config/navigation'
+import {
+  isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista,
+  type ViewId,
+} from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
 /* ============================================================
@@ -156,15 +159,29 @@ function AppShell() {
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
       // Con key: pasar de una factura a otra (o de nueva a editar) monta un
       // formulario limpio en vez de heredar el cliente y el aviso de salida del anterior.
-      case 'factura-simple-nueva': return <SimpleInvoiceFormView key="nueva" nav={nav} facturaId={null} />
+      // El borrador de una cotización convertida solo llega a la factura NUEVA,
+      // con su propia key: no se mezcla con una nueva en blanco ni con otra conversión.
+      case 'factura-simple-nueva': {
+        const prefill = isFacturaSimplePrefill(payload) ? payload : null
+        return (
+          <SimpleInvoiceFormView
+            key={prefill ? `cotizacion-${prefill.origen}` : 'nueva'} nav={nav} facturaId={null} prefill={prefill}
+          />
+        )
+      }
       case 'factura-simple-editar': {
         const id = isFacturaSimpleRef(payload) ? payload.id : null
         return <SimpleInvoiceFormView key={id ?? 'sin-id'} nav={nav} facturaId={id} />
       }
       case 'recurrentes': return <RecurringView nav={nav} />
       case 'cotizaciones': return <CotizacionesView nav={nav} />
-      case 'cotizacion-nueva':
-        return <CotizacionFormView nav={nav} cotizacionId={isCotizacionRef(payload) ? payload.id : null} />
+      // El editor elige el formulario del formato (Gratex, Ferretería…). Con
+      // key: pasar de una cotización a otra, o a una nueva, monta un editor
+      // limpio en vez de heredar las líneas y el aviso de salida del anterior.
+      case 'cotizacion-nueva': {
+        const id = isCotizacionRef(payload) ? payload.id : null
+        return <CotizacionEditor key={id ?? 'nueva'} nav={nav} cotizacionId={id} />
+      }
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />

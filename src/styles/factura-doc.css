@@ -879,6 +879,67 @@
   grid-template-columns: 22px minmax(0, 1fr) 70px 120px 130px;
 }
 
+/* ---------- Cotizacion de Ferreteria (formatos/ferreteria) ---------- */
+/* Rejilla de lineas: como la hoja de Excel de la tienda, empieza por la
+   cantidad, y cada linea lleva su unidad y su ITBIS (el precio va SIN ITBIS y
+   el impuesto se suma encima). Hereda lo del e-CF igual que .fx-grid-cot. */
+.fx-grid-ecf.fx-grid-cot-fer {
+  grid-template-columns: 22px 70px 86px minmax(0, 1fr) 110px 86px 120px;
+}
+
+/* Buscador del catalogo en la fila de "agregar", junto a "Linea libre". */
+.fx-buscar-prod { flex: 1 1 280px; max-width: 460px; }
+/* El papel recorta lo que sobresale (overflow: hidden, por el filete de
+   arriba): el desplegable se acorta para caber en lo que queda de hoja
+   debajo (totales y pie) aunque la cotizacion tenga pocas lineas. */
+.fx-buscar-prod .combobox-menu { max-height: 240px; }
+
+/* Totales: el grupo de cargos y abonos lleva campos con su rotulo, que no
+   caben en los 320px del cuadro de la factura. */
+.fx-totales-box--fer { width: min(400px, 100%); }
+
+.fx-ajustes {
+  margin: 2px 0;
+  padding: 2px 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+
+.fx-ajustes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 2px;
+}
+
+/* Mas especifico que .fx-detalle-toggle, que se define despues con padding 0. */
+.fx-ajustes .fx-ajustes-abrir { padding: 6px 12px; }
+
+/* El subrayado se queda visible: sin el, el 0 del campo se lee como un total
+   calculado y no como algo que se puede escribir. */
+.fx-ajuste-monto { width: 120px; flex: 0 0 auto; border-bottom-color: var(--border-strong); }
+.fx-ajuste-err { justify-content: flex-end; padding: 0 12px; }
+
+.fx-ajuste-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.fx-total-linea--restante,
+.fx-total-linea--restante > span:last-child {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* La pantalla quedo vieja (409: cambio el formato de la empresa): el aviso va
+   en la barra, junto a Recargar, en rojo y no en tono de pista. */
+.fx-motivo--alerta { color: var(--danger); }
+
 /* Pie de linea: contador de caracteres y enlace al detalle largo. */
 .fx-linea-pie {
   display: flex;
@@ -965,6 +1026,12 @@
   /* La variante de cotizacion tiene mas especificidad que .fx-grid-ecf, asi que
      sin repetir aqui el colapso se quedaria con sus 5 columnas en movil. */
   .fx-grid-ecf.fx-grid-cot { grid-template-columns: 1fr auto; }
+  /* Ferreteria: lo mismo, y en el telefono la descripcion va primero (a lo
+     ancho) y el valor total a la derecha, como en el e-CF. */
+  .fx-grid-ecf.fx-grid-cot-fer { grid-template-columns: 1fr auto; }
+  .fx-grid-cot-fer > .fx-gutter { order: -2; }
+  .fx-grid-cot-fer > .fx-desc { order: -1; }
+  .fx-grid-cot-fer > .fx-importe { grid-column: 2; }
   .fx-grid-ecf > .fx-desc { grid-column: 1 / -1; }
   .fx-cierre { grid-template-columns: 1fr; }
   /* La cabecera se oculta EN EL MISMO breakpoint en que colapsa la rejilla: si

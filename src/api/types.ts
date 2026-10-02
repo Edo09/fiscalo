@@ -556,11 +556,22 @@ export interface CotizacionItemRow {
   amount?: number | string | null
   quantity?: number | string | null
   subtotal?: number | string | null
+  // Columnas de la migración 026 (formatos con catálogo, ej. Ferretería).
+  // null en las líneas de Gratex y ausentes antes de la 026.
+  product_id?: number | null
+  /** Código DGII de la unidad (= unidades_medida.id), ej. '43'. */
+  unidad_medida?: string | null
+  /** 1 = 18%, 2 = 16%, 3 = 0%, 4 = exento. */
+  indicador_facturacion?: number | null
+  /** 1 = Bien, 2 = Servicio. */
+  indicador_bien_servicio?: number | null
+  /** DECIMAL como string: leer con aNumero. */
+  itbis_amount?: string | number | null
 }
 
 export interface CotizacionRow {
   id: number
-  /** Código único generado por el backend (ej. 48213AB). */
+  /** Código único generado por el backend (Gratex: ej. 48213AB; Ferretería: COT-000123). */
   code?: string | null
   date?: string | null
   client_id?: number | null
@@ -569,6 +580,19 @@ export interface CotizacionRow {
   /** Resumen: descripciones de los ítems unidas (lo arma el backend). */
   description?: string | null
   items?: CotizacionItemRow[]
+  /** Formato con que se guardó. null o ausente = gratex (filas de antes de la 026). */
+  formato?: string | null
+  /** Consecutivo del formato Ferretería (el de `code`); null en Gratex. */
+  numero?: number | null
+  /** DECIMAL como string (leer con aNumero); null en Gratex. */
+  subtotal?: string | number | null
+  itbis?: string | number | null
+  /**
+   * Ajustes por concepto (cargos_bancarios, manejo_bancario, mano_obra, abono,
+   * retencion_isr), montos DECIMAL como string. Siempre objeto: `{}` en Gratex;
+   * una clave ausente es 0. `retencion_isr` es el monto guardado, no la casilla.
+   */
+  ajustes?: Record<string, string | number>
 }
 
 export interface CotizacionItemInput {
@@ -589,6 +613,52 @@ export interface CreateCotizacionInput {
   user_id?: number
   /** true => el backend envía la cotización por correo al cliente. */
   sent_email?: boolean
+}
+
+/**
+ * Cargos y abonos del formato Ferretería (debajo del ITBIS). Montos ≥ 0 con
+ * hasta 2 decimales; una clave ausente es 0. Cargos y mano de obra se suman al
+ * TOTAL sin ITBIS; retención y abono solo bajan lo adeudado.
+ */
+export interface AjustesFerreteria {
+  cargos_bancarios?: number
+  manejo_bancario?: number
+  mano_obra?: number
+  abono?: number
+  /** Casilla "Retención Renta 5%": el backend calcula el 5% del Sub-total en cada guardado. */
+  retencion_isr: boolean
+}
+
+/** Línea del formato Ferretería: de un producto del catálogo o libre (`product_id` null). */
+export interface CotizacionFerreteriaItemInput {
+  product_id: number | null
+  description: string
+  /** Hasta 2 decimales, y solo si la unidad admite fracciones. */
+  quantity: number
+  /** Precio unitario SIN ITBIS (el backend suma el ITBIS encima), hasta 4 decimales. */
+  amount: number
+  /** Código DGII de la unidad (= unidades_medida.id), ej. '43'. */
+  unidad_medida: string
+  /** 1 = 18%, 2 = 16%, 3 = 0%, 4 = exento. */
+  indicador_facturacion: number
+  /** 1 = Bien, 2 = Servicio. Con `product_id`, el backend usa el del producto. */
+  indicador_bien_servicio: number
+}
+
+/**
+ * Cuerpo de POST / PUT / preview del formato Ferretería. Sin `total` ni
+ * `user_id`: el backend calcula los totales y toma el usuario del token.
+ * `formato` va siempre: si no es el del tenant (pantalla vieja) el backend
+ * responde 409 sin guardar.
+ */
+export interface CotizacionFerreteriaInput {
+  formato: 'ferreteria'
+  client_id: number
+  /** 'YYYY-MM-DD HH:MM:SS'. Ausente en PUT = se conserva la fecha guardada. */
+  date?: string
+  items: CotizacionFerreteriaItemInput[]
+  /** Un PUT reemplaza el juego completo. */
+  ajustes: AjustesFerreteria
 }
 
 // ---------------------------------------------------------------------------
@@ -994,6 +1064,12 @@ export interface BrandingData {
   /** Logo listo para <img src>. El API no sirve logos/ por URL: llega embebido. */
   logo_data_uri: string | null
   available_templates: string[]
+  /**
+   * Formato de cotización del tenant ('gratex' | 'ferreteria'; master
+   * tenants.cotizacion_formato). Ausente si el backend todavía no lo expone:
+   * el front lo trata como 'gratex'.
+   */
+  cotizacion_formato?: string
 }
 
 // ---------------------------------------------------------------------------

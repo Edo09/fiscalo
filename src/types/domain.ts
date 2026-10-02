@@ -147,7 +147,42 @@ export interface FacturaPrefill {
   clienteNombre: string
   /** Código del documento de origen (ej. cotización) — informativo. */
   origen?: string
-  lineas: { nombre: string; cantidad: number; precio: number }[]
+  /**
+   * Estado inicial del interruptor "Los precios incluyen ITBIS". Ausente = true
+   * (cotización Gratex, precios con ITBIS); Ferretería manda false.
+   */
+  precioConItbis?: boolean
+  /** Avisos bajo el banner de conversión (ej. cargos de la cotización que no se copiaron). */
+  avisos?: string[]
+  /**
+   * Los campos opcionales ligan la línea al catálogo. Ausentes = línea libre
+   * como hasta ahora: sin producto, unidad 43, indicador 1, 'Bien'.
+   */
+  lineas: {
+    nombre: string
+    cantidad: number
+    precio: number
+    prodId?: string
+    /** Código DGII de la unidad (= unidades_medida.id). */
+    unidadMedida?: number
+    /** indicador_facturacion: 1 = 18%, 2 = 16%, 3 = 0%, 4 = exento. */
+    indFact?: number
+    tipoItem?: 'Bien' | 'Servicio'
+  }[]
+}
+
+/** Borrador para precargar la factura simple (convertir una cotización de Ferretería). */
+export interface FacturaSimplePrefill {
+  kind: 'factura-simple-prefill'
+  /** Vacío si el documento de origen no tenía cliente. */
+  clienteId: string
+  clienteNombre: string
+  /** Código del documento de origen (ej. COT-000012), para el banner. */
+  origen: string
+  /** Avisos bajo el banner de conversión. */
+  avisos?: string[]
+  /** `precio` YA incluye el ITBIS: la factura simple cobra precios finales. */
+  lineas: { prodId?: string; descripcion: string; cantidad: number; precio: number; unidadMedida?: number | null }[]
 }
 
 export interface Proveedor {

@@ -1,6 +1,6 @@
 // Navegación de la aplicación: vistas, grupos del sidebar y títulos.
 import type { IconName } from '@/components/ui/Icon'
-import type { Factura, EcfTipo, FacturaPrefill } from '@/types/domain'
+import type { Factura, EcfTipo, FacturaPrefill, FacturaSimplePrefill } from '@/types/domain'
 import { esRolAdmin, hasModule } from '@/config/permissions'
 
 export type ViewId =
@@ -48,11 +48,17 @@ export interface FacturaSimpleRef { kind: 'factura-simple'; id: number }
 /** Referencia a una cotización para abrirla en su editor. */
 export interface CotizacionRef { kind: 'cotizacion'; id: number }
 
-export type NavPayload = Factura | EcfTipo | FacturaPrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef | null
+export type NavPayload =
+  | Factura | EcfTipo | FacturaPrefill | FacturaSimplePrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
   return p != null && (p as FacturaPrefill).kind === 'factura-prefill'
+}
+
+/** ¿El payload es un borrador de factura simple (conversión de cotización de Ferretería)? */
+export function isFacturaSimplePrefill(p: unknown): p is FacturaSimplePrefill {
+  return p != null && (p as FacturaSimplePrefill).kind === 'factura-simple-prefill'
 }
 
 /** ¿El payload apunta a una factura simple? */

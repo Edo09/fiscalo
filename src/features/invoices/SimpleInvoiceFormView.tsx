@@ -21,7 +21,7 @@ import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
 import { VistaPreviaRecibo } from './VistaPreviaRecibo'
 import { lineaQueCuadra, r2, redondear } from './montosLinea'
-import type { Cliente, Producto } from '@/types/domain'
+import type { Cliente, FacturaSimplePrefill, Producto } from '@/types/domain'
 import type { Nav } from '@/config/navigation'
 import '@/styles/factura-doc.css'
 
@@ -110,16 +110,34 @@ const esMetodoCredito = (m: string) => METODOS_CREDITO.includes(m)
 /* FISCALO — Facturas simples: alta y edición (POST/PUT /api/facturas-simples).
    La pantalla tiene forma de documento: se escribe sobre el papel y cada dato
    queda donde va a imprimirse. Estilos en styles/factura-doc.css.
-   Documento interno: no se envía a la DGII, no lleva e-NCF ni NCF fiscal. */
-export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId: number | null }) {
+   Documento interno: no se envía a la DGII, no lleva e-NCF ni NCF fiscal.
+   `prefill` llega al convertir una cotización (Ferretería): la factura nueva
+   arranca con su cliente y sus líneas, y todo sigue editable. */
+export function SimpleInvoiceFormView({
+  nav, facturaId, prefill = null,
+}: { nav: Nav; facturaId: number | null; prefill?: FacturaSimplePrefill | null }) {
   const queryClient = useQueryClient()
   const editando = facturaId != null
+  // Al editar manda la factura guardada: un borrador nunca la pisa.
+  const borrador = editando ? null : prefill
 
   const [cargando, setCargando] = useState(editando)
   const [errorCarga, setErrorCarga] = useState<string | null>(null)
   const [numero, setNumero] = useState<string | null>(null)
 
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  // Con borrador arranca con el cliente de la cotización. Es un placeholder
+  // con id y nombre (igual que en la factura e-CF): el efecto de más abajo trae
+  // la ficha completa y con ella sus condiciones (descuento y crédito).
+  const [cliente, setCliente] = useState<Cliente | null>(() =>
+    borrador && borrador.clienteId
+      ? {
+          id: borrador.clienteId, nombre: borrador.clienteNombre || `Cliente #${borrador.clienteId}`,
+          contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
+          balance: 0, facturas: 0, estado: '', desde: '',
+          descuento: 0, permiteCredito: false,
+        }
+      : null,
+  )
   const [metodo, setMetodo] = useState('Efectivo')
   const [clienteActual, setClienteActual] = useState<string | null>(null)
   /**
@@ -135,7 +153,17 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const [intentoFallido, setIntentoFallido] = useState(false)
   const clienteCajaRef = useRef<HTMLDivElement | null>(null)
   const [fecha, setFecha] = useState(hoyLocal)
-  const [lineas, setLineas] = useState<Linea[]>([lineaVacia(1)])
+  // Con borrador, sus líneas: el precio ya trae el ITBIS (ver conversion.ts de
+  // Ferretería) y el descuento lo pone el cliente al cargar. Sin fila vacía al
+  // final, como al abrir una factura guardada: "Descripción" agrega otra.
+  const [lineas, setLineas] = useState<Linea[]>(() =>
+    borrador && borrador.lineas.length > 0
+      ? borrador.lineas.map((l, i) => ({
+          id: i + 1, prodId: l.prodId ?? '', descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precio,
+          desc: 0, unidadMedida: l.unidadMedida ?? null,
+        }))
+      : [lineaVacia(1)],
+  )
   const [guardando, setGuardando] = useState(false)
   const [previaBusy, setPreviaBusy] = useState<FormatoImpresion | null>(null)
   /** Tirilla sin guardar abierta en pantalla (ver VistaPreviaRecibo). */
@@ -245,6 +273,31 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
       .finally(() => { if (vivo) setCargando(false) })
     return () => { vivo = false }
   }, [facturaId])
+
+  // Borrador de una cotización: el cliente llegó como placeholder. Se trae su
+  // ficha con la misma consulta que la factura e-CF y se aplican sus
+  // condiciones como al elegirlo a mano (seleccionarCliente): su descuento pasa
+  // a las líneas y, sin crédito, el pago queda de contado.
+  const borradorClienteId = borrador?.clienteId ? Number(borrador.clienteId) : null
+  const clienteEnriquecido = useRef(false)
+  const clienteDetalle = useApiQuery(
+    ['clients', 'detail', borradorClienteId],
+    () => (borradorClienteId ? getClient(borradorClienteId) : Promise.resolve(null)),
+  )
+  useEffect(() => {
+    const row = clienteDetalle.data
+    // Una sola vez, y solo si sigue siendo ese cliente: si el usuario ya
+    // eligió otro, valen las condiciones del que eligió.
+    if (!clienteEnriquecido.current && row && cliente && String(row.id) === cliente.id) {
+      clienteEnriquecido.current = true
+      const completo = mapClientRow(row)
+      setCliente(completo)
+      // Las líneas del borrador arrancan en 0%: con descuento queda igual que
+      // seleccionarCliente, y sin él no pisa uno escrito mientras cargaba.
+      if (completo.descuento > 0) setLineas((ls) => ls.map((l) => ({ ...l, desc: completo.descuento })))
+      if (!completo.permiteCredito) setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
+    }
+  }, [clienteDetalle.data, cliente])
 
   // Lista de metodos que ofrece el formulario (el credito depende del cliente).
   const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Credito 30 dias', 'Cheque']
@@ -607,12 +660,39 @@ export function SimpleInvoiceFormView({ nav, facturaId }: { nav: Nav; facturaId:
   const emisorNombre = emisor?.nombre_comercial || emisor?.razon_social || ''
   const contacto = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
 
+  // Avisos bajo el banner de la conversión: lo que la cotización no copió y,
+  // ya con el cliente cargado, su descuento fijo, que hace que el total no sea
+  // el de la cotización.
+  const pctCliente = cliente?.descuento ?? 0
+  const avisosConversion = borrador
+    ? [
+        ...(borrador.avisos ?? []),
+        ...(pctCliente > 0
+          ? [`Se aplicó el descuento fijo del cliente (${pctCliente}%): el total difiere del de la cotización.`]
+          : []),
+      ]
+    : []
+
   return (
     <div className="page fx-desk">
-      <div className="row" style={{ marginBottom: 14 }}>
+      <div className="row between" style={{ marginBottom: 14 }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas-simples')}>
           Facturas simples
         </Btn>
+        {borrador && (
+          <div className="col" style={{ alignItems: 'flex-end', textAlign: 'right', gap: 4, minWidth: 0 }}>
+            <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
+              <Icon name="file-plus" size={15} />
+              Convertida desde la cotización {borrador.origen} · cada precio ya incluye su ITBIS
+            </span>
+            {avisosConversion.map((a, i) => (
+              <span key={i} className="row gap-sm text-xs" style={{ color: 'var(--warning)' }}>
+                <Icon name="alert-triangle" size={13} />
+                {a}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <article className="fx-sheet">

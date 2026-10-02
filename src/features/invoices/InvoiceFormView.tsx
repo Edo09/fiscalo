@@ -26,7 +26,7 @@ import {
   facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors, type ReferenciaNotaForm,
 } from './factura.schema'
 import { NotaReferencia } from './NotaReferencia'
-import { montosLinea, totalesDocumento } from './montosLinea'
+import { indFactFromItbis, montosLinea, totalesDocumento } from './montosLinea'
 import '@/styles/factura-doc.css'
 
 interface Linea {
@@ -139,11 +139,6 @@ function TipoDocSelect({
   )
 }
 
-/** Deriva el indicador desde la tasa de ITBIS del producto (18→1, 16→2, resto→exento). */
-function indFactFromItbis(itbis: number): IndicadorFacturacion {
-  return itbis === 18 ? 1 : itbis === 16 ? 2 : 4
-}
-
 /**
  * e-NCF que el backend asignará a continuación para un tipo, derivado de
  * /api/facturas/stats. `secuencia_actual` es el ÚLTIMO número asignado, así que
@@ -183,16 +178,22 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [metodo, setMetodo] = useState('Efectivo')
   const [obs, setObs] = useState('')
-  // ¿Los precios de las líneas YA incluyen ITBIS? Las cotizaciones se cotizan
-  // con impuesto incluido, así que al convertir arranca en true (editable).
+  // ¿Los precios de las líneas YA incluyen ITBIS? Una cotización de Gratex se
+  // cotiza con impuesto incluido, así que al convertirla arranca en true; la de
+  // Ferretería trae precios sin ITBIS y lo dice con precioConItbis: false. Una
+  // factura en blanco arranca apagado. Siempre editable.
   // Solo cambia cómo se leen los precios escritos: a la DGII siempre viajan
   // sin ITBIS (ver montosLinea).
-  const [precioConItbis, setPrecioConItbis] = useState(prefill != null)
+  const [precioConItbis, setPrecioConItbis] = useState(prefill != null && (prefill.precioConItbis ?? true))
   const [lineas, setLineas] = useState<Linea[]>(() =>
     (prefill?.lineas ?? []).map((l, i) => ({
-      id: i + 1, prodId: '', nombre: l.nombre, descripcion: '', cant: l.cantidad, precio: l.precio,
-      // La cotización no distingue ITBIS ni unidad: default gravado 18% / Unidad (43).
-      desc: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
+      id: i + 1, prodId: l.prodId ?? '', nombre: l.nombre, descripcion: '', cant: l.cantidad, precio: l.precio,
+      // Lo que el origen no trae sale con los defaults de una línea libre:
+      // gravado 18%, Unidad (43), Bien (la cotización de Gratex no trae nada de
+      // eso). La de Ferretería trae su producto, unidad, indicador y tipo: con
+      // el producto ligado, emitir descuenta inventario.
+      desc: 0, indFact: (l.indFact ?? 1) as IndicadorFacturacion, unidadMedida: l.unidadMedida ?? 43,
+      tipoItem: l.tipoItem ?? 'Bien',
     })),
   )
   const [prodPicker, setProdPicker] = useState(false)
@@ -294,6 +295,19 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Descuento por defecto de las líneas: el que tenga el cliente elegido. El
   // usuario puede cambiarlo línea por línea después; esto solo lo precarga.
   const descuentoCliente = cliente?.descuento ?? 0
+
+  // Avisos bajo el banner de una conversión: lo que el origen no copió (los
+  // cargos de una cotización de Ferretería) y, ya con el cliente cargado, su
+  // descuento fijo. La factura lo aplica igual que al elegirlo a mano, así que
+  // su total ya no es el de la cotización; mejor decirlo antes de emitir.
+  const avisosConversion = prefill?.origen
+    ? [
+        ...(prefill.avisos ?? []),
+        ...(descuentoCliente > 0
+          ? [`Se aplicó el descuento fijo del cliente (${descuentoCliente}%): el total difiere del de la cotización.`]
+          : []),
+      ]
+    : []
 
   /**
    * Elegir cliente arrastra sus condiciones comerciales al documento: su % de
@@ -584,10 +598,22 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       <div className="row between" style={{ marginBottom: 14 }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
         {prefill?.origen && (
-          <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
-            <Icon name="file-plus" size={15} />
-            Convertida desde la cotización {prefill.origen} · los precios ya traen ITBIS incluido
-          </span>
+          <div className="col" style={{ alignItems: 'flex-end', textAlign: 'right', gap: 4, minWidth: 0 }}>
+            {/* El texto de siempre mientras los precios traigan ITBIS (Gratex);
+                la de Ferretería los manda sin ITBIS y el banner lo dice. */}
+            <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
+              <Icon name="file-plus" size={15} />
+              {prefill.precioConItbis !== false
+                ? `Convertida desde la cotización ${prefill.origen} · los precios ya traen ITBIS incluido`
+                : `Convertida desde la cotización ${prefill.origen} · los precios no incluyen ITBIS (se suma encima)`}
+            </span>
+            {avisosConversion.map((a, i) => (
+              <span key={i} className="row gap-sm text-xs" style={{ color: 'var(--warning)' }}>
+                <Icon name="alert-triangle" size={13} />
+                {a}
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
