@@ -426,13 +426,18 @@ with the same rules. Every amount, including each sum, is rounded with `r2`: `Re
 `Redondeo::r(float $x, int $dec): float` copies `montosLinea.redondear` exactly:
 
 ```
-$v = (float) sprintf('%.15g', abs($x) * 10 ** $dec);   // like Number(x.toPrecision(15))
+$v = (float) sprintf('%.15h', abs($x) * 10 ** $dec);   // like Number(x.toPrecision(15))
 $r = round($v) / 10 ** $dec;                            // integer round, half away from zero
 return $x < 0 ? -$r : $r;
 ```
 
 - **Same result on every PHP version.** It gives PHP 8.3 results on 8.3 and 8.5 alike, so a local test
   agrees with production.
+- **Same result in every locale.** The format is `%h`, not `%g`: `h` is `g` with a fixed `.` decimal point
+  (PHP 8.0+). `%g` takes its decimal point from `LC_NUMERIC`, while the `(float)` cast always reads `.`, so
+  under a comma locale (`setlocale(LC_ALL, 'es_ES')`) `1525.5` would print as `1525,5`, the cast would read
+  `1525`, and rounding would turn into truncation (84.75 × 0.18 → 15.25). JS `toPrecision` ignores the
+  locale too, so `%h` is the faithful copy.
 - **Where it's used.** FerreteriaFormato uses it for every amount. Gratex code doesn't use it and isn't
   changed.
 - **Testing.** The CLI test compares it with fixed expectations such as 84.75 × 0.18 → 15.26, plus a
