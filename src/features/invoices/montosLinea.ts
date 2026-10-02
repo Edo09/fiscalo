@@ -14,6 +14,15 @@ export function itbisRate(ind: IndicadorFacturacion): number {
 }
 
 /**
+ * Deriva el indicador desde la tasa de ITBIS del producto (18→1, 16→2, resto→exento).
+ * Compartido: la factura y la cotización de Ferretería eligen el mismo
+ * indicador para el mismo producto.
+ */
+export function indFactFromItbis(itbis: number): IndicadorFacturacion {
+  return itbis === 18 ? 1 : itbis === 16 ? 2 : 4
+}
+
+/**
  * Redondeo a `dec` decimales, la mitad hacia arriba sobre el valor DECIMAL
  * (84.75 × 18% = 15.255 → 15.26). Math.round a secas redondea el binario
  * (15.254999… → 15.25). toPrecision(15) es el mismo "pre-redondeo" de round()

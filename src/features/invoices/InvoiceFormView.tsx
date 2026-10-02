@@ -26,7 +26,7 @@ import {
   facturaFormSchema, mapFormIssues, emptyFormErrors, type FacturaFormErrors, type ReferenciaNotaForm,
 } from './factura.schema'
 import { NotaReferencia } from './NotaReferencia'
-import { montosLinea, totalesDocumento } from './montosLinea'
+import { indFactFromItbis, montosLinea, totalesDocumento } from './montosLinea'
 import '@/styles/factura-doc.css'
 
 interface Linea {
@@ -137,11 +137,6 @@ function TipoDocSelect({
       )}
     </div>
   )
-}
-
-/** Deriva el indicador desde la tasa de ITBIS del producto (18→1, 16→2, resto→exento). */
-function indFactFromItbis(itbis: number): IndicadorFacturacion {
-  return itbis === 18 ? 1 : itbis === 16 ? 2 : 4
 }
 
 /**
