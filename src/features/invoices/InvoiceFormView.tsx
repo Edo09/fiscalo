@@ -667,9 +667,13 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                 {sinNumeros}
               </span>
             ) : rangoRestantes != null && rangoRestantes <= 10 ? (
-              <span className="fx-aviso">
-                <Icon name="alert-triangle" size={13} />
-                {`Quedan ${rangoRestantes} números en el rango autorizado por la DGII.`}
+              // Aviso, no error: todavía se puede emitir. El detalle va en el title.
+              <span
+                className="fx-aviso fx-aviso--alerta"
+                title="Quedan pocos números en el rango autorizado por la DGII. Registra el próximo en Configuración › Numeraciones e-CF."
+              >
+                <Icon name="alert-triangle" size={12} />
+                {rangoRestantes === 1 ? 'Queda 1 número' : `Quedan ${rangoRestantes} números`}
               </span>
             ) : (
               <span className="fx-aviso fx-aviso--suave">e-NCF automatico</span>

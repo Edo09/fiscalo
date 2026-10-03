@@ -782,6 +782,17 @@
 
 .fx-aviso--suave { color: var(--text-3); }
 
+/* Rango por agotarse: aviso amarillo en pastilla, como el numero de arriba.
+   El rojo queda para cuando ya no se puede emitir. */
+.fx-aviso--alerta {
+  gap: 5px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-radius: var(--r-full);
+  padding: 2px 9px;
+  font-weight: 500;
+}
+
 /* Condiciones del documento: metodo de pago y regimen de ITBIS. Van en una
    franja fina bajo el receptor, no en tarjetas: son parte de la factura. */
 .fx-cond {
