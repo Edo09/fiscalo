@@ -63,6 +63,14 @@ const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
 ]
 
 /**
+ * Tipos cuyo ITBIS no se elige: su XSD de la DGII admite una sola tasa (ver
+ * ECFXmlBuilder::TOTALES_CONFIG en el backend). El E44 (regímenes especiales)
+ * va exento y el E46 (exportaciones) a tasa cero; una línea al 18% en ellos
+ * la rechaza la DGII y el e-NCF queda gastado.
+ */
+const ITBIS_FIJO_POR_TIPO: Partial<Record<TipoEcf, IndicadorFacturacion>> = { '44': 4, '46': 3 }
+
+/**
  * Selector del tipo de comprobante, dibujado como el titulo del documento.
  * Reemplaza al <select> nativo porque su lista la pinta el sistema operativo y
  * no admite estilos. Cierra con Escape, clic fuera o al elegir; las flechas
@@ -381,24 +389,35 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     clearLineaErr(id)
   }
 
+  // En E44/E46 el ITBIS de todas las líneas lo fija el tipo. Se aplica al
+  // calcular y al emitir, sin tocar la línea: al volver a otro tipo, cada una
+  // recupera el ITBIS que tenía.
+  const itbisFijo = ITBIS_FIJO_POR_TIPO[tipo]
+  const indFactDe = (l: Linea): IndicadorFacturacion => itbisFijo ?? l.indFact
+
   // Montos con las reglas y redondeos del backend: los totales de pantalla son
   // el MontoTotal que se va a firmar, también con precios con ITBIS.
-  const calc = (l: Linea) => montosLinea(l, precioConItbis)
+  const calc = (l: Linea) => montosLinea({ ...l, indFact: indFactDe(l) }, precioConItbis)
   const {
     subtotal, itbis: itbisTotal, descuentos: descTotal, total,
   } = totalesDocumento(lineas.map(calc))
 
   // Las notas piden además el comprobante que modifican (bloque NotaReferencia).
+  // E41, E43 y E47 no van aquí: la empresa los emite como comprador, desde Gastos.
   const tipos: { code: TipoEcf; n: string }[] = [
     { code: '31', n: 'Crédito Fiscal' },
     { code: '32', n: 'Consumo' },
+    { code: '44', n: 'Régimen Especial' },
+    { code: '45', n: 'Gubernamental' },
+    { code: '46', n: 'Exportación' },
     { code: '34', n: 'Nota de Crédito' },
     { code: '33', n: 'Nota de Débito' },
   ]
-  // El RNC del comprador es obligatorio en el E31 (Crédito Fiscal) y lo exige la
-  // DGII en las notas que modifican uno. Se avisa en vez de bloquear: el usuario
+  // El RNC del comprador es obligatorio en el E31 (Crédito Fiscal), el E44
+  // (Régimen Especial) y el E45 (Gubernamental), y lo exige la DGII en las notas
+  // que modifican un Crédito Fiscal. Se avisa en vez de bloquear: el usuario
   // puede corregirlo sin salir de la factura.
-  const faltaRnc = cliente != null && !cliente.doc.trim() && ['31', '33', '34'].includes(tipo)
+  const faltaRnc = cliente != null && !cliente.doc.trim() && ['31', '33', '34', '44', '45'].includes(tipo)
 
   const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
   // Solo el crédito es TipoPago=2 ante DGII. Transferencia, tarjeta y cheque son
@@ -463,7 +482,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
         nombre_item: l.nombre.trim(),
         ...(l.descripcion.trim() ? { descripcion: l.descripcion.trim() } : {}),
-        indicador_facturacion: l.indFact,
+        indicador_facturacion: indFactDe(l),
         indicador_bien_servicio: l.tipoItem === 'Servicio' ? 2 : 1,
         // La misma cantidad con la que se calcularon los montos (a 2 decimales):
         // con la escrita, el XML y lo guardado podían no dar el MontoItem.
@@ -699,7 +718,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
               <Icon name="alert-triangle" size={13} />
               {tipo === '31'
                 ? `${cliente.nombre} no tiene RNC, y el Crédito Fiscal lo exige.`
-                : `${cliente.nombre} no tiene RNC. Si esta nota modifica un Crédito Fiscal, la DGII lo exige.`}
+                : tipo === '44'
+                  ? `${cliente.nombre} no tiene RNC, y el comprobante de Régimen Especial lo exige.`
+                  : tipo === '45'
+                    ? `${cliente.nombre} no tiene RNC, y el comprobante Gubernamental lo exige.`
+                    : `${cliente.nombre} no tiene RNC. Si esta nota modifica un Crédito Fiscal, la DGII lo exige.`}
               <button type="button" className="fx-link-btn" onClick={() => setRncModal(true)}>
                 Agregar RNC
               </button>
@@ -895,8 +918,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
                 <select
                   className="fx-tasa fx-cell" data-label="ITBIS"
-                  value={l.indFact}
+                  value={indFactDe(l)}
                   onChange={(e) => setIndFact(l.id, Number(e.target.value) as IndicadorFacturacion)}
+                  disabled={itbisFijo != null}
+                  title={tipo === '44' ? 'El Régimen Especial va exento de ITBIS.' : tipo === '46' ? 'La exportación va a tasa 0%.' : undefined}
                   aria-label={`ITBIS del ítem ${i + 1}`}
                 >
                   {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

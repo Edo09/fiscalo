@@ -525,6 +525,9 @@
 
 .fx-tasa:hover { border-color: var(--border-strong); }
 .fx-tasa:focus-visible { outline: none; border-color: var(--accent); }
+/* ITBIS fijado por el tipo (E44 exento, E46 tasa 0%): se lee, no se elige. */
+.fx-tasa:disabled { cursor: default; opacity: 1; color: var(--text-3); }
+.fx-tasa:disabled:hover { border-color: transparent; }
 
 .fx-add {
   display: inline-flex;
