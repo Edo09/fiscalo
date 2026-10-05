@@ -9,6 +9,10 @@
     printing change, and split the work into two releases.
   - **Approved by the user on 2026-10-05**, including the two open proposals: `MSG_TARDO_EMISION` instead of
     rewording `MSG_TARDO_ESCRITURA` (section 2), and the "Pendientes" filter name and meaning (risk 11).
+  - **Decision 7, taken by the user on 2026-10-05 after the approval:** "do not give the user the ability to send
+    a ecf again if it fails". The app never re-sends an e-CF. Re-sending the stored signed XML exists only in the
+    Release 2 support CLI, and unconfirmed invoices are resolved only by support (section 2, row 7). It overrides
+    the spec where they conflict, and every section below was updated to match.
   - Location: branch `feat/ecf-write-ahead` of `fiscalo`, rebased on `main` `a9bf56c`. It reaches `main` through the
     branch merge, as `2026-10-01-cotizacion-formatos-design.md` did (merge `1de819b`).
   - Next step: an implementation plan per release, starting with Release 1. Section 2.1 lists what changed in the
@@ -52,7 +56,8 @@ We want:
    - the number is never reused while the row is unresolved.
 3. Two releases, each deployable on its own:
    - **Release 1** guarantees that nothing is lost;
-   - **Release 2** adds self-service recovery (lookup in the DGII and a re-send of the stored XML).
+   - **Release 2** adds recovery: a read-only lookup in the DGII from the app, and a support CLI that alone can
+     re-send the stored XML (decision 7).
 
 ### Success criteria
 
@@ -76,8 +81,8 @@ We want:
   - the PDF and the receipt print exactly as today for every row.
 - **Release 1 alone satisfies every criterion above.** Every state it can create has a reader and a documented
   manual resolution (10.2).
-- **Release 2** resolves in-flight rows from the app (`GET /estado`, `POST /reenviar`) and from a CLI, using the
-  same ordering rules.
+- **Release 2** resolves in-flight rows from the app with a read-only lookup (`GET /estado`) and from a support CLI,
+  using the same ordering rules. Only the CLI re-sends the stored XML; the app never re-sends an e-CF (decision 7).
 
 ## 2. Decisions taken
 
@@ -89,6 +94,7 @@ We want:
 | 4 | Printing | **Printing stays exactly as today** ("stay as it is, do not show preview"). An in-flight row prints its PDF and receipt like any other row. There is no PREVIEW watermark, no blanking of `codigo_seguridad`, no hidden "Imprimir recibo" and no relabeled "Ver PDF". The trade-off is accepted (15.1). |
 | 5 | Releases | **Two releases, each deployable on its own.** Release 1 is the core that guarantees no loss; Release 2 is recovery. Every component is assigned in section 11. |
 | 6 | Testing | Local PHP has no `pdo_mysql`. DB tests run on a local MySQL scratch tenant or a staging tenant, **never production** (the frontend `.env` proxies to production). The DGII is mocked by a local PHP server (12.2). Production runs PHP 8.3. |
+| 7 | No resend from the app | **Taken on 2026-10-05, after the approval; it overrides the spec where they conflict.** The user: "do not give the user the ability to send a ecf again if it fails". Resending is removed from the app, and unconfirmed invoices are resolved only by support. There is no "Reenviar a la DGII" button, no frontend `reenviarFactura()`, no `POST /api/facturas/{id}/reenviar` endpoint (the existing route keeps answering 501 as today, `handleReenviar` at `facturaController.php:795-798`; it is not implemented) and no `puede_reenviar` field in any API response (Release 1 or 2). Re-sending the stored signed XML exists **only** in the support CLI `tools/ecf_en_vuelo.php --reenviar` (Release 2), through `EcfReconciliador::reenviar()`, with the same duplicate guard, lock and ordering rules (10.3). The read-only lookup stays in the app: `GET /api/facturas/{id}/estado` (the Release 2 full branch with the DGII lookup) and the "Verificar en la DGII" button. Notes that offered a re-send now send the user to support, for example `'La DGII no tiene registro de este comprobante. Avisa a soporte con el número E310000000123: no lo emitas de nuevo.'`. **Unchanged:** a pre-send failure (nothing reached the DGII, number returned) still lets the cashier retry; a DGII rejection can still be corrected and emitted again; the 502 incierto still keeps the form locked with "Ver factura". |
 
 Decisions taken while writing this spec. All stay within the decisions above except the second, which needs the
 user's confirmation:
@@ -190,7 +196,7 @@ It touches files this spec changes, so its line references are stale there. The 
 - **Consult and re-send.**
   - `GET /api/facturas/{id}/estado` answers 422 "Esta factura no se envió a la DGII…" for any non-RFCE row without
     a `track_id` (`facturaController.php:649-657`).
-  - `POST /api/facturas/{id}/reenviar` answers 501 (`:795-798`).
+  - `POST /api/facturas/{id}/reenviar` answers 501 (`:795-798`). It keeps doing so in both releases (decision 7).
   - Consult-time rollbacks pass no `rango_id` (`:685`, `:764`).
 - **Frontend.**
   - The emission `catch` only shows a toast and re-enables the form (`FE/src/features/invoices/InvoiceFormView.tsx:585-588`).
@@ -297,7 +303,7 @@ Column `facturas.estado_dgii VARCHAR(40) NOT NULL DEFAULT 'PENDIENTE'` (`tenant_
 |---|---|---|
 | `PENDIENTE` | nobody (DDL default only) | legacy |
 | **`PENDIENTE_ENVIO`** | `reservarFacturaECF` (hook `'reservar'`) | Row, signed XML, RFCE XML, e-NCF, `codigo_seguridad` and items committed. The send has not started, or the process died before `'confirmar'`/`'incierto'`. |
-| **`ENVIO_INCIERTO`** | `marcarEnvioIncierto` (hook `'incierto'`: the send threw, `'confirmar'` threw, or the shutdown registry ran). Release 2 adds: `GET /estado`, `/reenviar` and the CLI for a `PENDIENTE_ENVIO` older than 180 s; `/reenviar` for an `ENVIADO` row without `track_id`, before its re-send; and the reconciler after a re-send flagged as duplicate. | The DGII state is unknown. |
+| **`ENVIO_INCIERTO`** | `marcarEnvioIncierto` (hook `'incierto'`: the send threw, `'confirmar'` threw, or the shutdown registry ran). Release 2 adds: `GET /estado` and the CLI (`--verificar`, `--reenviar`) for a `PENDIENTE_ENVIO` older than 180 s; the CLI `--reenviar` for an `ENVIADO` row without `track_id`, before its re-send; and the reconciler after a CLI re-send flagged as duplicate. The app never re-sends (decision 7). | The DGII state is unknown. |
 | `ENVIADO` | `confirmarFacturaECF` (2xx without a verdict) | Received, no verdict. `track_id` may be NULL (2xx non-JSON). |
 | `EN_PROCESO`, `ACEPTADO`, `ACEPTADO_CONDICIONAL`, `RECHAZADO`, `NO_ENCONTRADO` | `confirmarFacturaECF`; `updateECFEstado` from the consult (`facturaController.php:664`); Release 2 reconciler | DGII state |
 | `ERROR` | `confirmarFacturaECF` (`mapEstado` fallback, `ECFEmissionService.php:668`) | Burned by design: not retryable (`:99`, `:511`). With `secuenciaUtilizada === false` the reclaim still reverts the counter (`:512`) and the next dispense skips the number. Unchanged. |
@@ -315,10 +321,10 @@ PENDIENTE_ENVIO ──[process dies and the shutdown write fails]──▶ stays
 PENDIENTE_ENVIO | ENVIO_INCIERTO ──[R1: support hand-off, 10.2]──▶ ENVIADO+track_id | RFCE_ENVIADO
                                                                  | NO_ENCONTRADO | RFCE_NO_ENCONTRADO
 ENVIADO+track_id NULL ──[R1: support hand-off, 10.2 first case]──▶ ENVIADO+track_id
-PENDIENTE_ENVIO (desde > 180 s) ──[R2: GET /estado, /reenviar, CLI]──▶ ENVIO_INCIERTO
-ENVIADO+track_id NULL ──[R2: /reenviar, before the re-send]──▶ ENVIO_INCIERTO
-ENVIO_INCIERTO | ENVIADO+track_id NULL ──[R2: EcfReconciliador lookup or re-send]──▶ any DGII state
-ENVIO_INCIERTO ──[R2: re-send answered RECHAZADO + secuenciaUtilizada=true]──▶ ENVIO_INCIERTO (duplicado_en_dgii)
+PENDIENTE_ENVIO (desde > 180 s) ──[R2: GET /estado, CLI --verificar / --reenviar]──▶ ENVIO_INCIERTO
+ENVIADO+track_id NULL ──[R2: CLI --reenviar, before the re-send]──▶ ENVIO_INCIERTO
+ENVIO_INCIERTO | ENVIADO+track_id NULL ──[R2: EcfReconciliador lookup (GET /estado, CLI) or CLI re-send]──▶ any DGII state
+ENVIO_INCIERTO ──[R2: CLI re-send answered RECHAZADO + secuenciaUtilizada=true]──▶ ENVIO_INCIERTO (duplicado_en_dgii)
 ENVIO_INCIERTO ──[R2: CLI --marcar NO_ENCONTRADO]──▶ NO_ENCONTRADO
 ENVIADO | EN_PROCESO | RFCE_* ──[existing consult + guarded first-acceptance stock move]──▶ DGII state
 RECHAZADO | RFCE_RECHAZADO | NO_ENCONTRADO | RFCE_NO_ENCONTRADO
@@ -451,7 +457,8 @@ and `reclamarSecuenciaSiNoUtilizada` use it.
 - `public function reenviarFirmado(string $xmlFirmado, string $ambiente, string $flujo): array`:
   - authenticates as `consultarEstado` does (`:547-552`), then calls `recibir()` or `recibirResumen()`, then
     `mapEstado`/`extractTrackId`;
-  - returns the `proyectarResultado` keys plus `rfce_response`. `estado` is prefixed for RFCE.
+  - returns the `proyectarResultado` keys plus `rfce_response`. `estado` is prefixed for RFCE;
+  - its only caller is `EcfReconciliador::reenviar()`, which only the support CLI reaches (decision 7).
 - `public function consultarTrackIds(string $eNcf, ?string $ambiente = null, ?string $rncEmisor = null): array`:
   - authenticates as `consultarEstado` does (`:534-560`);
   - delegates to `DgiiReceptionService::consultarTrackIds` and returns the normalized list.
@@ -601,7 +608,7 @@ reverts (`ECFEmissionService.php:511-512`), the retry dispenses the same number 
   The parentheses matter: without them the `OR` branch would match every `ENVIADO` row without `track_id`.
 - `marcarEnvioIncierto(int $id, array $ctx, bool $desdeEnviadoSinTrack = false)`. When true, the precondition is
   `WHERE id = :id AND (estado_dgii = 'PENDIENTE_ENVIO' OR (estado_dgii = 'ENVIADO' AND track_id IS NULL))`. Only
-  `reenviar` step 1 passes true (10.3).
+  `EcfReconciliador::reenviar` step 1 passes true (10.3); its only caller is the support CLI (decision 7).
 - `anotarEnvioIncierto(int $id, array $meta): bool`. It rewrites the JSON of an `ENVIO_INCIERTO` row: `intentos + 1`,
   `duplicado_en_dgii`, and the last error (≤ 2000 characters).
 - `getXmlFirmado(int $id): array` returns `['xml_firmado' => ?string, 'rfce_xml' => ?string]`. `getECFData` does not
@@ -688,8 +695,9 @@ reverts (`ECFEmissionService.php:511-512`), the retry dispenses the same number 
 **Release 2:**
 
 - `handleEstadoEnVuelo` delegates to `EcfReconciliador::verificar()` (10.3).
-- `handleReenviar` (`:795-798`) is implemented on `EcfReconciliador::reenviar()`. Permissions are unchanged: module
-  `facturas` (`API/config/permissions.php:90`).
+- `handleReenviar` (`:795-798`) is **not** implemented: `POST /api/facturas/{id}/reenviar` keeps answering 501 as
+  today (decision 7, 7.4). `EcfReconciliador::reenviar()` is reached only from the support CLI (10.4). Permissions
+  are unchanged: module `facturas` (`API/config/permissions.php:90`).
 
 ### 4.8 Other backend changes
 
@@ -804,11 +812,11 @@ reverts (`ECFEmissionService.php:511-512`), the retry dispenses the same number 
 | 14 | `'reservar'`: duplicate key, driver code 1062 (concurrent same number; or 027 missing, 6.2), or a deadlock (1213) twice | none | stays +1 | same as 13 | same as 13; a single deadlock is retried inside the model |
 | 15 | `'reservar'`: any other `PDOException` (outage; NOT NULL 1048 and FK 1452, which share SQLSTATE 23000 with 1062; lock wait; commit; or "Data too long" without 028, 6.2) or a non-PDO Throwable | none (the model rolls back on any Throwable) | −1 | 502 generic | retry when the DB is back; for 1452, reload the product list. **The 2026-10-05 class becomes "refused before send".** |
 | 16 | Process dies **inside** the reserve transaction before COMMIT | none (server-side rollback) | **+1, not restored**: the catch never runs | JSON 500 (`ErrorHandler.php:76-94`) | Same class as today's fatal inside the try. Visible only as a counter gap; documented exception to the invariant. |
-| 17 | The hook left a transaction open and the row survived the forced rollback | `PENDIENTE_ENVIO` | stays +1 | 502 incierto | R1: 10.2; R2: `/reenviar`. It is a bug to fix. |
+| 17 | The hook left a transaction open and the row survived the forced rollback | `PENDIENTE_ENVIO` | stays +1 | 502 incierto | R1: 10.2; R2: the 180 s rule and `GET /estado`, then support (`tools/ecf_en_vuelo.php`, 10.4). It is a bug to fix. |
 | 18 | The hook left a transaction open and the rollback erased the INSERT | none | −1 (`$reserva` reset, the catch restores) | 502 generic | bug fix; no phantom `factura_id` is ever returned |
-| 19 | Reserve OK, process crash before `recibir()` | `PENDIENTE_ENVIO` (or `ENVIO_INCIERTO` through the shutdown registry) | +1 | JSON 500 | R1: 10.2 (the DGII has nothing → `NO_ENCONTRADO`); R2: 180 s rule, then `/reenviar` |
+| 19 | Reserve OK, process crash before `recibir()` | `PENDIENTE_ENVIO` (or `ENVIO_INCIERTO` through the shutdown registry) | +1 | JSON 500 | R1: 10.2 (the DGII has nothing → `NO_ENCONTRADO`); R2: 180 s rule and `GET /estado`, then support: CLI `--reenviar` or `--marcar NO_ENCONTRADO` (10.4) |
 | 20 | `random_bytes` inside `recibir`/`recibirResumen` (`DgiiReceptionService.php:37`, `:79`) | `ENVIO_INCIERTO`, `fase_fallida = envio` (conservative) | +1 | 502 incierto | same as 19 |
-| 21 | **`curl_exec === false`** (timeout, DNS, TLS; `DgiiAuthService.php:389-393`) | `ENVIO_INCIERTO`, `fase_fallida = envio` | +1 (the DGII may have consumed it) | 502 incierto; the form offers "Ver factura" | R1: 10.2 lookup; R2: `GET /estado` (TrackIds) or `/reenviar` with the duplicate guard |
+| 21 | **`curl_exec === false`** (timeout, DNS, TLS; `DgiiAuthService.php:389-393`) | `ENVIO_INCIERTO`, `fase_fallida = envio` | +1 (the DGII may have consumed it) | 502 incierto; the form offers "Ver factura" | R1: 10.2 lookup; R2: `GET /estado` (TrackIds); without a record, support re-sends with the CLI `--reenviar` and its duplicate guard, or marks the row (10.4) |
 | 22 | 4xx/5xx without JSON (`DgiiAuthService.php:141-144`) | `ENVIO_INCIERTO` (error text ≤ 2000 characters; the summary is already ≤ 500, `:538-546`) | +1 | 502 incierto | same as 21 |
 | 23 | 2xx without JSON → `ENVIADO`, `track_id` NULL (`:150`, `ECFEmissionService.php:665-666`) | `ENVIADO` confirmed, `track_id` NULL | +1 | 200 "emitido (En proceso)" | `GET /estado` answers 200 with a note (R1), then support fills `track_id` (10.2); R2: TrackIds lookup |
 | 24 | `mapEstado` → `ERROR` (`:668`) | `ERROR` confirmed | +1; −1 when `secuenciaUtilizada === false` (`:512`), and the next dispense skips the number because `ERROR` is not retryable (unchanged) | 422 + `data` (`RFCE_ERROR`: 200, pre-existing) | unchanged; **inventory no longer moves** (`SIN_STOCK`) |
@@ -822,9 +830,9 @@ reverts (`ECFEmissionService.php:511-512`), the retry dispenses the same number 
 | 31 | Crash between the DGII answer and `'confirmar'` | `PENDIENTE_ENVIO`, or `ENVIO_INCIERTO` through the shutdown registry | +1 | JSON 500 | R1: 10.2 (the DGII has it: first case, or the RFCE case). R2: the 180 s rule, then `GET /estado` (TrackIds or the RFCE consult), then `aplicarVeredicto`. |
 | 32 | `registrarVenta` throws or moves 0 lines | final row intact | — | 200/422 | `error_log` (unchanged); never runs for a state in `SIN_STOCK` now |
 | 33 | HTTP response lost (frontend 90 s `FE/src/api/http.ts:22`, proxy 504) | the row in its true state | per outcome | **"…revisa el filtro Pendientes…"** (9.1) | visible under `pendiente` while there is no verdict, otherwise under its final state |
-| 34 | R2 `/reenviar` re-send answered `RECHAZADO` + `secuenciaUtilizada = true` | stays `ENVIO_INCIERTO`, `duplicado_en_dgii = true` | +1 | 200 `{accion:'duplicado_en_dgii', puede_reenviar:false, nota}` | support links the TrackId |
-| 35 | R2 `/reenviar` transport failure | `ENVIO_INCIERTO`, `intentos + 1` | +1 | 502 `'No se pudo verificar con la DGII. Inténtalo en unos minutos.'` | retry later |
-| 36 | R2 lookup unavailable (`certecf` 404, transport) | unchanged | — | 200, `puede_reenviar: true` + note | re-send with the duplicate guard |
+| 34 | R2 CLI `--reenviar`: the re-send answered `RECHAZADO` + `secuenciaUtilizada = true` | stays `ENVIO_INCIERTO`, `duplicado_en_dgii = true` | +1 | support only: the CLI prints `accion:'duplicado_en_dgii'` and its `nota`; the app shows that `nota` on the next `GET /estado` (10.3 step 6) | support links the TrackId |
+| 35 | R2 CLI `--reenviar` transport failure | `ENVIO_INCIERTO`, `intentos + 1` | +1 | support only: the CLI prints `'No se pudo verificar con la DGII. Inténtalo en unos minutos.'` | support retries later |
+| 36 | R2 lookup unavailable (`certecf` 404, transport) | unchanged | — | 200 `accion:'lookup_no_disponible'` + a note that sends the user to support (10.3) | support: the CLI re-send with the duplicate guard (10.4) |
 | 37 | Gastos emission (`gastoModel.php:316-352`) | unchanged (no hook) | unchanged | unchanged | section 14 |
 | 38 | Integration master backup (`integracionEcfController.php:112-126`) | unchanged | n/a | unchanged | unchanged |
 
@@ -936,7 +944,7 @@ answers 422 for a row that exists.
 
 ```json
 {"status":true,"data":{"factura_id":41,"e_ncf":"E310000000123","tipo_ecf":"31","track_id":null,
- "estado_dgii":"ENVIO_INCIERTO","secuencia_utilizada":null,"en_vuelo":true,"puede_reenviar":false,
+ "estado_dgii":"ENVIO_INCIERTO","secuencia_utilizada":null,"en_vuelo":true,
  "nota":"La DGII todavía no ha confirmado este comprobante. No lo emitas de nuevo; si sigue así en unos minutos, avisa a soporte con el número E310000000123."}}
 ```
 
@@ -946,18 +954,15 @@ answers 422 for a row that exists.
   `'La DGII recibió este comprobante, pero no devolvió su número de seguimiento y por eso no se puede consultar su estado desde aquí. Si necesitas confirmarlo, avisa a soporte con el número E310000000123.'`
 
 **Release 2:** the same shape, computed by `EcfReconciliador::verificar()`, plus `accion` and `consulta?`.
-`puede_reenviar` and `nota` follow 10.3.
+`nota` follows 10.3. No response carries a `puede_reenviar` field, in either release (decision 7).
 
-### 7.4 `POST /api/facturas/{id}/reenviar` (Release 2)
+### 7.4 `POST /api/facturas/{id}/reenviar`: not implemented (decision 7)
 
-| Case | HTTP | Body |
-|---|---|---|
-| Resolved (lookup or re-send) | 200 | `{status:true, data:{factura_id, e_ncf, tipo_ecf, track_id, estado_dgii, en_vuelo, puede_reenviar, accion, nota?}}` |
-| Duplicate detected | 200 | `accion:'duplicado_en_dgii'`, `puede_reenviar:false`, `nota` |
-| The row already has a DGII answer | 409 | `'Esta factura ya tiene respuesta de la DGII; consulta su estado.'` |
-| Lock held by another re-send | 409 | `'Ya hay un reenvío en curso para esta factura. Espera un momento.'` |
-| Transport failure | 502 | `'No se pudo verificar con la DGII. Inténtalo en unos minutos.'` |
-| Unknown id | 404 | `'No encontramos esta factura. Puede que ya no exista.'` (same text as `facturaController.php:643`) |
+The route keeps answering 501 as today (`handleReenviar`, `facturaController.php:795-798`) in both releases. The
+user decided that the app never re-sends an e-CF after a failure: an unconfirmed invoice is resolved only by
+support. The only re-send of the stored signed XML is the support CLI `tools/ecf_en_vuelo.php --reenviar`
+(Release 2, 10.4), which goes through `EcfReconciliador::reenviar()` with the duplicate guard, the lock and the
+ordering rules of 10.3.
 
 ## 8. Consumers of `estado_dgii`
 
@@ -988,7 +993,7 @@ answers 422 for a row that exists.
 | `tools/restore_facturas_e31_28_29.sql:52` | its `NOT EXISTS` skips an in-flight row | none |
 | `tools/consultar_ecf_dgii.php` | standalone | R2: requires `EcfConsultaDgii`; stays the support tool for rows that were never written |
 | `tools/check_estado_dgii_ancho.php` | does not know the new states | R1: also reads `EstadosEcf::EN_VUELO` and checks each against the column width |
-| Master `audit_logs` (`AuditLogModel.php:20-25`) | — | new rows: `EMIT success=0` (incierto, projected `new_values`) and `NCF_SEQUENCE_UPDATE success=0` (burn without a row) in R1; `STATUS_CHANGE` from `/estado`, `/reenviar` and the CLI in R2; the vocabulary is unchanged |
+| Master `audit_logs` (`AuditLogModel.php:20-25`) | — | new rows: `EMIT success=0` (incierto, projected `new_values`) and `NCF_SEQUENCE_UPDATE success=0` (burn without a row) in R1; `STATUS_CHANGE` from `GET /estado` and the CLI in R2; the vocabulary is unchanged |
 | Gastos (`gastoModel.php:382-408`, `inventoryModel.php:244-246`) | untouched | section 14 |
 
 ## 9. Frontend
@@ -997,7 +1002,7 @@ answers 422 for a row that exists.
 
 - **Types** (`FE/src/api/types.ts`):
   - `EstadoDgii` (`:24-34`) adds `'PENDIENTE_ENVIO' | 'ENVIO_INCIERTO'`.
-  - `EstadoData` (`:208`) adds `en_vuelo?: boolean`, `puede_reenviar?: boolean` and `nota?: string`.
+  - `EstadoData` (`:208`) adds `en_vuelo?: boolean` and `nota?: string`. There is no `puede_reenviar` (decision 7).
   - `FacturaEstadoFiltro` (`:182`) adds `'pendiente'`, and so does `FacturaEstadoUi` (`FE/src/stores/facturasList.ts:6`).
   - The default filter stays `'aprobado'` (`facturasList.ts:26`).
 - **Labels.** `DGII_LABEL`, `dgiiLabel` and `isRechazo` (`FE/src/api/mappers.ts:19-35`, `:46-48`) move to a new
@@ -1074,15 +1079,15 @@ answers 422 for a row that exists.
 
 ### 9.2 Release 2
 
-- **API.** `FE/src/api/facturas.ts` adds `reenviarFactura(id)` → `POST /api/facturas/{id}/reenviar` (write timeout
-  90 s, `http.ts:22`). `EstadoData` adds `accion?` and `consulta?`.
+- **API.** `EstadoData` adds `accion?` and `consulta?`. `FE/src/api/facturas.ts` gets no `reenviarFactura()`, and
+  nothing in the frontend calls `POST /api/facturas/{id}/reenviar` (decision 7).
 - **Detail.**
   - For an in-flight row, or `ENVIADO` without `track_id`, the band button "Actualizar" (`:224-226`) reads
-    "Verificar en la DGII".
-  - When `puede_reenviar`, a "Reenviar a la DGII" button calls `reenviarFactura`. On 200 it invalidates
-    `['facturas']` and reloads the state; on 409 or 502 it shows a toast with the server text.
+    "Verificar en la DGII". It only consults the state at the DGII; it never sends the e-CF.
+  - There is no "Reenviar a la DGII" button (decision 7). When the DGII has no record of the row, or the lookup is
+    unavailable, the reconciler `nota` tells the user to contact support and not to emit the invoice again.
   - The card shows the reconciler `nota` (10.3) in place of the Release 1 minimal-branch `nota` (7.3).
-- **Script.** `scripts/check-errores.ts` adds the Release 2 texts of 7.4 and 10.3.
+- **Script.** `scripts/check-errores.ts` adds the Release 2 notes of `verificar` (10.3).
 
 ## 10. Recovery and reconciliation
 
@@ -1129,22 +1134,24 @@ The procedure goes into `API/docs/integrations/dgii-ecf.md`, after the recovery 
    |---|---|
    | e-CF flow, the DGII has a trackId T | `UPDATE facturas SET estado_dgii = 'ENVIADO', track_id = :T WHERE id = :id AND (estado_dgii IN ('PENDIENTE_ENVIO','ENVIO_INCIERTO') OR (estado_dgii = 'ENVIADO' AND track_id IS NULL));` |
    | RFCE flow (`respuesta_dgii.flujo = 'RFCE'`) | `UPDATE facturas SET estado_dgii = 'RFCE_ENVIADO' WHERE id = :id AND estado_dgii IN ('PENDIENTE_ENVIO','ENVIO_INCIERTO');`. The RFCE consult uses the stored `codigo_seguridad` (`facturaController.php:719-738`). |
-   | The DGII has no record (`ecf`/`testecf`: no trackIds) | `UPDATE facturas SET estado_dgii = 'NO_ENCONTRADO' WHERE id = :id AND estado_dgii IN ('PENDIENTE_ENVIO','ENVIO_INCIERTO');`, then, with `rango_id` and `secuencia_valor` from the meta read in step 1, `UPDATE ncf_sequences SET current_value = current_value - 1 WHERE id = :rango_id AND current_value = :secuencia_valor;`. The user emits again: when the decrement affected 1 row, the next emission of that type reuses this e-NCF and the reserve archives this row as `NO_ENCONTRADO_ARCHIVADO` (10.1); with 0 rows affected the number stays a gap, as today's "rollback sin coincidencia", and the next emission takes a new number. |
+   | The DGII has no record (`ecf`/`testecf`: no trackIds) | `UPDATE facturas SET estado_dgii = 'NO_ENCONTRADO' WHERE id = :id AND estado_dgii IN ('PENDIENTE_ENVIO','ENVIO_INCIERTO');`, then, with `rango_id` and `secuencia_valor` from the meta read in step 1, `UPDATE ncf_sequences SET current_value = current_value - 1 WHERE id = :rango_id AND current_value = :secuencia_valor;`. Support then tells the user to emit again: when the decrement affected 1 row, the next emission of that type reuses this e-NCF and the reserve archives this row as `NO_ENCONTRADO_ARCHIVADO` (10.1); with 0 rows affected the number stays a gap, as today's "rollback sin coincidencia", and the next emission takes a new number. |
    | RFCE flow, and support already knows the DGII has no record of the RFCE (otherwise the hand-off above lets the RFCE consult decide) | `UPDATE facturas SET estado_dgii = 'RFCE_NO_ENCONTRADO' WHERE id = :id AND estado_dgii IN ('PENDIENTE_ENVIO','ENVIO_INCIERTO');`, then the same guarded `ncf_sequences` decrement as the case above. The retry archives the row as `RFCE_NO_ENCONTRADO_ARCHIVADO` (`REINTENTABLES`, 4.6). |
-   | `certecf` (ConsultaTrackIds answers 404 there) | Use the DGII certification portal to decide between the cases above. A wrong call in `certecf` has no fiscal effect. Release 2 adds the re-send with the duplicate guard. |
+   | `certecf` (ConsultaTrackIds answers 404 there) | Use the DGII certification portal to decide between the cases above. A wrong call in `certecf` has no fiscal effect. Release 2 adds the support CLI re-send with the duplicate guard (`tools/ecf_en_vuelo.php --reenviar`, 10.4); the app never re-sends (decision 7). |
 
    No `DELETE`, ever.
 
 ### 10.3 Release 2: `EcfReconciliador`
 
-New file `API/src/Utils/FacturacionElectronica/EcfReconciliador.php`, shared by the controller and the CLI:
+New file `API/src/Utils/FacturacionElectronica/EcfReconciliador.php`, shared by the controller and the CLI. The
+controller calls only `verificar` (`GET /estado`). `reenviar` has a single caller, `tools/ecf_en_vuelo.php --reenviar`
+(10.4): the app never re-sends (decision 7).
 
 ```php
 public function __construct(facturaModel $model, ?ECFEmissionService $service = null, ?inventoryModel $inventario = null, int $graciaSegundos = 180)
 public function verificar(int $facturaId): array   // read-only against the DGII; may UPDATE our row (and revert the counter) when the DGII has a verdict
-public function reenviar(int $facturaId): array    // verificar() first, then a re-send of the stored XML with the duplicate guard
+public function reenviar(int $facturaId): array    // CLI only (decision 7): verificar() first, then a re-send of the stored XML with the duplicate guard
 // both return ['accion' => 'en_curso'|'trackids'|'consulta_rfce'|'reenvio'|'duplicado_en_dgii'|'sin_registro'|'lookup_no_disponible',
-//              'estado_dgii', 'track_id', 'en_vuelo' => bool, 'puede_reenviar' => bool, 'nota' => string, 'consulta' => ?array]
+//              'estado_dgii', 'track_id', 'en_vuelo' => bool, 'nota' => string, 'consulta' => ?array]
 private function aplicarVeredicto(array $ecf, array $meta, array $result): void
 ```
 
@@ -1168,7 +1175,7 @@ caller **before** any UPDATE.
    JSON gives `[]`.
 1. **Young `PENDIENTE_ENVIO`.** When `$meta['desde']` is younger than 180 s (6× the 30 s DGII timeout; server time;
    a row without `desde` counts as old), return
-   `{accion:'en_curso', en_vuelo:true, puede_reenviar:false, nota:'El envío a la DGII está en curso. Vuelve a verificar en unos minutos.'}`
+   `{accion:'en_curso', en_vuelo:true, nota:'El envío a la DGII está en curso. Vuelve a verificar en unos minutos.'}`
    without calling the DGII. When it is older, call
    `marcarEnvioIncierto($id, $meta + ['fase_fallida' => 'huerfano', 'clase' => 'huerfano', 'error' => 'sin respuesta tras 180 s', 'resultado_parcial' => null])`,
    so the stored JSON keeps every 6.3 key (`rango_id`, `secuencia_valor`, `ambiente_secuencia`, `flujo`, `desde`),
@@ -1179,7 +1186,7 @@ caller **before** any UPDATE.
    - A verdict other than `NO_ENCONTRADO`: `aplicarVeredicto` with `estado = 'RFCE_' . X`, then
      `{accion:'consulta_rfce', en_vuelo:false}`.
    - `NO_ENCONTRADO` or no verdict:
-     `{accion:'sin_registro', puede_reenviar:true, nota:'La DGII no tiene registro de este comprobante. Puedes reenviarlo con el mismo número.'}`.
+     `{accion:'sin_registro', nota:'La DGII no tiene registro de este comprobante. Avisa a soporte con el número {e_ncf}: no lo emitas de nuevo.'}`.
 3. **e-CF row with `ambiente_dgii` in {`ecf`, `testecf`}.** Call `consultarTrackIds(e_ncf, ambiente)`.
    - **At least one trackId:** take the newest by `fechaRecepcion` and call
      `consultarEstado(trackId, e_ncf, ambiente)` (`ECFEmissionService.php:534-560`). TrackIds gives the date only
@@ -1189,29 +1196,34 @@ caller **before** any UPDATE.
      when that gives nothing (`$elegido` is the trackId entry chosen above). Then `aplicarVeredicto`, which includes the conditional revert, and
      `{accion:'trackids', en_vuelo:false}`.
    - **No trackIds** (a 404 ProblemDetails included):
-     `{accion:'sin_registro', puede_reenviar:true, nota:'La DGII no tiene registro de este comprobante. Puedes reenviarlo con el mismo número.'}`.
+     `{accion:'sin_registro', nota:'La DGII no tiene registro de este comprobante. Avisa a soporte con el número {e_ncf}: no lo emitas de nuevo.'}`.
 4. **e-CF row in `certecf`:**
-   `{accion:'lookup_no_disponible', puede_reenviar:true, nota:'En certificación la DGII no permite buscar por número; puedes reenviar (si ya lo tiene, lo detectamos).'}`.
+   `{accion:'lookup_no_disponible', nota:'En certificación la DGII no permite buscar este comprobante por número. Avisa a soporte con el número {e_ncf}: no lo emitas de nuevo.'}`.
 5. **Any Throwable in 2–3:** `anotarEnvioIncierto(intentos + 1, error)`, then
-   `{accion:'lookup_no_disponible', puede_reenviar:true, nota:'No se pudo verificar en la DGII en este momento.'}`.
-   Never a dead end: the re-send carries the duplicate guard.
+   `{accion:'lookup_no_disponible', nota:'No se pudo verificar en la DGII en este momento. No lo emitas de nuevo; vuelve a verificar en unos minutos y, si sigue así, avisa a soporte con el número {e_ncf}.'}`.
+   Never a dead end: the user can verify again, and support resolves the row with the CLI (10.4), whose re-send
+   carries the duplicate guard. The app offers no re-send (decision 7).
 6. **Row flagged `duplicado_en_dgii`:**
-   `{accion:'duplicado_en_dgii', puede_reenviar:false, nota:'La DGII ya tiene este comprobante; soporte debe vincular el número de seguimiento.'}`.
+   `{accion:'duplicado_en_dgii', nota:'La DGII ya tiene este comprobante; soporte debe vincular el número de seguimiento.'}`.
 
-**`reenviar($id)`** (`POST /reenviar`, the button or the CLI):
+In these notes `{e_ncf}` is the row's e-NCF, as in the 9.1 card text. No result carries a `puede_reenviar` key
+(decision 7).
+
+**`reenviar($id)`** (support CLI `tools/ecf_en_vuelo.php --reenviar` only; decision 7). Each refusal below is a text
+the CLI prints before it exits with a non-zero code; no HTTP endpoint returns it:
 
 1. **Allowed rows:** `ENVIO_INCIERTO`; `PENDIENTE_ENVIO` only when `desde` is older than 180 s (flipped to
    `ENVIO_INCIERTO` first, as in `verificar` step 1); `ENVIADO AND track_id IS NULL` for a non-RFCE row, flipped to
    `ENVIO_INCIERTO` first with the compare-and-set
    `marcarEnvioIncierto($id, $meta + ['fase_fallida' => 'reenvio', 'clase' => 'reenvio', 'error' => 'reenvio de un ENVIADO sin track_id', 'resultado_parcial' => null], true)`
-   (4.6), so that the duplicate guard of step 4 can store its flag on it. Anything else gets 409
+   (4.6), so that the duplicate guard of step 4 can store its flag on it. Anything else is refused with
    `'Esta factura ya tiene respuesta de la DGII; consulta su estado.'`.
 2. **Lock:** `SELECT GET_LOCK(CONCAT(DATABASE(), ':ecf_reenvio_', :id), 5)`, following the precedent at
-   `facturaModel.php:563-583`. When the result is 0 or NULL, answer 409
+   `facturaModel.php:563-583`. When the result is 0 or NULL, refuse with
    `'Ya hay un reenvío en curso para esta factura. Espera un momento.'`. Re-read `$ecf` and `$meta` under the lock,
    before any UPDATE, and read the stored XML with `getXmlFirmado($id)` (4.6). Release the lock in `finally`.
-3. **`verificar($id)` first.** This makes a double click safe once the DGII has the e-CF: a resolved row is returned
-   as is, with no re-send.
+3. **`verificar($id)` first.** This makes a repeated or concurrent CLI run safe once the DGII has the e-CF: a
+   resolved row is returned as is, with no re-send.
 4. **Re-send:** `reenviarFirmado($xml['xml_firmado'] or $xml['rfce_xml'], ambiente_dgii, flujo)` (`$xml` from
    step 2), then:
    - **Duplicate guard (unconditional).** A state in {`RECHAZADO`, `RFCE_RECHAZADO`} with
@@ -1220,7 +1232,7 @@ caller **before** any UPDATE.
      `STATUS_CHANGE` audit row with the description "duplicado en DGII" and answer `accion:'duplicado_en_dgii'`.
      Such a row is never confirmed as `RECHAZADO` and never re-sent again.
    - **Otherwise** `aplicarVeredicto($ecf, $meta, $result)`, then `{accion:'reenvio', en_vuelo:false, estado_dgii, track_id}`.
-   - **Transport failure:** `anotarEnvioIncierto(intentos + 1, error)`, then 502
+   - **Transport failure:** `anotarEnvioIncierto(intentos + 1, error)`, then refuse with
      `'No se pudo verificar con la DGII. Inténtalo en unos minutos.'`.
 
 ### 10.4 Release 2: `tools/ecf_en_vuelo.php`
@@ -1236,7 +1248,9 @@ php tools/ecf_en_vuelo.php --tenant=<id|rnc> [--ambiente=] --listar
 ```
 
 - **`--listar`** prints `getEnVuelo`; it shows `legacy` when `metaEnvio` is empty.
-- **`--verificar` / `--reenviar`** go through `EcfReconciliador`.
+- **`--verificar` / `--reenviar`** go through `EcfReconciliador`. `--reenviar` is the only way to re-send a stored
+  XML (decision 7). Support runs it after `--verificar` found no record (`sin_registro`) or could not look the
+  number up (`lookup_no_disponible`, `certecf` included).
 - **`--marcar NO_ENCONTRADO`:**
   - It needs a lookup in the same run that found 0 trackIds (`ecf`/`testecf`), or `--forzar` (`certecf`).
   - It reads the meta first, marks the row, then calls `rollbackECFSequence` with the meta (conditional; legacy
@@ -1255,7 +1269,7 @@ php tools/ecf_en_vuelo.php --tenant=<id|rnc> [--ambiente=] --listar
 
 - the emitting request (`'confirmar'`, `'incierto'`, the shutdown registry);
 - the manual hand-off of 10.2 (R1);
-- `GET /estado`, `POST /reenviar` and `tools/ecf_en_vuelo.php` (R2).
+- `GET /estado` and `tools/ecf_en_vuelo.php` (R2); only the CLI re-sends (decision 7).
 
 **Stock moves** at most once per factura id, after a DGII answer outside `EstadosEcf::SIN_STOCK`. The places are
 the emitting request, `handleConsultarEstado[RFCE]` and the R2 reconciler; all of them check `yaMovioDocumento`
@@ -1281,14 +1295,14 @@ rejection does not reverse it.
 | Frontend: `EstadoDgii`/`EstadoData`/filter types; `estadosDgii.ts` labels (incl. RFCE/`ERROR`/archived/truncated/legacy `PENDIENTE`); Badge tones; `errores.ts` whitelist + `MSG_TARDO_EMISION` + `textoServidor`; "Pendientes" filter, KPI and chip; "Sin confirmar" KPI on the e-CF dashboard; 502 toast with "Ver factura" and the locked form; detail card (with the 7.3 `nota`), `estado.error`, footer; `scripts/check-errores.ts`; `cache.ts` comment; `docs/database-structure.md` | 1 |
 | Tests: release-gate check (12.0), `tools/test_write_ahead_puro.php`, `tools/mock_dgii.php`, `tools/test_write_ahead_ecf.php`, `tools/test_reservar_confirmar.php`, `tests/test_facturas_write_ahead.http` (R1 scenarios), the first two bullets of the staging run (12.3.8: emission and forced failure) | 1 |
 | `EcfConsultaDgii` (pure functions moved under the names of 4.8, plus `mapEstadoConsulta` and `normalizarSecuenciaUtilizada` from `facturaController`; the tool and the controller keep wrappers) | 2 |
-| `DgiiReceptionService::consultarTrackIds`; `ECFEmissionService::consultarTrackIds`, `reenviarFirmado` | 2 |
-| `EcfReconciliador` (`verificar`, `reenviar`, `aplicarVeredicto`) | 2 |
+| `DgiiReceptionService::consultarTrackIds`; `ECFEmissionService::consultarTrackIds`, `reenviarFirmado` (reached only through the CLI, decision 7) | 2 |
+| `EcfReconciliador` (`verificar`, `reenviar`, `aplicarVeredicto`); `reenviar` has the CLI as its only caller | 2 |
 | `facturaModel`: `confirmarFacturaECF(..., $desdeReconciliacion)`, `marcarEnvioIncierto(..., $desdeEnviadoSinTrack)`, `anotarEnvioIncierto`, `getEnVuelo`, `getXmlFirmado`, `getECFData` columns | 2 |
-| Full in-flight branch of `GET /estado` with the 180 s orphan rule; `POST /api/facturas/{id}/reenviar` | 2 |
-| `tools/ecf_en_vuelo.php` | 2 |
-| Frontend: "Verificar en la DGII", "Reenviar a la DGII", `reenviarFactura`, reconciler `nota` | 2 |
-| Docs: `docs/api/facturas.md` (`POST /api/facturas/{id}/reenviar` in the endpoint table at `:51`; the 7.3/7.4 shapes in the section at `:116`); `docs/integrations/dgii-ecf.md` (`tools/ecf_en_vuelo.php` becomes the first resort, and the 10.2 SQL stays as the fallback); `docs/modules/auditoria.md` (`STATUS_CHANGE` from `/estado`, `/reenviar` and the CLI) | 2 |
-| Tests: reconciler scenarios and `--conciliar` mode (12.3.6), `.http` re-send (12.3.7), the Release 2 bullets of the staging run with the real DGII (12.3.8) | 2 |
+| Full in-flight branch of `GET /estado` with the 180 s orphan rule. `POST /api/facturas/{id}/reenviar` is not implemented and keeps answering 501 (7.4, decision 7). | 2 |
+| `tools/ecf_en_vuelo.php` (its `--reenviar` is the only re-send) | 2 |
+| Frontend: "Verificar en la DGII" and the reconciler `nota`. No "Reenviar a la DGII" button and no `reenviarFactura` (decision 7). | 2 |
+| Docs: `docs/api/facturas.md` (the endpoint table at `:51` states that `POST /api/facturas/{id}/reenviar` answers 501 and is not planned, decision 7; the 7.3 shapes in the section at `:116`); `docs/integrations/dgii-ecf.md` (`tools/ecf_en_vuelo.php` becomes the first resort and its `--reenviar` the only re-send; the 10.2 SQL stays as the fallback); `docs/modules/auditoria.md` (`STATUS_CHANGE` from `GET /estado` and the CLI) | 2 |
+| Tests: reconciler scenarios and `--conciliar` mode (12.3.6), `.http` checks that `POST /reenviar` still answers 501 plus the CLI re-send (12.3.7), the Release 2 bullets of the staging run with the real DGII (12.3.8) | 2 |
 
 **Release 1 stands on its own:**
 
@@ -1301,8 +1315,8 @@ rejection does not reverse it.
 | `RFCE_NO_ENCONTRADO` (row 26a, 10.2) | list, under "Todos" (label "Pendiente", risk 11) | retryable (4.6): when the counter was reverted, the next emission reuses the number and archives the row; otherwise the number stays a gap |
 | DGII states, `*_ARCHIVADO` | unchanged | unchanged |
 
-Release 2 does not change any table or any Release 1 response shape. It only adds keys (`accion`, `consulta`) and
-makes `puede_reenviar` true when allowed.
+Release 2 does not change any table or any Release 1 response shape. It only adds keys (`accion`, `consulta`) to
+`GET /estado`; neither release has a `puede_reenviar` key (decision 7).
 
 ## 12. Testing
 
@@ -1481,8 +1495,8 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
    | any, fresh `PENDIENTE_ENVIO` | `accion:'en_curso'`; no request in the mock log; row unchanged |
    | any, `PENDIENTE_ENVIO` older than 180 s | flipped to `ENVIO_INCIERTO` with `fase_fallida:'huerfano'`, the 6.3 meta keys kept, and one `STATUS_CHANGE` audit row; then handled as `ENVIO_INCIERTO` |
    | RFCE row, consultarfce Aceptado | `accion:'consulta_rfce'`, `RFCE_ACEPTADO`, stock moved once |
-   | RFCE row, consultarfce without a record | `accion:'sin_registro'` with its `nota`, `puede_reenviar` |
-   | `trackids_vacio` | `sin_registro`, `puede_reenviar` |
+   | RFCE row, consultarfce without a record | `accion:'sin_registro'` with its support `nota` (10.3 step 2); no `puede_reenviar` key |
+   | `trackids_vacio` | `sin_registro` with its support `nota`; no `puede_reenviar` key |
    | `trackids_uno` | `trackids`, row confirmed, stock moved once |
    | `trackids_rechazado` | row `RECHAZADO`; `rollbackECFSequence` called after the UPDATE with the meta's `rango_id`, counter −1. On the legacy row: called with `rango_id = null` and type+ambiente. |
    | `trackids_404` | `lookup_no_disponible` |
@@ -1490,12 +1504,17 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
    | `reenviar` of the `ENVIADO` + NULL row + `rechaza_usada` | flipped to `ENVIO_INCIERTO` before the re-send, then `duplicado_en_dgii` stored; a second `reenviar` sends nothing |
    | `reenviar` + `rechaza` | `RECHAZADO`, counter −1, the spy gets `secuencia_valor` from the meta read before the UPDATE |
    | `reenviar` + `acepta` | confirmed, exactly one inventory row |
-   | Two concurrent `reenviar` calls | one 409 |
+   | Two concurrent `reenviar` calls | one refused with `'Ya hay un reenvío en curso para esta factura. Espera un momento.'` |
    | `--marcar NO_ENCONTRADO` without a lookup in the same run | refused |
 
-   `tools/test_consultar_ecf_dgii.php` still passes after the move to `EcfConsultaDgii`.
-7. **`tests/test_facturas_write_ahead.http`**: switch the mock to `acepta`, then `POST /{id}/reenviar` → 200
-   `ACEPTADO`. Repeat → 409.
+   `reenviar` is called on the reconciler directly, as `tools/ecf_en_vuelo.php --reenviar` does; no app endpoint
+   reaches it (decision 7). `tools/test_consultar_ecf_dgii.php` still passes after the move to `EcfConsultaDgii`.
+7. **`tests/test_facturas_write_ahead.http`** and the CLI:
+   - **No re-send from the app** (decision 7): `POST /{id}/reenviar` on an in-flight row → 501, as today; the row is
+     unchanged and the mock log has no `Recepcion`/`RecepcionFC` request. `GET /{id}/estado` with the mock in
+     `trackids_vacio` → 200 `accion:'sin_registro'` with the support `nota` and no `puede_reenviar` key.
+   - **Support re-send:** switch the mock to `acepta`, then `php tools/ecf_en_vuelo.php --tenant= --reenviar --id=`
+     → `ACEPTADO`. Repeat → refused with `'Esta factura ya tiene respuesta de la DGII; consulta su estado.'`.
 8. **Staging tenant (`certecf`, the real DGII):**
    - Emit E31, E32 on both sides of 250k, and an E34 for an accepted E31. Run before and after:
      `SELECT id, e_ncf, estado_dgii, track_id, secuencia_utilizada, ambiente_dgii, LENGTH(xml_firmado), LENGTH(respuesta_dgii) FROM facturas ORDER BY id DESC LIMIT 5`.
@@ -1505,8 +1524,9 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
      `DGII_ECF_BASE_URL` instead would break the seed requests inside the rollback-protected try
      (`DgiiAuthService.php:26-27`, `:59-60`; `ECFEmissionService.php:354-358`): no row, a generic 502. Restore the URL.
    - **Recovery** (Release 2): `GET /estado` → the RFCE branch of 10.3 step 2 (`sin_registro`, since the RFCE never
-     arrived; `lookup_no_disponible` if the RFCE consult itself fails); `POST /reenviar` → a real answer with the
-     stored RFCE XML. This also tests whether the DGII tolerates a re-sent `FechaHoraFirma`.
+     arrived; `lookup_no_disponible` if the RFCE consult itself fails); then support runs
+     `php tools/ecf_en_vuelo.php --tenant= --reenviar --id=` → a real answer with the stored RFCE XML (the app
+     offers no re-send, decision 7). This also tests whether the DGII tolerates a re-sent `FechaHoraFirma`.
    - **Field names:** the TrackIds and ConsultaResultado field names were already observed in production on
      2026-10-05 with the `db91ecf` tool (`docs/integrations/dgii-ecf.md:122-124`, `:133-134`), and
      `tools/test_consultar_ecf_dgii.php` holds those real answers. Recheck read-only on a `testecf` tenant only if
@@ -1524,8 +1544,9 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
     `facturaController.php`.
   - The same holds for `'No se pudo asignar el número de comprobante. Inténtalo de nuevo.'` and for
     `'No se pudo calcular el total de la factura. Revisa las líneas e inténtalo de nuevo.'` (422).
-  - `clasificar()` returns `null` for both 7.3 notes, the 9.1 card text and footer, and, in Release 2, every note
-    and error of 7.4 and 10.3.
+  - `clasificar()` returns `null` for both 7.3 notes, the 9.1 card text and footer, and, in Release 2, every `nota`
+    of `verificar` (10.3). The refusal texts of `reenviar` are CLI output only (decision 7) and are not checked
+    there.
   - `networkError(new DOMException('', 'TimeoutError'), { metodo: 'POST', path: '/api/facturas' }).message ===`
     the `MSG_TARDO_EMISION` text, while the same call with `path: '/api/clients'` still gives the old
     `MSG_TARDO_ESCRITURA` text.
@@ -1536,7 +1557,8 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
   - the "Pendientes" filter, KPI and chip, and the "Sin confirmar" KPI of the e-CF dashboard;
   - the 502 toast with "Ver factura" and the locked form;
   - the detail card, the note, the footer, and the unchanged print buttons;
-  - Release 2: "Verificar en la DGII" and "Reenviar a la DGII".
+  - Release 2: "Verificar en la DGII" and its support notes, and no "Reenviar a la DGII" button on any row,
+    whatever the state (decision 7).
 
 ## 13. Rollout
 
@@ -1583,7 +1605,9 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
 
 1. **Deploy the API, then the frontend.** No DDL; the gate of 13.1 still holds.
 2. **Smoke on staging:** one forced transport failure, made as in 12.3.8 (an E32 < 250k with
-   `DGII_FC_BASE_URL=https://127.0.0.1:9`, so authentication still works), then `GET /estado` and `POST /reenviar`.
+   `DGII_FC_BASE_URL=https://127.0.0.1:9`, so authentication still works), then `GET /estado` from the app and
+   `php tools/ecf_en_vuelo.php --tenant= --reenviar --id=` by support. Confirm that `POST /api/facturas/{id}/reenviar`
+   still answers 501 and that the detail view has no "Reenviar a la DGII" button (decision 7).
 3. **Production:** run `php tools/ecf_en_vuelo.php --tenant= --listar` once per tenant and resolve what it lists.
 
 **Rollback of Release 2:** go back to the Release 1 build. The rows are the same, and 10.2 applies again.
@@ -1639,11 +1663,13 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
 4. **ConsultaTrackIds (R2).** The route and the normalization come from the `d5cc063`/`db91ecf` tool and are
    unit-tested; TrackIds and ConsultaResultado answered in production on 2026-10-05
    (`docs/integrations/dgii-ecf.md:133-134`). By DGII design they answer 404 in `certecf`
-   (`tools/consultar_ecf_dgii.php:24-26`), so certifying tenants recover only through the re-send and its duplicate
-   guard. TrackIds gives `fechaRecepcion` without the time (`dgii-ecf.md:122`), so "newest" falls back to
-   ConsultaResultado when two trackIds share a date (10.3 step 3).
-5. **Re-sending a stored XML later (R2).** The DGII may reject on `FechaHoraFirma` plausibility. A rejection with
-   `secuenciaUtilizada = false` frees the number correctly, but the user must emit again.
+   (`tools/consultar_ecf_dgii.php:24-26`), so certifying tenants recover only through support: the CLI re-send and
+   its duplicate guard (10.4), or the certification portal (10.2). The app never re-sends (decision 7). TrackIds
+   gives `fechaRecepcion` without the time (`dgii-ecf.md:122`), so "newest" falls back to ConsultaResultado when two
+   trackIds share a date (10.3 step 3).
+5. **Re-sending a stored XML later (R2, support CLI only, decision 7).** The DGII may reject on `FechaHoraFirma`
+   plausibility. A rejection with `secuenciaUtilizada = false` frees the number correctly, but the user must emit
+   again; correcting and emitting again after a DGII rejection stays allowed. Only support can trigger the re-send.
 6. **Ambiente divergence.** `$ambienteEarly` (`ECFEmissionService.php:186`) can differ from the token ambiente
    (`:372`): through the forwarded `input.ambiente` (`facturaController.php:349`), or with nothing configured
    (`certecf` dispense vs `DgiiAuthService.php:10` `testecf`). The reserve logs it, and an "occupied" result costs
@@ -1656,7 +1682,8 @@ The archive overflow at reserve time without 028 is tested at model level (12.3.
    - The 180 s grace is an estimate (6× the DGII timeout). A slower original request would race the reconciler; the
      compare-and-set makes the outcome consistent (one `CONFIRM_RACE` line).
 9. **Double emission after a 502 incierto** stays possible by deliberate action: the user leaves the locked form and
-   emits again with a new number. The UX makes the first row visible.
+   emits again with a new number. The UX makes the first row visible. The app offers no re-send of that row
+   (decision 7): its notes say not to emit it again and to contact support, who resolves it with the CLI.
 10. **`dispenseNextECF` now throws.** On a DB outage, gastos get a generic error instead of the misleading "Se
     acabaron los números". The only caller is the service (grep).
 11. **`'pendiente'` means "sin veredicto de la DGII"**: `PENDIENTE_ENVIO`, `ENVIO_INCIERTO`, `ENVIADO`,
