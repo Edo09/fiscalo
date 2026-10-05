@@ -96,6 +96,37 @@ export interface Factura {
   trackId?: string | null
   codigoSeguridad?: string | null
   estadoDgiiRaw?: string | null
+  /** Notas E33/E34 que modifican esta factura (vacío si no tiene). */
+  notas?: NotaVinculada[]
+  /** En una nota E33/E34: el comprobante que modifica. */
+  modifica?: ComprobanteModificado | null
+  /** En una nota E33/E34: su código de modificación DGII ('1' = anula…). */
+  codigoModificacion?: string | null
+  /** En una nota E33/E34: e-NCF del comprobante que modifica. */
+  ncfModificado?: string | null
+}
+
+/** Nota de crédito (E34) o débito (E33) que modifica una factura. */
+export interface NotaVinculada {
+  id: number
+  ncf: string
+  /** '33' | '34' */
+  tipo: string
+  codigoModificacion: string | null
+  /** Total de la nota, positivo como se guarda (ver conSigno). */
+  total: number
+  estadoDgii: string
+  /** Fecha tal como la manda la API (formatApiDate para mostrarla). */
+  fecha: string | null
+}
+
+/** Comprobante que modifica una nota. id/tipo/total null: no está en Fiscalo (NCF de papel). */
+export interface ComprobanteModificado {
+  id: number | null
+  ncf: string
+  tipo: string | null
+  total: number | null
+  fecha: string | null
 }
 
 export interface FacturaLinea {

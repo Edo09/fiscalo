@@ -2,6 +2,7 @@
 import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserRow } from './types'
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { aNumero, colorFor } from '@/lib/format'
+import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
 export function formatApiDate(value?: string | null): string {
@@ -69,6 +70,11 @@ export function mapFacturaRow(r: FacturaRow): Factura {
     trackId: r.track_id ?? null,
     codigoSeguridad: r.codigo_seguridad ?? null,
     estadoDgiiRaw: (r.estado_dgii as EstadoDgii | null) ?? null,
+    // Notas E33/E34 que la modifican y, en una nota, lo que modifica.
+    notas: notasDeFila(r),
+    modifica: modificaDeFila(r),
+    codigoModificacion: r.codigo_modificacion ?? null,
+    ncfModificado: r.ncf_modificado ?? null,
   }
 }
 

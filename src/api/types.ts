@@ -92,6 +92,47 @@ export interface FacturaRow {
    * filas viejas ya no guardan (ver InvoiceDetailView).
    */
   xml_firmado?: string | null
+  /** Notas E33/E34: e-NCF del comprobante que modifican (InformacionReferencia). */
+  ncf_modificado?: string | null
+  /** Notas E33/E34: 1=Anula, 2=Corrige texto, 3=Corrige montos, 4=Reemplazo de contingencia, 5=Ref. factura de consumo. */
+  codigo_modificacion?: string | null
+  /**
+   * Notas (E33/E34, no rechazadas, mismo ambiente) que modifican esta fila, por
+   * id ascendente. En el listado y en el detalle; [] si no tiene. Opcional: un
+   * backend anterior no lo trae. Leer con notasDeFila (features/invoices/notasVinculadas).
+   */
+  notas?: FacturaNotaRow[] | null
+  /**
+   * En una nota E33/E34: el comprobante que modifica. null en las demás filas.
+   * Leer con modificaDeFila (features/invoices/notasVinculadas).
+   */
+  modifica?: FacturaModificaRow | null
+}
+
+/**
+ * Nota que modifica una factura (campo `notas` de GET /api/facturas). PDO manda
+ * el id y el total como texto ("82200.00"): convertir con Number().
+ */
+export interface FacturaNotaRow {
+  id: number | string
+  e_ncf: string
+  tipo_ecf: string
+  codigo_modificacion: string | null
+  total: number | string
+  estado_dgii: string
+  date: string | null
+}
+
+/**
+ * Comprobante que modifica una nota (campo `modifica`). id/tipo_ecf/total/date
+ * son null cuando el e-NCF referido no está en facturas (un NCF de papel).
+ */
+export interface FacturaModificaRow {
+  id: number | string | null
+  e_ncf: string
+  tipo_ecf: string | null
+  total: number | string | null
+  date: string | null
 }
 
 /** Configuración del emisor (emisor_config; también vía GET /api/emisor). */
@@ -409,6 +450,11 @@ export interface ReporteVentas {
 export interface StatsResumen {
   total_ecf: number
   monto_total: number
+  /**
+   * monto_total neto: la nota de crédito (E34) resta y los rechazados no
+   * cuentan. Llega como texto (DECIMAL). Opcional: un backend anterior no lo trae.
+   */
+  monto_neto?: number | string | null
   tipos_distintos: number
   primer_ecf: string | null
   ultimo_ecf: string | null

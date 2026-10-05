@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/components/ui'
 import '@/styles/factura-doc.css'
 import {
-  ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate,
+  ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate, mapFacturaRow,
 } from '@/api'
 import type { DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
 import { presentDocument } from '@/lib/file'
@@ -12,7 +12,9 @@ import { aNumero, fmtCantidad, fmtPrecio } from '@/lib/format'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo } from './imprimirRecibo'
 import { lineaQueCuadra, type ItemFirmado } from './montosLinea'
+import { anuladaPor, filasRelacionadas } from './notasVinculadas'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { staleTimeFor } from '@/config/cache'
 import type { Nav } from '@/config/navigation'
 import type { Factura } from '@/types/domain'
 
@@ -105,6 +107,8 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   // La clave distingue los dos PDF (carta y tirilla): con solo el DocKind los
   // dos botones mostraban "Abriendo…" a la vez.
   const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | null>(null)
+  // Comprobante relacionado (nota o factura modificada) que se está abriendo.
+  const [abriendo, setAbriendo] = useState<number | null>(null)
   const anchoTirilla = useAnchoTirilla()
 
   // Si el estado DGII pasa a un rechazo, refrescar los stats (la secuencia pudo
@@ -125,6 +129,17 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
     () => lineasImpresas(detalle.data?.items ?? [], detalle.data?.xml_firmado),
     [detalle.data],
   )
+
+  // Marca del documento en pantalla: cambia al pasar a otro (la vista no tiene
+  // key en App y sigue montada) y queda en null al salir. Al terminar de pedir un
+  // relacionado solo se navega si la marca es la misma: el usuario no volvió al
+  // listado ni abrió otro. Un objeto y no el id: un documento sin facturaId
+  // (null) no se confunde con "ya salió".
+  const enPantalla = useRef<object | null>(null)
+  useEffect(() => {
+    enPantalla.current = {}
+    return () => { enPantalla.current = null }
+  }, [id])
 
   if (!f) {
     return (
@@ -157,6 +172,32 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const subtotalGravado = aNumero(det?.monto_gravado ?? f.subtotal ?? 0)
   const montoExento = aNumero(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
+  // Notas que modifican este comprobante y, si es una nota, lo que modifica. Del
+  // detalle cuando llega; mientras, de la fila del listado (sale al instante).
+  const vinculos = det ? mapFacturaRow(det) : f
+  const relacionadas = filasRelacionadas(vinculos)
+  const anulacion = anuladaPor(vinculos.notas)
+
+  // Abre otro comprobante como lo abre el listado: con su fila completa. Se pide
+  // con la misma clave que usa esta vista, así el detalle ya llega en caché.
+  const abrirRelacionado = async (docId: number) => {
+    if (abriendo != null) return
+    const desde = enPantalla.current
+    const sigueAqui = () => desde != null && enPantalla.current === desde
+    setAbriendo(docId)
+    try {
+      const key = ['facturas', 'detail', docId]
+      const fila = await queryClient.fetchQuery({ queryKey: key, queryFn: () => getFactura(docId), staleTime: staleTimeFor(key) })
+      // Se fue mientras cargaba: no arrastrarlo de vuelta ni apilar historial.
+      if (!sigueAqui()) return
+      if (fila) nav('factura-ver', mapFacturaRow(fila))
+      else toast.error('No encontramos ese comprobante. Puede que se haya eliminado.')
+    } catch (e) {
+      if (sigueAqui()) toast.error(e instanceof ApiError ? e.message : 'No se pudo abrir el comprobante.')
+    } finally {
+      setAbriendo(null)
+    }
+  }
 
   const openDoc = async (kind: DocKind, download = false, formato: FormatoImpresion = 'carta') => {
     if (id == null) return
@@ -225,6 +266,68 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           Actualizar
         </Btn>
       </div>
+
+      {/* Notas de crédito/débito que lo modifican, o lo que modifica si es una
+          nota. Fuera del papel: no es parte del comprobante impreso. */}
+      {relacionadas.length > 0 && (
+        <div style={{ maxWidth: 1040, margin: '0 auto 12px' }}>
+          <Card
+            noPad
+            title="Comprobantes relacionados"
+            sub={anulacion
+              ? <span style={{ color: 'var(--danger)' }}>Anulada por la nota de crédito {anulacion.ncf}</span>
+              : undefined}
+          >
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Relación</th><th>Comprobante</th><th>Propósito</th><th>Fecha</th><th>Estado DGII</th>
+                    <th className="num">Monto</th><th style={{ width: 40 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relacionadas.map((r) => {
+                    const docId = r.id
+                    const abrible = docId != null && docId !== id
+                    const abrir = () => { if (docId != null && abrible) void abrirRelacionado(docId) }
+                    return (
+                      <tr
+                        key={r.clave}
+                        onClick={abrible ? abrir : undefined}
+                        onKeyDown={abrible ? (e) => { if (e.key === 'Enter') abrir() } : undefined}
+                        tabIndex={abrible ? 0 : undefined}
+                        style={abrible ? undefined : { cursor: 'default' }}
+                      >
+                        <td className="fw6 text-sm">{r.relacion}</td>
+                        <td>
+                          <span className="mono text-sm fw6">{r.ncf}</span>
+                          {r.clave === 'modifica' && (
+                            <div className="cell-sub">
+                              {r.tipo ? TIPO_TITULO[r.tipo] ?? `e-CF ${r.tipo}` : 'No registrado en Fiscalo'}
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-sm">{r.proposito || <span className="muted-3">—</span>}</td>
+                        <td className="muted text-sm">{formatApiDate(r.fecha)}</td>
+                        <td>{r.estadoDgii ? <EstadoBadge estado={dgiiLabel(r.estadoDgii)} /> : <span className="muted-3">—</span>}</td>
+                        <td className="num fw6">
+                          {r.monto != null ? <Money value={r.monto} cur={false} /> : <span className="muted-3">—</span>}
+                        </td>
+                        <td>
+                          {abriendo != null && abriendo === docId
+                            ? <Spinner />
+                            : abrible && <Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} />}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <article className="fx-sheet fx-sheet--ancha">
         {/* --- Emisor + identificación del comprobante --- */}

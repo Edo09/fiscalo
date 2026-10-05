@@ -5,6 +5,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
 import type { Nav } from '@/config/navigation'
+import { conSigno, lineasVinculo, montoTotalKpi, sumaConSigno } from './notasVinculadas'
 
 const PAGE_SIZES = [10, 25, 50]
 const SEARCH_DEBOUNCE_MS = 500
@@ -72,14 +73,16 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
     .reduce((a, e) => a + e.total, 0)
   const rechazadosBuckets = porEstado.filter((e) => isRechazo(e.estado))
   const rechazados = rechazadosBuckets.reduce((a, e) => a + e.total, 0)
-  // El "Monto total" excluye los rechazados: un comprobante rechazado no es ingreso.
-  const montoTotal = Number(resumen?.monto_total ?? 0) - rechazadosBuckets.reduce((a, e) => a + e.monto_total, 0)
+  // El "Monto total" excluye los rechazados (un comprobante rechazado no es
+  // ingreso) y resta las notas de crédito: monto_neto del backend, o la cuenta
+  // de antes si el backend aún no lo trae.
+  const montoTotal = montoTotalKpi(resumen, rechazadosBuckets.reduce((a, e) => a + Number(e.monto_total), 0))
 
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const total = data?.total ?? null
   const totalPages = data?.totalPages ?? null
-  const totalSum = rows.reduce((a, f) => a + f.total, 0)
-  const itbisSum = rows.reduce((a, f) => a + f.itbis, 0)
+  // La nota de crédito resta: una factura anulada y su nota suman 0.
+  const { total: totalSum, itbis: itbisSum } = sumaConSigno(rows)
 
   const submitSearch = () => { patch({ query: input.trim(), page: 1 }) }
   const clearSearch = () => { patch({ input: '', query: '', page: 1 }) }
@@ -190,6 +193,17 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
                   <tr key={f.id} onClick={() => nav('factura-ver', f)}>
                     <td>
                       <span className="mono text-sm fw6">{f.ncf}</span>
+                      {/* Notas que la modifican, o lo que modifica si es una nota. */}
+                      {lineasVinculo(f).map((l) => (
+                        <div
+                          key={l.texto}
+                          className="cell-desc"
+                          title={l.texto}
+                          style={l.tono === 'danger' ? { color: 'var(--danger)' } : undefined}
+                        >
+                          {l.texto}
+                        </div>
+                      ))}
                       {f.descripcion && <div className="cell-desc" title={f.descripcion}>{f.descripcion}</div>}
                     </td>
                     <td>
@@ -199,8 +213,9 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
                     <td><span className="ecf-tag">E{f.tipo}</span></td>
                     <td className="muted text-sm">{f.fecha}</td>
                     <td>{f.dgii !== '—' ? <EstadoBadge estado={f.dgii} /> : <span className="muted-3">—</span>}</td>
-                    <td className="num text-sm muted"><Money value={f.itbis} cur={false} /></td>
-                    <td className="num fw6"><Money value={f.total} cur={false} /></td>
+                    {/* La nota de crédito (E34) va en negativo: resta. */}
+                    <td className="num text-sm muted"><Money value={conSigno(f.tipo, f.itbis)} cur={false} /></td>
+                    <td className="num fw6"><Money value={conSigno(f.tipo, f.total)} cur={false} /></td>
                     <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
                   </tr>
                 ))}
