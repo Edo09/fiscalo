@@ -7,10 +7,12 @@
     belonged to `EsquemaTenant` and FP18 to the cross-ambiente archive, and both were dropped by decision 3).
   - The user then took six binding decisions (section 2). They remove the runtime schema fallback and every
     printing change, and split the work into two releases.
-  - Location: a draft on branch `feat/ecf-write-ahead` of `fiscalo`, **not on `main`**. It reaches `main` through
-    the branch merge once the user approves it, as `2026-10-01-cotizacion-formatos-design.md` did (merge `1de819b`).
-  - Next step: user review of this document (including: confirm `MSG_TARDO_EMISION` instead of rewording
-    `MSG_TARDO_ESCRITURA`, section 2), then an implementation plan per release.
+  - **Approved by the user on 2026-10-05**, including the two open proposals: `MSG_TARDO_EMISION` instead of
+    rewording `MSG_TARDO_ESCRITURA` (section 2), and the "Pendientes" filter name and meaning (risk 11).
+  - Location: branch `feat/ecf-write-ahead` of `fiscalo`, rebased on `main` `a9bf56c`. It reaches `main` through the
+    branch merge, as `2026-10-01-cotizacion-formatos-design.md` did (merge `1de819b`).
+  - Next step: an implementation plan per release, starting with Release 1. Section 2.1 lists what changed in the
+    code base after this spec was written.
 - **Code base:** every `file:line` below was re-read on `api-gratex` master `db91ecf` (worktree
   `.claude/worktrees/ecf-write-ahead`) and `fiscalo` main `492fc9b` (same worktree name). `API/` and `FE/` are
   those two roots. `API/src/` is identical to `d7f5f34`; `6609d91` reworked 028 and its checkers, and `db91ecf`
@@ -108,6 +110,26 @@ user's confirmation:
 - The RFCE flow follows the same rules as the e-CF flow: `RFCE_NO_ENCONTRADO` becomes retryable, and the stock gate
   uses `EstadosEcf::SIN_STOCK` instead of the controller's `$rechazado` (4.6, 4.7). The HTTP codes of
   `facturaController.php:472` do not change (section 14).
+
+### 2.1 Changes in the code base after this spec (linked notes, 2026-10-05)
+
+The "notas vinculadas" change shipped after this spec was written: `api-gratex` `9f669ad` and `fiscalo` `a9bf56c`.
+It touches files this spec changes, so its line references are stale there. The Release 1 plan re-pins every
+`file:line` on those commits. What it added, and how Release 1 must treat it:
+
+- **One list of valid notes.** `facturaModel::TIPOS_NOTA` and `facturaModel::ESTADOS_NOTA_VIGENTE`
+  (`'ACEPTADO', 'ACEPTADO_CONDICIONAL', 'EN_PROCESO', 'ENVIADO'`) now drive both `sqlReferencia` (the saldo) and
+  the new `notas` / `modifica` fields of the list and the detail (`adjuntarNotasVinculadas`, `vincularNotas`).
+  Section 8 adds the in-flight states to the saldo subquery; Release 1 does that by deriving
+  `ESTADOS_NOTA_VIGENTE` from `EstadosEcf` (4.6), so the saldo and the links cannot disagree. An in-flight credit
+  note therefore shows as linked. The frontend labels must not call an invoice "Anulada por" a note that is still in
+  flight: `anuladaPor` (`FE/src/features/invoices/notasVinculadas.ts`) only counts a note whose state is accepted or
+  conditionally accepted; an in-flight note shows as "Nota de crédito … (sin confirmar)".
+- **`resumen.monto_neto`** (`getECFStats`) is new money. Like `resumen.monto_total`, it excludes in-flight rows
+  ("In-flight rows are not money", success criteria).
+- **Frontend.** `InvoiceListView.tsx` and `InvoiceDetailView.tsx` already carry the linked-notes line, the signed
+  totals and the "Comprobantes relacionados" card. The in-flight band, labels and buttons of 9.1 are added next to
+  them; the card's state badge uses the same `dgiiLabel` labels as the rest of 9.1.
 
 ## 3. Current state (what the code map found)
 
