@@ -4,7 +4,8 @@
 - **Repos:** `fiscalo` (React frontend) and `api-gratex` (PHP backend), branch `feat/conduces` in both.
 - **Builds on:**
   - the per-tenant cotización formats (`docs/superpowers/specs/2026-10-01-cotizacion-formatos-design.md`);
-  - in production: master 011 and tenant 026, already run on both tenant databases.
+  - in production: master 011 and tenant 026 and 027, run on both tenant databases. Tenant 028
+    (`estado_dgii` width) is on master too and must be run on both databases before this deploy (section 7).
 - **Status:** design approved in chat, section by section. This spec is pending the user's review.
 
 ## 1. Goal
@@ -57,11 +58,13 @@ Two directions are **not** supported: conduce → cotización, and a conduce cre
 | Where | Its **own page** with its **own sidebar entry** under Cotizaciones, under the same `cotizaciones` permission, visible only for the `ferreteria` formato. |
 | Prices | Never shown or printed on a conduce. Each line keeps them internally for Facturar. |
 | Formato | Only `ferreteria`. Gratex never sees conduces. |
+| Number reuse | Same as quotes: deleting the most recent conduce frees its number (pending user confirmation). |
 
-## 3. Data model: tenant migration `027_conduces.sql`
+## 3. Data model: tenant migration `029_conduces.sql`
 
 The migration is idempotent and guarded with `information_schema`, following 026. It runs on **each** tenant
-database after 026. It **only creates tables**, so it is safe with the code running in production today.
+database after 028; it does not depend on 027 or 028. It **only creates tables**, so it is safe with the code
+running in production today. 027 and 028 already exist on master, so 029 is the next free number.
 
 **Read-only step 0** (as in 026):
 - `ENGINE` of `cotizaciones` and `products` must be InnoDB.
@@ -107,10 +110,26 @@ CREATE TABLE IF NOT EXISTS conduce_items (
 - **Building the DDL.** The migration reads the `<… type>` placeholders from `information_schema` and builds
   both CREATE statements dynamically (`PREPARE/EXECUTE`), as 026 does.
 - **Snapshot (`db/tenant_schema.sql`):** gets both tables right after the "2d) Cotizaciones" block, which
-  already sits after products. It uses the same index and FK names, and the header range becomes 012..027.
-- **Tooling and docs:** `tools/check_tenant_schema_orden.php` learns the two tables. `docs/database/schema.md`
-  and `db/migrations/README.md` are updated.
-- **Verification script:** `tools/verificar_migraciones_tenant.sql` gets a row for 027: tables `conduces` and
+  already sits after products. It uses the same index and FK names, and the header range becomes 012..029.
+- **Checker (`tools/check_tenant_schema_orden.php`):**
+  1. The header check takes the highest `NNN` from `glob('db/migrations/[0-9][0-9][0-9]_*.sql')` instead of a
+     hard-coded range, so the next migration doesn't break it.
+  2. `$columnas` gets the end state of both tables:
+     - `conduces`: `numero INT UNSIGNED NOT NULL`, `code VARCHAR(20) NOT NULL`, `date DATETIME NOT NULL`,
+       `cotizacion_id`/`client_id`/`user_id INT(11) NULL`, `client_name VARCHAR(100) NULL`;
+     - `conduce_items`: `conduce_id INT(11) NOT NULL`, `product_id INT(11) NULL`, `description TEXT NOT NULL`,
+       `quantity DECIMAL(12,3) NOT NULL DEFAULT 1.000`, `unidad_medida VARCHAR(10) NOT NULL DEFAULT '43'`,
+       `amount DECIMAL(18,4) NOT NULL DEFAULT 0.0000`.
+  3. `$indices` gets `uk_conduces_numero`, `idx_conduces_cotizacion`, `idx_conduces_date`,
+     `idx_conduce_items_conduce`, `idx_conduce_items_product`, plus the three CONSTRAINT lines exactly as in the
+     DDL.
+  4. The "names present / PREPARE-EXECUTE-DEALLOCATE / dynamic DDL expands and balances" block also runs over
+     029:
+     - the whitelist is `^CREATE TABLE IF NOT EXISTS (conduces|conduce_items) \(`;
+     - it reuses the example types (`int(11)`);
+     - 029 must use the `SET @sql_x := IF(@has_tabla = 0, CONCAT(...), 'DO 0');` form the checker parses.
+- **Docs:** `docs/database/schema.md`, and `db/migrations/README.md` (range "hasta la 029 (012–029)").
+- **Verification script:** `tools/verificar_migraciones_tenant.sql` gets a row for 029 (`029_conduces.sql`), with its header range moved to 012 a 029 and 029 listed among the ones safe to re-run: tables `conduces` and
   `conduce_items`.
 
 ## 4. Backend (api-gratex)
@@ -164,6 +183,15 @@ never shows them.
 - **Retry:** if the insert fails with a 1062 on `uk_conduces_numero`, retry **once** in a new transaction.
   Any other error is not retried. A second 1062 answers 500 "Otro conduce se guardó al mismo tiempo. Vuelve a
   guardar."
+- **Other insert errors, not retried:**
+  - **1452** naming `conduce_items_product_fk`: 422 "Un producto del conduce ya no existe en el catálogo (lo
+    eliminaron mientras lo editabas). Búscalo de nuevo o quita la línea."
+  - **1452** naming `conduces_cotizacion_fk` (POST only): 422 "La cotización de origen ya no existe; vuelve a
+    Cotizaciones."
+  - anything else: 500 with the generic message.
+- **Number reuse:** as with quotes, numbering is `MAX(numero)+1`. Deleting the **most recent** conduce frees its
+  number, and the next one reuses it. The delete confirmation says so: "Si es el último conduce, su número
+  CON-… se volverá a usar." (Decision to confirm with the user, see section 2.)
 - **Edits** never change `numero`, `code` or `cotizacion_id`.
 
 ### 4.3 Rules (`FerreteriaConduce`, pure static plus DB checks)
@@ -194,8 +222,8 @@ never shows them.
   - `cotizacion_id` in the body is ignored, because it is fixed.
   - Lines are replaced in one transaction.
 - **DELETE:** a hard delete; the lines cascade. Audit entry `module 'conduces'`, `action 'DELETE'`.
-- **`client_name`:** stored on create and update from the client's `razon_social`, else `company_name`, else
-  `client_name`, the same chain the quote PDF uses.
+- **`client_name`:** stored on create and update with the same chain the quote uses (`razon_social`, else
+  `company_name`, else `client_name`), trimmed and cut to 100 characters, the column's width.
 
 ### 4.4 PDF: conduce mode of `FerreteriaCotizacionPdf`
 
@@ -380,9 +408,11 @@ assert helpers):
 
 ## 7. Rollout
 
-1. Take a backup, then run **027** in `smhynzte_002` (Ferretería) and `smhynzte_new_gratexdb` (Gratex). Run
+1. Take a backup, then run **029** in `smhynzte_002` (Ferretería) and `smhynzte_new_gratexdb` (Gratex). Run
    step 0 first. It only creates tables.
-2. Re-run `tools/verificar_migraciones_tenant.sql`: 027 must say APLICADA in both databases.
+2. Re-run `tools/verificar_migraciones_tenant.sql` in both databases. **027, 028 and 029 must all say APLICADA**
+   before step 3: this deploy also ships the code that needs 027 and 028, which is already on master. If one says
+   FALTA, run it first, following the ORDEN note in its header.
 3. Deploy api-gratex, then fiscalo.
 4. Smoke test as Ferretería: create a conduce from a quote, check its PDF, edit it, then Facturar without
    issuing. As Gratex: check that nothing changed and there is no menu entry.
