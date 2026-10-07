@@ -4,6 +4,7 @@ import { getStats, formatApiDate } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
 import { RangosNcfModal } from './RangosNcfModal'
+import { contarSinConfirmar } from '@/features/invoices/enVuelo'
 import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Dashboard e-CF (GET /api/facturas/stats) */
@@ -15,6 +16,9 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
   const totalAceptados = d?.por_estado.filter((e) => e.estado.includes('ACEPTADO')).reduce((a, e) => a + e.total, 0) ?? 0
   const totalEnProceso = d?.por_estado.filter((e) => e.estado === 'ENVIADO' || e.estado === 'EN_PROCESO').reduce((a, e) => a + e.total, 0) ?? 0
   const totalRechazados = d?.por_estado.filter((e) => e.estado.includes('RECHAZADO')).reduce((a, e) => a + e.total, 0) ?? 0
+  // En vuelo: "Total e-CF" las cuenta y ningún otro cuadro sí; sin este, los
+  // cuadros no suman el total.
+  const totalSinConfirmar = contarSinConfirmar(d?.por_estado)
   const totalEcf = d?.resumen.total_ecf ?? 0
 
   // Solo tipos con rango autorizado por la DGII (secuencias). type viene como 'E31'.
@@ -27,6 +31,7 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
     { label: 'Aceptados', value: totalAceptados, color: 'var(--success)', icon: 'check-circle', bg: 'var(--success-soft)' },
     { label: 'En proceso', value: totalEnProceso, color: 'var(--warning)', icon: 'loader', bg: 'var(--warning-soft)' },
     { label: 'Rechazados', value: totalRechazados, color: 'var(--danger)', icon: 'x-circle', bg: 'var(--danger-soft)' },
+    { label: 'Sin confirmar', value: totalSinConfirmar, color: 'var(--danger)', icon: 'alert-triangle', bg: 'var(--danger-soft)' },
   ]
 
   return (
@@ -47,10 +52,11 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
         <>
           <div className="dash-grid">
             <div className="col gap-md">
-            {/* KPIs compactos (2x2) al lado de Secuencias: sin franja vacía */}
+            {/* KPIs compactos al lado de Secuencias: el total ocupa la primera
+                fila entera y los cuatro estados quedan en 2x2, sin hueco. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
               {estados.map((e, i) => (
-                <div className="kpi" key={i} style={{ padding: '10px 14px' }}>
+                <div className="kpi" key={i} style={{ padding: '10px 14px', gridColumn: e.total ? '1 / -1' : undefined }}>
                   <div className="row between" style={{ alignItems: 'center' }}>
                     <div className="row gap-sm" style={{ alignItems: 'center' }}>
                       <span className="kpi-ic" style={{ background: e.bg, color: e.color, width: 26, height: 26 }}><Icon name={e.icon} size={14} /></span>

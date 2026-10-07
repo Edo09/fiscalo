@@ -6,6 +6,7 @@ import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
 import type { Nav } from '@/config/navigation'
 import { conSigno, lineasVinculo, montoTotalKpi, sumaConSigno } from './notasVinculadas'
+import { contarSinConfirmar, textoChipSinConfirmar } from './enVuelo'
 
 const PAGE_SIZES = [10, 25, 50]
 const SEARCH_DEBOUNCE_MS = 500
@@ -14,6 +15,8 @@ const SEARCH_DEBOUNCE_MS = 500
 const ESTADO_OPCIONES: { value: FacturaEstadoUi; label: string }[] = [
   { value: 'aprobado', label: 'Aprobados' },
   { value: 'rechazado', label: 'Rechazados' },
+  // Sin veredicto de la DGII: en vuelo, enviados y en proceso (spec 7.2).
+  { value: 'pendiente', label: 'Pendientes' },
   { value: 'todos', label: 'Todos' },
 ]
 
@@ -77,6 +80,9 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
   // ingreso) y resta las notas de crédito: monto_neto del backend, o la cuenta
   // de antes si el backend aún no lo trae.
   const montoTotal = montoTotalKpi(resumen, rechazadosBuckets.reduce((a, e) => a + Number(e.monto_total), 0))
+  // Facturas en vuelo (guardadas antes de enviarlas, sin respuesta de la DGII).
+  // El "Monto total" ya no las cuenta: el backend las saca de monto_neto.
+  const sinConfirmar = contarSinConfirmar(porEstado)
 
   const rows = (data?.items ?? []).map(mapFacturaRow)
   const total = data?.total ?? null
@@ -98,6 +104,11 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         sub={total != null ? `${total} comprobantes emitidos` : 'Comprobantes fiscales electrónicos'}
         actions={
           <>
+            {sinConfirmar > 0 && (
+              <button type="button" className="filter-chip" onClick={() => changeEstado('pendiente')}>
+                {textoChipSinConfirmar(sinConfirmar)}
+              </button>
+            )}
             <RefreshButton onRefresh={() => Promise.all([reload(), stats.reload()])} />
             <Btn variant="primary" icon="plus" onClick={() => nav('factura-nueva')}>Nueva factura</Btn>
           </>
@@ -109,6 +120,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
         <KPI label="Monto total" value={montoTotal} money icon="trending-up" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Aceptados" value={aceptados} icon="check-circle" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Rechazados" value={rechazados} icon="x-circle" iconBg="var(--danger-soft)" iconColor="var(--danger)" />
+        <KPI label="Sin confirmar" value={sinConfirmar} icon="alert-triangle" iconBg="var(--danger-soft)" iconColor="var(--danger)" />
       </div>
 
       <div className="toolbar">
