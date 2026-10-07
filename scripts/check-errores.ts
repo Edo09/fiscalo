@@ -6,6 +6,9 @@
 //   node scripts/check-errores.ts
 import { dgiiLabel, isEnVuelo, isRechazo } from '../src/api/estadosDgii.ts'
 import { clasificar, humanizar, networkError } from '../src/api/errores.ts'
+import {
+  PIE_DOCUMENTO_EN_VUELO, textoChipSinConfirmar, textoTarjetaEnVuelo,
+} from '../src/features/invoices/enVuelo.ts'
 
 let fallos = 0
 let total = 0
@@ -118,6 +121,18 @@ igual('504 de otra escritura -> MSG_TARDO_ESCRITURA de siempre',
 const caido = humanizar('', 500, EMISION).mensaje
 chk(`500 sin texto en POST /api/facturas -> manda al filtro Pendientes (dio "${caido}")`,
   caido.startsWith(TEXTO_SERVIDOR_EMISION))
+
+// --- Textos del front para una factura en vuelo (enVuelo.ts) -----------------
+// Pasan por clasificar como cualquier aviso: ninguno puede parecer técnico.
+console.log('clasificar: tarjeta, pie y chip de una factura en vuelo')
+for (const [desc, texto] of [
+  ['tarjeta del detalle', textoTarjetaEnVuelo(ENCF)],
+  ['pie del documento en vuelo', PIE_DOCUMENTO_EN_VUELO],
+  ['chip del listado', textoChipSinConfirmar(2)],
+] as const) {
+  const tipo = clasificar(texto)
+  chk(`${desc} -> null (dio ${tipo})`, tipo === null)
+}
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)
