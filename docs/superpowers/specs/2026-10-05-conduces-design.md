@@ -681,3 +681,34 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
 - Soft delete for quotes. Quotes keep their current delete (user decision, 2026-10-06).
 - Restoring an inactive conduce from the UI. The row stays in the database, and support can set
   `activo = 1` by SQL.
+
+## 9. Notes from planning (2026-10-07; they supersede earlier text)
+
+- **Numbering (4.2).** The seed `INSERT IGNORE` into `conduce_secuencia` runs **right before** the transaction,
+  not inside it. Inside the transaction, its shared lock on the existing row deadlocked parallel creates. On the
+  real MySQL server (Task 6b), 4 of 5 parallel workers failed that way. The rest of 4.2 is unchanged: `FOR UPDATE`,
+  `GREATEST(ultimo, MAX(numero)) + 1`, and one retry on a 1062.
+- **029 lint (3.3).**
+  - `information_schema.REFERENTIAL_CONSTRAINTS` has no `TABLE_SCHEMA` column, so its filter is
+    `CONSTRAINT_SCHEMA = @db`. The rule counts either filter.
+  - The dynamic-SQL whitelist also allows a guarded read of the sequence row into `@fila_secuencia`, because the
+    final SELECT can't name a table that might not exist.
+  - Each prepared statement has a unique name.
+- **Id types (3.1, 7).** On MySQL 8.0.19+ (production is 8.0.46), `COLUMN_TYPE` prints `int`, not `int(11)`.
+  The rollout docs say so.
+- **Endpoint edges (4.1).**
+  - PUT/DELETE without `id` answer 422 with a specific text.
+  - An unknown sub-path or method answers 404 "Esta dirección de conduces no existe."
+  - Read failures answer a generic 500.
+- **Client block (5.5).** `NewClientModal` is rendered by each form **outside** `.fx-sheet`, because inside it
+  would be clipped (overflow plus a transform). The shared client block takes callbacks to open it.
+- **`useFormatoTenant` (5.1)** returns `{ formato, error, reintentar }`; `formato` is null while loading or after
+  an error.
+- **0-price block (5.6).** On the e-CF it also blocks Vista previa, because the block lives in `validateForm`. On
+  factura simple it blocks only Guardar.
+- **Screen texts (5.5).** The texts the spec didn't fix are chosen in Task 12 and checked verbatim in Task 14:
+  the eyebrow, the branding-error title, the no-RNC caption, and "De una cotización eliminada".
+- **Smoke test (7.4).** A real conduce created in production uses up a number. Task 7 documents a preview-only
+  alternative, so the first real conduce can still be `CON-000001`.
+- **Node test of `useFormatoTenant` (6).** It was not factored out; Task 14's browser checks cover the loading,
+  error, 409 and Gratex states.
