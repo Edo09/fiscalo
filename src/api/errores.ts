@@ -82,6 +82,11 @@ const MSG_TARDO = 'El servidor tardó demasiado en responder. Inténtalo de nuev
 // segundo intento duplica la factura y quema otro e-NCF.
 const MSG_TARDO_ESCRITURA =
   'El servidor tardó demasiado en responder. Puede que sí se haya guardado: revisa el listado antes de intentarlo otra vez.'
+// La emisión (POST /api/facturas) guarda la factura ANTES de enviarla a la
+// DGII: si el navegador se rindió, la factura está en el filtro Pendientes con
+// su e-NCF. Emitir otra vez gastaría otro número para la misma venta.
+const MSG_TARDO_EMISION =
+  'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
 const MSG_SIN_PERMISO = 'No tienes permiso para hacer esto. Pídele acceso a un administrador.'
 const MSG_NO_DISPONIBLE = 'Esta opción no está disponible ahora mismo. Recarga la página; si sigue pasando, avisa a soporte.'
 const MSG_MUY_GRANDE = 'El archivo es demasiado grande. Usa uno más liviano.'
@@ -150,8 +155,9 @@ const RE_INTERNO = new RegExp(
 const RE_CONSTANTE = /\b[A-Z][A-Z0-9]+_[A-Z][A-Z0-9_]{2,}\b/
 // …salvo los estados DGII de una factura, que las reglas de negocio citan
 // ("ya existe una factura … en estado EN_PROCESO") y el usuario ve en la lista.
+// Los dos primeros son los de una factura en vuelo (guardada antes de enviarla).
 const RE_ESTADO_DGII =
-  /\b(RFCE_)?(ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|ACEPTADO|RECHAZADO|ENVIADO)\b/g
+  /\b(RFCE_)?(PENDIENTE_ENVIO|ENVIO_INCIERTO|ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|ACEPTADO|RECHAZADO|ENVIADO)\b/g
 const RE_JERGA_INTERNA = /\b(php|pdo|sql|mysql|curl|openssl|fpdf|vendor|libxml)\b/i
 
 const RE_RUTA = /\/api\/|\/inventario\/|https?:\/\/|\bsub-?rutas?\b|\bendpoints?\b/i
@@ -271,9 +277,9 @@ const conReferencia = (texto: string, ref: string | null | undefined) =>
 function textoServidor(ctx: ContextoError): string {
   if (esLogin(ctx)) return MSG_LOGIN_SERVIDOR
   if (esEmisionEcf(ctx)) {
-    // Un fallo a mitad de la emisión puede haber dejado el e-CF enviado: antes
-    // de repetir hay que mirar el listado.
-    return 'No se pudo completar la emisión del e-CF. Revisa el listado de facturas antes de intentarlo otra vez.'
+    // Un fallo a mitad de la emisión puede haber dejado el e-CF guardado y
+    // enviado: antes de repetir hay que mirar el filtro Pendientes.
+    return 'No se pudo completar la emisión del e-CF. Revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
   }
   if (esEstadoDgii(ctx)) return 'No se pudo consultar el estado en la DGII. Inténtalo de nuevo en unos minutos.'
   if (esDocumento(ctx)) return 'No se pudo generar el documento. Inténtalo de nuevo en unos minutos.'
@@ -300,7 +306,7 @@ function textoPorStatus(status: number, tipo: TipoTecnico | null, ctx: ContextoE
   if (status === 413) return MSG_MUY_GRANDE
   if (status === 429) return MSG_DEMASIADOS
   // 504 = el proxy se cansó de esperar, pero el servidor pudo seguir y guardar.
-  if (status === 504 && esEscritura(ctx)) return MSG_TARDO_ESCRITURA
+  if (status === 504 && esEscritura(ctx)) return esEmisionEcf(ctx) ? MSG_TARDO_EMISION : MSG_TARDO_ESCRITURA
   if (ctx.ilegible && status < 500) return esEscritura(ctx) ? MSG_INESPERADO_ESCRITURA : MSG_INESPERADO
   if (tipo === 'interno' || status >= 500) return conReferencia(textoServidor(ctx), ref)
   if (status === 409) return MSG_CONFLICTO
@@ -436,7 +442,9 @@ export function sesionExpirada(raw: string | null, ctx: ContextoError = {}): Api
 /** Normaliza fallos de red/timeout de fetch a un ApiError con mensaje claro. */
 export function networkError(e: unknown, ctx: ContextoError = {}): ApiError {
   const timeout = e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')
-  const mensaje = timeout ? (esEscritura(ctx) ? MSG_TARDO_ESCRITURA : MSG_TARDO) : MSG_SIN_CONEXION
+  const mensaje = timeout
+    ? esEmisionEcf(ctx) ? MSG_TARDO_EMISION : esEscritura(ctx) ? MSG_TARDO_ESCRITURA : MSG_TARDO
+    : MSG_SIN_CONEXION
   const original = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
   console.warn('[API] fallo de red', { metodo: metodoDe(ctx), path: ctx.path ?? '', original })
   return new ApiError(mensaje, 0, { original })
