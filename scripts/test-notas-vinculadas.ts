@@ -75,8 +75,8 @@ igual('sin modifica (o backend viejo) -> null', [
 
 // Atajos para los casos de las líneas.
 type N = ReturnType<typeof notasDeFila>[number]
-const n = (id: number, tipo: string, codigo: string | null, ncf: string, total = 100): N => ({
-  id, ncf, tipo, codigoModificacion: codigo, total, estadoDgii: 'ACEPTADO', fecha: null,
+const n = (id: number, tipo: string, codigo: string | null, ncf: string, total = 100, estadoDgii = 'ACEPTADO'): N => ({
+  id, ncf, tipo, codigoModificacion: codigo, total, estadoDgii, fecha: null,
 })
 const mod = (ncf: string) => ({ id: 5, ncf, tipo: '44', total: 82200, fecha: null })
 
@@ -109,6 +109,35 @@ igual('sin relaciones -> ninguna línea', lineasVinculo({}), [])
 igual('anuladaPor: la nota de crédito código 1, o null',
   [anuladaPor([n(3, '33', '3', 'A'), n(9, '34', '1', 'B')])?.ncf ?? null, anuladaPor([n(4, '34', '3', 'C')])],
   ['B', null])
+
+console.log('notas sin veredicto de la DGII (solo una nota aceptada anula)')
+const enVuelo = n(9, '34', '1', 'E340000000002', 100, 'ENVIO_INCIERTO')
+igual('nota de crédito código 1 en ENVIO_INCIERTO: no anula todavía', anuladaPor([enVuelo]), null)
+igual('…y se nombra "(sin confirmar)", tono muted',
+  lineasVinculo({ notas: [enVuelo] }),
+  [{ texto: 'Nota de crédito E340000000002 (sin confirmar)', tono: 'muted' }])
+igual('igual en PENDIENTE_ENVIO',
+  lineasVinculo({ notas: [n(9, '34', '1', 'E340000000002', 100, 'PENDIENTE_ENVIO')] }),
+  [{ texto: 'Nota de crédito E340000000002 (sin confirmar)', tono: 'muted' }])
+igual('código 1 en EN_PROCESO o ENVIADO: no anula, y sin "(sin confirmar)" (no está en vuelo)',
+  [
+    anuladaPor([n(9, '34', '1', 'E340000000002', 100, 'EN_PROCESO')]),
+    anuladaPor([n(9, '34', '1', 'E340000000002', 100, 'ENVIADO')]),
+    lineasVinculo({ notas: [n(9, '34', '1', 'E340000000002', 100, 'EN_PROCESO')] }),
+  ],
+  [null, null, [{ texto: 'Nota de crédito E340000000002', tono: 'muted' }]])
+igual('código 1 en ACEPTADO_CONDICIONAL: sí anula',
+  lineasVinculo({ notas: [n(9, '34', '1', 'E340000000002', 100, 'ACEPTADO_CONDICIONAL')] }),
+  [{ texto: 'Anulada por E340000000002', tono: 'danger' }])
+igual('sin anulación aceptada se nombra la anulación en vuelo, aunque no sea la primera',
+  lineasVinculo({ notas: [n(4, '34', '3', 'E340000000001'), enVuelo] }),
+  [{ texto: 'Nota de crédito E340000000002 (sin confirmar) +1', tono: 'muted' }])
+igual('nota en vuelo que no anula (código 3), sola: también "(sin confirmar)"',
+  lineasVinculo({ notas: [n(4, '34', '3', 'E340000000003', 100, 'ENVIO_INCIERTO')] }),
+  [{ texto: 'Nota de crédito E340000000003 (sin confirmar)', tono: 'muted' }])
+igual('una anulación aceptada gana a una en vuelo',
+  lineasVinculo({ notas: [enVuelo, n(10, '34', '1', 'E340000000004')] }),
+  [{ texto: 'Anulada por E340000000004 +1', tono: 'danger' }])
 
 console.log('conSigno / sumaConSigno (la nota de crédito resta)')
 igual('E34 en texto "82200.00" -> -82200', conSigno('34', '82200.00'), -82200)

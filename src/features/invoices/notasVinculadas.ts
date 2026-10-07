@@ -5,13 +5,22 @@
 // La API (GET /api/facturas y ?id=) trae en cada fila `notas` (las notas que la
 // modifican, por id ascendente) y `modifica` (en una nota, el comprobante que
 // modifica). PDO manda los INT y los DECIMAL como texto: aquí se convierten.
+//
+// Imports de valor SOLO por ruta relativa con .ts (Node los carga tal cual);
+// lo de '@/…' va solo como `import type`, que Node borra.
 import type { FacturaModificaRow, FacturaNotaRow } from '@/api'
 import type { ComprobanteModificado, NotaVinculada } from '@/types/domain'
+import { isEnVuelo } from '../../api/estadosDgii.ts'
 
 const NOTA_CREDITO = '34'
 const NOTA_DEBITO = '33'
 /** CodigoModificacion DGII que anula el comprobante. */
 const CODIGO_ANULA = '1'
+/**
+ * Estados en que la DGII ya aceptó la nota. La API manda también las notas en
+ * proceso y en vuelo (cuentan para el saldo), pero solo una aceptada anula.
+ */
+const ESTADOS_ACEPTADA = ['ACEPTADO', 'ACEPTADO_CONDICIONAL']
 
 const PROPOSITO: Record<string, string> = {
   '1': 'Anula',
@@ -107,9 +116,16 @@ export function modificaDeFila(r: { modifica?: FacturaModificaRow | null }): Com
   }
 }
 
-/** La nota de crédito que anula el comprobante (código 1), o null. */
+/** ¿Es una nota de crédito con código 1 (la que anula el comprobante)? */
+const esAnulacion = (n: NotaVinculada): boolean => esNotaCredito(n.tipo) && n.codigoModificacion === CODIGO_ANULA
+
+/**
+ * La nota de crédito ACEPTADA por la DGII que anula el comprobante (código 1),
+ * o null. Una en proceso o en vuelo todavía no anula nada: la DGII puede
+ * rechazarla o no tenerla.
+ */
 export function anuladaPor(notas: readonly NotaVinculada[] | null | undefined): NotaVinculada | null {
-  return notas?.find((n) => esNotaCredito(n.tipo) && n.codigoModificacion === CODIGO_ANULA) ?? null
+  return notas?.find((n) => esAnulacion(n) && ESTADOS_ACEPTADA.includes(n.estadoDgii)) ?? null
 }
 
 export interface LineaVinculo {
@@ -120,7 +136,9 @@ export interface LineaVinculo {
 /**
  * Líneas cortas bajo el e-NCF en el listado. En una nota, primero el
  * comprobante que modifica; después, si la fila tiene notas, la que la anula
- * (en rojo) o la primera, con " +N" por las demás.
+ * (en rojo, solo si la DGII la aceptó) o, si no, la anulación en vuelo o la
+ * primera nota, con " +N" por las demás. Una nota en vuelo lleva
+ * " (sin confirmar)": la DGII todavía no ha respondido.
  */
 export function lineasVinculo(f: {
   notas?: readonly NotaVinculada[] | null
@@ -135,8 +153,9 @@ export function lineasVinculo(f: {
     if (anula) {
       lineas.push({ texto: `Anulada por ${anula.ncf}${mas}`, tono: 'danger' })
     } else {
-      const primera = notas[0]
-      lineas.push({ texto: `${tipoNotaLabel(primera.tipo) || 'Nota'} ${primera.ncf}${mas}`, tono: 'muted' })
+      const nota = notas.find((x) => esAnulacion(x) && isEnVuelo(x.estadoDgii)) ?? notas[0]
+      const sinConfirmar = isEnVuelo(nota.estadoDgii) ? ' (sin confirmar)' : ''
+      lineas.push({ texto: `${tipoNotaLabel(nota.tipo) || 'Nota'} ${nota.ncf}${sinConfirmar}${mas}`, tono: 'muted' })
     }
   }
   return lineas
