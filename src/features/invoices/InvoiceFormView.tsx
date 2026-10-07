@@ -27,6 +27,7 @@ import {
 } from './factura.schema'
 import { NotaReferencia } from './NotaReferencia'
 import { indFactFromItbis, montosLinea, totalesDocumento } from './montosLinea'
+import { datosEmisionIncierta, facturaEmisionIncierta } from './enVuelo'
 import '@/styles/factura-doc.css'
 
 interface Linea {
@@ -212,6 +213,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // solo, sin quedar apuntando a algo que ya no existe.
   const lineaAConvertir = lineas.find((l) => l.id === nuevoProdLinea)
   const [emitting, setEmitting] = useState(false)
+  // Tras un 502 "incierto" la factura quedó guardada con su e-NCF, pero no se
+  // sabe si la DGII la recibió. El formulario se queda bloqueado (emitirla otra
+  // vez gastaría otro número para la misma venta) y ofrece abrirla.
+  const [facturaEnVuelo, setFacturaEnVuelo] = useState<Factura | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [errors, setErrors] = useState<FacturaFormErrors>(emptyFormErrors)
   // Líneas con el campo de detalle (descripcion) desplegado. Se colapsa por
@@ -545,7 +550,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
 
   // Acción única: un doble clic emitiría DOS e-CF y quemaria un NCF en la DGII.
   const emitir = useAccionUnica(async () => {
-    if (emitting || sinNumeros) return
+    // emitting ya bloquea (no se suelta en un 502 incierto); facturaEnVuelo lo hace explícito.
+    if (emitting || sinNumeros || facturaEnVuelo) return
     if (!validateForm()) return
     const payload = buildPayload()
     if (!payload) return
@@ -583,6 +589,30 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       // no debe reabrirlo (con una cotización convertida volvería relleno).
       setTimeout(() => nav('factura-ver', created, { replace: true }), 1200)
     } catch (e) {
+      const incierta = datosEmisionIncierta(e)
+      if (incierta) {
+        // La factura existe (en vuelo): el listado y la secuencia cambiaron.
+        void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+        const f = facturaEmisionIncierta(incierta, {
+          cliente: cliente?.nombre ?? 'Consumidor final',
+          clienteId: cliente?.id ?? '',
+          rnc: cliente?.doc ?? '',
+          subtotal,
+          itbis: itbisTotal,
+          total,
+          metodo,
+        })
+        setFacturaEnVuelo(f)
+        // Sin duración: el texto del servidor dice qué hacer y no debe irse solo
+        // (el Toaster tiene botón de cerrar).
+        toast.error((e as ApiError).message, {
+          id: tid,
+          duration: Infinity,
+          action: { label: 'Ver factura', onClick: () => nav('factura-ver', f, { replace: true }) },
+        })
+        // Sin setEmitting(false): el formulario queda bloqueado.
+        return
+      }
       toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
       setEmitting(false)
     }
@@ -1009,8 +1039,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           <Btn variant="secondary" icon="eye" onClick={previsualizar} disabled={previewing}>
             {previewing ? 'Generando…' : 'Vista previa'}
           </Btn>
+          {facturaEnVuelo && (
+            // El aviso sin duración no hace falta en el detalle: allí lo dice la tarjeta.
+            <Btn variant="secondary" icon="eye" onClick={() => { toast.dismiss(); nav('factura-ver', facturaEnVuelo, { replace: true }) }}>
+              Ver factura
+            </Btn>
+          )}
           <Btn variant="primary" icon="send" onClick={emitir} disabled={emitting || sinNumeros != null} title={sinNumeros ?? undefined}>
-            {emitting ? 'Emitiendo…' : 'Emitir e-CF'}
+            {facturaEnVuelo ? 'Emisión sin confirmar' : emitting ? 'Emitiendo…' : 'Emitir e-CF'}
           </Btn>
         </div>
       </div>

@@ -5,7 +5,7 @@
 //
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-en-vuelo.ts
-import { ApiError } from '../src/api/errores.ts'
+import { ApiError, errorDeRespuesta } from '../src/api/errores.ts'
 import {
   PIE_DOCUMENTO, PIE_DOCUMENTO_EN_VUELO, contarSinConfirmar, datosEmisionIncierta, facturaEmisionIncierta,
   textoChipSinConfirmar, textoPieDocumento, textoTarjetaEnVuelo,
@@ -66,6 +66,12 @@ igual('factura_id 0, negativo, decimal o ausente -> null', [
   datosEmisionIncierta(new ApiError(MSG, 502, { datos: { e_ncf: 'E310000000123' } })),
 ], [null, null, null, null])
 igual('un Error que no es ApiError -> null', datosEmisionIncierta(new Error('x')), null)
+// La cadena real de http.ts (:90-93): un cuerpo {status:false, error, data} se
+// vuelve ApiError con errorDeRespuesta(texto, status, ctx, data). Los casos de
+// arriba arman el ApiError a mano; este lo arma como lo hace http.ts.
+igual('el ApiError que arma errorDeRespuesta (como http.ts) -> los mismos datos normalizados',
+  datosEmisionIncierta(errorDeRespuesta(MSG, 502, { metodo: 'POST', path: '/api/facturas' }, DATOS)),
+  { factura_id: 41, e_ncf: 'E310000000123', tipo_ecf: '31', estado_dgii: 'ENVIO_INCIERTO' })
 
 console.log('facturaEmisionIncierta (la factura que abre "Ver factura")')
 const f = facturaEmisionIncierta(
