@@ -3,6 +3,12 @@ import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserR
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { aNumero, colorFor } from '@/lib/format'
 import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
+import { dgiiLabel } from './estadosDgii'
+
+// Etiquetas y preguntas sobre el estado DGII: viven en estadosDgii.ts (sin
+// imports, para probarlas con node) y se re-exportan aquí, de donde la app
+// siempre las importó.
+export { dgiiLabel, isRechazo, isEnVuelo } from './estadosDgii'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
 export function formatApiDate(value?: string | null): string {
@@ -16,36 +22,12 @@ export function formatApiDate(value?: string | null): string {
   return d.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-/** Etiqueta corta (reutiliza los tonos de EstadoBadge) para un estado DGII. */
-const DGII_LABEL: Record<string, string> = {
-  ACEPTADO: 'Aceptado',
-  RFCE_ACEPTADO: 'Aceptado',
-  ACEPTADO_CONDICIONAL: 'Aceptado',
-  ENVIADO: 'En proceso',
-  EN_PROCESO: 'En proceso',
-  RECHAZADO: 'Rechazado',
-  RECHAZADO_ARCHIVADO: 'Rechazado',
-  RFCE_RECHAZADO: 'Rechazado',
-  NO_ENCONTRADO: 'Pendiente',
-  RFCE_NO_ENCONTRADO: 'Pendiente',
-}
-
-export function dgiiLabel(raw?: string | null): string {
-  if (!raw) return '—'
-  return DGII_LABEL[raw] ?? raw
-}
-
 /** `2026-05` -> `may` (abreviatura de mes en es-DO). */
 export function formatMonthKey(key: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(key.trim())
   if (!m) return key
   const d = new Date(Number(m[1]), Number(m[2]) - 1, 1)
   return d.toLocaleDateString('es-DO', { month: 'short' })
-}
-
-/** ¿El estado DGII es un rechazo (incluido RFCE)? */
-export function isRechazo(raw?: string | null): boolean {
-  return raw === 'RECHAZADO' || raw === 'RECHAZADO_ARCHIVADO' || raw === 'RFCE_RECHAZADO'
 }
 
 export function mapFacturaRow(r: FacturaRow): Factura {

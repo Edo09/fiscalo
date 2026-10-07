@@ -127,9 +127,9 @@ Base columns + e-CF tracking (migrations 001/003/005/006).
 | `user_id` | int | nullable |
 | **e-CF (001)** | | |
 | `tipo_ecf` | varchar(2) | 31,32,33,34,41,43,44,45,46,47 |
-| `e_ncf` | varchar(13) | UNIQUE (`uk_e_ncf`) |
+| `e_ncf` | varchar(13) | UNIQUE (`uk_e_ncf_amb`: `e_ncf` + `ambiente_dgii`, migration 027) |
 | `track_id` | varchar(60) | DGII TrackId — INDEX |
-| `estado_dgii` | varchar(20) | PENDIENTE/ENVIADO/ACEPTADO/ACEPTADO_CONDICIONAL/RECHAZADO/ERROR — INDEX |
+| `estado_dgii` | varchar(40) | migration 028. PENDIENTE (DDL default, legacy); PENDIENTE_ENVIO/ENVIO_INCIERTO (in flight: saved before the DGII send, no answer yet); ENVIADO/EN_PROCESO/ACEPTADO/ACEPTADO_CONDICIONAL/RECHAZADO/NO_ENCONTRADO/ERROR; RFCE_ + any of those (E32 < 250k); `<estado>_ARCHIVADO` (superseded attempt of a re-emitted number, `e_ncf` NULL) — INDEX |
 | `codigo_seguridad` | varchar(10) | for QR / printed rep |
 | `fecha_emision_dgii` | datetime | |
 | `ambiente_dgii` | varchar(20) | testecf/certecf/ecf |

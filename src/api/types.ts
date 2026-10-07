@@ -32,6 +32,9 @@ export type EstadoDgii =
   | 'RFCE_ACEPTADO'
   | 'RFCE_RECHAZADO'
   | 'RFCE_NO_ENCONTRADO'
+  // En vuelo: guardada antes de enviar a la DGII, sin respuesta todavía.
+  | 'PENDIENTE_ENVIO'
+  | 'ENVIO_INCIERTO'
 
 // ---------------------------------------------------------------------------
 // Crear factura — POST /api/facturas
@@ -218,9 +221,11 @@ export interface ListResult<T> {
 /**
  * Filtro de estado DGII (server-side, `?estado=`). Minúsculas.
  * `aprobado` = ACEPTADO/ACEPTADO_CONDICIONAL/RFCE_* aceptados; `rechazado`
- * incluye RFCE_RECHAZADO. (Ver ecf-api-payloads.md.)
+ * incluye RFCE_RECHAZADO; `pendiente` = sin veredicto de la DGII:
+ * PENDIENTE_ENVIO, ENVIO_INCIERTO, ENVIADO, EN_PROCESO, RFCE_ENVIADO,
+ * RFCE_EN_PROCESO. (Ver ecf-api-payloads.md.)
  */
-export type FacturaEstadoFiltro = 'aprobado' | 'rechazado'
+export type FacturaEstadoFiltro = 'aprobado' | 'rechazado' | 'pendiente'
 
 export interface FacturaListParams extends ListParams {
   estado?: FacturaEstadoFiltro
@@ -252,6 +257,17 @@ export interface EstadoData {
   track_id: string | null
   estado_dgii: EstadoDgii
   secuencia_utilizada: boolean | null
+  tipo_ecf?: string
+  /**
+   * true: la factura está en vuelo (PENDIENTE_ENVIO / ENVIO_INCIERTO). La API
+   * responde con lo guardado, sin consultar a la DGII.
+   */
+  en_vuelo?: boolean
+  /**
+   * Texto para el usuario: en vuelo, o ENVIADO sin número de seguimiento (lo
+   * resuelve soporte), o la consulta RFCE que no se pudo hacer.
+   */
+  nota?: string
   consulta?: {
     trackId?: string
     codigo?: string

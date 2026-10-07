@@ -3,7 +3,8 @@
 // una factura y volver, los filtros, la búsqueda y la página siguen aplicados.
 import { create } from 'zustand'
 
-export type FacturaEstadoUi = 'aprobado' | 'rechazado' | 'todos'
+/** `pendiente` = sin veredicto de la DGII (ver FacturaEstadoFiltro). */
+export type FacturaEstadoUi = 'aprobado' | 'rechazado' | 'pendiente' | 'todos'
 
 export interface FacturasListState {
   page: number

@@ -20,6 +20,8 @@ export function Badge({ tone = 'neutral', dot = false, children, className = '' 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   Emitida: 'info', Pagada: 'success', Borrador: 'neutral', Vencida: 'danger', Anulada: 'neutral',
   Aceptado: 'success', 'En proceso': 'warning', Rechazado: 'danger', Pendiente: 'neutral', Anulado: 'neutral',
+  // Factura e-CF en vuelo (guardada antes de enviarla a la DGII).
+  'Por enviar': 'warning', 'Sin confirmar': 'danger',
   'Al día': 'success', Vencido: 'danger', 'Por vencer': 'warning', Activo: 'success', Inactivo: 'neutral',
   Disponible: 'success', Bajo: 'warning', Agotado: 'danger', Pagado: 'success',
   // Estados del módulo de Gastos
