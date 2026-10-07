@@ -13,6 +13,7 @@ import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo } from './imprimirRecibo'
 import { lineaQueCuadra, type ItemFirmado } from './montosLinea'
 import { anuladaPor, filasRelacionadas } from './notasVinculadas'
+import { textoPieDocumento, textoTarjetaEnVuelo } from './enVuelo'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { staleTimeFor } from '@/config/cache'
 import type { Nav } from '@/config/navigation'
@@ -250,6 +251,25 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
         </div>
       )}
 
+      {/* En vuelo: guardada y firmada antes de enviarla, sin respuesta de la
+          DGII. La nota (GET /estado) dice que no se emita otra vez y que se
+          avise a soporte con el e-NCF. */}
+      {estadoData?.en_vuelo && (
+        <div className="card card-pad" style={{ maxWidth: 1040, margin: '0 auto 14px', background: 'var(--warning-soft)', borderColor: 'transparent' }}>
+          {/* El texto en el color normal: el ámbar sobre --warning-soft se lee mal. */}
+          <div className="row gap-sm">
+            <Icon name="alert-triangle" size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+            <span className="fw6 text-sm">{textoTarjetaEnVuelo(estadoData.e_ncf || f.ncf)}</span>
+          </div>
+          {estadoData.nota && <div className="text-sm mt-sm">{estadoData.nota}</div>}
+        </div>
+      )}
+      {/* Nota sin estar en vuelo: ENVIADO sin número de seguimiento, o la
+          consulta RFCE que no se pudo hacer (se muestra lo guardado). */}
+      {!estadoData?.en_vuelo && estadoData?.nota && (
+        <div className="text-sm muted" style={{ maxWidth: 1040, margin: '0 auto 12px' }}>{estadoData.nota}</div>
+      )}
+
       {/* Estado DGII: metadato del documento, no parte del comprobante impreso. */}
       <div className="fx-estado-band fx-estado-band--fuera">
         <span className="fx-estado-dato">
@@ -262,6 +282,13 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
         {estadoRaw && <span className="fx-estado-dato">DGII <b>{estadoRaw}</b></span>}
         <span className="fx-estado-dato">Track <b>{estadoData?.track_id ?? f.trackId ?? '—'}</b></span>
         {f.codigoSeguridad && <span className="fx-estado-dato">Cód. seguridad <b>{f.codigoSeguridad}</b></span>}
+        {/* Si la consulta falla se sigue viendo lo guardado; el motivo, en gris.
+            Un 422 no cuenta: GET /estado contesta 422 "Esta factura no se envio
+            a la DGII..." en las filas sin nada que consultar (archivadas con
+            e_ncf NULL, RECHAZADO/ERROR sin track_id) y mostrarlo junto al
+            veredicto guardado lo contradiria; el estado guardado queda en la
+            banda. Las fallas reales (otros codigos, 0 = sin respuesta) si salen. */}
+        {estado.error && estado.errorStatus !== 422 && <span className="fx-estado-dato muted">{estado.error}</span>}
         <Btn variant="ghost" size="sm" icon="refresh-cw" onClick={estado.reload} aria-label="Actualizar estado">
           Actualizar
         </Btn>
@@ -432,7 +459,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
         </section>
 
         <footer className="fx-nota">
-          Documento firmado y enviado a la DGII · la representación impresa se descarga en PDF
+          {textoPieDocumento(estadoRaw)}
         </footer>
       </article>
 

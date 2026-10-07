@@ -35,7 +35,8 @@ export const FRESCURA = {
 const POR_RECURSO: Record<string, number> = {
   // --- Vuelven a cambiar por su cuenta -------------------------------------
   // El estado DGII de una factura pasa de ENVIADO a ACEPTADO/RECHAZADO de forma
-  // asíncrona, sin que la app haga nada.
+  // asíncrona, sin que la app haga nada; una en vuelo (PENDIENTE_ENVIO /
+  // ENVIO_INCIERTO) también llega a un veredicto por fuera (soporte).
   facturas: FRESCURA.VOLATIL,
   'facturas-simples': FRESCURA.VOLATIL,
   gastos: FRESCURA.VOLATIL,
