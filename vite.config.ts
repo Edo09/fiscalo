@@ -1,6 +1,33 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
+
+/**
+ * En el build, la página de la app sale como `app.html` y no como `index.html`.
+ *
+ * Vercel sirve primero el archivo que exista y SOLO después aplica los
+ * `rewrites` de vercel.json. Con un `index.html` en la raíz, `/` siempre
+ * entregaba la app, también en pos.fiscalpoint.com.do (la regla de host no se
+ * llegaba a mirar). Sin archivo en `/`, cada host cae en su regla: pos.* →
+ * /pos.html y el resto → /app.html.
+ *
+ * En desarrollo no cambia nada: Vite sigue sirviendo index.html en `/`.
+ */
+function appHtmlSinIndex(): Plugin {
+  return {
+    name: 'fiscalpoint:app-html-sin-index',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_opciones, bundle) {
+      const html = bundle['index.html']
+      if (!html || html.type !== 'asset') {
+        this.error('No salió index.html del build: revisa build.rollupOptions.input.')
+      }
+      delete bundle['index.html']
+      this.emitFile({ type: 'asset', fileName: 'app.html', source: html.source })
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -10,14 +37,15 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.API_PROXY_TARGET
 
   return {
-    plugins: [react()],
+    plugins: [react(), appHtmlSinIndex()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
-    // Dos paginas: la app (app.fiscalpoint.com.do -> index.html) y el POS
-    // (pos.fiscalpoint.com.do -> pos.html, por la regla de host de vercel.json).
+    // Dos paginas: la app (app.fiscalpoint.com.do -> index.html, que en el build
+    // sale como app.html; ver appHtmlSinIndex) y el POS (pos.fiscalpoint.com.do ->
+    // pos.html, por la regla de host de vercel.json).
     // El POS no importa App.tsx: su bundle solo trae lo que usa. En desarrollo
     // se abre en http://localhost:5173/pos.html.
     build: {
