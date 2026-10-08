@@ -712,3 +712,4 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
   alternative, so the first real conduce can still be `CON-000001`.
 - **Node test of `useFormatoTenant` (6).** It was not factored out; Task 14's browser checks cover the loading,
   error, 409 and Gratex states.
+- **Rollout order (7), refined (final review, 2026-10-08).** Backup; the verifier (read-only) in both DBs; 027 then 028 wherever they say FALTA; 029 and its final row; the verifier again (027, 028 and 029 all APLICADA); then deploy and smoke tests. It follows 029's own ORDEN (after 028, before the code) and replaces the order of steps 1 and 2 in section 7, which ran 029 before the check for 027 and 028.
