@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Icon, Btn, RefreshButton, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState } from '@/components/ui'
+import {
+  Icon, Btn, RefreshButton, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState, Dropdown, MenuItem,
+} from '@/components/ui'
 import { ApiError, listConduces, getConducePdf, formatApiDate } from '@/api'
 import type { ConduceRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { presentDocument } from '@/lib/file'
-import type { Nav } from '@/config/navigation'
+import { useSession } from '@/stores/auth'
+import { puedeVerVista, type Nav } from '@/config/navigation'
 import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
+import { conduceAFacturaPrefill, conduceAFacturaSimplePrefill, nombreConduce } from './conversion'
 
 const PAGE_SIZE = 15
 
@@ -26,11 +30,17 @@ export function ConducesView({ nav }: { nav: Nav }) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
   const [pdfBusy, setPdfBusy] = useState<number | null>(null)
+  const { user } = useSession()
 
   // Otro observador de ['branding'] con las mismas opciones que el de
   // AppShell: no hace ninguna petición de más.
   const { formato, error: errorFormato, reintentar } = useFormatoTenant()
   const listo = formato === 'ferreteria'
+
+  // Facturar ofrece solo los destinos que el rol puede abrir (mismo criterio
+  // que el sidebar y que Cotizaciones). Ver conduces no pide permiso de facturas.
+  const puedeEcf = puedeVerVista(user, 'factura-nueva')
+  const puedeSimple = puedeVerVista(user, 'factura-simple-nueva')
 
   // Editar vive en su propia pantalla (el papel), como la cotización.
   const abrir = (c: ConduceRow) => nav('conduce-editar', { kind: 'conduce', id: c.id })
@@ -113,13 +123,14 @@ export function ConducesView({ nav }: { nav: Nav }) {
                   <th>Cliente</th>
                   <th>Fecha</th>
                   <th>Cotización</th>
-                  <th style={{ width: 190 }}></th>
+                  {/* PDF + Facturar ▾: el ancho de las cotizaciones de Ferretería. */}
+                  <th style={{ width: 210 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((c) => {
                   // El cliente se pudo borrar: queda el nombre que guardó el conduce.
-                  const cliente = c.client_name || c.client_name_guardado || '—'
+                  const cliente = nombreConduce(c) || '—'
                   return (
                     <tr key={c.id} onClick={() => abrir(c)}>
                       <td><span className="mono text-sm fw6">{c.code || `#${c.id}`}</span></td>
@@ -136,6 +147,31 @@ export function ConducesView({ nav }: { nav: Nav }) {
                           <Btn variant="ghost" size="sm" icon="printer" onClick={() => openPdf(c)} disabled={pdfBusy === c.id}>
                             {pdfBusy === c.id ? '…' : 'PDF'}
                           </Btn>
+                          {/* A e-CF o a factura simple, con el precio interno de cada
+                              línea (conversion.ts). Cada destino sale solo si el rol
+                              puede abrirlo; sin ninguno, no hay botón. */}
+                          {(puedeEcf || puedeSimple) && (
+                            <Dropdown
+                              align="right"
+                              width={220}
+                              trigger={
+                                <Btn variant="secondary" size="sm" icon="file-text" iconRight="chevron-down" title="Convertir en factura">
+                                  Facturar
+                                </Btn>
+                              }
+                            >
+                              {puedeEcf && (
+                                <MenuItem icon="file-text" onClick={() => nav('factura-nueva', conduceAFacturaPrefill(c))}>
+                                  Factura electrónica (e-CF)
+                                </MenuItem>
+                              )}
+                              {puedeSimple && (
+                                <MenuItem icon="file" onClick={() => nav('factura-simple-nueva', conduceAFacturaSimplePrefill(c))}>
+                                  Factura simple
+                                </MenuItem>
+                              )}
+                            </Dropdown>
+                          )}
                         </div>
                       </td>
                     </tr>
