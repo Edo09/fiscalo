@@ -1,9 +1,9 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Btn, Card, EmptyState, ErrorState, LoadingState, PageHead } from '@/components/ui'
 import { getClient, getConduce, getCotizacion, mapClientRow } from '@/api'
 import type { ClientRow, ConduceRow, CotizacionRow } from '@/api'
 import { useApiQuery, type ApiQueryState } from '@/hooks/useApiQuery'
-import { isConduceRef, type ConduceDesdeCotizacion, type ConduceRef, type Nav } from '@/config/navigation'
+import { isConduceDesdeCotizacion, isConduceRef, type Nav, type PayloadConduce } from '@/config/navigation'
 import { formatoDeFila } from '@/features/cotizaciones/formatos'
 import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
 import { clienteDeFila, lineasDeFila } from '@/features/cotizaciones/formatos/ferreteria/lineas'
@@ -15,10 +15,12 @@ import { ConduceForm, type InicialConduce } from './ConduceForm'
 
 /* FISCALO — Editor de conduces: carga el documento y abre el formulario.
 
-   Dos entradas (spec conduces 5.5):
+   Tres entradas (spec conduces 5.5; la tercera, decisión del 2026-10-08):
    - desde una cotización (botón "Conduce" de Cotizaciones): un conduce nuevo
      con el cliente y las líneas de esa cotización, fechado hoy;
-   - un conduce guardado (clic en su fila de Conduces).
+   - un conduce guardado (clic en su fila de Conduces);
+   - uno nuevo en blanco, sin cotización (botón "Nuevo conduce" de Conduces,
+     payload { kind: 'nuevo' }): sin cliente ni líneas, fechado hoy.
 
    El formulario se monta UNA vez, con todo resuelto: el documento y también
    el cliente (si se borró, abre sin cliente y lo dice). Montarlo antes y
@@ -29,18 +31,19 @@ import { ConduceForm, type InicialConduce } from './ConduceForm'
    Nada de esto llama a /api/conduces ni a la cotización hasta saber que la
    empresa es de Ferretería: a cualquier otra el backend le responde 422, y App
    saca de esta vista al saber que el formato es otro. */
-export function ConduceEditor({ nav, payload }: { nav: Nav; payload: ConduceRef | ConduceDesdeCotizacion }) {
+export function ConduceEditor({ nav, payload }: { nav: Nav; payload: PayloadConduce }) {
   const { formato, error, reintentar } = useFormatoTenant()
   // Primera decisión, y la única: un refresco de branding no desmonta el formulario.
   const habilitado = useRef(false)
   if (formato === 'ferreteria') habilitado.current = true
 
   if (habilitado.current) {
-    return isConduceRef(payload)
-      ? <EditorExistente nav={nav} conduceId={payload.id} />
-      : <EditorDesdeCotizacion nav={nav} cotizacionId={payload.cotizacionId} />
+    if (isConduceRef(payload)) return <EditorExistente nav={nav} conduceId={payload.id} />
+    if (isConduceDesdeCotizacion(payload)) return <EditorDesdeCotizacion nav={nav} cotizacionId={payload.cotizacionId} />
+    return <EditorEnBlanco nav={nav} />
   }
-  const desde = isConduceRef(payload) ? 'conduces' : 'cotizaciones'
+  // Solo el que sale de una cotización vuelve a Cotizaciones; los demás, a Conduces.
+  const desde = isConduceDesdeCotizacion(payload) ? 'cotizaciones' : 'conduces'
   return (
     <Marco nav={nav} desde={desde}>
       {error ? (
@@ -174,6 +177,34 @@ function EditorDesdeCotizacion({ nav, cotizacionId }: { nav: Nav; cotizacionId: 
   )
 }
 
+/**
+ * Un conduce nuevo sin cotización: sin cliente, sin líneas y fechado hoy. No
+ * lee nada, así que no pasa por ConClienteResuelto: con `clientId` null ese
+ * camino diría "El cliente ya no existe" (clienteBorrado), y aquí nunca hubo
+ * cliente. El número queda en "Se asigna al guardar", como el de uno nuevo
+ * desde una cotización. Las líneas del catálogo traen su precio como precio
+ * interno (lineaDesdeProducto, desde el formulario) y las libres no lo traen:
+ * Facturar lo pide después, con su bloqueo del precio 0.
+ */
+function EditorEnBlanco({ nav }: { nav: Nav }) {
+  // Una sola vez: el formulario toma `inicial` al montarse, y la fecha no cambia
+  // porque se pinte de nuevo (ni por pasar la medianoche con el formulario abierto).
+  const [inicial] = useState<InicialConduce>(() => ({
+    conduceId: null,
+    cotizacionId: null,
+    codigo: '',
+    cotizacionCodigo: null,
+    fecha: hoyLocal(),
+    fechaGuardada: '',
+    lineas: [],
+    cliente: null,
+    clienteCompleto: true,
+    clienteBorrado: false,
+    avisoCargos: null,
+  }))
+  return <ConduceForm nav={nav} inicial={inicial} />
+}
+
 function EditorExistente({ nav, conduceId }: { nav: Nav; conduceId: number }) {
   const detalle = useApiQuery(['conduces', 'detail', conduceId], () => getConduce(conduceId))
   const fila = useRef<ConduceRow | null>(null)
@@ -213,7 +244,8 @@ function clienteInicial(
   doc: DocumentoConduce,
   ficha: ApiQueryState<ClientRow | null>,
 ): Pick<InicialConduce, 'cliente' | 'clienteCompleto' | 'clienteBorrado'> | null {
-  // Sin client_id: el cliente se borró (o la cotización nunca lo tuvo).
+  // Sin client_id: el cliente se borró (o la cotización nunca lo tuvo). (El conduce
+  // en blanco no pasa por aquí: ver EditorEnBlanco.)
   if (doc.clientId == null) return { cliente: null, clienteCompleto: true, clienteBorrado: true }
   if (ficha.loading || ficha.fetching) return null
   // 404: el cliente se borró después. El conduce guarda su nombre, pero para

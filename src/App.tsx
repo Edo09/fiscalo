@@ -47,8 +47,8 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  claveFormularioFactura, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaPrefill,
-  isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, type Nav, type ViewId,
+  claveEditorConduce, claveFormularioFactura, debeSalirDeVista, isCotizacionRef, isFacturaPrefill,
+  isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, payloadConduce, type Nav, type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -219,14 +219,14 @@ function AppShell() {
       // Solo Ferretería: la vista espera al formato, y App saca de aquí a otro (debeSalirDeVista).
       case 'conduces': return <ConducesView nav={nav} />
       case 'punto-venta': return <PuntoVentaView />
-      // El conduce de un payload (uno guardado, o uno nuevo desde una
-      // cotización). Con key por documento: pasar de uno a otro monta un
-      // editor limpio. Sin payload (no debería pasar: VIEW_SIN_PAYLOAD cubre
-      // la recarga) no se sabe cuál era: al listado.
+      // El conduce de un payload (uno guardado, uno nuevo desde una cotización,
+      // o uno nuevo en blanco: { kind: 'nuevo' }). Con key por documento: pasar
+      // de uno a otro monta un editor limpio. Sin payload (no debería pasar:
+      // VIEW_SIN_PAYLOAD cubre la recarga) no se sabe cuál era: al listado.
       case 'conduce-editar': {
-        const p = isConduceRef(payload) || isConduceDesdeCotizacion(payload) ? payload : null
+        const p = payloadConduce(payload)
         if (!p) return <SinPayload nav={nav} destino="conduces" />
-        return <ConduceEditor key={p.kind === 'conduce' ? `c-${p.id}` : `q-${p.cotizacionId}`} nav={nav} payload={p} />
+        return <ConduceEditor key={claveEditorConduce(p)} nav={nav} payload={p} />
       }
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />

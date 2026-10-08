@@ -24,7 +24,10 @@ export async function getConduce(id: number | string): Promise<ConduceRow | null
   return data ?? null
 }
 
-/** Crea el conduce de una cotización (`cotizacion_id` obligatorio). El número lo asigna el backend. */
+/**
+ * Crea un conduce, de una cotización de Ferretería (`cotizacion_id`) o sin
+ * cotización (sin esa clave). El número lo asigna el backend.
+ */
 export function createConduce(input: ConduceInput): Promise<{ id: number; code: string; numero: number }> {
   return postJson('/api/conduces', input)
 }
@@ -57,7 +60,8 @@ export function getConducePdf(id: number | string): Promise<DocBase64> {
 
 /**
  * Vista previa del PDF SIN guardar. Con `id` (al editar) sale con el número y
- * la cotización de esa fila; sin `id`, el backend valida `cotizacion_id` como
+ * la cotización de esa fila; sin `id`, el backend valida `cotizacion_id` (si
+ * viene; sin ella, el conduce es sin cotización) como
  * al crear.
  */
 export function previewConduce(input: ConduceInput & { id?: number }): Promise<DocBase64> {

@@ -22,6 +22,7 @@
 // scripts/test-schema-conduce.ts sin compilar nada.
 import { z } from 'zod'
 import type { ConduceInput, CotizacionRow } from '@/api'
+import type { ConduceRef } from '@/config/navigation'
 import type { Cliente } from '@/types/domain'
 import { aNumero, fmt } from '../../lib/format.ts'
 import { isoLocal } from '../../lib/date.ts'
@@ -44,6 +45,41 @@ export const MSG_FECHA = 'La fecha no es válida.'
 /** Confirmación de Eliminar: el conduce se desactiva y su número queda gastado. */
 export const confirmacionEliminar = (codigo: string): string =>
   `El conduce dejará de verse en la lista. Su número ${codigo} no se vuelve a usar.`
+
+// --- Después de guardar --------------------------------------------------------
+
+/**
+ * Guardar un conduce no navega ni muestra un aviso de éxito: abre un modal que
+ * pregunta si volver a la lista (decisión del 2026-10-08). Esto es lo que ese
+ * modal necesita saber del guardado.
+ */
+export interface ConduceGuardado {
+  accion: 'creado' | 'actualizado'
+  id: number
+  /** CON-000005: el que devolvió el backend al crear, o el que ya tenía al editar. */
+  codigo: string
+}
+
+export const PREGUNTA_VOLVER_A_LA_LISTA = '¿Quieres volver a la lista de conduces?'
+export const BTN_VOLVER_A_LA_LISTA = 'Volver a la lista'
+export const BTN_SEGUIR_EN_CONDUCE = 'Seguir en el conduce'
+
+/** Título del modal: "Conduce CON-000005 creado" o "Conduce CON-000005 actualizado". */
+export const tituloConduceGuardado = (g: ConduceGuardado): string => `Conduce ${g.codigo} ${g.accion}`
+
+/**
+ * Adónde lleva "Seguir en el conduce" (y cerrar el modal con la X, Esc o el fondo).
+ * - Recién creado: el formulario que se deja era el de un conduce sin número (en
+ *   blanco o desde una cotización), así que se reemplaza esta entrada del
+ *   historial por el conduce ya guardado, con el payload con que lo abre el
+ *   listado: el editor lo muestra como a cualquier conduce guardado (con su
+ *   número y Guardar cambios, Eliminar y Vista previa), y atrás, adelante y
+ *   recargar se portan igual que con uno abierto desde la lista.
+ * - Recién editado: ya es el conduce guardado, no hay a dónde ir ('quedarse').
+ */
+export function destinoSeguirEnConduce(g: ConduceGuardado): { view: 'conduce-editar'; payload: ConduceRef } | 'quedarse' {
+  return g.accion === 'creado' ? { view: 'conduce-editar', payload: { kind: 'conduce', id: g.id } } : 'quedarse'
+}
 
 /** Cargos que suben el TOTAL de la cotización, en el orden y con las etiquetas del PDF (como ferreteria/conversion.ts). */
 const CARGOS: { clave: string; etiqueta: string }[] = [
@@ -172,7 +208,9 @@ export function mapearErroresConduce(error: z.ZodError, lineas: { id: number }[]
  * precio con el redondeo de la cotización (2 y 4 decimales). Sin `ajustes` ni
  * `formato`: un conduce no lleva cargos (el backend respondería 422) y su
  * formato es siempre el de Ferretería.
- * `cotizacionId` solo al crear: al editar no viaja (el PUT la ignora).
+ * `cotizacionId` solo al crear y solo si hay una: al editar no viaja (el PUT la
+ * ignora), y un conduce sin cotización tampoco la manda (ni la clave: el POST
+ * entiende su ausencia como "sin cotización").
  * `date` ausente = el backend usa ahora (POST) o conserva la guardada (PUT).
  */
 export function cuerpoConduce(datos: {

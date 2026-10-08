@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn } from '@/components/ui'
@@ -24,9 +24,10 @@ import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto } from '@/types/domain'
 import {
-  MSG_CLIENTE_BORRADO, conduceFormSchema, confirmacionEliminar, cuerpoConduce, lineaVacia, mapearErroresConduce,
-  sinErroresConduce, type ErroresConduce,
+  MSG_CLIENTE_BORRADO, conduceFormSchema, confirmacionEliminar, cuerpoConduce, destinoSeguirEnConduce, lineaVacia,
+  mapearErroresConduce, sinErroresConduce, type ConduceGuardado, type ErroresConduce,
 } from './schema'
+import { ConduceGuardadoModal } from './ConduceGuardadoModal'
 import '@/styles/factura-doc.css'
 
 /* FISCALO — Conduce de mercancía de Ferretería (spec conduces 5.5).
@@ -37,19 +38,27 @@ import '@/styles/factura-doc.css'
    para Facturar desde el conduce, y nunca se muestran ni se imprimen.
 
    Este componente es solo el formulario: ConduceEditor lo monta cuando ya sabe
-   qué documento es (nuevo desde una cotización o uno guardado) y quién es el
-   cliente, con todo en `inicial`. App le pone una key por documento, así que
-   `inicial` no cambia mientras está montado. */
+   qué documento es (nuevo desde una cotización, nuevo en blanco sin cotización,
+   o uno guardado) y quién es el cliente, con todo en `inicial`. App le pone una
+   key por documento, así que `inicial` no cambia mientras está montado.
+
+   Guardar (crear o editar) no navega ni avisa con un toast: abre un modal que
+   pregunta si volver a la lista (ConduceGuardadoModal; decisión del 2026-10-08).
+   Eliminar sí avisa con un toast y vuelve a la lista. */
 
 /** Lo que el editor sabe del conduce al abrirlo. */
 export interface InicialConduce {
-  /** null = conduce nuevo (sale de `cotizacionId`). */
+  /** null = conduce nuevo (de `cotizacionId`, o en blanco si ese también es null). */
   conduceId: number | null
-  /** Cotización de origen al crear: el POST la exige. null al editar (el PUT la ignora). */
+  /**
+   * Cotización de origen al crear: el POST la manda si hay una. null al crear =
+   * un conduce sin cotización (el cuerpo no lleva `cotizacion_id`); al editar
+   * siempre null (el PUT la ignora).
+   */
   cotizacionId: number | null
   /** CON-000001, o '' si todavía no se guardó. */
   codigo: string
-  /** Código de la cotización de origen para el encabezado; null = esa cotización se eliminó. */
+  /** Código de la cotización de origen para el encabezado; null = sin cotización (nació sin ella, o se eliminó). */
   cotizacionCodigo: string | null
   /** 'YYYY-MM-DD' del campo de fecha. */
   fecha: string
@@ -61,7 +70,7 @@ export interface InicialConduce {
   clienteCompleto: boolean
   /** El cliente del documento ya no existe: el formulario abre sin cliente y lo dice. */
   clienteBorrado: boolean
-  /** Cargos de la cotización que no pasan al conduce (solo al crear); null = no tenía. */
+  /** Cargos de la cotización que no pasan al conduce (solo al crear con cotización); null = no tenía, o no hay cotización. */
   avisoCargos: string | null
 }
 
@@ -78,8 +87,11 @@ function huella(clienteId: string | null, libre: string, fecha: string, lineas: 
 
 export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduce }) {
   const queryClient = useQueryClient()
-  const { conduceId, cotizacionId, codigo, fechaGuardada } = inicial
+  const { conduceId, cotizacionId, codigo } = inicial
   const editando = conduceId != null
+  // Solo un conduce nuevo que sale de una cotización vuelve a Cotizaciones; uno
+  // guardado o uno en blanco (sin cotización) vuelven a Conduces.
+  const desdeCotizacion = !editando && cotizacionId != null
 
   const [cliente, setCliente] = useState<Cliente | null>(inicial.cliente)
   /** false mientras el cliente es la ficha provisional (sin su RNC). */
@@ -98,8 +110,25 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   const [previewing, setPreviewing] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const [borrando, setBorrando] = useState(false)
-  /** Foto del documento tal como se abrió (ver huella). */
-  const [original] = useState(() => huella(inicial.cliente?.id ?? null, '', inicial.fecha, inicial.lineas))
+  /** Lo que se acaba de guardar, mientras el modal pregunta si volver a la lista; null = no hay modal. */
+  const [guardado, setGuardado] = useState<ConduceGuardado | null>(null)
+  /**
+   * Ya se creó: este formulario no puede crear otro conduce. Con el modal abierto
+   * el botón está desactivado, pero un segundo "Crear conduce" (por teclado, por
+   * un clic que ya venía en camino) gastaría otro número.
+   */
+  const yaCreado = useRef(false)
+  /**
+   * Foto del documento tal como se abrió (ver huella). Al editar y guardar pasa a
+   * ser la de lo guardado: el formulario sigue en pantalla ya sin cambios.
+   */
+  const [original, setOriginal] = useState(() => huella(inicial.cliente?.id ?? null, '', inicial.fecha, inicial.lineas))
+  /**
+   * Día guardado ('' al crear). Si la fecha del formulario sigue siendo ese, el
+   * PUT no la manda y el backend conserva la hora. Al editar y guardar pasa a ser
+   * el día que se mandó.
+   */
+  const [diaGuardado, setDiaGuardado] = useState(inicial.fechaGuardada)
 
   // --- Emisor: el membrete del papel, igual que en la cotización ---
   const { data: emisor } = useApiQuery(['emisor'], getEmisor)
@@ -112,7 +141,8 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   /** Las líneas que se guardan: las filas vacías se descartan sin avisar (ver lineaVacia). */
   const enUso = lineas.filter((l) => !lineaVacia(l))
   // Nuevo o guardado, se avisa al salir solo si se tocó algo: un conduce nuevo
-  // abre con lo de su cotización, y eso se recupera con volver a pulsar Conduce.
+  // abre con lo de su cotización (se recupera con volver a pulsar Conduce) o en
+  // blanco, y sin tocar nada no hay qué perder.
   const hayCambios = huella(cliente?.id ?? null, clienteLibre, fecha, lineas) !== original
   const salida = useAvisoSalida(
     hayCambios,
@@ -122,8 +152,9 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     // Mientras se guarda o se borra no se pregunta: la navegación espera.
     guardando || borrando,
   )
-  // Uno nuevo sale de Cotizaciones y uno guardado, de Conduces: Cancelar vuelve allí.
-  const volver = () => nav(editando ? 'conduces' : 'cotizaciones')
+  // Uno nuevo desde una cotización sale de Cotizaciones; uno guardado o uno en
+  // blanco, de Conduces: Cancelar vuelve allí.
+  const volver = () => nav(desdeCotizacion ? 'cotizaciones' : 'conduces')
 
   // --- Cliente ---
   const quitarErrCliente = () => setErrores((e) => (e.cliente ? { ...e, cliente: undefined } : e))
@@ -197,32 +228,65 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     setErrores(sinErroresConduce())
     // Nuevo: el día elegido con la hora de ahora. Editando, la fecha solo
     // viaja si se cambió el día; si no, el backend conserva la fecha y la hora.
-    const date = editando && fecha === fechaGuardada ? undefined : `${fecha} ${ahoraLocal().slice(11)}`
+    const date = editando && fecha === diaGuardado ? undefined : `${fecha} ${ahoraLocal().slice(11)}`
     return cuerpoConduce({ clienteId: Number(cliente.id), lineas: enUso, cotizacionId: editando ? null : cotizacionId, date })
   }
 
   // Acción única: un doble clic crearía el mismo conduce dos veces (y gastaría dos números).
   const guardar = useAccionUnica(async () => {
+    // Con el modal abierto, o ya creado, no hay nada más que guardar.
+    if (guardado != null || yaCreado.current) return
     const cuerpo = validar()
     if (!cuerpo) return
+    // Lo que se está guardando. Si se sigue escribiendo mientras el servidor
+    // responde, eso queda como cambio sin guardar.
+    const foto = huella(cliente?.id ?? null, clienteLibre, fecha, lineas)
+    const diaEnviado = fecha
     setGuardando(true)
+    let resultado: ConduceGuardado
     try {
       if (conduceId != null) {
         await updateConduce({ ...cuerpo, id: conduceId })
-        toast.success(`Conduce ${codigo} actualizado.`)
+        resultado = { accion: 'actualizado', id: conduceId, codigo }
       } else {
         const res = await createConduce(cuerpo)
-        toast.success(`Conduce ${res.code} creado.`)
+        yaCreado.current = true
+        resultado = { accion: 'creado', id: res.id, codigo: res.code }
       }
-      void queryClient.invalidateQueries({ queryKey: ['conduces'] })
-      salida.liberar()
-      nav('conduces', null, { replace: true })
     } catch (e) {
-      // Los 422 del servidor dicen qué línea falla: se muestran tal cual.
+      // Los 422 del servidor dicen qué línea falla: se muestran tal cual. Sin modal.
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar el conduce.')
       setGuardando(false)
+      return
     }
+    void queryClient.invalidateQueries({ queryKey: ['conduces'] })
+    // Lo guardado pasa a ser el punto de partida: ni la barra de abajo ni el aviso
+    // de salida cuentan como pendiente lo que ya se guardó (y sí lo que se escriba
+    // después, al editar y seguir en el conduce).
+    setOriginal(foto)
+    setDiaGuardado(diaEnviado)
+    // Recién creado, las dos respuestas del modal salen de este formulario: no
+    // queda nada que avisar. (Antes de que el nuevo estado llegue a salida.)
+    if (resultado.accion === 'creado') salida.liberar()
+    setGuardado(resultado)
+    setGuardando(false)
   })
+
+  // --- Después de guardar (ConduceGuardadoModal) ---
+  const volverALaLista = () => {
+    salida.liberar()
+    nav('conduces', null, { replace: true })
+  }
+  /** También lo que hace cerrar el modal: nunca saca al usuario de la pantalla. */
+  const seguirEnElConduce = () => {
+    const destino = guardado ? destinoSeguirEnConduce(guardado) : 'quedarse'
+    if (destino === 'quedarse') {
+      setGuardado(null)
+      return
+    }
+    // Recién creado: esta entrada del historial pasa a ser la del conduce guardado.
+    nav(destino.view, destino.payload, { replace: true })
+  }
 
   const vistaPrevia = async () => {
     const cuerpo = validar()
@@ -260,7 +324,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     <div className="page fx-desk">
       <div className="row between" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={volver}>
-          {editando ? 'Conduces' : 'Cotizaciones'}
+          {desdeCotizacion ? 'Cotizaciones' : 'Conduces'}
         </Btn>
         {editando && confirmDel ? (
           <span className="row gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -301,7 +365,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
               {codigo || 'Se asigna al guardar'}
             </span>
             <span className="fx-aviso fx-aviso--suave">
-              {inicial.cotizacionCodigo ? `Desde la cotización ${inicial.cotizacionCodigo}` : 'De una cotización eliminada'}
+              {inicial.cotizacionCodigo ? `Desde la cotización ${inicial.cotizacionCodigo}` : 'Sin cotización'}
             </span>
             <label className="fx-eyebrow" htmlFor="fx-con-fecha">Fecha</label>
             <input
@@ -469,7 +533,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
           <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previewing}>
             {previewing ? 'Generando…' : 'Vista previa'}
           </Btn>
-          <Btn variant="primary" icon="save" onClick={() => void guardar()} disabled={guardando || borrando}>
+          <Btn variant="primary" icon="save" onClick={() => void guardar()} disabled={guardando || borrando || guardado != null}>
             {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear conduce'}
           </Btn>
         </div>
@@ -484,6 +548,9 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
           onCreated={seleccionarCliente}
         />
       )}
+
+      {/* También fuera del papel, por lo mismo. */}
+      {guardado && <ConduceGuardadoModal guardado={guardado} onVolver={volverALaLista} onSeguir={seguirEnElConduce} />}
     </div>
   )
 }

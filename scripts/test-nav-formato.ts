@@ -11,9 +11,11 @@
 //   node scripts/test-nav-formato.ts
 import type { FormatoId } from '../src/features/cotizaciones/formatos/index.ts'
 import type { NavItem, SesionNav, ViewId } from '../src/config/navigation.ts'
+import type { NavPayload } from '../src/config/navigation.ts'
 import {
-  NAV, TITLES, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, navFormatoFor, navModuleFor, navRequierePos,
-  navSoloAdmin, navTopFor, puedeVerItem, puedeVerVista,
+  NAV, TITLES, claveEditorConduce, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isNuevoSignal, mismoDestino,
+  navFormatoFor, navModuleFor, navRequierePos, navSoloAdmin, navTopFor, payloadAlVolver, payloadConduce, puedeVerItem,
+  puedeVerVista,
 } from '../src/config/navigation.ts'
 import { esRolAdmin, hasModule } from '../src/config/permissions.ts'
 
@@ -196,6 +198,58 @@ chk('isConduceRef', isConduceRef({ kind: 'conduce', id: 3 }) && !isConduceRef({ 
 chk('isConduceDesdeCotizacion',
   isConduceDesdeCotizacion({ kind: 'conduce-desde-cotizacion', cotizacionId: 12 })
   && !isConduceDesdeCotizacion({ kind: 'conduce', id: 12 }) && !isConduceDesdeCotizacion(null))
+
+// Conduce nuevo sin cotización (decisión del 2026-10-08): "Nuevo conduce" abre conduce-editar con el payload
+// { kind: 'nuevo' } de siempre. Pasa las puertas igual que los otros dos payloads (la vista, no el payload, decide
+// el permiso y el formato), App lo acepta y lo monta con su key, y el historial lo compara y lo reabre bien.
+console.log('Conduce nuevo (sin cotización): { kind: "nuevo" } en conduce-editar')
+const nuevo: NavPayload = { kind: 'nuevo' }
+const conduceGuardado: NavPayload = { kind: 'conduce', id: 3 }
+const desdeCotizacion: NavPayload = { kind: 'conduce-desde-cotizacion', cotizacionId: 12 }
+chk('isNuevoSignal: { kind: "nuevo" } sí; los de conduce y null no',
+  isNuevoSignal(nuevo) && !isNuevoSignal(conduceGuardado) && !isNuevoSignal(desdeCotizacion) && !isNuevoSignal(null))
+chk('las puertas de conduce-editar son por vista, no por payload: con ferreteria y permiso entra, con gratex o sin permiso no',
+  puedeVerVista(vendedor, 'conduce-editar', 'ferreteria') && !puedeVerVista(vendedor, 'conduce-editar', 'gratex')
+  && !puedeVerVista(contable, 'conduce-editar', 'ferreteria') && !debeSalirDeVista(vendedor, 'conduce-editar', 'ferreteria')
+  && debeSalirDeVista(vendedor, 'conduce-editar', 'gratex') && debeSalirDeVista(contable, 'conduce-editar', 'ferreteria')
+  && !debeSalirDeVista(vendedor, 'conduce-editar', null))
+chk('payloadConduce (lo que App deja pasar a conduce-editar): los tres, tal cual',
+  payloadConduce(conduceGuardado) === conduceGuardado && payloadConduce(desdeCotizacion) === desdeCotizacion
+  && payloadConduce(nuevo) === nuevo)
+chk('payloadConduce: sin payload, una cotización o una factura no es de un conduce (null: App vuelve al listado)',
+  payloadConduce(null) === null && payloadConduce({ kind: 'cotizacion', id: 3 }) === null
+  && payloadConduce({ kind: 'factura-simple', id: 3 }) === null)
+chk('claveEditorConduce: c-<id>, q-<cotizacion> y nuevo; ninguna se repite entre sí',
+  claveEditorConduce({ kind: 'conduce', id: 3 }) === 'c-3' && claveEditorConduce({ kind: 'conduce-desde-cotizacion', cotizacionId: 3 }) === 'q-3'
+  && claveEditorConduce({ kind: 'nuevo' }) === 'nuevo'
+  && new Set([claveEditorConduce({ kind: 'conduce', id: 3 }), claveEditorConduce({ kind: 'conduce', id: 4 }),
+    claveEditorConduce({ kind: 'conduce-desde-cotizacion', cotizacionId: 3 }), claveEditorConduce({ kind: 'nuevo' })]).size === 4)
+chk('mismoDestino: dos { kind: "nuevo" } distintos en conduce-editar son el mismo destino (el formulario en blanco que ya está)',
+  mismoDestino('conduce-editar', { kind: 'nuevo' }, 'conduce-editar', { kind: 'nuevo' }))
+chk('mismoDestino: nuevo no es un conduce guardado, ni uno desde una cotización, ni la vista sin payload',
+  !mismoDestino('conduce-editar', nuevo, 'conduce-editar', conduceGuardado)
+  && !mismoDestino('conduce-editar', conduceGuardado, 'conduce-editar', nuevo)
+  && !mismoDestino('conduce-editar', nuevo, 'conduce-editar', desdeCotizacion)
+  && !mismoDestino('conduce-editar', desdeCotizacion, 'conduce-editar', nuevo)
+  && !mismoDestino('conduce-editar', nuevo, 'conduce-editar', null) && !mismoDestino('conduce-editar', null, 'conduce-editar', nuevo))
+chk('mismoDestino: nuevo en otra vista no cuenta, y fuera de conduce-editar no cambia nada (gastos: objetos distintos = otro destino)',
+  !mismoDestino('conduce-editar', nuevo, 'conduces', null) && !mismoDestino('conduce-editar', nuevo, 'gastos', { kind: 'nuevo' })
+  && !mismoDestino('gastos', { kind: 'nuevo' }, 'gastos', { kind: 'nuevo' }) && mismoDestino('gastos', nuevo, 'gastos', nuevo))
+chk('mismoDestino de siempre: el mismo conduce, la misma cotización de origen o el mismo id sí; otro id, otra vista o un payload distinto no',
+  mismoDestino('conduce-editar', { kind: 'conduce', id: 3 }, 'conduce-editar', { kind: 'conduce', id: 3 })
+  && !mismoDestino('conduce-editar', { kind: 'conduce', id: 3 }, 'conduce-editar', { kind: 'conduce', id: 4 })
+  && mismoDestino('conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: 12 }, 'conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: 12 })
+  && !mismoDestino('conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: 12 }, 'conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: 13 })
+  && !mismoDestino('conduce-editar', conduceGuardado, 'conduces', conduceGuardado)
+  && mismoDestino('cotizacion-nueva', { kind: 'cotizacion', id: 5 }, 'cotizacion-nueva', { kind: 'cotizacion', id: 5 })
+  && mismoDestino('factura-simple-editar', { kind: 'factura-simple', id: 5 }, 'factura-simple-editar', { kind: 'factura-simple', id: 5 })
+  && mismoDestino('conduces', null, 'conduces', null))
+chk('payloadAlVolver: "Nueva > Gasto" (nuevo en otra vista) no se repite al volver, como siempre; en conduce-editar el nuevo SÍ vuelve (es el formulario)',
+  payloadAlVolver('gastos', nuevo) === null && payloadAlVolver('compras', nuevo) === null
+  && payloadAlVolver('conduce-editar', nuevo) === nuevo)
+chk('payloadAlVolver: lo que no es "nuevo" vuelve tal cual, y null sigue siendo null',
+  payloadAlVolver('conduce-editar', conduceGuardado) === conduceGuardado && payloadAlVolver('conduce-editar', desdeCotizacion) === desdeCotizacion
+  && payloadAlVolver('factura-ver', null) === null && payloadAlVolver('conduces', null) === null)
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

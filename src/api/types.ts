@@ -739,9 +739,9 @@ export interface ConduceRow {
   /** CON-000001. No se vuelve a usar nunca, ni después de Eliminar. */
   code?: string | null
   date?: string | null
-  /** Cotización de origen; null si esa cotización se eliminó. */
+  /** Cotización de origen; null = sin cotización (se creó sin ella, o esa cotización se eliminó). */
   cotizacion_id?: number | null
-  /** Código de la cotización de origen (COT-…); null si se eliminó. */
+  /** Código de la cotización de origen (COT-…); null = sin cotización. */
   cotizacion_code?: string | null
   client_id?: number | null
   /** Del cliente actual (LEFT JOIN clients): null si el cliente se borró. */
@@ -781,7 +781,10 @@ export interface ConduceItemInput {
  * token). En PUT el `id` va en el cuerpo, como en cotizaciones.
  */
 export interface ConduceInput {
-  /** Obligatorio al crear: la cotización de Ferretería de origen. En PUT se ignora. */
+  /**
+   * Al crear: la cotización de Ferretería de origen. Ausente = un conduce sin
+   * cotización. En PUT se ignora.
+   */
   cotizacion_id?: number
   client_id: number
   /** 'YYYY-MM-DD HH:MM:SS'. Ausente en PUT = se conserva la fecha guardada. */
