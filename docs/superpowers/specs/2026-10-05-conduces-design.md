@@ -549,7 +549,8 @@ Unchanged, except for one button on quote rows.
     vuelve a usar.";
   - the leave-without-saving warning.
 
-  After saving or deleting, the user goes back to the Conduces list, with a toast.
+  After deleting, the user goes back to the Conduces list, with a toast. After saving (a create or an edit), a
+  modal asks whether to go back to the list (section 9, decision of 2026-10-08).
 - **Validation:** a Zod schema with the quote form's per-line messages, and the conduce header messages
   (client required, at least one line).
 
@@ -741,3 +742,4 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
   Factura. Quote A, quote B and a conduce never share a key (the type tells quotes from conduces, and the code, or
   `#id`, tells one from another).
 - **Conduce without a quote, "Nuevo conduce" (decision of 2026-10-08).** The owner decided that conduces can also be created without a quote, which replaces the original "no conduce from scratch" (sections 1 and 8). `POST /api/conduces` takes `cotizacion_id` as optional: absent or `null` creates a conduce with `cotizacion_id` NULL, and when it is sent it is validated as before. The Conduces page gets a "Nuevo conduce" button, and `conduce-editar` opens a blank form with the `{ kind: 'nuevo' }` payload. A conduce created without a quote and one whose quote was deleted are the same row, and both show **"Sin cotización"**, which replaces "eliminada" in the list column and "De una cotización eliminada" in the form header; the empty state now reads "Todavía no hay conduces. Crea uno con Nuevo conduce o desde una cotización con el botón Conduce."
+- **After saving, a modal asks whether to go back to the list (5.5; decision of 2026-10-08).** Saving a conduce (a new one from scratch, a new one from a quote, or an edit) no longer navigates away or shows the success toast. A modal (`ConduceGuardadoModal`) titled "Conduce CON-000005 creado" (or "… actualizado") asks "¿Quieres volver a la lista de conduces?", with a primary "Volver a la lista" (the Conduces list, replacing the history entry, as before) and a ghost "Seguir en el conduce". "Seguir en el conduce", and closing the modal with its X, Esc or the backdrop, stay on the saved conduce. After a create, the history entry is replaced by the saved conduce (`conduce-editar` with `{ kind: 'conduce', id }`, from `destinoSeguirEnConduce` in `schema.ts`), so the editor shows it like one opened from the list, and Back, Forward and reload behave the same. After an edit the form stays where it is and what was saved becomes its starting point, so the leave warning counts only what is typed afterwards. While the modal is open the save button is disabled, and a conduce already created cannot be created again from the same form. The error toast, the delete toast with its return to the list, and the `['conduces']` invalidation are unchanged.
