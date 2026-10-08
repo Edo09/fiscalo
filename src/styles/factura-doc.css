@@ -901,6 +901,16 @@
   grid-template-columns: 22px 70px 86px minmax(0, 1fr) 110px 86px 120px;
 }
 
+/* ---------- Conduce de mercancia (features/conduces) ---------- */
+/* La rejilla de Ferreteria sin Precio, ITBIS ni Valor total: el conduce no
+   muestra montos (cada linea guarda su precio solo para facturar). Con esas
+   columnas fuera, la unidad tiene sitio para su nombre entero. Hereda lo del
+   e-CF (rotulos por celda en movil, hover del boton de quitar) igual que
+   .fx-grid-cot-fer. */
+.fx-grid-ecf.fx-grid-conduce {
+  grid-template-columns: 22px 70px 140px minmax(0, 1fr);
+}
+
 /* Buscador del catalogo en la fila de "agregar", junto a "Linea libre". */
 .fx-buscar-prod { flex: 1 1 280px; max-width: 460px; }
 /* El papel recorta lo que sobresale (overflow: hidden, por el filete de
@@ -1046,6 +1056,11 @@
   .fx-grid-cot-fer > .fx-gutter { order: -2; }
   .fx-grid-cot-fer > .fx-desc { order: -1; }
   .fx-grid-cot-fer > .fx-importe { grid-column: 2; }
+  /* Conduce: igual, la descripcion primero y a lo ancho; debajo, la cantidad
+     y la unidad lado a lado, cada una con su rotulo (data-label). */
+  .fx-grid-ecf.fx-grid-conduce { grid-template-columns: 1fr auto; }
+  .fx-grid-conduce > .fx-gutter { order: -2; }
+  .fx-grid-conduce > .fx-desc { order: -1; }
   .fx-grid-ecf > .fx-desc { grid-column: 1 / -1; }
   .fx-cierre { grid-template-columns: 1fr; }
   /* La cabecera se oculta EN EL MISMO breakpoint en que colapsa la rejilla: si

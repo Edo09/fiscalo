@@ -19,6 +19,7 @@ import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
 import { ConducesView } from '@/features/conduces/ConducesView'
+import { ConduceEditor } from '@/features/conduces/ConduceEditor'
 import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
@@ -44,8 +45,8 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  debeSalirDeVista, isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor,
-  type ViewId,
+  debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill,
+  isFacturaSimpleRef, isNuevoSignal, navTopFor, type Nav, type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -80,6 +81,15 @@ function restoreView(): ViewId {
   const guardada = localStorage.getItem('fiscalo.view') as ViewId | null
   if (!guardada) return 'dashboard'
   return VIEW_SIN_PAYLOAD[guardada] ?? guardada
+}
+
+/**
+ * Vista que llegó sin su payload: no pinta nada y vuelve a `destino` sin
+ * apilar. Desde un efecto: navegar mientras se pinta no está permitido.
+ */
+function SinPayload({ nav, destino }: { nav: Nav; destino: ViewId }) {
+  useEffect(() => { nav(destino, null, { replace: true }) }, [nav, destino])
+  return null
 }
 
 function App() {
@@ -195,6 +205,15 @@ function AppShell() {
       }
       // Solo Ferretería: la vista espera al formato, y App saca de aquí a otro (debeSalirDeVista).
       case 'conduces': return <ConducesView nav={nav} />
+      // El conduce de un payload (uno guardado, o uno nuevo desde una
+      // cotización). Con key por documento: pasar de uno a otro monta un
+      // editor limpio. Sin payload (no debería pasar: VIEW_SIN_PAYLOAD cubre
+      // la recarga) no se sabe cuál era: al listado.
+      case 'conduce-editar': {
+        const p = isConduceRef(payload) || isConduceDesdeCotizacion(payload) ? payload : null
+        if (!p) return <SinPayload nav={nav} destino="conduces" />
+        return <ConduceEditor key={p.kind === 'conduce' ? `c-${p.id}` : `q-${p.cotizacionId}`} nav={nav} payload={p} />
+      }
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />
