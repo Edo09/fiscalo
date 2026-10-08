@@ -40,6 +40,8 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { id: 'landing', label: 'Landing', admin: true },
   { id: 'users', label: 'Usuarios', admin: true },
   { id: 'roles', label: 'Roles', admin: true },
+  // POS: cajas, empleados con PIN, equipos de caja y el botón POS (api-gratex docs/specs/pos.md).
+  { id: 'pos', label: 'POS', admin: true },
 ]
 
 /** Etiqueta de un módulo (o el id crudo si no está en el catálogo). */

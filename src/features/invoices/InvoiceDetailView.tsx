@@ -11,7 +11,7 @@ import { presentDocument } from '@/lib/file'
 import { aNumero, fmtCantidad, fmtPrecio } from '@/lib/format'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo } from './imprimirRecibo'
-import { lineaQueCuadra, type ItemFirmado } from './montosLinea'
+import { lineaQueCuadra, r2, type ItemFirmado } from './montosLinea'
 import { anuladaPor, filasRelacionadas } from './notasVinculadas'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { staleTimeFor } from '@/config/cache'
@@ -81,15 +81,29 @@ function itemsFirmados(xml: string | null | undefined): ItemFirmado[] | null {
 function lineasImpresas(items: FacturaItemRow[], xml: string | null | undefined) {
   const firmados = itemsFirmados(xml)
   const delXml = firmados != null && firmados.length === items.length ? firmados : null
+  const conItbis = preciosIncluyenItbis(xml)
   return items.map((l, i) => {
     const descuento = aNumero(l.descuento_monto)
-    const importe = l.subtotal == null || l.subtotal === '' ? null : aNumero(l.subtotal)
+    const base = l.subtotal == null || l.subtotal === '' ? null : aNumero(l.subtotal)
+    // Con precios con ITBIS (ventas del POS) subtotal guarda la base sin ITBIS,
+    // que es lo que suman los reportes: el importe de la línea es el MontoItem
+    // firmado, base + ITBIS. Igual que EcfDocumento::conItbisEnValor.
+    const importe = base != null && conItbis ? r2(base + aNumero(l.itbis_amount)) : base
     // Sin cantidad cuenta 1, como en el backend.
     const { cantidad, precio } = lineaQueCuadra(
       aNumero(l.quantity ?? 1), aNumero(l.amount), importe, descuento, 'ecf', delXml?.[i] ?? null,
     )
-    return { cantidad, precio, descuento }
+    return { cantidad, precio, descuento, importe }
   })
+}
+
+/**
+ * IndicadorMontoGravado = 1 en el e-CF firmado: los precios y el MontoItem de
+ * cada línea traen el ITBIS adentro. Mismo criterio que
+ * EcfDocumento::preciosIncluyenItbis en el backend.
+ */
+function preciosIncluyenItbis(xml: string | null | undefined): boolean {
+  return xml != null && /<IndicadorMontoGravado>\s*1\s*<\/IndicadorMontoGravado>/.test(xml)
 }
 
 /* FISCALO — Facturación: ver factura (detalle + estado DGII en vivo + PDF/XML).
@@ -395,7 +409,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
                 <span className="fx-num fx-cell" data-label="Precio"><span className="num">{fmtPrecio(impresas[i]?.precio ?? l.amount)}</span></span>
                 <span className="fx-num fx-cell" data-label="ITBIS"><Money value={aNumero(l.itbis_amount)} cur={false} /></span>
                 <span className="fx-importe fx-cell" data-label="Importe">
-                  <Money value={aNumero(l.subtotal ?? l.amount)} cur={false} />
+                  <Money value={impresas[i]?.importe ?? aNumero(l.subtotal ?? l.amount)} cur={false} />
                   {/* El importe ya viene neto del descuento: sin mostrarlo, la
                       línea no daba cantidad × precio. */}
                   {(impresas[i]?.descuento ?? 0) > 0 && (
