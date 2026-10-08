@@ -18,8 +18,9 @@ const PAGE_SIZE = 15
 
    El conduce es el papel que va con la mercancía y que el cliente firma. Sale
    de una cotización de Ferretería (botón "Conduce" del listado de
-   cotizaciones), así que aquí no hay "Nuevo". Nunca muestra precios. Eliminar
-   lo desactiva: deja de salir aquí y su número no se vuelve a usar.
+   cotizaciones) o se crea aquí sin cotización (botón "Nuevo conduce", decisión
+   del 2026-10-08). Nunca muestra precios. Eliminar lo desactiva: deja de salir
+   aquí y su número no se vuelve a usar.
 
    Es solo del formato 'ferreteria'. Hasta que branding dice el del tenant no
    se pide nada, porque a otro formato el backend le responde 422 en todo. Si
@@ -44,6 +45,8 @@ export function ConducesView({ nav }: { nav: Nav }) {
 
   // Editar vive en su propia pantalla (el papel), como la cotización.
   const abrir = (c: ConduceRow) => nav('conduce-editar', { kind: 'conduce', id: c.id })
+  // Uno nuevo, sin cotización: el mismo papel en blanco (payload { kind: 'nuevo' }).
+  const nuevo = () => nav('conduce-editar', { kind: 'nuevo' })
 
   // `listo` va en la clave: mientras se espera el formato, la consulta guarda
   // un null, y con la misma clave ese null seguiría en caché al saberse el
@@ -81,7 +84,12 @@ export function ConducesView({ nav }: { nav: Nav }) {
         sub={total != null
           ? `${total} ${total === 1 ? 'conduce registrado' : 'conduces registrados'}`
           : 'La mercancía que entregas, firmada por el cliente'}
-        actions={<RefreshButton onRefresh={reload} />}
+        actions={
+          <>
+            <RefreshButton onRefresh={reload} />
+            <Btn variant="primary" icon="plus" onClick={nuevo}>Nuevo conduce</Btn>
+          </>
+        }
       />
 
       <div className="toolbar">
@@ -110,9 +118,9 @@ export function ConducesView({ nav }: { nav: Nav }) {
         ) : rows.length === 0 ? (
           <EmptyState icon="truck" title="No hay conduces"
             action={query ? undefined : (
-              <Btn variant="secondary" icon="file-plus" onClick={() => nav('cotizaciones')}>Ir a Cotizaciones</Btn>
+              <Btn variant="primary" icon="plus" onClick={nuevo}>Nuevo conduce</Btn>
             )}>
-            {query ? `Sin resultados para "${query}".` : 'Todavía no hay conduces. Crea uno desde una cotización con el botón Conduce.'}
+            {query ? `Sin resultados para "${query}".` : 'Todavía no hay conduces. Crea uno con Nuevo conduce o desde una cotización con el botón Conduce.'}
           </EmptyState>
         ) : (
           <div className="tbl-wrap">
@@ -136,11 +144,11 @@ export function ConducesView({ nav }: { nav: Nav }) {
                       <td><span className="mono text-sm fw6">{c.code || `#${c.id}`}</span></td>
                       <td><div className="row gap-sm"><Avatar name={cliente} size={28} /><span className="cell-main">{cliente}</span></div></td>
                       <td className="muted text-sm">{formatApiDate(c.date)}</td>
-                      {/* La cotización de origen se pudo eliminar: su código llega en null. */}
+                      {/* Sin cotización: se creó sin ella, o su cotización se eliminó (el código llega en null). */}
                       <td>
                         {c.cotizacion_code
                           ? <span className="mono text-sm">{c.cotizacion_code}</span>
-                          : <span className="muted text-sm">eliminada</span>}
+                          : <span className="muted text-sm">Sin cotización</span>}
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>

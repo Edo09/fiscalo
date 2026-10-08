@@ -46,7 +46,12 @@ export type ViewId =
   | 'bitacora'
   | 'configuracion'
 
-/** Señal del botón "Nueva" del navbar: abre el formulario de alta al llegar a la vista. */
+/**
+ * Señal del botón "Nueva" del navbar: abre el formulario de alta al llegar a la
+ * vista. También es el payload de `conduce-editar` para un conduce nuevo sin
+ * cotización (botón "Nuevo conduce" de Conduces): ahí es el destino mismo, el
+ * formulario en blanco (ver payloadConduce y payloadAlVolver).
+ */
 export interface NuevoSignal { kind: 'nuevo' }
 
 /** Referencia a una factura simple para abrirla en su formulario de edición. */
@@ -113,6 +118,55 @@ export function isConduceDesdeCotizacion(p: unknown): p is ConduceDesdeCotizacio
 /** ¿El payload pide abrir el formulario de "nuevo" (desde el botón Nueva)? */
 export function isNuevoSignal(p: NavPayload): p is NuevoSignal {
   return p != null && (p as NuevoSignal).kind === 'nuevo'
+}
+
+/** Lo que `conduce-editar` sabe abrir: un conduce guardado, uno nuevo desde una cotización, o uno nuevo en blanco. */
+export type PayloadConduce = ConduceRef | ConduceDesdeCotizacion | NuevoSignal
+
+/**
+ * El payload de `conduce-editar`, o null si no es de un conduce (App vuelve
+ * entonces al listado: sin payload no se sabe qué conduce era).
+ */
+export function payloadConduce(p: NavPayload): PayloadConduce | null {
+  return isConduceRef(p) || isConduceDesdeCotizacion(p) || isNuevoSignal(p) ? p : null
+}
+
+/**
+ * La `key` con que App monta el editor de conduces: una por documento, para que
+ * pasar de uno a otro monte un editor limpio. Un conduce nuevo en blanco es
+ * siempre el mismo documento: dos señales "nuevo" distintas dan la misma key.
+ */
+export function claveEditorConduce(p: PayloadConduce): string {
+  return isConduceRef(p) ? `c-${p.id}` : isConduceDesdeCotizacion(p) ? `q-${p.cotizacionId}` : 'nuevo'
+}
+
+/**
+ * Dos destinos muestran lo mismo. Los payloads se comparan por lo que abren y
+ * no por identidad: cada clic en una factura arma un objeto nuevo, y "atrás" a
+ * otra entrada de la misma factura no es salir de ella. Dos señales "nuevo" de
+ * `conduce-editar` son el mismo formulario en blanco; en las demás vistas
+ * (Gastos, Compras) la señal solo se compara por identidad, como siempre.
+ */
+export function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayload): boolean {
+  if (v1 !== v2) return false
+  if (p1 === p2) return true
+  if (isFacturaSimpleRef(p1) && isFacturaSimpleRef(p2)) return p1.id === p2.id
+  if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
+  if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
+  if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
+  if (v1 === 'conduce-editar' && isNuevoSignal(p1) && isNuevoSignal(p2)) return true
+  return false
+}
+
+/**
+ * El payload con que se reabre una entrada del historial al volver "atrás" o
+ * "adelante". La señal "nuevo" abre el formulario de alta al llegar a la vista
+ * (Nueva > Gasto) y no se repite al volver: cae a null. En `conduce-editar` es
+ * el documento mismo (el conduce en blanco), y sin ella volver a esa entrada
+ * mostraría el listado.
+ */
+export function payloadAlVolver(view: ViewId, guardado: NavPayload): NavPayload {
+  return isNuevoSignal(guardado) && view !== 'conduce-editar' ? null : guardado
 }
 
 export interface NavOptions {

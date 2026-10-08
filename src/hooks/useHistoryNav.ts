@@ -12,7 +12,7 @@
 // cambio de vista se detiene hasta que el usuario confirme (`salidaPendiente`).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaSimpleRef, isNuevoSignal,
+  mismoDestino, payloadAlVolver,
   type Nav, type NavOptions, type NavPayload, type ViewId,
 } from '@/config/navigation'
 import { descartarSinGuardar, guardandoAhora, haySinGuardar, mensajeSinGuardar } from './useAvisoSalida'
@@ -66,21 +66,6 @@ export interface SalidaPendiente {
   salir: () => void
   /** Seguir en la vista (y deshacer lo que el navegador ya movió, si fue atrás). */
   quedarse: () => void
-}
-
-/**
- * Dos destinos muestran lo mismo. Los payloads se comparan por lo que abren y
- * no por identidad: cada clic en una factura arma un objeto nuevo, y "atrás" a
- * otra entrada de la misma factura no es salir de ella.
- */
-function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayload): boolean {
-  if (v1 !== v2) return false
-  if (p1 === p2) return true
-  if (isFacturaSimpleRef(p1) && isFacturaSimpleRef(p2)) return p1.id === p2.id
-  if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
-  if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
-  if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
-  return false
 }
 
 export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
@@ -243,7 +228,8 @@ export function useHistoryNav({ inicial, sinPayload, onCambio }: Opciones): {
       const perdido = entrada.conPayload && !payloads.current.has(entrada.key)
       const guardado = payloads.current.get(entrada.key) ?? null
       // "Nueva → Gasto" abre el formulario al llegar; al volver no se repite.
-      const p = isNuevoSignal(guardado) ? null : guardado
+      // En un conduce nuevo la señal es el documento mismo y sí vuelve (payloadAlVolver).
+      const p = payloadAlVolver(entrada.view, guardado)
       const v = perdido ? (sinPayloadRef.current[entrada.view] ?? entrada.view) : entrada.view
       return { entrada, v, p, perdido }
     }

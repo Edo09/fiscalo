@@ -37,19 +37,23 @@ import '@/styles/factura-doc.css'
    para Facturar desde el conduce, y nunca se muestran ni se imprimen.
 
    Este componente es solo el formulario: ConduceEditor lo monta cuando ya sabe
-   qué documento es (nuevo desde una cotización o uno guardado) y quién es el
-   cliente, con todo en `inicial`. App le pone una key por documento, así que
-   `inicial` no cambia mientras está montado. */
+   qué documento es (nuevo desde una cotización, nuevo en blanco sin cotización,
+   o uno guardado) y quién es el cliente, con todo en `inicial`. App le pone una
+   key por documento, así que `inicial` no cambia mientras está montado. */
 
 /** Lo que el editor sabe del conduce al abrirlo. */
 export interface InicialConduce {
-  /** null = conduce nuevo (sale de `cotizacionId`). */
+  /** null = conduce nuevo (de `cotizacionId`, o en blanco si ese también es null). */
   conduceId: number | null
-  /** Cotización de origen al crear: el POST la exige. null al editar (el PUT la ignora). */
+  /**
+   * Cotización de origen al crear: el POST la manda si hay una. null al crear =
+   * un conduce sin cotización (el cuerpo no lleva `cotizacion_id`); al editar
+   * siempre null (el PUT la ignora).
+   */
   cotizacionId: number | null
   /** CON-000001, o '' si todavía no se guardó. */
   codigo: string
-  /** Código de la cotización de origen para el encabezado; null = esa cotización se eliminó. */
+  /** Código de la cotización de origen para el encabezado; null = sin cotización (nació sin ella, o se eliminó). */
   cotizacionCodigo: string | null
   /** 'YYYY-MM-DD' del campo de fecha. */
   fecha: string
@@ -61,7 +65,7 @@ export interface InicialConduce {
   clienteCompleto: boolean
   /** El cliente del documento ya no existe: el formulario abre sin cliente y lo dice. */
   clienteBorrado: boolean
-  /** Cargos de la cotización que no pasan al conduce (solo al crear); null = no tenía. */
+  /** Cargos de la cotización que no pasan al conduce (solo al crear con cotización); null = no tenía, o no hay cotización. */
   avisoCargos: string | null
 }
 
@@ -80,6 +84,9 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   const queryClient = useQueryClient()
   const { conduceId, cotizacionId, codigo, fechaGuardada } = inicial
   const editando = conduceId != null
+  // Solo un conduce nuevo que sale de una cotización vuelve a Cotizaciones; uno
+  // guardado o uno en blanco (sin cotización) vuelven a Conduces.
+  const desdeCotizacion = !editando && cotizacionId != null
 
   const [cliente, setCliente] = useState<Cliente | null>(inicial.cliente)
   /** false mientras el cliente es la ficha provisional (sin su RNC). */
@@ -112,7 +119,8 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   /** Las líneas que se guardan: las filas vacías se descartan sin avisar (ver lineaVacia). */
   const enUso = lineas.filter((l) => !lineaVacia(l))
   // Nuevo o guardado, se avisa al salir solo si se tocó algo: un conduce nuevo
-  // abre con lo de su cotización, y eso se recupera con volver a pulsar Conduce.
+  // abre con lo de su cotización (se recupera con volver a pulsar Conduce) o en
+  // blanco, y sin tocar nada no hay qué perder.
   const hayCambios = huella(cliente?.id ?? null, clienteLibre, fecha, lineas) !== original
   const salida = useAvisoSalida(
     hayCambios,
@@ -122,8 +130,9 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     // Mientras se guarda o se borra no se pregunta: la navegación espera.
     guardando || borrando,
   )
-  // Uno nuevo sale de Cotizaciones y uno guardado, de Conduces: Cancelar vuelve allí.
-  const volver = () => nav(editando ? 'conduces' : 'cotizaciones')
+  // Uno nuevo desde una cotización sale de Cotizaciones; uno guardado o uno en
+  // blanco, de Conduces: Cancelar vuelve allí.
+  const volver = () => nav(desdeCotizacion ? 'cotizaciones' : 'conduces')
 
   // --- Cliente ---
   const quitarErrCliente = () => setErrores((e) => (e.cliente ? { ...e, cliente: undefined } : e))
@@ -260,7 +269,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     <div className="page fx-desk">
       <div className="row between" style={{ marginBottom: 14, alignItems: 'flex-start' }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={volver}>
-          {editando ? 'Conduces' : 'Cotizaciones'}
+          {desdeCotizacion ? 'Cotizaciones' : 'Conduces'}
         </Btn>
         {editando && confirmDel ? (
           <span className="row gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -301,7 +310,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
               {codigo || 'Se asigna al guardar'}
             </span>
             <span className="fx-aviso fx-aviso--suave">
-              {inicial.cotizacionCodigo ? `Desde la cotización ${inicial.cotizacionCodigo}` : 'De una cotización eliminada'}
+              {inicial.cotizacionCodigo ? `Desde la cotización ${inicial.cotizacionCodigo}` : 'Sin cotización'}
             </span>
             <label className="fx-eyebrow" htmlFor="fx-con-fecha">Fecha</label>
             <input

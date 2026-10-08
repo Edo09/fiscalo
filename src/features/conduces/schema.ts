@@ -172,7 +172,9 @@ export function mapearErroresConduce(error: z.ZodError, lineas: { id: number }[]
  * precio con el redondeo de la cotización (2 y 4 decimales). Sin `ajustes` ni
  * `formato`: un conduce no lleva cargos (el backend respondería 422) y su
  * formato es siempre el de Ferretería.
- * `cotizacionId` solo al crear: al editar no viaja (el PUT la ignora).
+ * `cotizacionId` solo al crear y solo si hay una: al editar no viaja (el PUT la
+ * ignora), y un conduce sin cotización tampoco la manda (ni la clave: el POST
+ * entiende su ausencia como "sin cotización").
  * `date` ausente = el backend usa ahora (POST) o conserva la guardada (PUT).
  */
 export function cuerpoConduce(datos: {

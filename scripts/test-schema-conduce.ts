@@ -82,6 +82,24 @@ chk('cuerpo: nunca lleva ajustes ni formato (el backend rechaza los ajustes)', !
 const alEditar = cuerpoConduce({ clienteId: 7, lineas: [linea(1)], cotizacionId: null })
 chk('cuerpo al editar: sin cotizacion_id ni date (el PUT conserva la fecha guardada)',
   !('cotizacion_id' in alEditar) && !('date' in alEditar) && alEditar.client_id === 7)
+// Un conduce nuevo SIN cotización ("Nuevo conduce", decisión del 2026-10-08): ConduceForm manda cotizacionId null
+// y el POST no lleva la clave cotizacion_id (ni siquiera null): el backend entiende su ausencia como "sin cotización".
+const lineasSinCot = [linea(1, { prodId: '55', descripcion: 'FUNDAS CEMENTO GRIS', cantidad: 2, precio: 935 }), linea(2, { descripcion: 'ARENA', precio: 0 })]
+const sinCotizacion = cuerpoConduce({ clienteId: 7, lineas: lineasSinCot, cotizacionId: null, date: '2026-10-08 09:00:00' })
+chk('cuerpo al crear sin cotización: ni la clave cotizacion_id (ni null), con cliente, fecha y líneas como siempre',
+  !('cotizacion_id' in sinCotizacion) && !JSON.stringify(sinCotizacion).includes('cotizacion_id')
+  && JSON.stringify(sinCotizacion) === JSON.stringify({
+    client_id: 7,
+    date: '2026-10-08 09:00:00',
+    items: [
+      { product_id: 55, description: 'FUNDAS CEMENTO GRIS', quantity: 2, unidad_medida: '43', amount: 935, indicador_facturacion: 1, indicador_bien_servicio: 1 },
+      { product_id: null, description: 'ARENA', quantity: 1, unidad_medida: '43', amount: 0, indicador_facturacion: 1, indicador_bien_servicio: 1 },
+    ],
+  }))
+chk('cuerpo sin cotización: cotizacionId ausente da lo mismo que null',
+  JSON.stringify(cuerpoConduce({ clienteId: 7, lineas: lineasSinCot, date: '2026-10-08 09:00:00' })) === JSON.stringify(sinCotizacion))
+chk('cuerpo con cotización: sigue llevando cotizacion_id, como primera clave',
+  Object.keys(cuerpoConduce({ clienteId: 7, lineas: lineasSinCot, cotizacionId: 12 }))[0] === 'cotizacion_id')
 chk('cuerpo: la cantidad viaja con 2 decimales', cuerpoConduce({ clienteId: 7, lineas: [linea(1, { cantidad: 2.005, unidadMedida: 47 })] })
   .items[0].quantity === 2.01)
 
