@@ -21,6 +21,7 @@ export type ViewId =
   | 'cotizaciones'
   | 'cotizacion-nueva'
   | 'conduces'
+  | 'punto-venta'
   | 'conduce-editar'
   | 'clientes'
   | 'productos'
@@ -207,6 +208,12 @@ export interface NavItem {
    * Ferretería). Además de `module`, no en vez de él. Ver puedeVerItem().
    */
   formato?: FormatoId
+  /**
+   * Solo si la empresa tiene el POS activo (branding.pos_enabled, master
+   * tenants.pos_enabled). Además de `module`, no en vez de él. Igual que
+   * `formato`, no es fail-open: mientras no se sabe, no se muestra.
+   */
+  requierePos?: boolean
 }
 
 export interface NavGroup {
@@ -231,6 +238,9 @@ export const NAV: NavGroup[] = [
       // Solo Ferretería: el conduce sale de sus cotizaciones (spec conduces 5.1).
       // El permiso es el de Cotizaciones; el formato lo dice branding (puedeVerItem).
       { id: 'conduces', label: 'Conduces', icon: 'truck', module: 'cotizaciones', formato: 'ferreteria' },
+      // POS (api-gratex docs/specs/pos.md M1): empleados con PIN, cajas y equipos.
+      // El POS solo vende; esto se administra aqui. Solo con el POS activo.
+      { id: 'punto-venta', label: 'Punto de venta', icon: 'printer', module: 'pos', requierePos: true },
       { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
     ],
   },
@@ -336,6 +346,12 @@ export function navFormatoFor(view: ViewId): FormatoId | undefined {
   return undefined
 }
 
+/** ¿La vista (o su item del menú) exige que la empresa tenga el POS activo? */
+export function navRequierePos(view: ViewId): boolean {
+  const top = navTopFor(view)
+  return NAV.some((g) => g.items.some((i) => i.id === top && i.requierePos === true))
+}
+
 /** Lo que hace falta de la sesión para decidir qué se muestra (ver stores/auth). */
 export interface SesionNav {
   role?: string
@@ -355,18 +371,28 @@ export interface SesionNav {
  */
 export function puedeVerItem(
   user: SesionNav | null | undefined,
-  it: { module?: string; soloAdmin?: boolean; formato?: FormatoId },
+  it: { module?: string; soloAdmin?: boolean; formato?: FormatoId; requierePos?: boolean },
   formato?: FormatoId | null,
+  posActivo?: boolean | null,
 ): boolean {
   if (it.formato !== undefined && formato !== it.formato) return false
+  // Como el formato: un item del POS solo se ve cuando se SABE que la empresa lo tiene.
+  if (it.requierePos && posActivo !== true) return false
   if (it.soloAdmin) return esRolAdmin(user?.role)
   const perms = user?.permissions
   return !it.module || !perms || hasModule(perms, it.module)
 }
 
 /** ¿La sesión puede abrir la vista? Las subvistas heredan el permiso y el formato de su item del menú. */
-export function puedeVerVista(user: SesionNav | null | undefined, view: ViewId, formato?: FormatoId | null): boolean {
-  return puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), formato: navFormatoFor(view) }, formato)
+export function puedeVerVista(
+  user: SesionNav | null | undefined, view: ViewId, formato?: FormatoId | null, posActivo?: boolean | null,
+): boolean {
+  return puedeVerItem(
+    user,
+    { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), formato: navFormatoFor(view), requierePos: navRequierePos(view) },
+    formato,
+    posActivo,
+  )
 }
 
 /**
@@ -376,8 +402,12 @@ export function puedeVerVista(user: SesionNav | null | undefined, view: ViewId, 
  * sobre Conduces mandaría al dashboard antes de que branding responda. Sabido
  * y distinto (un Gratex con 'conduces' guardado en el navegador), se sale.
  */
-export function debeSalirDeVista(user: SesionNav | null | undefined, view: ViewId, formato: FormatoId | null): boolean {
+export function debeSalirDeVista(
+  user: SesionNav | null | undefined, view: ViewId, formato: FormatoId | null, posActivo: boolean | null = null,
+): boolean {
   if (!puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view) })) return true
+  // POS: igual que el formato, solo se saca cuando se SABE que la empresa no lo tiene.
+  if (navRequierePos(view) && posActivo === false) return true
   const exigido = navFormatoFor(view)
   return exigido !== undefined && formato !== null && formato !== exigido
 }
@@ -394,6 +424,7 @@ export const TITLES: Record<ViewId, string> = {
   cotizaciones: 'Cotizaciones',
   'cotizacion-nueva': 'Nueva cotización',
   conduces: 'Conduces',
+  'punto-venta': 'Punto de venta',
   'conduce-editar': 'Conduce',
   clientes: 'Clientes',
   productos: 'Productos',

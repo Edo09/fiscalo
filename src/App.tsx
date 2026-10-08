@@ -21,6 +21,8 @@ import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEdi
 import { ConducesView } from '@/features/conduces/ConducesView'
 import { ConduceEditor } from '@/features/conduces/ConduceEditor'
 import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
+import { PuntoVentaView } from '@/features/pos/PuntoVentaView'
+import { usePosActivo } from '@/features/pos/usePosActivo'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -104,6 +106,9 @@ function AppShell() {
   // conduces de Ferretería) en el sidebar, el buscador y la redirección de
   // abajo. null mientras branding no responde.
   const { formato } = useFormatoTenant()
+  // POS activo en la empresa (branding.pos_enabled): decide si se ve Punto de
+  // venta en el sidebar, el buscador y la redirección. null mientras no se sabe.
+  const posActivo = usePosActivo()
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState(false)
@@ -168,8 +173,8 @@ function AppShell() {
   // cargando o con error) no se redirige, o recargar sobre Conduces mandaría
   // al dashboard antes de tiempo. Sabido y distinto, se sale (ver debeSalirDeVista).
   useEffect(() => {
-    if (debeSalirDeVista(user, activeTop, formato)) nav('dashboard', null, { replace: true, forzar: true })
-  }, [activeTop, user, nav, formato])
+    if (debeSalirDeVista(user, activeTop, formato, posActivo)) nav('dashboard', null, { replace: true, forzar: true })
+  }, [activeTop, user, nav, formato, posActivo])
 
   const renderView = () => {
     switch (view) {
@@ -213,6 +218,7 @@ function AppShell() {
       }
       // Solo Ferretería: la vista espera al formato, y App saca de aquí a otro (debeSalirDeVista).
       case 'conduces': return <ConducesView nav={nav} />
+      case 'punto-venta': return <PuntoVentaView />
       // El conduce de un payload (uno guardado, uno nuevo desde una cotización,
       // o uno nuevo en blanco: { kind: 'nuevo' }). Con key por documento: pasar
       // de uno a otro monta un editor limpio. Sin payload (no debería pasar:
@@ -259,6 +265,7 @@ function AppShell() {
         mobileOpen={mobileNav}
         onCloseMobile={() => setMobileNav(false)}
         formato={formato}
+        posActivo={posActivo}
       />
 
       <div className="main-col">
@@ -273,7 +280,7 @@ function AppShell() {
         <div className="content">{renderView()}</div>
       </div>
 
-      {search && <SearchPalette nav={nav} formato={formato} onClose={() => setSearch(false)} />}
+      {search && <SearchPalette nav={nav} formato={formato} posActivo={posActivo} onClose={() => setSearch(false)} />}
       {/* key: cada pregunta es un Modal nuevo. El Modal fija su Escape al montar,
           y uno reciclado cerraría con las acciones del diálogo anterior. */}
       {salidaPendiente && (
