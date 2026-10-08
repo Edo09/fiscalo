@@ -241,7 +241,7 @@ INSERT IGNORE INTO conduce_secuencia (id, ultimo) VALUES (1, 0);
 
 | Method | Path | Body / query | Response |
 |---|---|---|---|
-| GET | `/api/conduces?page&pageSize&query` | search by code, stored client name, client name, client RNC; active rows only | `{data:[row], pagination}`, ordered `date DESC, id DESC` |
+| GET | `/api/conduces?page&pageSize&query` | search by code, quote code (2026-10-08, see section 9), stored client name, client name, client RNC; active rows only | `{data:[row], pagination}`, ordered `date DESC, id DESC` |
 | GET | `/api/conduces?id=N` | | `{data:[row]}` (`[]` if missing or inactive) |
 | POST | `/api/conduces` | `{cotizacion_id, client_id, date?, items:[…]}` | `{id, code, numero}` |
 | PUT | `/api/conduces` | `{id, client_id, date?, items:[…]}` | `{id, code, numero}` |
@@ -487,7 +487,8 @@ Unchanged, except for one button on quote rows.
 - **Columns:** Número | Cliente | Fecha | Cotización.
   - Cliente uses the display name.
   - Cotización shows `cotizacion_code`, or "eliminada" when it is NULL.
-- **Search and paging:** like `CotizacionesView`, over active conduces only.
+- **Search and paging:** like `CotizacionesView`, over active conduces only. The placeholder is "Buscar por número,
+  cotización, cliente o RNC…" (the quote code was added to the search on 2026-10-08, see section 9).
 - **Row actions:**
   - PDF;
   - **Facturar ▾**: "Factura electrónica (e-CF)" / "Factura simple", each gated by `puedeVerVista(…)` as on
@@ -722,3 +723,9 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
   header range `012..029`, the verifier row, the rollout steps) now means 031.
   In the rollout order, "027 then 028 wherever they say FALTA" now also covers `029_precios_4_decimales.sql` and
   `030_pos.sql`, before 031 runs; the final verifier check is 027 to 031 all APLICADA.
+- **Search by quote code (4.1, 5.4; decision of 2026-10-08).** In the Conduces list, the quote's code (`COT-000012`
+  or just `000012`) finds that quote's conduces. The backend searches `q.code` through the `LEFT JOIN` to
+  `cotizaciones` that the list already makes for `cotizacion_code`, and the count uses the same join, so the
+  pagination total matches. A deleted quote leaves `cotizacion_id` NULL (`ON DELETE SET NULL`), so its conduces can no
+  longer be found by that code: the table keeps no copy of the code, and no column was added. The placeholder is
+  "Buscar por número, cotización, cliente o RNC…".

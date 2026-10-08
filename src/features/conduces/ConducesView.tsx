@@ -86,7 +86,7 @@ export function ConducesView({ nav }: { nav: Nav }) {
 
       <div className="toolbar">
         <form className="search-input" onSubmit={(e) => { e.preventDefault(); submitSearch() }}>
-          <Icon name="search" /><input placeholder="Buscar por número, cliente o RNC…" value={input} onChange={(e) => setInput(e.target.value)} />
+          <Icon name="search" /><input placeholder="Buscar por número, cotización, cliente o RNC…" value={input} onChange={(e) => setInput(e.target.value)} />
         </form>
         {query && <button className="filter-chip" onClick={() => { setInput(''); setQuery(''); setPage(1) }}><Icon name="x" />Limpiar</button>}
         <div className="toolbar-spacer"></div>
