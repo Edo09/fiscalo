@@ -77,6 +77,9 @@ const MSG_TARDO_EMISION =
 const MSG_TARDO_ESCRITURA =
   'El servidor tardó demasiado en responder. Puede que sí se haya guardado: revisa el listado antes de intentarlo otra vez.'
 const MSG_TARDO = 'El servidor tardó demasiado en responder. Inténtalo de nuevo.'
+const MSG_SIN_CONEXION = 'No se pudo conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.'
+const MSG_SIN_CONEXION_EMISION =
+  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
 const TEXTO_SERVIDOR_EMISION =
   'No se pudo completar la emisión del e-CF. Revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
 
@@ -112,12 +115,31 @@ try {
     networkError(timeout(), { metodo: 'POST', path: '/api/clients' }).message, MSG_TARDO_ESCRITURA)
   igual('timeout de una lectura -> MSG_TARDO de siempre',
     networkError(timeout(), { metodo: 'GET', path: '/api/facturas' }).message, MSG_TARDO)
+  // Fallo de red que NO es timeout (fetch lanza TypeError: conexion cortada, Wi-Fi,
+  // proxy que cierra el socket). En la emision la factura puede estar ya guardada
+  // y enviada: no se invita a repetir.
+  const sinRed = () => new TypeError('Failed to fetch')
+  igual('corte de red en POST /api/facturas -> MSG_SIN_CONEXION_EMISION',
+    networkError(sinRed(), EMISION).message, MSG_SIN_CONEXION_EMISION)
+  igual('corte de red en una lectura (GET /api/facturas) -> MSG_SIN_CONEXION de siempre',
+    networkError(sinRed(), { metodo: 'GET', path: '/api/facturas' }).message, MSG_SIN_CONEXION)
+  igual('corte de red en otra escritura (POST /api/clients) -> MSG_SIN_CONEXION de siempre',
+    networkError(sinRed(), { metodo: 'POST', path: '/api/clients' }).message, MSG_SIN_CONEXION)
+  igual('corte de red en POST /api/facturas/ (barra final) -> MSG_SIN_CONEXION_EMISION',
+    networkError(sinRed(), { metodo: 'POST', path: '/api/facturas/' }).message, MSG_SIN_CONEXION_EMISION)
+  igual('timeout de POST /api/facturas sigue siendo MSG_TARDO_EMISION (el corte no lo pisa)',
+    networkError(timeout(), EMISION).message, MSG_TARDO_EMISION)
 } finally {
   console.warn = warn
 }
 igual('504 de POST /api/facturas -> MSG_TARDO_EMISION', humanizar('', 504, EMISION).mensaje, MSG_TARDO_EMISION)
 igual('504 de otra escritura -> MSG_TARDO_ESCRITURA de siempre',
   humanizar('', 504, { metodo: 'POST', path: '/api/clients' }).mensaje, MSG_TARDO_ESCRITURA)
+{
+  // El texto nuevo pasa por clasificar como cualquier aviso: no puede parecer tecnico.
+  const tipo = clasificar(MSG_SIN_CONEXION_EMISION)
+  chk(`clasificar(MSG_SIN_CONEXION_EMISION) -> null, no 'interno' (dio ${tipo})`, tipo === null)
+}
 const caido = humanizar('', 500, EMISION).mensaje
 chk(`500 sin texto en POST /api/facturas -> manda al filtro Pendientes (dio "${caido}")`,
   caido.startsWith(TEXTO_SERVIDOR_EMISION))

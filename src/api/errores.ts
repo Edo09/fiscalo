@@ -87,6 +87,10 @@ const MSG_TARDO_ESCRITURA =
 // su e-NCF. Emitir otra vez gastaría otro número para la misma venta.
 const MSG_TARDO_EMISION =
   'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+// Lo mismo cuando la conexion se corta (no es un timeout) en plena emision:
+// la fila pudo quedar guardada y hasta enviada, y reintentar quemaria otro e-NCF.
+const MSG_SIN_CONEXION_EMISION =
+  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
 const MSG_SIN_PERMISO = 'No tienes permiso para hacer esto. Pídele acceso a un administrador.'
 const MSG_NO_DISPONIBLE = 'Esta opción no está disponible ahora mismo. Recarga la página; si sigue pasando, avisa a soporte.'
 const MSG_MUY_GRANDE = 'El archivo es demasiado grande. Usa uno más liviano.'
@@ -444,7 +448,7 @@ export function networkError(e: unknown, ctx: ContextoError = {}): ApiError {
   const timeout = e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')
   const mensaje = timeout
     ? esEmisionEcf(ctx) ? MSG_TARDO_EMISION : esEscritura(ctx) ? MSG_TARDO_ESCRITURA : MSG_TARDO
-    : MSG_SIN_CONEXION
+    : esEmisionEcf(ctx) ? MSG_SIN_CONEXION_EMISION : MSG_SIN_CONEXION
   const original = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
   console.warn('[API] fallo de red', { metodo: metodoDe(ctx), path: ctx.path ?? '', original })
   return new ApiError(mensaje, 0, { original })
