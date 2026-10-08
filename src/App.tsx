@@ -175,7 +175,21 @@ function AppShell() {
     switch (view) {
       case 'dashboard': return <DashboardView nav={nav} variant={THEME.dashLayout === 'enfoque' ? 'focus' : 'balanced'} />
       case 'facturas': return <InvoiceListView nav={nav} />
-      case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
+      // Con key solo para el borrador de un conduce: el bloqueo del precio 0 sale del
+      // prefill, pero las líneas son estado del formulario. Pasar de una factura de
+      // conduce a Nueva > Factura (o a la de otro conduce) monta un formulario limpio;
+      // si no, quedarían las líneas del conduce sin el bloqueo. Una nueva en blanco o
+      // una cotización convertida siguen con la key de siempre: el menú Nueva no les
+      // borra lo escrito.
+      case 'factura-nueva': {
+        const prefill = isFacturaPrefill(payload) ? payload : null
+        return (
+          <InvoiceFormView
+            key={prefill?.origenTipo === 'conduce' ? `conduce-${prefill.origen ?? ''}` : 'nueva'}
+            nav={nav} prefill={prefill}
+          />
+        )
+      }
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
       // Con key: pasar de una factura a otra (o de nueva a editar) monta un
