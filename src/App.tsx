@@ -45,8 +45,8 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill,
-  isFacturaSimpleRef, isNuevoSignal, navTopFor, type Nav, type ViewId,
+  claveFormularioFactura, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaPrefill,
+  isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, type Nav, type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -175,33 +175,27 @@ function AppShell() {
     switch (view) {
       case 'dashboard': return <DashboardView nav={nav} variant={THEME.dashLayout === 'enfoque' ? 'focus' : 'balanced'} />
       case 'facturas': return <InvoiceListView nav={nav} />
-      // Con key solo para el borrador de un conduce: el bloqueo del precio 0 sale del
-      // prefill, pero las líneas son estado del formulario. Pasar de una factura de
-      // conduce a Nueva > Factura (o a la de otro conduce) monta un formulario limpio;
-      // si no, quedarían las líneas del conduce sin el bloqueo. Una nueva en blanco o
-      // una cotización convertida siguen con la key de siempre: el menú Nueva no les
-      // borra lo escrito.
+      // Cada borrador (una cotización convertida, un conduce) tiene su key: el formulario
+      // toma el borrador solo al montarse y sus líneas son estado propio. Pasar de una
+      // factura convertida a Nueva > Factura (o a la conversión de otro documento) monta un
+      // formulario limpio; si no, quedarían las líneas del documento anterior, y en un
+      // conduce, sin su bloqueo del precio 0. Una nueva en blanco conserva la key 'nueva': el
+      // menú Nueva no le borra lo escrito (ver claveFormularioFactura).
       case 'factura-nueva': {
         const prefill = isFacturaPrefill(payload) ? payload : null
-        return (
-          <InvoiceFormView
-            key={prefill?.origenTipo === 'conduce' ? `conduce-${prefill.origen ?? ''}` : 'nueva'}
-            nav={nav} prefill={prefill}
-          />
-        )
+        return <InvoiceFormView key={claveFormularioFactura(prefill)} nav={nav} prefill={prefill} />
       }
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
       // Con key: pasar de una factura a otra (o de nueva a editar) monta un
       // formulario limpio en vez de heredar el cliente y el aviso de salida del anterior.
-      // El borrador de una cotización convertida solo llega a la factura NUEVA,
-      // con su propia key: no se mezcla con una nueva en blanco ni con otra conversión.
+      // El borrador de una cotización o de un conduce convertido solo llega a la factura
+      // NUEVA, con su propia key (la misma regla que la e-CF): no se mezcla con una nueva en
+      // blanco ni con otra conversión.
       case 'factura-simple-nueva': {
         const prefill = isFacturaSimplePrefill(payload) ? payload : null
         return (
-          <SimpleInvoiceFormView
-            key={prefill ? `cotizacion-${prefill.origen}` : 'nueva'} nav={nav} facturaId={null} prefill={prefill}
-          />
+          <SimpleInvoiceFormView key={claveFormularioFactura(prefill)} nav={nav} facturaId={null} prefill={prefill} />
         )
       }
       case 'factura-simple-editar': {

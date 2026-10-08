@@ -13,6 +13,7 @@ import {
 import {
   ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill,
 } from '../src/features/cotizaciones/formatos/ferreteria/conversion.ts'
+import { claveFormularioFactura } from '../src/config/navigation.ts'
 
 let fallos = 0
 let total = 0
@@ -197,6 +198,39 @@ igual('cotización: el borrador e-CF no trae origenTipo ni avisos de precio',
   ['origenTipo' in ferreteriaAFacturaPrefill(cotizacion), ferreteriaAFacturaPrefill(cotizacion).avisos], [false, []])
 igual('cotización: el borrador simple tampoco',
   ['origenTipo' in ferreteriaAFacturaSimplePrefill(cotizacion), ferreteriaAFacturaSimplePrefill(cotizacion).avisos], [false, []])
+
+// --- La key del formulario de factura (App, Nueva > Factura) --------------------
+// Cada borrador monta su propio formulario; sin borrador, 'nueva' (que no cambia, para que Nueva >
+// Factura no borre lo escrito en uno en blanco). El origen se identifica por su tipo y su codigo; `vieja`
+// es un conduce sin code (id 3, origen "#3").
+const cotizacion2: CotizacionRow = { ...cotizacion, id: 13, code: 'COT-000013' }
+const cotizacionSinCodigo: CotizacionRow = { ...cotizacion, id: 3, code: '' }
+igual('key: sin borrador es "nueva"', [claveFormularioFactura(null)], ['nueva'])
+igual('key: una cotizacion convertida, e-CF y simple con la misma regla',
+  [claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacion)), claveFormularioFactura(ferreteriaAFacturaSimplePrefill(cotizacion))],
+  ['cotizacion-COT-000012', 'cotizacion-COT-000012'])
+igual('key: un conduce convertido, e-CF y simple con la misma regla (antes la simple lo llamaba "cotizacion-CON-...")',
+  [claveFormularioFactura(conduceAFacturaPrefill(fila)), claveFormularioFactura(conduceAFacturaSimplePrefill(fila))],
+  ['conduce-CON-000003', 'conduce-CON-000003'])
+igual('key: el borrador de una cotizacion de Gratex (origen = su codigo, sin origenTipo)',
+  [claveFormularioFactura({ origen: 'COT-000007' })], ['cotizacion-COT-000007'])
+const claves = [
+  claveFormularioFactura(null),
+  claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacion)),
+  claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacion2)),
+  claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacionSinCodigo)),
+  claveFormularioFactura(conduceAFacturaPrefill(fila)),
+  claveFormularioFactura(conduceAFacturaPrefill(vieja)),
+]
+chk('key: en blanco, cotizacion A, cotizacion B, cotizacion sin codigo, conduce y conduce sin codigo: seis distintas',
+  new Set(claves).size === claves.length)
+igual('key: una cotizacion y un conduce sin codigo, los dos con origen "#3", no comparten key',
+  [ferreteriaAFacturaPrefill(cotizacionSinCodigo).origen, conduceAFacturaPrefill(vieja).origen,
+    claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacionSinCodigo)), claveFormularioFactura(conduceAFacturaPrefill(vieja))],
+  ['#3', '#3', 'cotizacion-#3', 'conduce-#3'])
+igual('key: el mismo borrador da siempre la misma key (el formulario no se desmonta al volver a renderizar)',
+  [claveFormularioFactura(ferreteriaAFacturaPrefill(cotizacion)) === claveFormularioFactura(ferreteriaAFacturaPrefill({ ...cotizacion }))],
+  [true])
 
 console.log(`\n${total - fallos}/${total} OK`)
 process.exit(fallos === 0 ? 0 : 1)

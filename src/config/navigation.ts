@@ -75,6 +75,21 @@ export function isFacturaSimplePrefill(p: unknown): p is FacturaSimplePrefill {
   return p != null && (p as FacturaSimplePrefill).kind === 'factura-simple-prefill'
 }
 
+/**
+ * La `key` con que App monta el formulario de factura (e-CF o simple) para un
+ * borrador. Cada borrador monta un formulario limpio: el formulario toma el
+ * borrador solo al montarse (sus líneas son estado propio), así que sin una key
+ * distinta, ir de una factura convertida a Nueva > Factura, o de una conversión
+ * a otra, dejaría lo de la primera. El origen se identifica por su tipo
+ * (`origenTipo`; ausente = cotización) y su código (COT-…, CON-… o #id), que no
+ * se repiten entre documentos: dos orígenes distintos nunca comparten key.
+ * Sin borrador la key es siempre 'nueva': Nueva > Factura no borra lo que ya se
+ * escribió en un formulario en blanco.
+ */
+export function claveFormularioFactura(borrador: { origenTipo?: 'conduce'; origen?: string } | null): string {
+  return borrador ? `${borrador.origenTipo ?? 'cotizacion'}-${borrador.origen ?? ''}` : 'nueva'
+}
+
 /** ¿El payload apunta a una factura simple? */
 export function isFacturaSimpleRef(p: NavPayload): p is FacturaSimpleRef {
   return p != null && (p as FacturaSimpleRef).kind === 'factura-simple'

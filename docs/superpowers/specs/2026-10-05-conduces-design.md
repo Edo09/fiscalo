@@ -732,3 +732,11 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
   pagination total matches. A deleted quote leaves `cotizacion_id` NULL (`ON DELETE SET NULL`), so its conduces can no
   longer be found by that code: the table keeps no copy of the code, and no column was added. The placeholder is
   "Buscar por número, cotización, cliente o RNC…".
+- **Nueva > Factura after a conversion (5.6; decision of 2026-10-08).** Before, only a draft from a conduce got its
+  own form key, so Nueva > Factura after Cotizaciones > Facturar > e-CF kept the quote's lines. Now every draft does:
+  `claveFormularioFactura` (in `config/navigation.ts`) gives `` `${origenTipo ?? 'cotizacion'}-${origen}` `` for a
+  draft and `'nueva'` for none, and `App` uses it for both the e-CF and the factura simple forms. After Facturar from
+  a quote (Gratex or Ferretería) or from a conduce, Nueva > Factura opens a blank form. It is the only change to the
+  quote flow in this work. A blank form keeps the key `'nueva'`, so what was typed on it survives a second Nueva >
+  Factura. Quote A, quote B and a conduce never share a key (the type tells quotes from conduces, and the code, or
+  `#id`, tells one from another).
