@@ -38,7 +38,7 @@ export interface ApiQueryState<T> {
 export function useApiQuery<T>(
   key: readonly unknown[],
   fn: () => Promise<T>,
-  opts: { keepPrevious?: boolean; staleTime?: number } = {},
+  opts: { keepPrevious?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean } = {},
 ): ApiQueryState<T> {
   const q = useQuery({
     queryKey: key,
@@ -56,6 +56,9 @@ export function useApiQuery<T>(
     // keepPrevious: al cambiar la clave (ej. tecleo en un buscador) se sigue
     // mostrando el resultado anterior mientras llega el nuevo (sin parpadeo).
     placeholderData: opts.keepPrevious ? keepPreviousData : undefined,
+    // Solo si quien llama lo pide. Pasarla en undefined taparía la del
+    // QueryClient (main.tsx): TanStack mezcla las opciones con un spread.
+    ...(opts.refetchOnWindowFocus !== undefined && { refetchOnWindowFocus: opts.refetchOnWindowFocus }),
   })
   return {
     data: q.data ?? null,

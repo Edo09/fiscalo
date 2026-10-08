@@ -39,6 +39,15 @@ export {
   getCotizacionPdf,
   previewCotizacion,
 } from './cotizaciones'
+export {
+  listConduces,
+  getConduce,
+  createConduce,
+  updateConduce,
+  deleteConduce,
+  getConducePdf,
+  previewConduce,
+} from './conduces'
 export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
 export { listProveedores, getProveedor, createProveedor, updateProveedor, deleteProveedor } from './proveedores'
 export { consultarRnc } from './rnc'

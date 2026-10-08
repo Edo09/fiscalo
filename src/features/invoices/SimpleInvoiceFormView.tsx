@@ -10,6 +10,7 @@ import type { DocBase64, FacturaSimpleInput, FacturaSimpleItemInput, FormatoImpr
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { NombreClienteLibre } from '@/features/clients/NombreClienteLibre'
+import { MSG_SIN_PRECIO } from '@/features/conduces/conversion'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
@@ -120,6 +121,9 @@ export function SimpleInvoiceFormView({
   const editando = facturaId != null
   // Al editar manda la factura guardada: un borrador nunca la pisa.
   const borrador = editando ? null : prefill
+  // Borrador de un conduce (Facturar en Conduces): cambia los textos de la
+  // conversión y no deja guardar una línea sin precio (ver sinPrecio).
+  const deConduce = borrador?.origenTipo === 'conduce'
 
   const [cargando, setCargando] = useState(editando)
   const [errorCarga, setErrorCarga] = useState<string | null>(null)
@@ -425,6 +429,15 @@ export function SimpleInvoiceFormView({
     }))
 
   /**
+   * Factura de un conduce: línea que se guardaría sin precio. El conduce no
+   * muestra precios y su "Línea libre" se guarda en 0: se pide escribirlo en
+   * vez de guardar la mercancía regalada. Sin conduce, el precio 0 se sigue
+   * aceptando como hoy.
+   */
+  const sinPrecio = (l: Linea) => deConduce && esValida(l) && l.precio === 0
+  const haySinPrecio = lineas.some(sinPrecio)
+
+  /**
    * Cantidad heredada: la misma que tenía, al abrir la factura, una línea del
    * mismo producto. Una factura vieja pudo guardar 1.5 en un producto que hoy
    * se cuenta entero; el backend no le aplica la regla de la unidad a esa
@@ -478,6 +491,7 @@ export function SimpleInvoiceFormView({
     ?? (lineasValidas.length === 0 ? 'Agrega al menos una línea con descripción.' : null)
     ?? (lineasIncompletas.length > 0 ? 'Completa o quita las líneas marcadas en rojo.' : null)
     ?? (cantidadesMal.length > 0 ? 'Corrige la cantidad de las líneas marcadas en rojo.' : null)
+    ?? (haySinPrecio ? 'Escribe el precio de las líneas marcadas en rojo.' : null)
     ?? (editando && !hayCambios ? 'No hay cambios que guardar.' : null)
   const puedeGuardar = motivoBloqueo == null && !guardando
   const marcarCliente = intentoFallido && problemaCliente != null
@@ -660,15 +674,18 @@ export function SimpleInvoiceFormView({
   const emisorNombre = emisor?.nombre_comercial || emisor?.razon_social || ''
   const contacto = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
 
-  // Avisos bajo el banner de la conversión: lo que la cotización no copió y,
-  // ya con el cliente cargado, su descuento fijo, que hace que el total no sea
-  // el de la cotización.
+  // Avisos bajo el banner de la conversión: lo que el origen no copió y, ya
+  // con el cliente cargado, su descuento fijo, que hace que el total no sea el
+  // de la cotización. Un conduce no tiene total: solo se dice que sus precios
+  // llevan el descuento.
   const pctCliente = cliente?.descuento ?? 0
   const avisosConversion = borrador
     ? [
         ...(borrador.avisos ?? []),
         ...(pctCliente > 0
-          ? [`Se aplicó el descuento fijo del cliente (${pctCliente}%): el total difiere del de la cotización.`]
+          ? [deConduce
+              ? `Se aplicó el descuento fijo del cliente (${pctCliente}%) a los precios del conduce.`
+              : `Se aplicó el descuento fijo del cliente (${pctCliente}%): el total difiere del de la cotización.`]
           : []),
       ]
     : []
@@ -683,7 +700,9 @@ export function SimpleInvoiceFormView({
           <div className="col" style={{ alignItems: 'flex-end', textAlign: 'right', gap: 4, minWidth: 0 }}>
             <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
               <Icon name="file-plus" size={15} />
-              Convertida desde la cotización {borrador.origen} · cada precio ya incluye su ITBIS
+              {deConduce
+                ? `Convertida desde el conduce ${borrador.origen} · cada precio ya incluye su ITBIS`
+                : `Convertida desde la cotización ${borrador.origen} · cada precio ya incluye su ITBIS`}
             </span>
             {avisosConversion.map((a, i) => (
               <span key={i} className="row gap-sm text-xs" style={{ color: 'var(--warning)' }}>
@@ -809,7 +828,7 @@ export function SimpleInvoiceFormView({
           {lineas.map((l, i) => (
             <div
               className={'fx-grid fx-row' + (esLineaNueva(l.id) ? ' fx-row-nueva' : '')
-                + ((!esValida(l) && !estaEnBlanco(l)) || cantidadMal(l) ? ' fx-row-incompleta' : '')}
+                + ((!esValida(l) && !estaEnBlanco(l)) || cantidadMal(l) || sinPrecio(l) ? ' fx-row-incompleta' : '')}
               key={l.id}
             >
               <button
@@ -849,8 +868,10 @@ export function SimpleInvoiceFormView({
               />
 
               <input
-                className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'precio'))} data-label="Precio"
+                className={'fx-field fx-num fx-cell' + marca(campoCambiado(l, 'precio'))
+                  + (sinPrecio(l) ? ' fx-field--err' : '')} data-label="Precio"
                 type="number" min={0} step="any" inputMode="decimal"
+                aria-invalid={sinPrecio(l) ? true : undefined}
                 value={l.precio}
                 onChange={(e) => updLinea(l.id, { precio: Number(e.target.value) })}
                 aria-label={`Precio de la línea ${i + 1}`}
@@ -867,6 +888,14 @@ export function SimpleInvoiceFormView({
               <span className="fx-importe fx-cell" data-label="Importe">
                 <Money value={subtotalDe(l)} cur={false} />
               </span>
+
+              {/* En su propio renglón de la cuadrícula, bajo la línea: en la
+                  columna del precio no cabe. */}
+              {sinPrecio(l) && (
+                <span className="fx-err" style={{ gridColumn: '1 / -1' }}>
+                  <Icon name="alert-circle" size={12} />{MSG_SIN_PRECIO}
+                </span>
+              )}
             </div>
           ))}
 

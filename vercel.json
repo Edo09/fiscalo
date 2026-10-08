@@ -6,7 +6,12 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "has": [{ "type": "host", "value": "pos.fiscalpoint.com.do" }],
+      "destination": "/pos.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/app.html"
     }
   ]
 }
