@@ -11,7 +11,9 @@ interface Result {
   action: () => void
 }
 
-export function SearchPalette({ nav, formato, onClose }: { nav: Nav; formato: FormatoId | null; onClose: () => void }) {
+export function SearchPalette({ nav, formato, posActivo, onClose }: {
+  nav: Nav; formato: FormatoId | null; posActivo: boolean | null; onClose: () => void
+}) {
   const { user } = useSession()
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -19,7 +21,7 @@ export function SearchPalette({ nav, formato, onClose }: { nav: Nav; formato: Fo
 
   // Solo las páginas que el sidebar mostraría: mismo criterio de permisos y de formato.
   const pages: Result[] = NAV.flatMap((g) => g.items)
-    .filter((i) => puedeVerItem(user, i, formato))
+    .filter((i) => puedeVerItem(user, i, formato, posActivo))
     .map((i) => ({ type: 'Página', label: i.label, icon: i.icon, action: () => nav(i.id) }))
   const results = q ? pages.filter((r) => r.label.toLowerCase().includes(q.toLowerCase())).slice(0, 8) : pages.slice(0, 6)
 

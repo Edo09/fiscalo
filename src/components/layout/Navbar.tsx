@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Icon, Btn, Avatar, Dropdown, MenuItem, type IconName } from '@/components/ui'
-import { getEmisor, getBranding, ApiError } from '@/api'
+import { getEmisor, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession } from '@/stores/auth'
 import { logout, posHandoff } from '@/api/auth'
 import { hasModule } from '@/config/permissions'
+import { usePosActivo } from '@/features/pos/usePosActivo'
 import { puedeVerVista, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 
 // Accesos del botón "Nueva". Cada uno se muestra solo si el rol puede abrir su
@@ -45,10 +46,9 @@ export function Navbar({
     : '…'
 
   // Botón POS (api-gratex docs/specs/pos.md A1): solo si la empresa tiene el
-  // POS activo y el rol tiene el módulo 'pos'. Misma caché de branding que el
-  // resto de la app.
-  const { data: branding } = useApiQuery(['branding'], getBranding)
-  const puedePos = branding?.pos_enabled === true && hasModule(user?.permissions ?? [], 'pos')
+  // POS activo y el rol tiene el módulo 'pos' (mismo criterio que el menú).
+  const posActivo = usePosActivo()
+  const puedePos = posActivo === true && hasModule(user?.permissions ?? [], 'pos')
   const [abriendoPos, setAbriendoPos] = useState(false)
 
   const abrirPos = async () => {

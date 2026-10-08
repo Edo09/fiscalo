@@ -43,6 +43,9 @@ const POR_RECURSO: Record<string, number> = {
   'ecf-recibidos': FRESCURA.VOLATIL,
   // Los rangos e-NCF suelen registrarse por fuera (phpMyAdmin / otro operador).
   ncf: FRESCURA.VOLATIL,
+  // POS: el equipo de cada caja se usa, se bloquea por PIN o se reemplaza desde
+  // la propia caja (pos.fiscalpoint.com.do), no desde aquí.
+  pos: FRESCURA.VOLATIL,
 
   // --- Cambian solo al editarlos en la app ---------------------------------
   clients: FRESCURA.NORMAL,
