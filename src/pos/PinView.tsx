@@ -137,11 +137,19 @@ export function PinView({ equipo, onEntro, onEquipoInvalido, onSinPos, onRehabil
     setPin((p) => (p.length >= DIGITOS_PIN ? p : p + d))
   }, [deshabilitado])
 
-  // Completo el PIN, se envia solo. En un efecto y no dentro de setPin: React
-  // (StrictMode) puede llamar dos veces a la funcion que actualiza el estado.
+  // La version vigente de `enviar`, para que el efecto de abajo dependa solo del PIN.
+  const enviarRef = useRef(enviar)
+  useEffect(() => { enviarRef.current = enviar }, [enviar])
+
+  // Completo el PIN, se envia solo, UNA vez por PIN tecleado. En un efecto y no
+  // dentro de setPin: React (StrictMode) puede llamar dos veces a la funcion que
+  // actualiza el estado. Depende solo de `pin`: si dependiera de `enviar`, cada
+  // render de PosApp (callbacks nuevos) lo volvia a disparar con el mismo PIN, se
+  // abria una segunda sesion que cerraba la primera y la venta quedaba con un
+  // token muerto ("Tu sesion se cerro").
   useEffect(() => {
-    if (pin.length === DIGITOS_PIN) void enviar(pin)
-  }, [pin, enviar])
+    if (pin.length === DIGITOS_PIN) void enviarRef.current(pin)
+  }, [pin])
 
   const borrar = useCallback(() => setPin((p) => p.slice(0, -1)), [])
 

@@ -174,7 +174,7 @@ export function PosApp() {
   }
 
   return (
-    <div className="pos-root">
+    <div className={'pos-root' + (pantalla.tipo === 'venta' ? ' en-venta' : '')}>
       {!enLinea && (
         <div className="pos-sin-red" role="alert">
           <Icon name="wifi-off" size={16} />

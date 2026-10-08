@@ -10,6 +10,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Caja, Empleado } from './api'
+import { useCarritoStore } from './carrito'
 
 export interface EquipoGuardado {
   token: string
@@ -43,12 +44,20 @@ const almacen = createJSONStorage(() => ({
 
 export const usePosStore = create<PosState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       equipo: null,
       sesion: null,
-      guardarEquipo: (equipo) => set({ equipo }),
-      // Olvidar el equipo cierra tambien la sesion: sin equipo no hay caja.
-      olvidarEquipo: () => set({ equipo: null, sesion: null }),
+      guardarEquipo: (equipo) => {
+        // Otro equipo (habilitado de nuevo, quiza en otra caja o empresa): la
+        // venta en curso y el catalogo eran del anterior.
+        if (get().equipo?.token !== equipo.token) useCarritoStore.getState().olvidarTodo()
+        set({ equipo })
+      },
+      // Olvidar el equipo cierra tambien la sesion y descarta la venta: sin equipo no hay caja.
+      olvidarEquipo: () => {
+        useCarritoStore.getState().olvidarTodo()
+        set({ equipo: null, sesion: null })
+      },
       abrirSesion: (token, empleado) => set({ sesion: { token, empleado } }),
       cerrarSesion: () => set({ sesion: null }),
     }),

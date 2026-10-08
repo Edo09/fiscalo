@@ -135,6 +135,38 @@ export interface SesionPos {
   turno_caja: TurnoCaja | null
 }
 
+/** Producto del catálogo de la caja (GET /api/pos/catalogo, C1-C4). */
+export interface ProductoPos {
+  id: number
+  nombre: string
+  sku: string | null
+  /** null: sin categoría, o su categoría está inactiva (sale solo en "Todos"). */
+  category_id: number | null
+  /** Precio final con ITBIS, en centavos. Lo calcula el servidor (C2). */
+  precio_centavos: number
+  /** ITBIS en %: 18, 16 o 0. */
+  tasa: number
+  indicador_facturacion: number
+  /** null = servicio (sin existencia). */
+  stock: number | null
+  stock_minimo: number | null
+  unidad_medida: string
+  /** ¿La cantidad admite decimales (kilo, libra, metro)? */
+  decimales: boolean
+}
+
+export interface CategoriaPos {
+  id: number
+  nombre: string
+  productos: number
+}
+
+export interface CatalogoPos {
+  productos: ProductoPos[]
+  categorias: CategoriaPos[]
+  generado_at: string
+}
+
 export interface LoginAdmin {
   token: string
   user: { id: number; name: string; username: string; permissions?: string[] }
@@ -152,6 +184,8 @@ export const posApi = {
     posFetch<SesionPos>('POST', '/pos/sesion', { equipo }, { pin }),
   salir: (equipo: string, sesion: string) =>
     posFetch<{ cerrada: boolean }>('DELETE', '/pos/sesion', { equipo, sesion }),
+  catalogo: (equipo: string, sesion: string) =>
+    posFetch<CatalogoPos>('GET', '/pos/catalogo', { equipo, sesion }),
 
   // Admin, solo para habilitar el equipo
   login: (usuario: string, clave: string) =>
