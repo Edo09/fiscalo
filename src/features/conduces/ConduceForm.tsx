@@ -433,7 +433,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
 
           <div className="fx-add-row">
             <div className="fx-buscar-prod">
-              <ProductoCombobox onSelect={addProducto} placeholder="Agregar del catálogo: nombre, SKU o categoría…" />
+              <ProductoCombobox ocultarMonto onSelect={addProducto} placeholder="Agregar del catálogo: nombre, SKU o categoría…" />
             </div>
             <button type="button" className="fx-add" onClick={addLineaLibre}>
               <Icon name="plus" size={14} />Línea libre
