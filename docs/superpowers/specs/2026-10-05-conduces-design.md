@@ -713,3 +713,9 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
 - **Node test of `useFormatoTenant` (6).** It was not factored out; Task 14's browser checks cover the loading,
   error, 409 and Gratex states.
 - **Rollout order (7), refined (final review, 2026-10-08).** Backup; the verifier (read-only) in both DBs; 027 then 028 wherever they say FALTA; 029 and its final row; the verifier again (027, 028 and 029 all APLICADA); then deploy and smoke tests. It follows 029's own ORDEN (after 028, before the code) and replaces the order of steps 1 and 2 in section 7, which ran 029 before the check for 027 and 028.
+- **Migration renumbered 029 -> 030 (at merge time, 2026-10-08).** `origin/master` already carries
+  `029_precios_4_decimales.sql` (`products.precio` .. `precio_4` become `DECIMAL(18,4)`), which is pushed and may
+  already be applied somewhere, so it keeps its number and the conduces migration became `030_conduces.sql`.
+  Every "029" in this spec (the file name, "029 lint", the data-model sections, the rollout steps) now means 030.
+  In the rollout order, "027 then 028 wherever they say FALTA" now also covers `029_precios_4_decimales.sql`,
+  before 030 runs.
