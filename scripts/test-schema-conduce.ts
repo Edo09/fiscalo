@@ -7,11 +7,13 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-schema-conduce.ts
 import {
-  MSG_CLIENTE_BORRADO, MSG_CONDUCE_NO_EXISTE, MSG_COTIZACION_NO_EXISTE, MSG_FECHA, MSG_SIN_CLIENTE, MSG_SIN_LINEAS,
-  MSG_SOLO_FERRETERIA, avisoCargosConduce, conduceFormSchema, confirmacionEliminar, cuerpoConduce, lineaVacia,
-  mapearErroresConduce, sinErroresConduce,
+  BTN_SEGUIR_EN_CONDUCE, BTN_VOLVER_A_LA_LISTA, MSG_CLIENTE_BORRADO, MSG_CONDUCE_NO_EXISTE, MSG_COTIZACION_NO_EXISTE,
+  MSG_FECHA, MSG_SIN_CLIENTE, MSG_SIN_LINEAS, MSG_SOLO_FERRETERIA, PREGUNTA_VOLVER_A_LA_LISTA, avisoCargosConduce,
+  conduceFormSchema, confirmacionEliminar, cuerpoConduce, destinoSeguirEnConduce, lineaVacia, mapearErroresConduce,
+  sinErroresConduce, tituloConduceGuardado,
 } from '../src/features/conduces/schema.ts'
-import type { FormConduce } from '../src/features/conduces/schema.ts'
+import type { ConduceGuardado, FormConduce } from '../src/features/conduces/schema.ts'
+import { claveEditorConduce, isConduceRef, mismoDestino, payloadConduce } from '../src/config/navigation.ts'
 import { avisosCargos } from '../src/features/cotizaciones/formatos/ferreteria/conversion.ts'
 import type { LineaFerreteriaForm } from '../src/features/cotizaciones/formatos/ferreteria/schema.ts'
 import type { CotizacionRow } from '../src/api/types.ts'
@@ -162,6 +164,39 @@ chk('conduce que ya no existe', MSG_CONDUCE_NO_EXISTE === 'Este conduce ya no ex
 chk('cliente borrado', MSG_CLIENTE_BORRADO === 'El cliente ya no existe: elige otro.')
 chk('confirmación de Eliminar', confirmacionEliminar('CON-000007')
   === 'El conduce dejará de verse en la lista. Su número CON-000007 no se vuelve a usar.')
+
+// Después de guardar (decisión del 2026-10-08): no se navega ni hay toast de éxito; un modal pregunta si volver a la
+// lista. "Seguir en el conduce" (y cerrar con la X, Esc o el fondo) se queda en el conduce guardado.
+console.log('Modal de después de guardar')
+const creado: ConduceGuardado = { accion: 'creado', id: 5, codigo: 'CON-000005' }
+const actualizado: ConduceGuardado = { accion: 'actualizado', id: 5, codigo: 'CON-000005' }
+chk('título al crear, con el código real', tituloConduceGuardado(creado) === 'Conduce CON-000005 creado')
+chk('título al editar, con el código real', tituloConduceGuardado(actualizado) === 'Conduce CON-000005 actualizado')
+chk('el texto del modal', PREGUNTA_VOLVER_A_LA_LISTA === '¿Quieres volver a la lista de conduces?')
+chk('los dos botones', BTN_VOLVER_A_LA_LISTA === 'Volver a la lista' && BTN_SEGUIR_EN_CONDUCE === 'Seguir en el conduce')
+const trasCrear = destinoSeguirEnConduce(creado)
+chk('seguir tras crear: reemplaza por el conduce guardado (conduce-editar, { kind: "conduce", id })',
+  trasCrear !== 'quedarse' && trasCrear.view === 'conduce-editar'
+  && JSON.stringify(trasCrear.payload) === JSON.stringify({ kind: 'conduce', id: 5 }))
+chk('seguir tras crear: el id es el del conduce nuevo, sea cual sea',
+  JSON.stringify(destinoSeguirEnConduce({ accion: 'creado', id: 1234, codigo: 'CON-001234' }))
+  === JSON.stringify({ view: 'conduce-editar', payload: { kind: 'conduce', id: 1234 } }))
+chk('seguir tras editar: se queda donde está (sin navegar)', destinoSeguirEnConduce(actualizado) === 'quedarse')
+// Lo que devuelve lo entiende la navegación como un conduce guardado abierto desde el listado: App lo deja pasar a
+// conduce-editar, lo monta con la key de ese conduce (un editor limpio, distinto del nuevo o del que sale de una
+// cotización) y no lo toma por el mismo destino que el formulario que se deja (así nav() no lo descarta).
+if (trasCrear !== 'quedarse') {
+  const ref = payloadConduce(trasCrear.payload)
+  chk('seguir tras crear: payloadConduce lo acepta y es un ConduceRef', ref !== null && isConduceRef(ref) && ref.id === 5)
+  chk('seguir tras crear: key c-<id>, distinta de la del formulario en blanco y de la de una cotización',
+    ref !== null && claveEditorConduce(ref) === 'c-5' && claveEditorConduce(ref) !== claveEditorConduce({ kind: 'nuevo' })
+    && claveEditorConduce(ref) !== claveEditorConduce({ kind: 'conduce-desde-cotizacion', cotizacionId: 5 }))
+  chk('seguir tras crear: no es el mismo destino que el formulario nuevo ni que el de la cotización (se reemplaza de verdad)',
+    !mismoDestino(trasCrear.view, trasCrear.payload, 'conduce-editar', { kind: 'nuevo' })
+    && !mismoDestino(trasCrear.view, trasCrear.payload, 'conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: 5 }))
+  chk('seguir tras crear: igual que abrirlo desde el listado (mismo destino que un ConduceRef con ese id)',
+    mismoDestino(trasCrear.view, trasCrear.payload, 'conduce-editar', { kind: 'conduce', id: 5 }))
+}
 
 console.log(`\n${total - fallos}/${total} OK`)
 process.exit(fallos === 0 ? 0 : 1)
