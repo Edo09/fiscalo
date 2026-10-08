@@ -1116,6 +1116,11 @@ export interface BrandingData {
    * el front lo trata como 'gratex'.
    */
   cotizacion_formato?: string
+  /**
+   * El POS está activo para la empresa (master tenants.pos_enabled). Con esto
+   * se muestra el botón POS del navbar. Ausente si el backend no lo expone: sin POS.
+   */
+  pos_enabled?: boolean
 }
 
 // ---------------------------------------------------------------------------

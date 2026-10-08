@@ -16,6 +16,18 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    // Dos paginas: la app (app.fiscalpoint.com.do -> index.html) y el POS
+    // (pos.fiscalpoint.com.do -> pos.html, por la regla de host de vercel.json).
+    // El POS no importa App.tsx: su bundle solo trae lo que usa. En desarrollo
+    // se abre en http://localhost:5173/pos.html.
+    build: {
+      rollupOptions: {
+        input: {
+          main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          pos: fileURLToPath(new URL('./pos.html', import.meta.url)),
+        },
+      },
+    },
     server: {
       port: 5173,
       open: true,

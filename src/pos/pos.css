@@ -1,0 +1,136 @@
+/* FISCALO — POS (pos.fiscalpoint.com.do). Pantalla tactil primero: zonas
+   tocables de 56 px o mas, nada que dependa del hover. Usa los tokens de
+   styles.css (claro/oscuro) y no redefine colores. */
+
+.pos-root {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Pantallas centradas (habilitar, PIN, avisos) ---------------------- */
+.pos-centro {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+.pos-panel {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-md);
+  padding: 28px;
+}
+.pos-marca { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14px; }
+.pos-marca .brand-name { font-weight: 700; color: var(--text); }
+.pos-titulo { font-size: 24px; letter-spacing: -0.02em; margin: 18px 0 6px; }
+.pos-sub { color: var(--text-2); margin: 0 0 20px; line-height: 1.5; }
+.pos-campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.pos-campo label { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.pos-campo input {
+  height: 48px; font-size: 16px; padding: 0 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text);
+}
+.pos-campo input:focus { outline: 2px solid var(--ring); border-color: var(--accent); }
+.pos-error {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--danger-soft); color: var(--danger);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 14px; font-size: 14px;
+}
+.pos-aviso {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--warning-soft); color: var(--warning);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 14px; font-size: 14px;
+}
+.pos-info {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--info-soft); color: var(--accent-text);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 14px; font-size: 14px;
+}
+.pos-boton-grande { width: 100%; height: 56px; font-size: 17px; justify-content: center; }
+.pos-enlace {
+  background: none; border: 0; color: var(--text-3); font-size: 13px;
+  padding: 12px 4px; cursor: pointer; text-decoration: underline;
+}
+
+/* ---- Elegir caja --------------------------------------------------------- */
+.pos-cajas { display: grid; gap: 10px; margin-bottom: 16px; }
+.pos-caja {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 64px; padding: 0 18px; font-size: 17px; font-weight: 600;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg);
+  cursor: pointer; text-align: left;
+}
+.pos-caja:active { background: var(--accent-soft); border-color: var(--accent); }
+.pos-caja:disabled { opacity: 0.55; cursor: default; }
+.pos-fila { display: flex; gap: 10px; }
+.pos-fila .pos-campo { flex: 1; margin: 0; }
+
+/* ---- PIN ----------------------------------------------------------------- */
+.pos-pin-encabezado { text-align: center; }
+.pos-pin-caja { font-size: 13px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.pos-puntos { display: flex; justify-content: center; gap: 18px; margin: 26px 0 22px; }
+.pos-punto {
+  width: 18px; height: 18px; border-radius: 99px;
+  border: 2px solid var(--border-strong); background: transparent;
+  transition: background .12s, border-color .12s;
+}
+.pos-punto.lleno { background: var(--accent); border-color: var(--accent); }
+.pos-puntos.error .pos-punto { border-color: var(--danger); }
+.pos-puntos.error { animation: pos-temblor .35s; }
+@keyframes pos-temblor {
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.pos-teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pos-tecla {
+  height: 68px; font-size: 26px; font-weight: 600;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  display: grid; place-items: center;
+}
+.pos-tecla:active { background: var(--accent-soft); border-color: var(--accent); }
+.pos-tecla:disabled { opacity: 0.4; cursor: default; }
+.pos-tecla.secundaria { background: transparent; border-color: transparent; color: var(--text-2); font-size: 15px; }
+.pos-mensaje-pin { min-height: 44px; text-align: center; margin-top: 14px; font-size: 14px; }
+.pos-mensaje-pin.error { color: var(--danger); }
+.pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
+
+/* ---- Barra de la caja (con sesion) -------------------------------------- */
+.pos-barra {
+  height: 60px; display: flex; align-items: center; gap: 16px;
+  padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.pos-barra-dato { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.pos-barra-dato small { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+/* Un nombre largo se corta con puntos suspensivos: nunca parte la barra en dos lineas. */
+.pos-barra-dato b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.pos-barra-espacio { flex: 1; }
+.pos-reloj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.pos-barra .btn { white-space: nowrap; flex-shrink: 0; }
+.pos-cuerpo { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
+
+/* ---- Sin conexion ------------------------------------------------------- */
+.pos-sin-red {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--danger); color: #fff; font-weight: 600; font-size: 14px;
+  padding: 8px 16px;
+}
+
+/* La empresa es lo primero que sobra: el cajero sabe donde trabaja. */
+@media (max-width: 720px) {
+  .pos-barra { gap: 10px; }
+  .pos-barra-dato.ocultable { display: none; }
+  .pos-barra-dato b { max-width: 140px; }
+}
+@media (max-width: 520px) {
+  .pos-panel { padding: 22px 18px; }
+}

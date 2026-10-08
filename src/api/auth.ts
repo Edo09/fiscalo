@@ -119,3 +119,21 @@ export async function logout(): Promise<void> {
     /* aunque falle la revocación remota, cerramos sesión local igual */
   }
 }
+
+/** Respuesta de POST /api/auth/pos-handoff (api-gratex docs/api/pos.md). */
+export interface PosHandoff {
+  /** pos.fiscalpoint.com.do/#code=<código>: el código va en el fragmento. */
+  url: string
+  code: string
+  /** Segundos de vida del código (60). */
+  expira_en: number
+}
+
+/**
+ * Botón POS (docs/specs/pos.md A1, A2): código de un solo uso para abrir
+ * pos.* ya autenticado. Pide el módulo `pos` y el POS activo en la empresa.
+ */
+export async function posHandoff(): Promise<PosHandoff> {
+  const body = await authPost<PosHandoff>('/api/auth/pos-handoff', {}, true)
+  return body.data as PosHandoff
+}

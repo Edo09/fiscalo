@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Icon, Btn, Avatar, Dropdown, MenuItem, type IconName } from '@/components/ui'
-import { getEmisor } from '@/api'
+import { getEmisor, getBranding, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession } from '@/stores/auth'
-import { logout } from '@/api/auth'
+import { logout, posHandoff } from '@/api/auth'
+import { hasModule } from '@/config/permissions'
 import { puedeVerVista, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 
 // Accesos del botón "Nueva". Cada uno se muestra solo si el rol puede abrir su
@@ -42,6 +44,36 @@ export function Navbar({
     ? empresaNombre.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
     : '…'
 
+  // Botón POS (api-gratex docs/specs/pos.md A1): solo si la empresa tiene el
+  // POS activo y el rol tiene el módulo 'pos'. Misma caché de branding que el
+  // resto de la app.
+  const { data: branding } = useApiQuery(['branding'], getBranding)
+  const puedePos = branding?.pos_enabled === true && hasModule(user?.permissions ?? [], 'pos')
+  const [abriendoPos, setAbriendoPos] = useState(false)
+
+  const abrirPos = async () => {
+    // La pestaña se abre YA, en el clic: abierta después del await, el
+    // navegador la bloquea como ventana emergente. Se le pone la URL al llegar.
+    const pestana = window.open('', '_blank')
+    setAbriendoPos(true)
+    try {
+      const r = await posHandoff()
+      // En desarrollo no hay pos.fiscalpoint.com.do: el POS vive en /pos.html.
+      const url = import.meta.env.DEV ? `${window.location.origin}/pos.html#code=${r.code}` : r.url
+      if (pestana) {
+        pestana.opener = null
+        pestana.location.href = url
+      } else {
+        window.location.href = url
+      }
+    } catch (e) {
+      pestana?.close()
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo abrir el POS. Inténtalo de nuevo.')
+    } finally {
+      setAbriendoPos(false)
+    }
+  }
+
   const handleLogout = async () => {
     setLoggingOut(true)
     await logout()
@@ -71,6 +103,13 @@ export function Navbar({
       <div className="navbar-spacer"></div>
       <div className="navbar-actions">
         <button className="icon-btn mobile-only" onClick={onOpenSearch}><Icon name="search" /></button>
+        {puedePos && (
+          <Btn
+            size="sm" icon="printer" className="desktop-only"
+            onClick={() => void abrirPos()} disabled={abriendoPos}
+            title="Abrir el punto de venta en una pestaña nueva"
+          >POS</Btn>
+        )}
         {/* Sin ningún acceso permitido no hay botón: un menú vacío no lleva a nada. */}
         {nuevos.length > 0 && (
           <Dropdown align="right" width={210} className="desktop-only" trigger={
