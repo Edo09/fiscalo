@@ -179,6 +179,12 @@ export interface FacturaPrefill {
   /** Código del documento de origen (ej. cotización) — informativo. */
   origen?: string
   /**
+   * Qué documento es `origen`. Ausente = una cotización, con los textos de
+   * siempre. 'conduce' cambia el banner y el aviso del descuento, y pide el
+   * precio de cada línea antes de emitir: en el conduce pudo no tenerlo.
+   */
+  origenTipo?: 'conduce'
+  /**
    * Estado inicial del interruptor "Los precios incluyen ITBIS". Ausente = true
    * (cotización Gratex, precios con ITBIS); Ferretería manda false.
    */
@@ -202,7 +208,7 @@ export interface FacturaPrefill {
   }[]
 }
 
-/** Borrador para precargar la factura simple (convertir una cotización de Ferretería). */
+/** Borrador para precargar la factura simple (convertir una cotización de Ferretería o un conduce). */
 export interface FacturaSimplePrefill {
   kind: 'factura-simple-prefill'
   /** Vacío si el documento de origen no tenía cliente. */
@@ -210,6 +216,8 @@ export interface FacturaSimplePrefill {
   clienteNombre: string
   /** Código del documento de origen (ej. COT-000012), para el banner. */
   origen: string
+  /** Qué documento es `origen`. Ausente = una cotización; 'conduce' como en FacturaPrefill. */
+  origenTipo?: 'conduce'
   /** Avisos bajo el banner de conversión. */
   avisos?: string[]
   /** `precio` YA incluye el ITBIS: la factura simple cobra precios finales. */

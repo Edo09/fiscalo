@@ -708,6 +708,89 @@ export interface CotizacionFerreteriaInput {
 }
 
 // ---------------------------------------------------------------------------
+// Conduces de mercancía (Ferretería) — tablas `conduces` / `conduce_items`
+//   Nada se borra: `activo` 0 es un conduce eliminado o una línea que una
+//   edición reemplazó. El API solo devuelve lo activo.
+// ---------------------------------------------------------------------------
+
+export interface ConduceItemRow {
+  id?: number
+  conduce_id?: number
+  /** null = línea libre, o el producto se borró del catálogo después. */
+  product_id?: number | null
+  description?: string | null
+  /** DECIMAL como string: leer con aNumero. */
+  quantity?: string | number | null
+  /** Código DGII de la unidad (= unidades_medida.id), ej. '43'. */
+  unidad_medida?: string | null
+  /** Precio interno SIN ITBIS, solo para Facturar: el conduce nunca lo muestra. DECIMAL como string. */
+  amount?: string | number | null
+  /** 1 = 18%, 2 = 16%, 3 = 0%, 4 = exento. */
+  indicador_facturacion?: number | string | null
+  /** 1 = Bien, 2 = Servicio. */
+  indicador_bien_servicio?: number | string | null
+  activo?: number | string | null
+}
+
+export interface ConduceRow {
+  id: number
+  /** Consecutivo del conduce (el de `code`). */
+  numero?: number | string | null
+  /** CON-000001. No se vuelve a usar nunca, ni después de Eliminar. */
+  code?: string | null
+  date?: string | null
+  /** Cotización de origen; null si esa cotización se eliminó. */
+  cotizacion_id?: number | null
+  /** Código de la cotización de origen (COT-…); null si se eliminó. */
+  cotizacion_code?: string | null
+  client_id?: number | null
+  /** Del cliente actual (LEFT JOIN clients): null si el cliente se borró. */
+  client_name?: string | null
+  company_name?: string | null
+  rnc?: string | null
+  /**
+   * Nombre guardado en el conduce al crearlo o editarlo. Es el que se muestra
+   * cuando el cliente ya no existe: `client_name || client_name_guardado`.
+   */
+  client_name_guardado?: string | null
+  user_id?: number | null
+  activo?: number | string | null
+  /** Solo las líneas activas, por id. */
+  items?: ConduceItemRow[]
+}
+
+/** Línea de un conduce: de un producto del catálogo o libre (`product_id` null). */
+export interface ConduceItemInput {
+  product_id: number | null
+  description: string
+  /** Las reglas de la cotización: hasta 2 decimales, y solo si la unidad admite fracciones. */
+  quantity: number
+  /** Código DGII de la unidad (= unidades_medida.id), ej. '43'. */
+  unidad_medida: string
+  /** Precio interno SIN ITBIS, hasta 4 decimales; 0 se acepta (línea libre). El formulario no lo muestra. */
+  amount: number
+  /** 1 = 18%, 2 = 16%, 3 = 0%, 4 = exento. */
+  indicador_facturacion: number
+  /** 1 = Bien, 2 = Servicio. Con `product_id`, el backend usa el del producto. */
+  indicador_bien_servicio: number
+}
+
+/**
+ * Cuerpo de POST / PUT / preview de /api/conduces. Sin `ajustes` (el backend
+ * responde 422: un conduce no lleva cargos ni abonos) ni `user_id` (sale del
+ * token). En PUT el `id` va en el cuerpo, como en cotizaciones.
+ */
+export interface ConduceInput {
+  /** Obligatorio al crear: la cotización de Ferretería de origen. En PUT se ignora. */
+  cotizacion_id?: number
+  client_id: number
+  /** 'YYYY-MM-DD HH:MM:SS'. Ausente en PUT = se conserva la fecha guardada. */
+  date?: string
+  /** Un PUT reemplaza el juego completo (las líneas anteriores quedan inactivas). */
+  items: ConduceItemInput[]
+}
+
+// ---------------------------------------------------------------------------
 // Proveedores — tabla `proveedores` (directorio del tenant)
 // ---------------------------------------------------------------------------
 

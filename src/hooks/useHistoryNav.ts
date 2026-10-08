@@ -12,7 +12,8 @@
 // cambio de vista se detiene hasta que el usuario confirme (`salidaPendiente`).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  isCotizacionRef, isFacturaSimpleRef, isNuevoSignal, type Nav, type NavOptions, type NavPayload, type ViewId,
+  isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaSimpleRef, isNuevoSignal,
+  type Nav, type NavOptions, type NavPayload, type ViewId,
 } from '@/config/navigation'
 import { descartarSinGuardar, guardandoAhora, haySinGuardar, mensajeSinGuardar } from './useAvisoSalida'
 
@@ -77,6 +78,8 @@ function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayload): b
   if (p1 === p2) return true
   if (isFacturaSimpleRef(p1) && isFacturaSimpleRef(p2)) return p1.id === p2.id
   if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
+  if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
+  if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
   return false
 }
 

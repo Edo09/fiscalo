@@ -1,9 +1,9 @@
 // "Abrir la entidad" desde un registro de la bitácora.
 //
 // Donde la app tiene pantalla de detalle (factura e-CF, factura simple,
-// cotización) se abre ese documento; para el resto se va al módulo, porque
-// esos listados no se abren por id. Una eliminación no ofrece nada: el
-// documento ya no existe.
+// cotización, conduce) se abre ese documento; para el resto se va al
+// módulo, porque esos listados no se abren por id. Una eliminación no
+// ofrece nada: el documento ya no existe.
 import { ApiError, getFactura, listFacturas, mapFacturaRow } from '@/api'
 import type { AuditLogRow } from '@/api'
 import { TITLES, type Nav, type ViewId } from '@/config/navigation'
@@ -70,6 +70,14 @@ export function destinoEntidad(r: AuditLogRow): Destino | null {
     return {
       etiqueta: 'Abrir cotización',
       abrir: async (nav) => nav('cotizacion-nueva', { kind: 'cotizacion', id: Number(id) }),
+    }
+  }
+  // Su CREATE o UPDATE abre el formulario del conduce. Si después lo
+  // eliminaron (activo = 0), el formulario dice "Este conduce ya no existe".
+  if (r.entity_type === 'conduce' && soloDigitos(id)) {
+    return {
+      etiqueta: 'Abrir conduce',
+      abrir: async (nav) => nav('conduce-editar', { kind: 'conduce', id: Number(id) }),
     }
   }
 

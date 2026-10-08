@@ -18,6 +18,9 @@ import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
+import { ConducesView } from '@/features/conduces/ConducesView'
+import { ConduceEditor } from '@/features/conduces/ConduceEditor'
+import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -42,8 +45,8 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista,
-  type ViewId,
+  claveFormularioFactura, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isCotizacionRef, isFacturaPrefill,
+  isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, type Nav, type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -70,12 +73,23 @@ const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
   // que parece listo para guardar: se vuelve al listado, que deja claro que lo
   // que se estaba escribiendo ya no esta.
   'cotizacion-nueva': 'cotizaciones',
+  // Mismo criterio para un conduce: sin su payload no se sabe cuál era.
+  'conduce-editar': 'conduces',
 }
 
 function restoreView(): ViewId {
   const guardada = localStorage.getItem('fiscalo.view') as ViewId | null
   if (!guardada) return 'dashboard'
   return VIEW_SIN_PAYLOAD[guardada] ?? guardada
+}
+
+/**
+ * Vista que llegó sin su payload: no pinta nada y vuelve a `destino` sin
+ * apilar. Desde un efecto: navegar mientras se pinta no está permitido.
+ */
+function SinPayload({ nav, destino }: { nav: Nav; destino: ViewId }) {
+  useEffect(() => { nav(destino, null, { replace: true }) }, [nav, destino])
+  return null
 }
 
 function App() {
@@ -86,6 +100,10 @@ function App() {
 
 function AppShell() {
   const { user } = useSession()
+  // Formato de cotización del tenant: decide lo que es de un solo formato (los
+  // conduces de Ferretería) en el sidebar, el buscador y la redirección de
+  // abajo. null mientras branding no responde.
+  const { formato } = useFormatoTenant()
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState(false)
@@ -146,27 +164,38 @@ function AppShell() {
   // la redirección se repetiría, dejando al usuario atrapado. Forzada: el
   // efecto no se repite, y un aviso de "sin guardar" la cancelaría para siempre
   // (sin el módulo, lo escrito tampoco se podría guardar).
+  // Lo de un formato espera a saberlo: con el formato en null (branding
+  // cargando o con error) no se redirige, o recargar sobre Conduces mandaría
+  // al dashboard antes de tiempo. Sabido y distinto, se sale (ver debeSalirDeVista).
   useEffect(() => {
-    if (!puedeVerVista(user, activeTop)) nav('dashboard', null, { replace: true, forzar: true })
-  }, [activeTop, user, nav])
+    if (debeSalirDeVista(user, activeTop, formato)) nav('dashboard', null, { replace: true, forzar: true })
+  }, [activeTop, user, nav, formato])
 
   const renderView = () => {
     switch (view) {
       case 'dashboard': return <DashboardView nav={nav} variant={THEME.dashLayout === 'enfoque' ? 'focus' : 'balanced'} />
       case 'facturas': return <InvoiceListView nav={nav} />
-      case 'factura-nueva': return <InvoiceFormView nav={nav} prefill={isFacturaPrefill(payload) ? payload : null} />
+      // Cada borrador (una cotización convertida, un conduce) tiene su key: el formulario
+      // toma el borrador solo al montarse y sus líneas son estado propio. Pasar de una
+      // factura convertida a Nueva > Factura (o a la conversión de otro documento) monta un
+      // formulario limpio; si no, quedarían las líneas del documento anterior, y en un
+      // conduce, sin su bloqueo del precio 0. Una nueva en blanco conserva la key 'nueva': el
+      // menú Nueva no le borra lo escrito (ver claveFormularioFactura).
+      case 'factura-nueva': {
+        const prefill = isFacturaPrefill(payload) ? payload : null
+        return <InvoiceFormView key={claveFormularioFactura(prefill)} nav={nav} prefill={prefill} />
+      }
       case 'factura-ver': return <InvoiceDetailView factura={payload as Factura | null} nav={nav} />
       case 'facturas-simples': return <SimpleInvoiceListView nav={nav} />
       // Con key: pasar de una factura a otra (o de nueva a editar) monta un
       // formulario limpio en vez de heredar el cliente y el aviso de salida del anterior.
-      // El borrador de una cotización convertida solo llega a la factura NUEVA,
-      // con su propia key: no se mezcla con una nueva en blanco ni con otra conversión.
+      // El borrador de una cotización o de un conduce convertido solo llega a la factura
+      // NUEVA, con su propia key (la misma regla que la e-CF): no se mezcla con una nueva en
+      // blanco ni con otra conversión.
       case 'factura-simple-nueva': {
         const prefill = isFacturaSimplePrefill(payload) ? payload : null
         return (
-          <SimpleInvoiceFormView
-            key={prefill ? `cotizacion-${prefill.origen}` : 'nueva'} nav={nav} facturaId={null} prefill={prefill}
-          />
+          <SimpleInvoiceFormView key={claveFormularioFactura(prefill)} nav={nav} facturaId={null} prefill={prefill} />
         )
       }
       case 'factura-simple-editar': {
@@ -181,6 +210,17 @@ function AppShell() {
       case 'cotizacion-nueva': {
         const id = isCotizacionRef(payload) ? payload.id : null
         return <CotizacionEditor key={id ?? 'nueva'} nav={nav} cotizacionId={id} />
+      }
+      // Solo Ferretería: la vista espera al formato, y App saca de aquí a otro (debeSalirDeVista).
+      case 'conduces': return <ConducesView nav={nav} />
+      // El conduce de un payload (uno guardado, o uno nuevo desde una
+      // cotización). Con key por documento: pasar de uno a otro monta un
+      // editor limpio. Sin payload (no debería pasar: VIEW_SIN_PAYLOAD cubre
+      // la recarga) no se sabe cuál era: al listado.
+      case 'conduce-editar': {
+        const p = isConduceRef(payload) || isConduceDesdeCotizacion(payload) ? payload : null
+        if (!p) return <SinPayload nav={nav} destino="conduces" />
+        return <ConduceEditor key={p.kind === 'conduce' ? `c-${p.id}` : `q-${p.cotizacionId}`} nav={nav} payload={p} />
       }
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
@@ -218,6 +258,7 @@ function AppShell() {
         sbClass={sbClass}
         mobileOpen={mobileNav}
         onCloseMobile={() => setMobileNav(false)}
+        formato={formato}
       />
 
       <div className="main-col">
@@ -232,7 +273,7 @@ function AppShell() {
         <div className="content">{renderView()}</div>
       </div>
 
-      {search && <SearchPalette nav={nav} onClose={() => setSearch(false)} />}
+      {search && <SearchPalette nav={nav} formato={formato} onClose={() => setSearch(false)} />}
       {/* key: cada pregunta es un Modal nuevo. El Modal fija su Escape al montar,
           y uno reciclado cerraría con las acciones del diálogo anterior. */}
       {salidaPendiente && (

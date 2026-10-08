@@ -20,6 +20,12 @@ interface ProductoComboboxProps {
    * cuesta el artículo; una cotización, en lo que paga el cliente.
    */
   mostrarPrecio?: boolean
+  /**
+   * No muestra ningún monto (ni costo ni precio): para un documento sin
+   * precios, como el conduce. La línea de abajo (SKU, categoría, existencia)
+   * se queda: es lo que una entrega necesita ver.
+   */
+  ocultarMonto?: boolean
 }
 
 export function ProductoCombobox({
@@ -27,6 +33,7 @@ export function ProductoCombobox({
   placeholder = 'Buscar producto por nombre, SKU o categoría…',
   debounceMs = 250,
   mostrarPrecio = false,
+  ocultarMonto = false,
 }: ProductoComboboxProps) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
@@ -98,12 +105,14 @@ export function ProductoCombobox({
                       .join('  ·  ')}
                   </div>
                 </div>
-                <span className="text-xs muted" style={{ whiteSpace: 'nowrap' }}>
-                  {/* El precio con sus decimales (hasta 4): es el que se copia a la línea. */}
-                  {mostrarPrecio
-                    ? <>Precio <span className="num">{fmtPrecio(p.precio)}</span></>
-                    : <>Costo <Money value={p.costo} cur={false} /></>}
-                </span>
+                {!ocultarMonto && (
+                  <span className="text-xs muted" style={{ whiteSpace: 'nowrap' }}>
+                    {/* El precio con sus decimales (hasta 4): es el que se copia a la línea. */}
+                    {mostrarPrecio
+                      ? <>Precio <span className="num">{fmtPrecio(p.precio)}</span></>
+                      : <>Costo <Money value={p.costo} cur={false} /></>}
+                  </span>
+                )}
               </div>
             ))
           )}

@@ -11,6 +11,7 @@ import type {
 } from '@/api'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
+import { MSG_SIN_PRECIO } from '@/features/conduces/conversion'
 import { ProductFormModal } from '@/features/products/ProductFormModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import {
@@ -304,15 +305,23 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // usuario puede cambiarlo línea por línea después; esto solo lo precarga.
   const descuentoCliente = cliente?.descuento ?? 0
 
+  // Factura de un conduce (Facturar en Conduces): cambia los textos de la
+  // conversión y no deja emitir una línea sin precio (ver validateForm).
+  const deConduce = prefill?.origenTipo === 'conduce'
+
   // Avisos bajo el banner de una conversión: lo que el origen no copió (los
-  // cargos de una cotización de Ferretería) y, ya con el cliente cargado, su
-  // descuento fijo. La factura lo aplica igual que al elegirlo a mano, así que
-  // su total ya no es el de la cotización; mejor decirlo antes de emitir.
+  // cargos de una cotización de Ferretería, las líneas de un conduce sin
+  // precio) y, ya con el cliente cargado, su descuento fijo. La factura lo
+  // aplica igual que al elegirlo a mano, así que su total ya no es el de la
+  // cotización; mejor decirlo antes de emitir. Un conduce no tiene total: solo
+  // se dice que sus precios llevan el descuento.
   const avisosConversion = prefill?.origen
     ? [
         ...(prefill.avisos ?? []),
         ...(descuentoCliente > 0
-          ? [`Se aplicó el descuento fijo del cliente (${descuentoCliente}%): el total difiere del de la cotización.`]
+          ? [deConduce
+              ? `Se aplicó el descuento fijo del cliente (${descuentoCliente}%) a los precios del conduce.`
+              : `Se aplicó el descuento fijo del cliente (${descuentoCliente}%): el total difiere del de la cotización.`]
           : []),
       ]
     : []
@@ -457,6 +466,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       if (mal) {
         const bucket = (errs.lineas[l.id] ??= {})
         if (!bucket.cant) { bucket.cant = mal; n += 1 }
+      }
+      // Factura de un conduce: el precio 0 no se emite. El conduce no muestra
+      // precios y su "Línea libre" se guarda en 0; la DGII rechaza un MontoItem
+      // 0 después de reservar el e-NCF, y el número se pierde. Sin conduce, el
+      // precio 0 se sigue aceptando como hoy.
+      if (deConduce && l.precio === 0) {
+        const bucket = (errs.lineas[l.id] ??= {})
+        if (!bucket.precio) { bucket.precio = MSG_SIN_PRECIO; n += 1 }
       }
     }
     if (n > 0) {
@@ -619,12 +636,15 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         {prefill?.origen && (
           <div className="col" style={{ alignItems: 'flex-end', textAlign: 'right', gap: 4, minWidth: 0 }}>
             {/* El texto de siempre mientras los precios traigan ITBIS (Gratex);
-                la de Ferretería los manda sin ITBIS y el banner lo dice. */}
+                la de Ferretería los manda sin ITBIS y el banner lo dice. Un
+                conduce lo nombra como conduce: sus precios tampoco traen ITBIS. */}
             <span className="row gap-sm text-sm" style={{ color: 'var(--info)' }}>
               <Icon name="file-plus" size={15} />
-              {prefill.precioConItbis !== false
-                ? `Convertida desde la cotización ${prefill.origen} · los precios ya traen ITBIS incluido`
-                : `Convertida desde la cotización ${prefill.origen} · los precios no incluyen ITBIS (se suma encima)`}
+              {deConduce
+                ? `Convertida desde el conduce ${prefill.origen} · los precios no incluyen ITBIS (se suma encima)`
+                : prefill.precioConItbis !== false
+                  ? `Convertida desde la cotización ${prefill.origen} · los precios ya traen ITBIS incluido`
+                  : `Convertida desde la cotización ${prefill.origen} · los precios no incluyen ITBIS (se suma encima)`}
             </span>
             {avisosConversion.map((a, i) => (
               <span key={i} className="row gap-sm text-xs" style={{ color: 'var(--warning)' }}>

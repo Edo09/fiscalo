@@ -1,5 +1,6 @@
 import { Icon, Image } from '@/components/ui'
 import { NAV, puedeVerItem, type Nav } from '@/config/navigation'
+import type { FormatoId } from '@/features/cotizaciones/formatos'
 import { useSession } from '@/stores/auth'
 
 export interface SidebarProps {
@@ -8,9 +9,11 @@ export interface SidebarProps {
   sbClass: string
   mobileOpen: boolean
   onCloseMobile: () => void
+  /** Formato de cotización del tenant (useFormatoTenant, en AppShell); null mientras no se sabe. */
+  formato: FormatoId | null
 }
 
-export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile, formato }: SidebarProps) {
   const { user } = useSession()
 
   return (
@@ -23,8 +26,9 @@ export function Sidebar({ nav, activeTop, sbClass, mobileOpen, onCloseMobile }: 
         </div>
         <div className="sidebar-scroll">
           {NAV.map((g) => {
-            // Fail-open sin lista de permisos; lo soloAdmin no (ver puedeVerItem).
-            const items = g.items.filter((it) => puedeVerItem(user, it))
+            // Fail-open sin lista de permisos; lo soloAdmin y lo de un formato no
+            // (ver puedeVerItem): Conduces aparece cuando branding dice Ferretería.
+            const items = g.items.filter((it) => puedeVerItem(user, it, formato))
             if (items.length === 0) return null
             return (
               <div className="nav-group" key={g.group}>

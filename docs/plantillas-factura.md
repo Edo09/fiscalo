@@ -2,9 +2,10 @@
 
 Cada tenant elige cómo se ve su factura PDF: una plantilla predefinida + un
 color de acento + su logo. Para clientes que pidan un diseño totalmente a la
-medida existe la vía `custom:*` (sección final). La cotización no sigue esta
-plantilla: la arma el formato de cotización del tenant (sección
-"Cotizaciones: las define el formato, no la plantilla").
+medida existe la vía `custom:*` (sección final). La cotización (y el conduce
+de mercancía de Ferretería) no sigue esta plantilla: la arma el formato de
+cotización del tenant (sección "Cotizaciones: las define el formato, no la
+plantilla").
 
 ## Arquitectura
 
@@ -38,7 +39,7 @@ del texto sobre el acento lo decide `BrandingResolver::contrastText()`
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
-| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, logo_data_uri, available_templates, cotizacion_formato}`. `cotizacion_formato` (`gratex` \| `ferreteria`) elige la pantalla de cotización (`src/features/cotizaciones/formatos/`); solo lectura, se cambia por SQL en `master.tenants` |
+| GET | `/api/branding` | — | `{template, accent_color, logo_path, has_custom_logo, logo_data_uri, available_templates, cotizacion_formato}`. `cotizacion_formato` (`gratex` \| `ferreteria`) elige la pantalla de cotización (`src/features/cotizaciones/formatos/`) y, con `ferreteria`, muestra Conduces (`useFormatoTenant()`); solo lectura, se cambia por SQL en `master.tenants` |
 | PUT | `/api/branding` | `{template?, accent_color?}` | 422 si plantilla desconocida o hex inválido. `accent_color: null` limpia. |
 | POST | `/api/branding/logo` | multipart `logo` | PNG/JPG real (getimagesize), máx 2 MB. Guarda `logos/<tenant_id>.<ext>`. |
 | DELETE | `/api/branding/logo` | — | Borra el logo; vuelve al global. |
@@ -62,16 +63,26 @@ de factura no cambia ese cuerpo:
   `pdf_template` o `pdf_accent_color` no la cambia.
 - Una cotización guardada conserva su formato (`cotizaciones.formato`; NULL =
   gratex) aunque el tenant cambie de formato después.
+- **Conduce de mercancía (solo `ferreteria`):** el papel que va con la
+  mercancía y que firma el cliente (`/api/conduces`) sale del mismo
+  `FerreteriaCotizacionPdf.php`, en modo conduce (`documento => 'conduce'`):
+  título CONDUCE DE MERCANCÍA, columnas Cantidad | Unidad | Descripción
+  mercancías, sin precios ni totales, la cotización de origen y "Recibido
+  por". Como la cotización, del branding usa solo el logo. Un tenant `gratex`
+  no tiene conduces: el menú no los muestra y la API responde 422.
 - **Frontend:** `src/features/cotizaciones/formatos/` (registro `FORMATOS`). Para
   una cotización nueva, `useCotizacionFormato()` lee `cotizacion_formato` de
   `GET /api/branding`; una guardada se abre con el formulario de su formato.
   En single-tenant ese GET responde 409 y la cotización es `gratex`, igual que
-  en el backend.
+  en el backend. Los conduces viven en `src/features/conduces/`; su página y su
+  formulario esperan a `useFormatoTenant()` (ver `docs/roles-permisos.md`,
+  "Vistas de un formato de cotización").
 - **Se cambia solo por SQL** (no hay pantalla ni `PUT /api/branding` para esto):
   `UPDATE tenants SET cotizacion_formato = 'ferreteria' WHERE id = <id>;`
 - Arquitectura y cómo agregar el formato de otro tenant:
   `api-gratex/docs/modules/cotizaciones-formatos.md`. Contrato del API:
-  `api-gratex/docs/api/cotizaciones.md`.
+  `api-gratex/docs/api/cotizaciones.md` y, para los conduces,
+  `api-gratex/docs/api/conduces.md`.
 
 ## Diseños a la medida (`custom:*`)
 

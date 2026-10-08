@@ -35,6 +35,13 @@ Módulos del rol `user` por defecto (operativos): `facturas`, `facturas-simples`
 `unidades`. **Solo admin** (excluidos de `user`): `emisor`, `branding`, `landing`, `users`,
 `roles`. (Si un `user` necesita un módulo admin, crear/ajustar un rol con `/api/roles`.)
 
+> `conduces` **no es un módulo**: `/api/conduces` (los conduces de mercancía de Ferretería) usa
+> el módulo `cotizaciones` (`'conduces' => 'cotizaciones'` en `routes` del backend), porque un
+> conduce sale de una cotización. Quien tiene `cotizaciones` ve y usa los conduces; sin él, 403
+> como en cualquier módulo. Aparte del rol, el backend responde 422 a las empresas que no están
+> en el formato de cotización `ferreteria` (`api-gratex/docs/api/conduces.md`). En el front la
+> página además depende del formato: ver "Vistas de un formato de cotización" más abajo.
+
 ## Aplicación — `PermissionGate` (Router)
 
 [`src/PermissionGate.php`](../../src/PermissionGate.php) corre en
@@ -113,9 +120,34 @@ El front decide qué páginas/menú mostrar con la **lista de módulos** del usu
 El front muestra/oculta por módulo: `perms.includes('*') || perms.includes('facturas')`.
 
 Si los ids de vista del front no coinciden con los nombres de módulo (ej. `clientes`→`clients`,
-`productos`→`products`, `compras`→`gastos`, `ecf`→`facturas`, `aprobar-ecf`→`aprobaciones`),
-mantener un mapa `vista → módulo(s)` y mostrar con *any-of*. Vistas sin API (dashboard,
-tesorería) no se gatean (no hay 403 que dar).
+`productos`→`products`, `compras`→`gastos`, `ecf`→`facturas`, `aprobar-ecf`→`aprobaciones`,
+`conduces`→`cotizaciones`), mantener un mapa `vista → módulo(s)` y mostrar con *any-of*. Vistas
+sin API (dashboard, tesorería) no se gatean (no hay 403 que dar).
+
+### Vistas de un formato de cotización (Conduces)
+
+Además del módulo, un item del menú puede exigir el **formato de cotización** del tenant
+(`NavItem.formato` en `src/config/navigation.ts`). Hoy solo lo usa **Conduces**
+(`{ id: 'conduces', module: 'cotizaciones', formato: 'ferreteria' }`). Su formulario
+`conduce-editar` hereda el módulo y el formato por `SUBVISTA_DE`.
+
+- **De dónde sale el formato:** `useFormatoTenant()` lee `cotizacion_formato` de
+  `GET /api/branding`, sin volver a pedirlo al regresar a la pestaña. `AppShell` lo lee una vez
+  y se lo pasa al sidebar, al buscador de páginas y a la redirección de `App`. El 409 de
+  single-tenant cuenta como `gratex`.
+- **Mientras no se sabe** (branding cargando o con error), el formato es `null`: el item no se
+  ve, pero `App` no saca de la vista (`debeSalirDeVista`). Recargar sobre Conduces se queda en
+  Conduces, que muestra "cargando" o el error con "Reintentar".
+- **Con el formato sabido y distinto** (Gratex), `App` lleva al dashboard sin apilar historial.
+  Conduces y su formulario no llaman a `/api/conduces` hasta saber que el formato es
+  `ferreteria`, así que Gratex nunca ve el 422 "Los conduces no están disponibles para tu
+  empresa.".
+- `puedeVerItem(user, it, formato?)` y `puedeVerVista(user, view, formato?)`: un item con
+  `formato` se ve solo cuando el del tenant es ese (`null` lo esconde). Los items sin `formato`
+  dan lo mismo que antes, se pase o no el tercer argumento.
+- **Bitácora:** los eventos de los conduces llevan el módulo `conduces` (etiqueta "Conduces"; es
+  un módulo de la bitácora, no un permiso) y la entidad `conduce`, que se abre con "Abrir
+  conduce". Una eliminación no ofrece nada, como en el resto.
 
 > El front-gating es solo UX. El **backend igual aplica** (PermissionGate): aunque el
 > front muestre la página, la API responde 403 si el rol no tiene el módulo.

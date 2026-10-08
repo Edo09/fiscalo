@@ -12,6 +12,7 @@ import { useSession } from '@/stores/auth'
 import { puedeVerVista, type Nav } from '@/config/navigation'
 import type { FacturaPrefill } from '@/types/domain'
 import { formatoDeFila, useCotizacionFormato, type FormatoId } from './formatos'
+import { useFormatoTenant } from './formatos/useFormatoTenant'
 import { ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill } from './formatos/ferreteria/conversion'
 
 const PAGE_SIZE = 15
@@ -52,6 +53,11 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
   // Facturar ofrece solo los destinos que el rol puede abrir (mismo criterio que el sidebar).
   const puedeEcf = puedeVerVista(user, 'factura-nueva')
   const puedeSimple = puedeVerVista(user, 'factura-simple-nueva')
+  // "Conduce" sale cuando el formato de la empresa SE SABE y es Ferretería: el
+  // mismo criterio que muestra la página de Conduces (mientras branding carga,
+  // o si falló, no sale).
+  const { formato: formatoConocido } = useFormatoTenant()
+  const puedeConduce = formatoConocido === 'ferreteria' && puedeVerVista(user, 'conduce-editar', formatoConocido)
 
   // Crear y editar viven en su propia pantalla (el editor "en papel", igual que
   // el de factura), no en un modal.
@@ -123,7 +129,8 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
                   {columnas === 'gratex' && <th>Descripción</th>}
                   <th>Fecha</th>
                   <th className="num">Total</th>
-                  <th style={{ width: columnas === 'gratex' ? 190 : 210 }}></th>
+                  {/* Ferretería con conduces lleva tres botones (PDF, Conduce, Facturar). */}
+                  <th style={{ width: columnas === 'gratex' ? 190 : puedeConduce ? 320 : 210 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -142,30 +149,40 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
                           {pdfBusy === c.id ? '…' : 'PDF'}
                         </Btn>
                         {formatoDeFila(c) === 'ferreteria' ? (
-                          // Ferretería factura a e-CF o a factura simple. Cada destino
-                          // sale solo si el rol puede abrirlo; sin ninguno, no hay botón.
-                          (puedeEcf || puedeSimple) && (
-                            <Dropdown
-                              align="right"
-                              width={220}
-                              trigger={
-                                <Btn variant="secondary" size="sm" icon="file-text" iconRight="chevron-down" title="Convertir en factura">
-                                  Facturar
-                                </Btn>
-                              }
-                            >
-                              {puedeEcf && (
-                                <MenuItem icon="file-text" onClick={() => nav('factura-nueva', ferreteriaAFacturaPrefill(c))}>
-                                  Factura electrónica (e-CF)
-                                </MenuItem>
-                              )}
-                              {puedeSimple && (
-                                <MenuItem icon="file" onClick={() => nav('factura-simple-nueva', ferreteriaAFacturaSimplePrefill(c))}>
-                                  Factura simple
-                                </MenuItem>
-                              )}
-                            </Dropdown>
-                          )
+                          <>
+                            {/* Conduce: fuera de la condición de Facturar, porque un rol
+                                sin facturas también entrega mercancía. */}
+                            {puedeConduce && (
+                              <Btn variant="secondary" size="sm" icon="truck" title="Crear un conduce de mercancía con esta cotización"
+                                onClick={() => nav('conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: c.id })}>
+                                Conduce
+                              </Btn>
+                            )}
+                            {/* Ferretería factura a e-CF o a factura simple. Cada destino
+                                sale solo si el rol puede abrirlo; sin ninguno, no hay botón. */}
+                            {(puedeEcf || puedeSimple) && (
+                              <Dropdown
+                                align="right"
+                                width={220}
+                                trigger={
+                                  <Btn variant="secondary" size="sm" icon="file-text" iconRight="chevron-down" title="Convertir en factura">
+                                    Facturar
+                                  </Btn>
+                                }
+                              >
+                                {puedeEcf && (
+                                  <MenuItem icon="file-text" onClick={() => nav('factura-nueva', ferreteriaAFacturaPrefill(c))}>
+                                    Factura electrónica (e-CF)
+                                  </MenuItem>
+                                )}
+                                {puedeSimple && (
+                                  <MenuItem icon="file" onClick={() => nav('factura-simple-nueva', ferreteriaAFacturaSimplePrefill(c))}>
+                                    Factura simple
+                                  </MenuItem>
+                                )}
+                              </Dropdown>
+                            )}
+                          </>
                         ) : (
                           <Btn variant="secondary" size="sm" icon="file-text" title="Convertir a factura e-CF"
                             onClick={() => nav('factura-nueva', toFacturaPrefill(c))}>
