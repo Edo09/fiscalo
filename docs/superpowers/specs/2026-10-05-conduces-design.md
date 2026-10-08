@@ -711,6 +711,9 @@ No setting is needed: Ferretería already has `cotizacion_formato = 'ferreteria'
   the eyebrow, the branding-error title, the no-RNC caption, and "De una cotización eliminada".
 - **Smoke test (7.4).** A real conduce created in production uses up a number. Task 7 documents a preview-only
   alternative, so the first real conduce can still be `CON-000001`.
+  **Decided on 2026-10-08:** the owner chose the full test (create from a quote, edit, PDF, Facturar e-CF with a
+  0-price line, which must be blocked, and delete), so it spends `CON-000001` and the first real conduce will be
+  `CON-000002`. The preview-only check still exists, but it doesn't exercise the 0-price block.
 - **Node test of `useFormatoTenant` (6).** It was not factored out; Task 14's browser checks cover the loading,
   error, 409 and Gratex states.
 - **Rollout order (7), refined (final review, 2026-10-08).** Backup; the verifier (read-only) in both DBs; 027 then 028 wherever they say FALTA; 029 and its final row; the verifier again (027, 028 and 029 all APLICADA); then deploy and smoke tests. It follows 029's own ORDEN (after 028, before the code) and replaces the order of steps 1 and 2 in section 7, which ran 029 before the check for 027 and 028.
