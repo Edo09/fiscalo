@@ -43,11 +43,15 @@ const SESIONES: { nombre: string; user: SesionNav | null }[] = [
 const FORMATOS: (FormatoId | null | undefined)[] = [undefined, null, 'gratex', 'ferreteria']
 const nombreFormato = (f: FormatoId | null | undefined) => (f === undefined ? 'sin pasar' : String(f))
 
-// El item de Conduces lo agrega al menú su página. Si el menú todavía no lo
-// trae, se simula aquí con los mismos datos, para probar la puerta igual.
-if (!NAV.some((g) => g.items.some((i) => i.id === 'conduces'))) {
-  const simulado: NavItem = { id: 'conduces', label: 'Conduces', icon: 'truck', module: 'cotizaciones', formato: 'ferreteria' }
-  NAV.push({ group: 'Prueba', items: [simulado] })
+// El item de Conduces es el del menú de verdad: en Ventas, justo después de
+// Cotizaciones, con el mismo módulo que ellas y la puerta de Ferretería.
+console.log('Item de Conduces en el menú')
+{
+  const ventas: NavItem[] = NAV.find((g) => g.group === 'Ventas')?.items ?? []
+  const it = ventas[ventas.findIndex((i) => i.id === 'cotizaciones') + 1]
+  chk('Ventas: Conduces justo después de Cotizaciones (truck, módulo cotizaciones, formato ferreteria)',
+    it?.id === 'conduces' && it.label === 'Conduces' && it.icon === 'truck' && it.module === 'cotizaciones'
+    && it.formato === 'ferreteria')
 }
 
 console.log('Items sin formato: lo mismo que antes, se pase el formato o no')

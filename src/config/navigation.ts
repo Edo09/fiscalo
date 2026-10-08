@@ -159,6 +159,9 @@ export const NAV: NavGroup[] = [
       { id: 'facturas', label: 'Facturación', icon: 'file-text', module: 'facturas' },
       { id: 'facturas-simples', label: 'Facturas simples', icon: 'file', module: 'facturas-simples' },
       { id: 'cotizaciones', label: 'Cotizaciones', icon: 'file-plus', module: 'cotizaciones' },
+      // Solo Ferretería: el conduce sale de sus cotizaciones (spec conduces 5.1).
+      // El permiso es el de Cotizaciones; el formato lo dice branding (puedeVerItem).
+      { id: 'conduces', label: 'Conduces', icon: 'truck', module: 'cotizaciones', formato: 'ferreteria' },
       { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
     ],
   },

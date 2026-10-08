@@ -18,6 +18,7 @@ import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
+import { ConducesView } from '@/features/conduces/ConducesView'
 import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
@@ -192,6 +193,8 @@ function AppShell() {
         const id = isCotizacionRef(payload) ? payload.id : null
         return <CotizacionEditor key={id ?? 'nueva'} nav={nav} cotizacionId={id} />
       }
+      // Solo Ferretería: la vista espera al formato, y App saca de aquí a otro (debeSalirDeVista).
+      case 'conduces': return <ConducesView nav={nav} />
       case 'clientes': return <ClientsView nav={nav} />
       case 'productos': return <ProductsView />
       case 'categorias': return <CategoriesView />
