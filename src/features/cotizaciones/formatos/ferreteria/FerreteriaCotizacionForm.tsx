@@ -357,6 +357,9 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     try {
       await deleteCotizacion(cotizacionId)
       void queryClient.invalidateQueries({ queryKey: ['cotizaciones'] })
+      // Sus conduces siguen, pero sin cotización de origen (la FK queda en
+      // null): el listado de conduces tiene que pasar a decir "eliminada".
+      void queryClient.invalidateQueries({ queryKey: ['conduces'] })
       toast.success(`Cotización ${codigo} eliminada.`)
       salida.liberar()
       nav('cotizaciones', null, { replace: true })
