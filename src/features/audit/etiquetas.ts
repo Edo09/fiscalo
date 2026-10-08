@@ -22,6 +22,9 @@ const MODULOS: Record<string, string> = {
   categories: 'Categorías',
   warehouses: 'Almacenes',
   cotizaciones: 'Cotizaciones',
+  // Los conduces se registran con su propio módulo aunque su permiso sea el de
+  // cotizaciones: 'conduces' no está en el catálogo de permisos y saldría crudo.
+  conduces: 'Conduces',
   users: 'Usuarios',
   roles: 'Roles',
   branding: 'Branding',
