@@ -18,6 +18,7 @@ import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
+import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTenant'
 import { ProductsView } from '@/features/products/ProductsView'
 import { CategoriesView } from '@/features/categories/CategoriesView'
 import { WarehousesView } from '@/features/warehouses/WarehousesView'
@@ -42,7 +43,7 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, puedeVerVista,
+  debeSalirDeVista, isCotizacionRef, isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor,
   type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
@@ -70,6 +71,8 @@ const VIEW_SIN_PAYLOAD: Partial<Record<ViewId, ViewId>> = {
   // que parece listo para guardar: se vuelve al listado, que deja claro que lo
   // que se estaba escribiendo ya no esta.
   'cotizacion-nueva': 'cotizaciones',
+  // Mismo criterio para un conduce: sin su payload no se sabe cuál era.
+  'conduce-editar': 'conduces',
 }
 
 function restoreView(): ViewId {
@@ -86,6 +89,10 @@ function App() {
 
 function AppShell() {
   const { user } = useSession()
+  // Formato de cotización del tenant: decide lo que es de un solo formato (los
+  // conduces de Ferretería) en el sidebar, el buscador y la redirección de
+  // abajo. null mientras branding no responde.
+  const { formato } = useFormatoTenant()
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('fiscalo.theme') as ThemeMode) || 'light')
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState(false)
@@ -146,9 +153,12 @@ function AppShell() {
   // la redirección se repetiría, dejando al usuario atrapado. Forzada: el
   // efecto no se repite, y un aviso de "sin guardar" la cancelaría para siempre
   // (sin el módulo, lo escrito tampoco se podría guardar).
+  // Lo de un formato espera a saberlo: con el formato en null (branding
+  // cargando o con error) no se redirige, o recargar sobre Conduces mandaría
+  // al dashboard antes de tiempo. Sabido y distinto, se sale (ver debeSalirDeVista).
   useEffect(() => {
-    if (!puedeVerVista(user, activeTop)) nav('dashboard', null, { replace: true, forzar: true })
-  }, [activeTop, user, nav])
+    if (debeSalirDeVista(user, activeTop, formato)) nav('dashboard', null, { replace: true, forzar: true })
+  }, [activeTop, user, nav, formato])
 
   const renderView = () => {
     switch (view) {
@@ -218,6 +228,7 @@ function AppShell() {
         sbClass={sbClass}
         mobileOpen={mobileNav}
         onCloseMobile={() => setMobileNav(false)}
+        formato={formato}
       />
 
       <div className="main-col">
@@ -232,7 +243,7 @@ function AppShell() {
         <div className="content">{renderView()}</div>
       </div>
 
-      {search && <SearchPalette nav={nav} onClose={() => setSearch(false)} />}
+      {search && <SearchPalette nav={nav} formato={formato} onClose={() => setSearch(false)} />}
       {/* key: cada pregunta es un Modal nuevo. El Modal fija su Escape al montar,
           y uno reciclado cerraría con las acciones del diálogo anterior. */}
       {salidaPendiente && (

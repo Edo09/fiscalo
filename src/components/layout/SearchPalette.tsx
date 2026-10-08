@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon, type IconName } from '@/components/ui'
 import { NAV, puedeVerItem, type Nav } from '@/config/navigation'
+import type { FormatoId } from '@/features/cotizaciones/formatos'
 import { useSession } from '@/stores/auth'
 
 interface Result {
@@ -10,15 +11,15 @@ interface Result {
   action: () => void
 }
 
-export function SearchPalette({ nav, onClose }: { nav: Nav; onClose: () => void }) {
+export function SearchPalette({ nav, formato, onClose }: { nav: Nav; formato: FormatoId | null; onClose: () => void }) {
   const { user } = useSession()
   const [q, setQ] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
 
-  // Solo las páginas que el sidebar mostraría: mismo criterio de permisos.
+  // Solo las páginas que el sidebar mostraría: mismo criterio de permisos y de formato.
   const pages: Result[] = NAV.flatMap((g) => g.items)
-    .filter((i) => puedeVerItem(user, i))
+    .filter((i) => puedeVerItem(user, i, formato))
     .map((i) => ({ type: 'Página', label: i.label, icon: i.icon, action: () => nav(i.id) }))
   const results = q ? pages.filter((r) => r.label.toLowerCase().includes(q.toLowerCase())).slice(0, 8) : pages.slice(0, 6)
 
