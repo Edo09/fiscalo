@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TextareaHTMLAttributes } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Money, Spinner } from '@/components/ui'
@@ -7,15 +7,12 @@ import {
   getCotizacion, getClient, getBranding, getEmisor, mapClientRow,
 } from '@/api'
 import type { CotizacionRow, IndicadorFacturacion } from '@/api'
-import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
-import { NombreClienteLibre } from '@/features/clients/NombreClienteLibre'
 import { ProductoCombobox } from '@/features/products/ProductoCombobox'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import {
   MSG_UNIDAD, admiteDecimales, problemaCantidad, unidadValida, useUnidadesMedida,
 } from '@/components/unidadesMedida'
-import { indFactFromItbis } from '@/features/invoices/montosLinea'
 import { presentDocument } from '@/lib/file'
 import { ahoraLocal, hoyLocal } from '@/lib/date'
 import { aNumero } from '@/lib/format'
@@ -29,6 +26,9 @@ import {
   MAX_DESCRIPCION, cuerpoFerreteria, ferreteriaFormSchema, lineaEnBlanco, mapearErrores, sinErrores,
   type ErroresFerreteria, type LineaFerreteriaForm,
 } from './schema'
+import { BloqueCliente } from './BloqueCliente'
+import { DescripcionLinea } from './DescripcionLinea'
+import { clienteDeFila, formatearRnc, lineaDesdeProducto, lineaLibre, lineasDeFila, siguienteId } from './lineas'
 import '@/styles/factura-doc.css'
 
 /* FISCALO — Cotización con el formato de Ferretería (spec 8.1).
@@ -57,33 +57,6 @@ const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
 
 const SIN_AJUSTES: AjustesFerreteriaForm = { cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false }
 
-const siguienteId = (ls: LineaFerreteriaForm[]) => Math.max(0, ...ls.map((l) => l.id)) + 1
-
-/** Línea escrita a mano: gravada al 18%, por unidad y como bien, igual que en la factura. */
-const lineaLibre = (id: number): LineaFerreteriaForm => ({
-  id, prodId: '', descripcion: '', cantidad: 1, precio: 0, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
-})
-
-/** Indicador guardado (TINYINT, null en una línea sin él) → uno válido; 1 por defecto, como el backend. */
-const indicadorDe = (v: unknown): IndicadorFacturacion => {
-  const n = Number(v)
-  return n === 2 || n === 3 || n === 4 ? n : 1
-}
-
-/** Líneas de una cotización guardada. Cantidad y precio llegan como texto DECIMAL ("2.000", "935.0000"). */
-function lineasDeFila(row: CotizacionRow): LineaFerreteriaForm[] {
-  return (row.items ?? []).map((it, i) => ({
-    id: i + 1,
-    prodId: it.product_id ? String(it.product_id) : '',
-    descripcion: it.description ?? '',
-    cantidad: aNumero(it.quantity ?? 1),
-    precio: aNumero(it.amount),
-    indFact: indicadorDe(it.indicador_facturacion),
-    unidadMedida: Number(it.unidad_medida ?? 43) || 43,
-    tipoItem: Number(it.indicador_bien_servicio ?? 1) === 2 ? 'Servicio' : 'Bien',
-  }))
-}
-
 /** Cargos y abonos guardados: montos DECIMAL como texto; una clave ausente es 0. */
 function ajustesDeFila(row: CotizacionRow): AjustesFerreteriaForm {
   const a = row.ajustes ?? {}
@@ -96,29 +69,6 @@ function ajustesDeFila(row: CotizacionRow): AjustesFerreteriaForm {
     // guardar, el backend la vuelve a calcular sobre el Sub-total de ese momento.
     retencion: aNumero(a.retencion_isr) > 0,
   }
-}
-
-/**
- * Ficha provisional con lo que trae la fila (id y nombre), mientras llega el
- * cliente completo. Con ella el client_id ya está puesto: si la ficha no
- * llegara, guardar sigue funcionando.
- */
-function clienteDeFila(row: CotizacionRow): Cliente | null {
-  if (!row.client_id) return null
-  return {
-    id: String(row.client_id), nombre: row.client_name || `Cliente #${row.client_id}`,
-    contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
-    balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false,
-  }
-}
-
-/** RNC o cédula con guiones, como lo imprime el PDF (FerreteriaFormato::formatearRnc). */
-function formatearRnc(rnc: string | null | undefined): string {
-  const tal = (rnc ?? '').trim()
-  const d = tal.replace(/\D/g, '')
-  if (d.length === 9) return `${d.slice(0, 3)}-${d.slice(3, 8)}-${d.slice(8)}`
-  if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 10)}-${d.slice(10)}`
-  return tal
 }
 
 /**
@@ -137,39 +87,6 @@ function huella(
 
 /** 409: el formato del tenant ya no es este (pantalla vieja). Nada de lo que se haga aquí se puede guardar. */
 const esDesactualizada = (e: unknown): e is ApiError => e instanceof ApiError && e.status === 409
-
-/**
- * Descripción que crece con el texto: el PDF la imprime entera (hasta 1000
- * caracteres) y en pantalla tampoco se corta. Sin saltos de línea: en el PDF y
- * al facturar la descripción es un solo párrafo, así que Enter no hace nada y
- * un texto pegado con saltos queda en una sola línea.
- */
-function DescripcionLinea({
-  value, onValue, ...rest
-}: {
-  value: string
-  onValue: (v: string) => void
-} & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>) {
-  const ref = useRef<HTMLTextAreaElement | null>(null)
-
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [value])
-
-  return (
-    <textarea
-      {...rest}
-      ref={ref}
-      rows={1}
-      value={value}
-      onChange={(e) => onValue(e.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
-    />
-  )
-}
 
 /** Un monto del grupo "Cargos y abonos": etiqueta a la izquierda y el campo donde va la cifra. */
 function CampoAjuste({
@@ -337,26 +254,16 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     quitarErrForm()
   }
   /**
-   * Artículo del catálogo: trae su nombre, su precio SIN ITBIS, su unidad, su
-   * tasa y si es bien o servicio. Si la última fila sigue vacía se reemplaza,
-   * para no dejar huecos.
+   * Artículo del catálogo (lineaDesdeProducto: su nombre, su precio SIN ITBIS,
+   * su unidad, su tasa y si es bien o servicio). Si la última fila sigue vacía
+   * se reemplaza, para no dejar huecos.
    */
   const addProducto = (p: Producto) => {
-    const desde = (id: number): LineaFerreteriaForm => ({
-      id,
-      prodId: p.id,
-      descripcion: p.nombre,
-      cantidad: 1,
-      precio: p.precio,
-      indFact: indFactFromItbis(p.itbis),
-      unidadMedida: p.unidadMedida || 43,
-      tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
-    })
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
       return ultima && lineaEnBlanco(ultima)
-        ? [...ls.slice(0, -1), desde(ultima.id)]
-        : [...ls, desde(siguienteId(ls))]
+        ? [...ls.slice(0, -1), lineaDesdeProducto(p, ultima.id)]
+        : [...ls, lineaDesdeProducto(p, siguienteId(ls))]
     })
     quitarErrForm()
   }
@@ -522,45 +429,18 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
         <div className="fx-rule" />
 
         {/* --- Cliente: el mismo rótulo que la hoja impresa --- */}
-        <section className="fx-a-quien">
-          <span className="fx-eyebrow">Nombre o razón social <span className="req">*</span></span>
-          <div className="fx-cliente-row">
-            <div className="fx-cliente">
-              <ClientCombobox
-                value={cliente}
-                onChange={seleccionarCliente}
-                onBusquedaChange={(texto) => { setBusquedaCliente(texto); quitarErrCliente() }}
-                invalido={errores.cliente != null}
-              />
-            </div>
-            <button
-              type="button"
-              className="fx-cliente-add"
-              onClick={() => setNuevoCliente(true)}
-              title="Nuevo cliente"
-              aria-label="Crear un cliente nuevo"
-            >
-              <Icon name="plus" size={16} />
-            </button>
-          </div>
-          {/* Un nombre escrito se guarda como cliente con su botón "Guardar",
-              como en la factura simple: la cotización necesita un client_id. */}
-          {!cliente && (
-            <NombreClienteLibre
-              value={clienteLibre}
-              onChange={(v) => { setClienteLibre(v); quitarErrCliente() }}
-              onGuardado={seleccionarCliente}
-            />
-          )}
-          {cliente && clienteCompleto && (
-            <span className="text-xs muted-3 mono" style={{ display: 'block', marginTop: 4 }}>
-              {cliente.doc
-                ? `${cliente.doc.replace(/\D/g, '').length === 11 ? 'Cédula' : 'RNC'} ${formatearRnc(cliente.doc)}`
-                : 'Este cliente no tiene RNC ni cédula: la cotización sale sin ese dato.'}
-            </span>
-          )}
-          {errores.cliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errores.cliente}</span>}
-        </section>
+        {/* El modal de cliente nuevo va al final, fuera de la hoja (ver BloqueCliente). */}
+        <BloqueCliente
+          cliente={cliente}
+          clienteCompleto={clienteCompleto}
+          clienteLibre={clienteLibre}
+          error={errores.cliente}
+          avisoSinDoc="Este cliente no tiene RNC ni cédula: la cotización sale sin ese dato."
+          onSeleccionar={seleccionarCliente}
+          onBusquedaChange={(texto) => { setBusquedaCliente(texto); quitarErrCliente() }}
+          onLibreChange={(v) => { setClienteLibre(v); quitarErrCliente() }}
+          onNuevoCliente={() => setNuevoCliente(true)}
+        />
 
         {/* --- Líneas: las columnas de la hoja, más unidad e ITBIS --- */}
         <section className="fx-items" style={{ marginTop: 24 }}>
