@@ -67,8 +67,8 @@ de factura no cambia ese cuerpo:
   mercancía y que firma el cliente (`/api/conduces`) sale del mismo
   `FerreteriaCotizacionPdf.php`, en modo conduce (`documento => 'conduce'`):
   título CONDUCE DE MERCANCÍA, columnas Cantidad | Unidad | Descripción
-  mercancías, sin precios ni totales, la cotización de origen y "Recibido
-  por". Como la cotización, del branding usa solo el logo. Un tenant `gratex`
+  mercancías, sin precios ni totales, la cotización de origen (si el conduce
+  tiene una: se puede crear sin cotización) y "Recibido por". Como la cotización, del branding usa solo el logo. Un tenant `gratex`
   no tiene conduces: el menú no los muestra y la API responde 422.
 - **Frontend:** `src/features/cotizaciones/formatos/` (registro `FORMATOS`). Para
   una cotización nueva, `useCotizacionFormato()` lee `cotizacion_formato` de
