@@ -162,16 +162,62 @@
   background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .pos-vistas button.on { background: var(--accent); color: var(--on-accent); }
-.pos-selector {
-  position: relative; display: inline-flex; align-items: center; gap: 6px; height: 52px; padding: 0 4px 0 12px;
-  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); font-size: 13px;
+/* Selector de la caja (orden, cuántos): botón con rótulo y valor, y un menú de
+   filas grandes. Mismo alto que el buscador y la botonera de vistas. */
+.pos-sel {
+  display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 10px 0 8px; min-width: 0;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text);
+  cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent;
+  transition: border-color .12s, box-shadow .12s, background .12s;
 }
-.pos-selector select {
-  height: 100%; border: 0; background: transparent; color: var(--text); font-size: 15px; font-weight: 600;
-  padding: 0 8px 0 0; cursor: pointer; max-width: 210px;
+.pos-sel:hover { background: var(--surface-hover); }
+.pos-sel:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pos-sel.abierto { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
+.pos-sel-ic {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
 }
-.pos-selector select:focus { outline: none; }
-.pos-selector:focus-within { outline: 2px solid var(--ring); border-color: var(--accent); }
+.pos-sel-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.pos-sel-txt small { font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+.pos-sel-txt b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-sel-flecha { flex-shrink: 0; color: var(--text-3); transition: transform .18s ease; }
+.pos-sel.abierto .pos-sel-flecha { transform: rotate(180deg); color: var(--accent); }
+
+.pos-sel-menu {
+  position: fixed; z-index: 80; width: max-content; min-width: 280px; max-width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 32px); overflow-y: auto;
+  padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  box-shadow: var(--sh-pop); animation: pos-sel-abre .16s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes pos-sel-abre { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.pos-sel-titulo {
+  padding: 8px 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3);
+}
+.pos-sel-op {
+  width: 100%; display: grid; grid-template-columns: 38px minmax(0, 1fr) 20px; align-items: center; gap: 12px;
+  min-height: 56px; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .1s;
+}
+.pos-sel-op:hover, .pos-sel-op:focus-visible { background: var(--surface-hover); outline: none; }
+.pos-sel-op:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.pos-sel-op:active { background: var(--surface-active); }
+.pos-sel-op.on { background: var(--accent-soft); }
+.pos-sel-glifo {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--neutral-soft); color: var(--text-2); font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.pos-sel-op.on .pos-sel-glifo { background: var(--accent); color: var(--on-accent); }
+.pos-sel-op-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pos-sel-op-txt b { font-size: 15px; font-weight: 600; }
+.pos-sel-op.on .pos-sel-op-txt b { color: var(--accent-text); font-weight: 700; }
+.pos-sel-op-txt small { font-size: 12.5px; color: var(--text-3); line-height: 1.3; }
+.pos-sel-check { color: var(--accent); opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+.pos-sel-op.on .pos-sel-check { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pos-sel-menu { animation: none; }
+  .pos-sel-flecha, .pos-sel-check { transition: none; }
+}
 
 /* Categorías: una fila deslizable; "Todas" las despliega en varias filas. */
 .pos-chips-fila { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; min-width: 0; }
@@ -196,10 +242,13 @@
 .pos-chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .pos-chip.on span { color: inherit; opacity: 0.8; }
 
+/* Los botones de la tarjeta sobresalen 9 px de sus esquinas de arriba: la grilla
+   deja ese aire arriba y a los lados (si no, el borde del área con scroll los
+   corta) y entre columnas (los de dos vecinas no se montan). */
 .pos-grilla {
   flex: 1; min-height: 0; overflow-y: auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
-  gap: 10px; align-content: start; padding-bottom: 16px;
+  gap: 14px 20px; align-content: start; padding: 11px 11px 16px;
 }
 .pos-grilla-vacia {
   grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 12px;
@@ -226,11 +275,18 @@
 .pos-producto:active { transform: scale(0.97); border-color: var(--accent); background: var(--accent-soft); }
 .pos-producto.en-carrito { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .pos-producto.agotado .pos-producto-precio { color: var(--text-2); }
-.pos-producto-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+/* Foto (o iniciales) grande y centrada. Empieza debajo de los botones de las
+   esquinas (bajan 25 px dentro de la tarjeta): en una tarjeta angosta el − y el
+   contador llegan hasta el centro y la taparían. */
+.pos-producto-top { display: flex; align-items: center; justify-content: center; margin: 13px 0 6px; }
 .pos-ini {
-  width: 38px; height: 38px; border-radius: var(--r-md);
-  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
+  width: 72px; height: 72px; border-radius: var(--r-lg);
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 22px;
 }
+/* Tarjetas verticales: la foto, cuadrada, ocupa el 72 % del ancho y crece con la
+   tarjeta; con el nombre y el precio debajo, la tarjeta siempre queda más alta que
+   ancha. Sin aspect-ratio fijo: con un nombre de dos líneas el contenido se salía. */
+.vista-tarjetas .pos-ini { width: 72%; max-width: 200px; height: auto; aspect-ratio: 1; font-size: 26px; }
 .pos-ini.con-foto { background: var(--surface-2); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
 .pos-ini.con-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pos-producto-cant {
@@ -238,39 +294,49 @@
   background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 13px;
   display: grid; place-items: center;
 }
-/* Contador: arriba a la derecha, a la altura de la foto (padding 12 + borde 1 de
-   la tarjeta). Deja pasar el toque a la tarjeta (agrega). */
-.pos-producto-marcas {
-  position: absolute; top: 13px; right: 13px; height: 38px;
-  display: flex; align-items: center; pointer-events: none;
+/* Sobre el borde de la tarjeta, en las esquinas de arriba (sobresalen 9 px). Un
+   anillo del color del fondo los despega del borde. */
+.pos-producto-paso {
+  position: absolute; top: -9px; right: -9px; display: flex; align-items: center; gap: 4px;
+  pointer-events: none;
 }
+.pos-producto-paso .pos-producto-cant { box-shadow: 0 0 0 3px var(--bg); }
+.pos-producto-menos, .pos-producto-quitar {
+  width: 34px; height: 34px; border-radius: var(--r-full); display: grid; place-items: center;
+  cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; box-shadow: 0 0 0 3px var(--bg);
+}
+.pos-producto-menos { background: var(--danger-soft); color: var(--danger); border: 1.5px solid var(--danger); }
+.pos-producto-menos:active { background: var(--danger); color: #fff; transform: scale(0.94); }
+.pos-producto-quitar { position: absolute; top: -9px; left: -9px; background: var(--danger); color: #fff; border: 0; }
+.pos-producto-quitar:active { filter: brightness(0.88); transform: scale(0.94); }
+.pos-producto-menos:disabled, .pos-producto-quitar:disabled { opacity: 0.45; cursor: default; }
 
 /* Vista compacta: más productos por pantalla; sin código. */
-.pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+.pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px 18px; }
 .vista-compacta .pos-producto { min-height: 100px; padding: 9px; gap: 2px; }
-.vista-compacta .pos-ini { width: 30px; height: 30px; font-size: 12px; }
-.vista-compacta .pos-producto-top { margin-bottom: 2px; }
+.vista-compacta .pos-ini { width: 62%; max-width: 140px; height: auto; aspect-ratio: 1; font-size: 18px; border-radius: var(--r-md); }
+.vista-compacta .pos-producto-top { margin: 13px 0 4px; }
 .vista-compacta .pos-producto-nombre { font-size: 13px; }
 .vista-compacta .pos-producto-sku { display: none; }
 .vista-compacta .pos-producto-pie { padding-top: 4px; }
 .vista-compacta .pos-producto-precio { font-size: 15px; }
 .vista-compacta .pos-exist { font-size: 11px; }
-.vista-compacta .pos-producto-marcas { top: 10px; right: 10px; height: 30px; }
 .vista-compacta .pos-producto-cant { height: 24px; min-width: 30px; padding: 0 6px; font-size: 12px; }
+.vista-compacta .pos-producto-menos, .vista-compacta .pos-producto-quitar { width: 30px; height: 30px; }
 
-/* Vista lista: una fila por producto; la columna de la derecha queda para el − y el contador. */
-.pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+/* Vista lista: una fila por producto. Los botones de las esquinas quedan sobre el
+   borde de la fila; la foto y el precio se corren para no quedar debajo. */
+.pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .vista-lista .pos-producto {
-  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
-  align-items: center; column-gap: 12px; row-gap: 0; min-height: 60px; padding: 8px 72px 8px 12px;
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 30px;
 }
 .vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
-.vista-lista .pos-ini { width: 34px; height: 34px; font-size: 12px; }
+.vista-lista .pos-ini { width: 40px; height: 40px; font-size: 13px; border-radius: var(--r-md); }
 .vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
 .vista-lista .pos-producto-sku { grid-area: sku; }
 .vista-lista .pos-producto-pie { grid-area: pie; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; padding: 0; flex-wrap: nowrap; }
 .vista-lista .pos-producto-precio { font-size: 17px; }
-.vista-lista .pos-producto-marcas { top: 50%; right: 13px; transform: translateY(-50%); height: 36px; }
 .vista-lista .pos-producto:active { transform: scale(0.99); }
 .pos-producto-nombre {
   font-weight: 600; font-size: 14.5px; line-height: 1.25;

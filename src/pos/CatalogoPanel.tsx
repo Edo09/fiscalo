@@ -1,7 +1,8 @@
 // Catálogo táctil de la caja (api-gratex docs/specs/pos.md C3 y C4): buscador,
-// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad y
-// el contador de arriba a la derecha dice cuántas lleva la venta; restar o quitar
-// se hace en el panel de la venta (la tarjeta queda libre para la foto).
+// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad.
+// La foto (o las iniciales) va grande y centrada; con el producto en la venta,
+// sobre el borde de la tarjeta: arriba a la derecha el − y el contador, arriba a
+// la izquierda el botón que lo quita de la venta.
 // La búsqueda es en memoria y, mientras hay texto, busca en todas las categorías.
 // Vista (tarjetas, compacta, lista), orden y cuántos se pintan son preferencia
 // del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
@@ -13,9 +14,9 @@ import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
 import {
-  cargarPreferencias, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS,
-  type Limite, type Orden, type PreferenciasCatalogo,
+  cargarPreferencias, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS, type PreferenciasCatalogo,
 } from './catalogoVista'
+import { SelectorCaja } from './SelectorCaja'
 
 interface Props {
   catalogo: CatalogoPos | null
@@ -31,6 +32,10 @@ interface Props {
   /** Cantidad de cada producto que ya está en el carrito. */
   enCarrito: Map<number, number>
   onAgregar: (p: ProductoPos) => void
+  /** Una unidad menos; con una sola, sale de la venta (queda registrada, V4). */
+  onQuitarUno: (p: ProductoPos) => void
+  /** Fuera de la venta con todas sus unidades (queda registrado, V4). */
+  onQuitar: (p: ProductoPos) => void
   /** Cobro sin confirmar: la venta no se puede cambiar hasta reintentarlo. */
   bloqueado?: boolean
 }
@@ -67,7 +72,7 @@ function Existencia({ p }: { p: ProductoPos }) {
 
 export function CatalogoPanel({
   catalogo, error, onReintentar, busqueda, onBusqueda, categoria, onCategoria, buscadorRef, enCarrito, onAgregar,
-  bloqueado = false,
+  onQuitarUno, onQuitar, bloqueado = false,
 }: Props) {
   const colores = useMemo(() => {
     const m = new Map<number, string>()
@@ -143,20 +148,10 @@ export function CatalogoPanel({
               </button>
             ))}
           </div>
-          <label className="pos-selector" title="Ordenar">
-            <Icon name="arrow-up-down" size={16} />
-            <select value={prefs.orden} aria-label="Ordenar productos"
-              onChange={(e) => setPrefs((p) => ({ ...p, orden: e.target.value as Orden }))}>
-              {ORDENES.map((o) => <option key={o.valor} value={o.valor}>{o.nombre}</option>)}
-            </select>
-          </label>
-          <label className="pos-selector" title="Productos en pantalla">
-            <span>Mostrar</span>
-            <select value={prefs.limite} aria-label="Cuántos productos mostrar"
-              onChange={(e) => setPrefs((p) => ({ ...p, limite: Number(e.target.value) as Limite }))}>
-              {LIMITES.map((l) => <option key={l.valor} value={l.valor}>{l.nombre}</option>)}
-            </select>
-          </label>
+          <SelectorCaja rotulo="Ordenar" titulo="Ordenar productos por" icono="arrow-up-down" valor={prefs.orden} opciones={ORDENES}
+            onCambio={(orden) => setPrefs((p) => ({ ...p, orden }))} />
+          <SelectorCaja rotulo="Mostrar" titulo="Productos en pantalla" icono="layers" valor={prefs.limite} opciones={LIMITES}
+            onCambio={(limite) => setPrefs((p) => ({ ...p, limite }))} />
         </div>
       </div>
 
@@ -217,8 +212,9 @@ export function CatalogoPanel({
           visibles.map((p) => {
             const cant = enCarrito.get(p.id) ?? 0
             const agotado = p.stock !== null && p.stock <= 0
-            // El contador va encima de la tarjeta, arriba a la derecha: el mismo
-            // lugar en las tres vistas (en la lista, la tarjeta le guarda el hueco).
+            // Los botones van fuera de la tarjeta (un botón no puede ir dentro de
+            // otro), montados sobre su borde en las esquinas de arriba; la grilla
+            // deja aire alrededor para que no se monten sobre la vecina.
             return (
               <div key={p.id} className="pos-producto-celda">
                 <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
@@ -234,7 +230,19 @@ export function CatalogoPanel({
                   </span>
                 </button>
                 {cant > 0 && (
-                  <span className="pos-producto-marcas"><span className="pos-producto-cant">×{fmtCantidad(cant)}</span></span>
+                  <>
+                    <button type="button" className="pos-producto-quitar" onClick={() => onQuitar(p)} disabled={bloqueado}
+                      aria-label={`Quitar ${p.nombre} de la venta`} title="Quitar de la venta">
+                      <Icon name="trash-2" size={16} />
+                    </button>
+                    <span className="pos-producto-paso">
+                      <button type="button" className="pos-producto-menos" onClick={() => onQuitarUno(p)} disabled={bloqueado}
+                        aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
+                        <Icon name="minus" size={17} />
+                      </button>
+                      <span className="pos-producto-cant">×{fmtCantidad(cant)}</span>
+                    </span>
+                  </>
                 )}
               </div>
             )

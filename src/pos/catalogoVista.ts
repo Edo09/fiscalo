@@ -19,18 +19,31 @@ export const VISTAS: { valor: Vista; nombre: string; icono: 'layout-grid' | 'gri
   { valor: 'compacta', nombre: 'Compacta', icono: 'grid-3x3' },
   { valor: 'lista', nombre: 'Lista', icono: 'list' },
 ]
-export const ORDENES: { valor: Orden; nombre: string }[] = [
-  { valor: 'nombre', nombre: 'Nombre (A-Z)' },
-  { valor: 'precio_asc', nombre: 'Precio: menor primero' },
-  { valor: 'precio_desc', nombre: 'Precio: mayor primero' },
-  { valor: 'codigo', nombre: 'Código' },
-  { valor: 'existencia', nombre: 'Existencia: menor primero' },
+/**
+ * Una opción de los selectores de la caja. `corto` va en el botón cerrado;
+ * `detalle` explica en el menú qué hace; el glifo es un texto corto o un ícono.
+ */
+export interface OpcionSelector<T extends string | number> {
+  valor: T
+  nombre: string
+  corto: string
+  detalle?: string
+  glifo?: string
+  icono?: 'trending-up' | 'trending-down' | 'hash' | 'package' | 'layers'
+}
+
+export const ORDENES: OpcionSelector<Orden>[] = [
+  { valor: 'nombre', nombre: 'Nombre', corto: 'Nombre A–Z', detalle: 'De la A a la Z, sin importar acentos', glifo: 'AZ' },
+  { valor: 'precio_asc', nombre: 'Precio: menor primero', corto: 'Precio ↑', detalle: 'Lo más barato arriba', icono: 'trending-up' },
+  { valor: 'precio_desc', nombre: 'Precio: mayor primero', corto: 'Precio ↓', detalle: 'Lo más caro arriba', icono: 'trending-down' },
+  { valor: 'codigo', nombre: 'Código', corto: 'Código', detalle: 'Por SKU; los que no tienen, al final', icono: 'hash' },
+  { valor: 'existencia', nombre: 'Existencia: menor primero', corto: 'Existencia', detalle: 'Lo que se está acabando arriba', icono: 'package' },
 ]
-export const LIMITES: { valor: Limite; nombre: string }[] = [
-  { valor: 200, nombre: '200' },
-  { valor: 300, nombre: '300' },
-  { valor: 500, nombre: '500' },
-  { valor: 0, nombre: 'Todos' },
+export const LIMITES: OpcionSelector<Limite>[] = [
+  { valor: 200, nombre: '200 productos', corto: '200', detalle: 'Por defecto: rápido en cualquier PC', glifo: '200' },
+  { valor: 300, nombre: '300 productos', corto: '300', glifo: '300' },
+  { valor: 500, nombre: '500 productos', corto: '500', glifo: '500' },
+  { valor: 0, nombre: 'Todos', corto: 'Todos', detalle: 'Todo el catálogo; con miles puede ir más lento', icono: 'layers' },
 ]
 
 export const PREFERENCIAS_POR_DEFECTO: PreferenciasCatalogo = { vista: 'tarjetas', orden: 'nombre', limite: 200 }

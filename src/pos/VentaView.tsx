@@ -231,6 +231,22 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
   }, [equipo.token, sesion.token, cliente])
 
+  // Botones de la tarjeta del catálogo. El −: una unidad menos; con una sola (o
+  // menos, si es fraccionaria) sale de la venta. Quitar: fuera con todas sus
+  // unidades. Las dos salidas quedan registradas como la papelera del carrito (V4).
+  const quitarUno = useCallback((p: { id: number }) => {
+    const l = lineas.find((x) => x.productoId === p.id)
+    if (!l || cobroEnDuda) return
+    if (l.cantidad > 1) cambiarCantidad(l.productoId, Math.round((l.cantidad - 1) * 100) / 100)
+    else { registrarEvento('quitada', [l]); quitar(l.productoId) }
+  }, [lineas, cobroEnDuda, cambiarCantidad, registrarEvento, quitar])
+  const quitarDeVenta = useCallback((p: { id: number }) => {
+    const l = lineas.find((x) => x.productoId === p.id)
+    if (!l || cobroEnDuda) return
+    registrarEvento('quitada', [l])
+    quitar(l.productoId)
+  }, [lineas, cobroEnDuda, registrarEvento, quitar])
+
   const abrirCobro = useCallback((forma: FormaPago) => {
     if (cobroEnDuda) { setModal({ tipo: 'cobro', forma: cobroEnDuda.forma_pago }); return }
     if (lineas.length === 0 || !estado || turnoAjeno) return
@@ -324,6 +340,8 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           buscadorRef={buscadorRef}
           enCarrito={enCarrito}
           onAgregar={agregar}
+          onQuitarUno={quitarUno}
+          onQuitar={quitarDeVenta}
           bloqueado={cobroEnDuda !== null}
         />
         <CarritoPanel
