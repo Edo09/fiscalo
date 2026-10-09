@@ -30,24 +30,27 @@ export function descuentoLinea(brutoCentavos: number, porcentaje: number): numbe
   return pct100 > 0 ? Math.floor((brutoCentavos * pct100 + 5000) / 10000) : 0
 }
 
-/** Totales del carrito con el descuento del cliente: lo que se cobra y lo que dirá el e-CF. */
+/**
+ * Totales del carrito con el descuento del cliente: lo que se cobra y lo que dirá
+ * el e-CF. `subtotal` es el total sin ITBIS (gravado sin ITBIS + exento), el
+ * mismo "Subtotal" del recibo: subtotal + itbis = total.
+ */
 export function totalesCarrito(
   lineas: { precioCentavos: number; cantidad: number; tasa: number }[],
   descuentoPct = 0,
-): { lineas: { bruto: number; descuento: number; neto: number }[]; bruto: number; descuento: number; total: number; itbis: number } {
+): {
+  lineas: { bruto: number; descuento: number; neto: number }[]
+  bruto: number; descuento: number; total: number; itbis: number; subtotal: number
+} {
   const detalle = lineas.map((l) => {
     const bruto = importeLinea(l.precioCentavos, l.cantidad)
     const descuento = descuentoLinea(bruto, descuentoPct)
     return { bruto, descuento, neto: bruto - descuento }
   })
   const suma = (k: 'bruto' | 'descuento' | 'neto') => detalle.reduce((s, d) => s + d[k], 0)
-  return {
-    lineas: detalle,
-    bruto: suma('bruto'),
-    descuento: suma('descuento'),
-    total: suma('neto'),
-    itbis: itbisIncluido(detalle.map((d, i) => ({ importe: d.neto, tasa: lineas[i].tasa }))),
-  }
+  const total = suma('neto')
+  const itbis = itbisIncluido(detalle.map((d, i) => ({ importe: d.neto, tasa: lineas[i].tasa })))
+  return { lineas: detalle, bruto: suma('bruto'), descuento: suma('descuento'), total, itbis, subtotal: total - itbis }
 }
 
 /** División entera redondeando la mitad hacia arriba (a y b positivos). */

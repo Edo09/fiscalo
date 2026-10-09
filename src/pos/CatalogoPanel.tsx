@@ -226,7 +226,7 @@ export function CatalogoPanel({
                   <span className="pos-producto-nombre">{p.nombre}</span>
                   {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
                   <span className="pos-producto-pie">
-                    <b className="pos-producto-precio">{formatoCentavos(p.precio_centavos)}</b>
+                    <b className="pos-producto-precio"><span className="pos-moneda">RD$</span>{formatoCentavos(p.precio_centavos)}</b>
                     <Existencia p={p} />
                   </span>
                 </button>

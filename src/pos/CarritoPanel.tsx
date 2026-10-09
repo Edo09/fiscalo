@@ -74,10 +74,10 @@ export function CarritoPanel({
             <div key={l.productoId} className="pos-linea">
               <div className="pos-linea-info">
                 <b>{l.nombre}</b>
-                <small>{formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{l.tasa === 0 ? ' · Exento' : ''}</small>
+                <small>RD$ {formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{l.tasa === 0 ? ' · Exento' : ''}</small>
                 {aviso && <small className="pos-linea-aviso"><Icon name="alert-triangle" size={13} />{aviso}</small>}
               </div>
-              <b key={t.lineas[i].bruto} className="pos-linea-importe pos-num">{formatoCentavos(t.lineas[i].bruto)}</b>
+              <b key={t.lineas[i].bruto} className="pos-linea-importe pos-num"><span className="pos-moneda">RD$</span>{formatoCentavos(t.lineas[i].bruto)}</b>
               <div className="pos-cant">
                 <button type="button" onClick={() => onMenos(l)} disabled={l.cantidad <= 1 || enDuda} aria-label={`Quitar una unidad de ${l.nombre}`}>
                   <Icon name="minus" size={20} />
@@ -105,19 +105,21 @@ export function CarritoPanel({
               <small>Crédito fiscal</small>
               <b>{cliente.nombre}</b>
               <small>{cliente.rnc.length === 11 ? 'Cédula' : 'RNC'} {formatoRnc(cliente.rnc)}</small>
+              {/* Su descuento ya va aplicado en los precios: aquí se dice cuánto es. */}
+              {cliente.descuento > 0 && (
+                <small className="pos-cliente-ahorro">
+                  Descuento {cliente.descuento}%{t.descuento > 0 ? ` · −RD$ ${formatoCentavos(t.descuento)}` : ''}
+                </small>
+              )}
             </div>
             <Btn variant="ghost" onClick={onQuitarCliente} disabled={enDuda} aria-label="Quitar el cliente: la venta vuelve a consumo">Quitar</Btn>
           </div>
         ) : !enDuda && (
           <Btn className="pos-cliente-boton" icon="building-2" onClick={onCliente}>Crédito fiscal (RNC)</Btn>
         )}
-        {t.descuento > 0 && (
-          <>
-            <div className="pos-total-fila"><span>Subtotal</span><span>{formatoCentavos(t.bruto)}</span></div>
-            <div className="pos-total-fila pos-total-desc"><span>Descuento del cliente ({cliente?.descuento}%)</span><span>−{formatoCentavos(t.descuento)}</span></div>
-          </>
-        )}
-        <div className="pos-total-fila"><span>ITBIS incluido</span><span>{formatoCentavos(t.itbis)}</span></div>
+        {/* Como el recibo: subtotal sin ITBIS + ITBIS = total. */}
+        <div className="pos-total-fila"><span>Subtotal</span><span>RD$ {formatoCentavos(t.subtotal)}</span></div>
+        <div className="pos-total-fila"><span>ITBIS</span><span>RD$ {formatoCentavos(t.itbis)}</span></div>
         <div className="pos-total-fila pos-total"><span>Total</span><span key={t.total} className="pos-num">RD$ {formatoCentavos(t.total)}</span></div>
         {enDuda ? (
           <Btn variant="primary" className="pos-cobrar" icon="refresh-cw" onClick={onCobrar}>Reintentar cobro</Btn>

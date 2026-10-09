@@ -151,7 +151,7 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
   const ajeno = turno.empleado_id !== sesion.empleado.id
 
   return (
-    <Overlay onCerrar={() => { if (fase.tipo === 'conteo') onCancelar() }} ancho={fase.tipo === 'conteo' || fase.tipo === 'confirmar' ? 760 : 480}>
+    <Overlay ancho={fase.tipo === 'conteo' || fase.tipo === 'confirmar' ? 760 : 480}>
       {(fase.tipo === 'conteo' || fase.tipo === 'confirmar') && (
         <>
           <div className="pos-modal-cab">

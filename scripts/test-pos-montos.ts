@@ -48,6 +48,12 @@ chk('agua 3 × 25 + arroz 38 con 10%: total 101.70, descuento 11.30, ITBIS 10.30
   conDesc.total === 10170 && conDesc.descuento === 1130 && conDesc.bruto === 11300 && conDesc.itbis === 1030, conDesc)
 const sinDesc = totalesCarrito([{ precioCentavos: 2500, cantidad: 7, tasa: 18 }])
 chk('sin cliente: 7 × 25 = 175.00 con ITBIS 26.69', sinDesc.total === 17500 && sinDesc.descuento === 0 && sinDesc.itbis === 2669, sinDesc)
+chk('subtotal sin ITBIS (el del recibo): 148.31 + 26.69 = 175.00', sinDesc.subtotal === 14831 && sinDesc.subtotal + sinDesc.itbis === sinDesc.total, sinDesc)
+chk('con el 10%: subtotal 91.40 (agua 57.20 + arroz exento 34.20, como el e-CF) + ITBIS 10.30 = 101.70',
+  conDesc.subtotal === 9140 && conDesc.subtotal + conDesc.itbis === conDesc.total, conDesc)
+const soloExento = totalesCarrito([{ precioCentavos: 3800, cantidad: 2, tasa: 0 }])
+chk('solo exento: subtotal = total, ITBIS 0', soloExento.subtotal === 7600 && soloExento.itbis === 0 && soloExento.total === 7600, soloExento)
+chk('carrito vacío: todo en 0', JSON.stringify(totalesCarrito([])) === JSON.stringify({ lineas: [], bruto: 0, descuento: 0, total: 0, itbis: 0, subtotal: 0 }))
 
 console.log('Formato')
 chk('RNC 131000001 → 1-31-00000-1; cédula 00112345678 → 001-1234567-8; incompleto tal cual',

@@ -33,6 +33,7 @@ import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } fr
 import { CierreModal } from './CierreModal'
 import { ClienteRncModal } from './ClienteRncModal'
 import { VentasDiaModal } from './VentasDiaModal'
+import { useTemaPos } from './tema'
 import { totalesCarrito } from './montos'
 
 /** Minutos sin tocar la pantalla antes de bloquearla (docs/specs/pos.md §8, punto 5). */
@@ -85,6 +86,8 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const [bloqueando, setBloqueando] = useState(false)
   const ultimaActividad = useRef(Date.now())
 
+  const tema = useTemaPos((s) => s.tema)
+  const alternarTema = useTemaPos((s) => s.alternar)
   const { lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, vaciar, ponerCliente, guardarCatalogo } = useCarritoStore()
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
@@ -299,6 +302,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
         <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
         <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
+        <Btn icon={tema === 'oscuro' ? 'sun' : 'moon'} onClick={alternarTema}
+          aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'} />
         <Btn icon="lock" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
       </header>
 

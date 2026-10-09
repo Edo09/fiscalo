@@ -52,7 +52,7 @@ export function VentasDiaModal({ equipo, sesion, onCerrar, errorDeSesion }: {
   }
 
   return (
-    <Overlay onCerrar={onCerrar} ancho={640}>
+    <Overlay ancho={640}>
       <div className="pos-modal-cab">
         <div>
           <small>{equipo.caja.nombre} · {sesion.empleado.nombre}</small>

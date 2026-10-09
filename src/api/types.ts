@@ -1353,6 +1353,8 @@ export interface FacturaSimpleInput {
   date?: string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number
+  /** Plazo del crédito en días (30, 45, 60). null = contado; sin plazo, el backend asume 30. */
+  dias_credito?: number | null
   items: FacturaSimpleItemInput[]
 }
 
@@ -1385,6 +1387,8 @@ export interface FacturaSimpleRow {
   total: number | string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number | string | null
+  /** Plazo del crédito en días (migración 033). null = contado o crédito de 30. */
+  dias_credito?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
 }

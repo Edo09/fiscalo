@@ -1,6 +1,61 @@
 /* FISCALO — POS (pos.fiscalpoint.com.do). Pantalla tactil primero: zonas
    tocables de 56 px o mas, nada que dependa del hover. Usa los tokens de
-   styles.css (claro/oscuro) y no redefine colores. */
+   styles.css; el unico tema propio es el gris oscuro de abajo. */
+
+/* ---- Tema gris oscuro (tema.ts) --------------------------------------------
+   El modo oscuro del POS se monta sobre el del sistema (data-theme="dark") con
+   una paleta mas clara: gris frio en vez de casi negro, el mismo azul de acento
+   y los mismos semanticos, aclarados lo justo para leer bien sobre gris (texto
+   secundario y estados con contraste de 4.5:1 o mas). Solo en el POS: app.* no
+   carga este archivo. */
+[data-theme="dark"][data-pos-tema="gris"] {
+  --accent: #649cf3;
+  --accent-hover: #72a6f4;
+  --accent-active: #80aff5;
+  --accent-soft: #2e3b52;
+  --accent-soft-2: #34445f;
+  --accent-text: #a6c5f8;
+  --on-accent: #0d1626;
+
+  --bg: #24272d;
+  --surface: #2c3037;
+  --surface-2: #282b32;
+  --surface-hover: #343941;
+  --surface-active: #3b4049;
+  --sidebar-bg: #262a30;
+  --border: #3b4049;
+  --border-strong: #4b515c;
+  --ring: rgba(100, 156, 243, 0.45);
+
+  --text: #eceef2;
+  --text-2: #bcc2cb;
+  --text-3: #979eaa;
+  --text-inverse: #24272d;
+
+  --success: #43c089;
+  --success-soft: #26392f;
+  --warning: #e4aa45;
+  --warning-soft: #3c3424;
+  --danger: #f17d7d;
+  --danger-soft: #45292c;
+  --info: #649cf3;
+  --info-soft: #2e3b52;
+  --neutral-soft: #353a42;
+
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --sh-md: 0 4px 14px rgba(0, 0, 0, 0.32);
+  --sh-lg: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
+}
+/* Franjas rojas con texto blanco: el rojo claro del gris no da contraste con
+   blanco; ahi va un rojo mas profundo. */
+[data-pos-tema="gris"] :is(.pos-alerta, .pos-sin-red) { background: #b23b3b; }
+[data-pos-tema="gris"] .pos-overlay, [data-pos-tema="gris"] .pos-confirmar-capa { background: rgba(10, 12, 16, 0.55); }
+/* Al cambiar de tema los colores se funden en vez de saltar (lo pone tema.ts un instante). */
+.pos-tema-cambiando, .pos-tema-cambiando *, .pos-tema-cambiando *::before, .pos-tema-cambiando *::after {
+  transition: background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease, fill .3s ease, stroke .3s ease !important;
+}
 
 .pos-root {
   min-height: 100vh;
@@ -404,7 +459,9 @@
 .pos-cliente-barra > div > small:first-child { text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-text); font-weight: 600; }
 .pos-cliente-barra b { font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-cliente-barra .btn { flex-shrink: 0; }
-.pos-total-fila.pos-total-desc { color: var(--success); }
+/* "RD$" delante de un precio: más chico y suave, el número manda. */
+.pos-moneda { font-size: .68em; font-weight: 600; color: var(--text-3); margin-right: 3px; letter-spacing: .01em; }
+.pos-cliente-barra .pos-cliente-ahorro { color: var(--success); font-weight: 600; }
 .pos-cliente-ficha { display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--r-md); }
 .pos-cliente-ficha > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pos-cliente-ficha b { font-size: 17px; }

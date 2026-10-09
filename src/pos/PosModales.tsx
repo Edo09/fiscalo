@@ -7,9 +7,14 @@ import { leerCantidad } from './montos'
 import type { LineaCarrito } from './carrito'
 
 /** Fondo oscuro + panel. Tocar fuera cierra (si `onCerrar` lo permite). */
-export function Overlay({ children, onCerrar, ancho }: { children: ReactNode; onCerrar: () => void; ancho?: number }) {
+/**
+ * Fondo y caja de todos los diálogos del POS. Tocar fuera NO cierra: un toque
+ * de más en la pantalla táctil (o el cliente apoyando la mano) cerraba el cobro
+ * a medias. Cada diálogo se cierra solo con sus botones.
+ */
+export function Overlay({ children, ancho }: { children: ReactNode; ancho?: number }) {
   return (
-    <div className="pos-overlay" onPointerDown={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
+    <div className="pos-overlay">
       <div className="pos-modal" role="dialog" aria-modal="true" style={ancho ? { maxWidth: ancho } : undefined}>{children}</div>
     </div>
   )
@@ -55,7 +60,7 @@ export function CantidadModal({ linea, onAceptar, onCerrar }: {
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', linea.decimales ? '.' : '', '0', '⌫']
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>Cantidad</small>
@@ -106,7 +111,7 @@ export function ConfirmarModal({ titulo, texto, confirmar, onConfirmar, onCerrar
   }, [onCerrar])
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div><b>{titulo}</b></div>
       </div>
