@@ -14,7 +14,7 @@ import { posApi, PosApiError, type FormaPago, type VentaCuerpo, type VentaRespue
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nuevaClave, useCarritoStore } from './carrito'
-import { formatoCentavos, importeLinea, montoACentavos } from './montos'
+import { centavosATexto, formatoCentavos, importeLinea, montoACentavos } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 
@@ -33,8 +33,13 @@ const FORMAS: { forma: FormaPago; nombre: string; tecla: string; icono: 'banknot
   { forma: 3, nombre: 'Tarjeta', tecla: 'F2', icono: 'wallet' },
   { forma: 2, nombre: 'Transferencia', tecla: 'F3', icono: 'landmark' },
 ]
-/** Billetes de atajo para el efectivo recibido (en pesos). */
-const BILLETES = [100, 200, 500, 1000, 2000]
+/**
+ * Billetes de atajo para el efectivo recibido (en pesos). Se SUMAN: el cliente
+ * paga 2,342.30 con 2,000 + 500 → se tocan los dos. Antes cada botón ponía un
+ * solo billete y, si no alcanzaba, quedaba desactivado: con un total mayor de
+ * 2,000 no servía ninguno.
+ */
+const BILLETES = [2000, 1000, 500, 200, 100, 50]
 
 type Fase =
   | { tipo: 'eligiendo' }
@@ -199,14 +204,19 @@ export function CobroModal({
                   <b className={recibido === '' ? 'vacio' : ''}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
                 </div>
                 <div className="pos-billetes">
-                  <button type="button" className={'pos-billete' + (recibido === '' ? ' on' : '')} onClick={() => setRecibido('')}>Exacto</button>
                   {BILLETES.map((b) => (
-                    <button key={b} type="button" className={'pos-billete' + (recibido === String(b) ? ' on' : '')}
-                      disabled={b * 100 < total} onClick={() => setRecibido(String(b))}>{b.toLocaleString('es-DO')}</button>
+                    <button key={b} type="button" className="pos-billete" aria-label={`Sumar un billete de ${b}`}
+                      onClick={() => setRecibido((r) => centavosATexto((r === '' ? 0 : montoACentavos(r) ?? 0) + b * 100))}>
+                      +{b.toLocaleString('es-DO')}
+                    </button>
                   ))}
+                  {/* Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
+                  <button type="button" className={'pos-billete' + (recibido === '' ? ' on' : '')} style={{ gridColumn: '1 / -1' }}
+                    onClick={() => setRecibido('')}>Exacto</button>
                 </div>
-                <div className={'pos-devuelta' + (alcanza ? '' : ' falta')}>
-                  <small>{alcanza ? 'Devuelta' : 'Falta'}</small>
+                {/* Verde = pago exacto; amarillo = hay que dar devuelta; rojo = falta. */}
+                <div className={'pos-devuelta' + (!alcanza ? ' falta' : (devuelta ?? 0) > 0 ? ' cambio' : '')}>
+                  <small>{!alcanza ? 'Falta' : (devuelta ?? 0) > 0 ? 'Devuelta' : 'Pago exacto'}</small>
                   <b>RD$ {formatoCentavos(Math.abs(devuelta ?? 0))}</b>
                 </div>
               </div>
@@ -241,8 +251,8 @@ export function CobroModal({
           <b>Venta cobrada</b>
           <p className="pos-sub" style={{ margin: 0 }}>Factura de consumo {fase.r.venta.e_ncf}</p>
           {fase.r.cobro.devuelta_centavos !== null ? (
-            <div className="pos-devuelta grande">
-              <small>Devuelta</small>
+            <div className={'pos-devuelta grande' + (fase.r.cobro.devuelta_centavos > 0 ? ' cambio' : '')}>
+              <small>{fase.r.cobro.devuelta_centavos > 0 ? 'Devuelta' : 'Pago exacto'}</small>
               <b>RD$ {formatoCentavos(fase.r.cobro.devuelta_centavos)}</b>
             </div>
           ) : (

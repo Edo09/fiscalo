@@ -6,7 +6,7 @@
 //   node scripts/test-pos-montos.ts
 import {
   coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, montoACentavos, normalizar, semaforo,
-  teclearMonto,
+  teclearMonto, centavosATexto,
 } from '../src/pos/montos.ts'
 
 let fallos = 0
@@ -87,6 +87,13 @@ chk('un solo punto y 2 decimales: 1,.,.,2,3,4 → "1.23"', escribir(['1', '.', '
 chk('punto primero → "0.", cero a la izquierda no se repite', escribir(['.']) === '0.' && escribir(['0', '0', '7']) === '7')
 chk('borrar y limpiar', escribir(['1', '2', '⌫']) === '1' && escribir(['1', '2', 'C']) === '')
 chk('tope de 7 cifras', escribir(['1', '2', '3', '4', '5', '6', '7', '8']) === '1234567')
+chk('centavos a texto: 250000 → "2500", 234230 → "2342.30", 5 → "0.05"', centavosATexto(250000) === '2500'
+  && centavosATexto(234230) === '2342.30' && centavosATexto(5) === '0.05')
+// Billetes que se suman (CobroModal): 2,000 + 500 para un total de 2,342.30.
+const sumar = (texto: string, billete: number) => centavosATexto((texto === '' ? 0 : montoACentavos(texto) ?? 0) + billete * 100)
+const recibido = [2000, 500].reduce(sumar, '')
+chk('billetes 2,000 + 500 → recibido "2500", devuelta 157.70', recibido === '2500' && (montoACentavos(recibido) ?? 0) - 234230 === 15770)
+chk('se puede seguir tecleando sobre lo sumado: "2500" + ".5" → 2500.5', montoACentavos(teclearMonto(teclearMonto(recibido, '.'), '5')) === 250050)
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

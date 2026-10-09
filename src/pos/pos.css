@@ -316,6 +316,8 @@
 .pos-devuelta small { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .pos-devuelta b { font-size: 26px; font-variant-numeric: tabular-nums; }
 .pos-devuelta.falta { background: var(--danger-soft); color: var(--danger); }
+/* Hay que dar devuelta: amarillo, para que el cajero no lo pase por alto. */
+.pos-devuelta.cambio { background: var(--warning-soft); color: var(--warning); }
 .pos-devuelta.grande { width: 100%; flex-direction: column; align-items: center; padding: 14px; }
 .pos-devuelta.grande b { font-size: 40px; letter-spacing: -0.02em; }
 .pos-teclado-monto { gap: 8px; }

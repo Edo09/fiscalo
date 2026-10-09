@@ -103,6 +103,11 @@ export function montoACentavos(texto: string): number | null {
   return Math.round(Number(texto) * 100)
 }
 
+/** Centavos → texto del campo de monto: 250000 → "2500", 234230 → "2342.30". */
+export function centavosATexto(centavos: number): string {
+  return centavos % 100 === 0 ? String(centavos / 100) : (centavos / 100).toFixed(2)
+}
+
 /** Aplica una tecla al texto del monto respetando el formato. */
 export function teclearMonto(actual: string, tecla: string): string {
   if (tecla === '⌫') return actual.slice(0, -1)
