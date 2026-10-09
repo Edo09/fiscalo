@@ -5,7 +5,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
 import type { Nav } from '@/config/navigation'
-import { conSigno, lineasVinculo, montoTotalKpi, sumaConSigno } from './notasVinculadas'
+import { conSigno, esNotaCredito, lineasVinculo, montoTotalKpi, sumaConSigno } from './notasVinculadas'
 
 const PAGE_SIZES = [10, 25, 50]
 const SEARCH_DEBOUNCE_MS = 500
@@ -213,9 +213,13 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
                     <td><span className="ecf-tag">E{f.tipo}</span></td>
                     <td className="muted text-sm">{f.fecha}</td>
                     <td>{f.dgii !== '—' ? <EstadoBadge estado={f.dgii} /> : <span className="muted-3">—</span>}</td>
-                    {/* La nota de crédito (E34) va en negativo: resta. */}
-                    <td className="num text-sm muted"><Money value={conSigno(f.tipo, f.itbis)} cur={false} /></td>
-                    <td className="num fw6"><Money value={conSigno(f.tipo, f.total)} cur={false} /></td>
+                    {/* La nota de crédito (E34) va en negativo y en rojo: resta. */}
+                    <td className="num text-sm muted" style={esNotaCredito(f.tipo) ? { color: 'var(--danger)' } : undefined}>
+                      <Money value={conSigno(f.tipo, f.itbis)} cur={false} />
+                    </td>
+                    <td className="num fw6" style={esNotaCredito(f.tipo) ? { color: 'var(--danger)' } : undefined}>
+                      <Money value={conSigno(f.tipo, f.total)} cur={false} />
+                    </td>
                     <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
                   </tr>
                 ))}
