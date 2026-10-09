@@ -5,8 +5,10 @@ import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/compon
 import '@/styles/factura-doc.css'
 import {
   ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate, mapFacturaRow,
+  reenviarFactura,
 } from '@/api'
-import type { DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
+import type { CreateFacturaResponse, DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { presentDocument } from '@/lib/file'
 import { aNumero, fmtCantidad, fmtPrecio } from '@/lib/format'
 import { useAnchoTirilla } from '@/stores/impresora'
@@ -155,6 +157,47 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
     return () => { enPantalla.current = null }
   }, [id])
 
+  // Reenvío de un rechazado que no consumió la secuencia. El backend lo emite
+  // como una factura nueva (otro id, mismo e-NCF) y archiva esta: se pasa a ver
+  // la nueva, también si la DGII la vuelve a rechazar (viene en el error).
+  const [reenviando, setReenviando] = useState(false)
+  const abrirReenviada = (res: Partial<CreateFacturaResponse> & { factura_id: number }) => {
+    if (!f || !enPantalla.current) return
+    nav('factura-ver', {
+      ...f,
+      id: String(res.factura_id),
+      facturaId: res.factura_id,
+      ncf: res.e_ncf ?? f.ncf,
+      fecha: res.fecha_emision_dgii ? formatApiDate(res.fecha_emision_dgii) : f.fecha,
+      dgii: res.estado_dgii ? dgiiLabel(res.estado_dgii) : f.dgii,
+      trackId: res.track_id ?? null,
+      codigoSeguridad: res.codigo_seguridad ?? null,
+      estadoDgiiRaw: res.estado_dgii ?? null,
+    }, { replace: true })
+  }
+  const reenviar = useAccionUnica(async () => {
+    if (id == null) return
+    setReenviando(true)
+    const tid = toast.loading('Reenviando a la DGII…')
+    try {
+      const res = await reenviarFactura(id)
+      void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+      toast.success(`e-CF ${res.e_ncf} reenviado (${dgiiLabel(res.estado_dgii)}).`, { id: tid })
+      abrirReenviada(res)
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo reenviar el comprobante.', { id: tid })
+      const nueva = e instanceof ApiError ? (e.datos as Partial<CreateFacturaResponse> | undefined) : undefined
+      if (nueva?.factura_id) {
+        void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+        abrirReenviada({ ...nueva, factura_id: nueva.factura_id })
+      } else {
+        estado.reload()
+      }
+    } finally {
+      setReenviando(false)
+    }
+  })
+
   if (!f) {
     return (
       <div className="page">
@@ -169,6 +212,10 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
+  // Mismas condiciones que el backend (handleReenviar): rechazado sin archivar y
+  // con la secuencia sin consumir (o sin la bandera, que se trata igual).
+  const puedeReenviar = ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO'].includes(estadoRaw ?? '')
+    && estadoData?.secuencia_utilizada !== true
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.
@@ -256,7 +303,14 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
             <div key={i} className="text-sm" style={{ color: 'var(--danger)', marginTop: 6 }}>• {m.valor} {m.codigo ? `(cód. ${m.codigo})` : ''}</div>
           ))}
           {estadoData?.secuencia_utilizada === false && (
-            <div className="text-xs muted mt-sm">La secuencia no se consumió: puedes corregir y reemitir con el mismo e-NCF.</div>
+            <div className="text-xs muted mt-sm">La secuencia no se consumió: corrige la causa del rechazo y reenvíalo con el mismo e-NCF.</div>
+          )}
+          {puedeReenviar && (
+            <div className="row mt-sm">
+              <Btn variant="primary" size="sm" icon="send" onClick={() => void reenviar()} disabled={reenviando}>
+                {reenviando ? 'Reenviando…' : 'Reenviar a la DGII'}
+              </Btn>
+            </div>
           )}
           {estadoData?.secuencia_utilizada === true && (
             <div className="text-xs muted mt-sm">La secuencia se consumió: la reemisión tomará un nuevo e-NCF.</div>

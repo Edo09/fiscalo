@@ -252,7 +252,9 @@ const esLogin = (ctx: ContextoError) => /\/api\/auth\/login\b/.test(rutaDe(ctx))
 const esVistaPrevia = (ctx: ContextoError) => /\/preview\b/.test(rutaDe(ctx))
 const esDocumento = (ctx: ContextoError) => /\/(pdf|xml)\b/.test(rutaDe(ctx))
 const esEstadoDgii = (ctx: ContextoError) => /\/estado\b/.test(rutaDe(ctx))
-const esEmisionEcf = (ctx: ContextoError) => metodoDe(ctx) === 'POST' && /^\/api\/facturas\/?$/.test(rutaDe(ctx))
+// El reenvío de un rechazado también emite: un fallo a mitad pudo dejarlo enviado.
+const esEmisionEcf = (ctx: ContextoError) =>
+  metodoDe(ctx) === 'POST' && /^\/api\/facturas(\/\d+\/reenviar)?\/?$/.test(rutaDe(ctx))
 
 /**
  * ¿La petición pudo dejar algo guardado? Decide si un timeout o una respuesta

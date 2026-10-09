@@ -9,6 +9,7 @@ export {
   getFactura,
   listFacturasModificables,
   createFactura,
+  reenviarFactura,
   previewFactura,
   getEstado,
   getDocumentBase64,
