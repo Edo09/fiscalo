@@ -172,8 +172,21 @@ export interface CatalogoPos {
 /** Forma de pago (codigo DGII de TablaFormasPago): 1 efectivo, 2 transferencia/deposito, 3 tarjeta. */
 export type FormaPago = 1 | 2 | 3
 
+/** Cliente de crédito fiscal (POST /api/pos/clientes/rnc, F2). */
+export interface ClientePos {
+  id: number
+  /** Razón social (o el nombre que tenga). */
+  nombre: string
+  rnc: string
+  /** % de descuento del cliente (V5); 0 = sin descuento. */
+  descuento: number
+}
+
 /** Cuerpo de POST /api/pos/ventas. El POS no manda precios: solo producto y cantidad. */
 export interface VentaCuerpo {
+  /** '32' consumo (sin cliente) o '31' crédito fiscal (con client_id). */
+  tipo_ecf: '32' | '31'
+  client_id: number | null
   /** Una por intento de venta: repetirla nunca saca otro e-NCF (F5). */
   clave: string
   lineas: { product_id: number; cantidad: number }[]
@@ -191,9 +204,14 @@ export interface VentaRespuesta {
     e_ncf: string
     tipo_ecf: string
     estado_dgii: string
-    /** La DGII no respondió a tiempo: se imprimió y se reenvía sola (F6). */
+    /**
+     * Sin veredicto de la DGII todavía: no respondió a tiempo (RFCE_PENDIENTE /
+     * ENVIO_PENDIENTE) o, en un E31, recibió el e-CF y lo está validando
+     * (ENVIADO / EN_PROCESO). Se imprimió y se confirma solo (F6, F7).
+     */
     envio_pendiente: boolean
     total_centavos: number
+    cliente: ClientePos | null
   }
   cobro: {
     forma_pago: FormaPago
@@ -284,6 +302,9 @@ export const posApi = {
     posFetch<{ cerrada: boolean }>('DELETE', '/pos/sesion', { equipo, sesion }),
   catalogo: (equipo: string, sesion: string) =>
     posFetch<CatalogoPos>('GET', '/pos/catalogo', { equipo, sesion }),
+  // Consulta el registro de contribuyentes si el cliente no existe (hasta ~5 s).
+  clienteRnc: (equipo: string, sesion: string, rnc: string) =>
+    posFetch<{ cliente: ClientePos; nuevo: boolean; estado_dgii: string | null }>('POST', '/pos/clientes/rnc', { equipo, sesion }, { rnc }, 30_000),
   abrirTurno: (equipo: string, sesion: string, fondoCentavos: number) =>
     posFetch<{ turno_caja: TurnoCaja }>('POST', '/pos/turno', { equipo, sesion }, { fondo_centavos: fondoCentavos }),
   // La emision puede esperar a la DGII (y, con doble toque, a la otra peticion): mas margen.

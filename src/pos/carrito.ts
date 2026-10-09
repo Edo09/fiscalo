@@ -12,7 +12,7 @@
 //   clave hasta reintentar: cambiarlo y cobrar con otra clave podría emitir la
 //   misma venta dos veces.
 import { create } from 'zustand'
-import type { CatalogoPos, ProductoPos, VentaCuerpo } from './api'
+import type { CatalogoPos, ClientePos, ProductoPos, VentaCuerpo } from './api'
 
 export interface LineaCarrito {
   productoId: number
@@ -30,6 +30,8 @@ interface CarritoState {
   catalogo: CatalogoPos | null
   /** Hora del primer artículo (métrica de tiempo por venta). */
   iniciadaMs: number | null
+  /** Cliente de crédito fiscal (E31) o null = consumidor final (E32). */
+  cliente: ClientePos | null
   /**
    * Cobro sin confirmar: el cuerpo exacto (con su clave) que hay que reenviar.
    * Mientras exista, el carrito no se puede tocar.
@@ -42,6 +44,7 @@ interface CarritoState {
   /** Venta cobrada o cancelada: carrito vacío y sin cobro pendiente. */
   vaciar: () => void
   marcarCobroEnDuda: (cuerpo: VentaCuerpo | null) => void
+  ponerCliente: (cliente: ClientePos | null) => void
   guardarCatalogo: (c: CatalogoPos) => void
   /** Al olvidar el equipo (revocado, otra empresa): no queda nada de la venta. */
   olvidarTodo: () => void
@@ -51,6 +54,7 @@ export const useCarritoStore = create<CarritoState>()((set) => ({
   lineas: [],
   catalogo: null,
   iniciadaMs: null,
+  cliente: null,
   cobroEnDuda: null,
   agregar: (p) => set((s) => {
     if (s.cobroEnDuda) return s
@@ -72,8 +76,10 @@ export const useCarritoStore = create<CarritoState>()((set) => ({
     const lineas = s.lineas.filter((l) => l.productoId !== productoId)
     return { lineas, iniciadaMs: lineas.length === 0 ? null : s.iniciadaMs }
   }),
-  vaciar: () => set({ lineas: [], iniciadaMs: null, cobroEnDuda: null }),
+  vaciar: () => set({ lineas: [], iniciadaMs: null, cobroEnDuda: null, cliente: null }),
   marcarCobroEnDuda: (cobroEnDuda) => set({ cobroEnDuda }),
+  // Con un cobro en duda tampoco se cambia el cliente: el reintento manda lo mismo.
+  ponerCliente: (cliente) => set((s) => (s.cobroEnDuda ? s : { cliente })),
   guardarCatalogo: (catalogo) => set((s) => {
     // Con un cobro en duda las líneas no cambian: el reintento manda lo mismo.
     if (s.cobroEnDuda) return { catalogo }
@@ -86,7 +92,7 @@ export const useCarritoStore = create<CarritoState>()((set) => ({
     })
     return { catalogo, lineas }
   }),
-  olvidarTodo: () => set({ lineas: [], catalogo: null, iniciadaMs: null, cobroEnDuda: null }),
+  olvidarTodo: () => set({ lineas: [], catalogo: null, iniciadaMs: null, cobroEnDuda: null, cliente: null }),
 }))
 
 /** Clave nueva para un intento de cobro (UUID v4). */

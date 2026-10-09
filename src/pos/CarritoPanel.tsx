@@ -1,14 +1,17 @@
-// Carrito de la venta en curso (api-gratex docs/specs/pos.md V1-V4): líneas con
-// − / cantidad / +, aviso de existencia, totales al centavo e ITBIS incluido.
-// El cobro va en CobroModal; aquí se decide si se puede cobrar (turno, cobro
-// sin confirmar).
+// Carrito de la venta en curso (api-gratex docs/specs/pos.md V1-V5, F2): líneas
+// con − / cantidad / +, aviso de existencia, cliente de crédito fiscal (E31) con
+// su descuento, totales al centavo e ITBIS incluido. El cobro va en CobroModal;
+// aquí se decide si se puede cobrar (turno, cobro sin confirmar).
 import { Btn, Icon } from '@/components/ui'
 import { fmtCantidad } from '@/lib/format'
+import type { ClientePos } from './api'
 import type { LineaCarrito } from './carrito'
-import { formatoCentavos, importeLinea, itbisIncluido } from './montos'
+import { formatoCentavos, formatoRnc, totalesCarrito } from './montos'
 
 interface Props {
   lineas: LineaCarrito[]
+  /** Cliente de crédito fiscal (E31); null = consumidor final (E32). */
+  cliente: ClientePos | null
   /** Cobro sin confirmar: la venta queda congelada y el botón reintenta. */
   enDuda: boolean
   puedeCobrar: boolean
@@ -23,6 +26,8 @@ interface Props {
   onCantidad: (l: LineaCarrito) => void
   onQuitar: (l: LineaCarrito) => void
   onCancelar: () => void
+  onCliente: () => void
+  onQuitarCliente: () => void
 }
 
 /** Existencia de la línea (V3): se vende igual, pero se avisa. */
@@ -34,11 +39,10 @@ function avisoExistencia(l: LineaCarrito): string | null {
 }
 
 export function CarritoPanel({
-  lineas, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, onQuitar, onCancelar,
+  lineas, cliente, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, onQuitar, onCancelar,
+  onCliente, onQuitarCliente,
 }: Props) {
-  const importes = lineas.map((l) => ({ importe: importeLinea(l.precioCentavos, l.cantidad), tasa: l.tasa }))
-  const total = importes.reduce((s, i) => s + i.importe, 0)
-  const itbis = itbisIncluido(importes)
+  const t = totalesCarrito(lineas, cliente?.descuento ?? 0)
   const unidades = lineas.reduce((s, l) => s + l.cantidad, 0)
 
   return (
@@ -73,7 +77,7 @@ export function CarritoPanel({
                 <small>{formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{l.tasa === 0 ? ' · Exento' : ''}</small>
                 {aviso && <small className="pos-linea-aviso"><Icon name="alert-triangle" size={13} />{aviso}</small>}
               </div>
-              <b className="pos-linea-importe">{formatoCentavos(importes[i].importe)}</b>
+              <b className="pos-linea-importe">{formatoCentavos(t.lineas[i].bruto)}</b>
               <div className="pos-cant">
                 <button type="button" onClick={() => onMenos(l)} disabled={l.cantidad <= 1 || enDuda} aria-label={`Quitar una unidad de ${l.nombre}`}>
                   <Icon name="minus" size={20} />
@@ -94,8 +98,27 @@ export function CarritoPanel({
       </div>
 
       <div className="pos-totales">
-        <div className="pos-total-fila"><span>ITBIS incluido</span><span>{formatoCentavos(itbis)}</span></div>
-        <div className="pos-total-fila pos-total"><span>Total</span><span>RD$ {formatoCentavos(total)}</span></div>
+        {cliente ? (
+          <div className="pos-cliente-barra">
+            <Icon name="building-2" size={18} />
+            <div>
+              <small>Crédito fiscal</small>
+              <b>{cliente.nombre}</b>
+              <small>{cliente.rnc.length === 11 ? 'Cédula' : 'RNC'} {formatoRnc(cliente.rnc)}</small>
+            </div>
+            <Btn variant="ghost" onClick={onQuitarCliente} disabled={enDuda} aria-label="Quitar el cliente: la venta vuelve a consumo">Quitar</Btn>
+          </div>
+        ) : !enDuda && (
+          <Btn className="pos-cliente-boton" icon="building-2" onClick={onCliente}>Crédito fiscal (RNC)</Btn>
+        )}
+        {t.descuento > 0 && (
+          <>
+            <div className="pos-total-fila"><span>Subtotal</span><span>{formatoCentavos(t.bruto)}</span></div>
+            <div className="pos-total-fila pos-total-desc"><span>Descuento del cliente ({cliente?.descuento}%)</span><span>−{formatoCentavos(t.descuento)}</span></div>
+          </>
+        )}
+        <div className="pos-total-fila"><span>ITBIS incluido</span><span>{formatoCentavos(t.itbis)}</span></div>
+        <div className="pos-total-fila pos-total"><span>Total</span><span>RD$ {formatoCentavos(t.total)}</span></div>
         {enDuda ? (
           <Btn variant="primary" className="pos-cobrar" icon="refresh-cw" onClick={onCobrar}>Reintentar cobro</Btn>
         ) : sinTurno ? (
@@ -106,7 +129,7 @@ export function CarritoPanel({
           </Btn>
         )}
         <small className="pos-cobrar-nota">
-          {motivoNoCobrar ?? (sinTurno ? 'Abre el turno con el fondo de la gaveta para empezar a cobrar.' : 'F9 efectivo · F2 tarjeta · F3 transferencia')}
+          {motivoNoCobrar ?? (sinTurno ? 'Abre el turno con el fondo de la gaveta para empezar a cobrar.' : 'F9 efectivo · F2 tarjeta · F3 transferencia · F4 crédito fiscal')}
         </small>
       </div>
     </aside>

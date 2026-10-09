@@ -20,6 +20,36 @@ export function importeLinea(precioCentavos: number, cantidad: number): number {
   return Math.floor((precioCentavos * aCentesimas(cantidad) + 50) / 100)
 }
 
+/**
+ * Descuento del cliente en una línea (V5): round(bruto × % / 100, 2), igual que
+ * EcfItemMapper::aplicarDescuentoPorcentaje y PosVenta::armarLineas. El % lleva
+ * a lo sumo 2 decimales (clients.descuento DECIMAL(5,2)).
+ */
+export function descuentoLinea(brutoCentavos: number, porcentaje: number): number {
+  const pct100 = Math.round(porcentaje * 100)
+  return pct100 > 0 ? Math.floor((brutoCentavos * pct100 + 5000) / 10000) : 0
+}
+
+/** Totales del carrito con el descuento del cliente: lo que se cobra y lo que dirá el e-CF. */
+export function totalesCarrito(
+  lineas: { precioCentavos: number; cantidad: number; tasa: number }[],
+  descuentoPct = 0,
+): { lineas: { bruto: number; descuento: number; neto: number }[]; bruto: number; descuento: number; total: number; itbis: number } {
+  const detalle = lineas.map((l) => {
+    const bruto = importeLinea(l.precioCentavos, l.cantidad)
+    const descuento = descuentoLinea(bruto, descuentoPct)
+    return { bruto, descuento, neto: bruto - descuento }
+  })
+  const suma = (k: 'bruto' | 'descuento' | 'neto') => detalle.reduce((s, d) => s + d[k], 0)
+  return {
+    lineas: detalle,
+    bruto: suma('bruto'),
+    descuento: suma('descuento'),
+    total: suma('neto'),
+    itbis: itbisIncluido(detalle.map((d, i) => ({ importe: d.neto, tasa: lineas[i].tasa }))),
+  }
+}
+
 /** División entera redondeando la mitad hacia arriba (a y b positivos). */
 function divRedondeo(a: number, b: number): number {
   return Math.floor((2 * a + b) / (2 * b))
@@ -139,4 +169,11 @@ export function teclearEntero(actual: string, tecla: string): string {
   if (tecla === 'C') return ''
   if (!/^\d$/.test(tecla) || actual.length >= 5) return actual
   return actual === '0' ? tecla : actual + tecla
+}
+
+/** RNC y cédula como se escriben: 131000001 → 1-31-00000-1; 00112345678 → 001-1234567-8. */
+export function formatoRnc(digitos: string): string {
+  if (digitos.length === 9) return `${digitos[0]}-${digitos.slice(1, 3)}-${digitos.slice(3, 8)}-${digitos[8]}`
+  if (digitos.length === 11) return `${digitos.slice(0, 3)}-${digitos.slice(3, 10)}-${digitos[10]}`
+  return digitos
 }

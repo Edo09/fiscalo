@@ -30,6 +30,7 @@ const DGII_LABEL: Record<string, string> = {
   RFCE_NO_ENCONTRADO: 'Pendiente',
   // Venta del POS sin respuesta de la DGII: se reenvía sola (api-gratex pos.md F6/F7).
   RFCE_PENDIENTE: 'Pendiente',
+  ENVIO_PENDIENTE: 'Pendiente',
 }
 
 export function dgiiLabel(raw?: string | null): string {

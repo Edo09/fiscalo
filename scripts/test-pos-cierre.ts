@@ -75,6 +75,8 @@ chk('cerró un supervisor: aparece con su firma; y la nota', html.includes('Luis
   && html.includes('Faltan 25 centavos'))
 chk('los nombres se escapan (nada de HTML inyectado)', !html.includes('<script>') && html.includes('Ana &lt;script&gt;'))
 chk('sin devoluciones no hay renglón de devoluciones', !html.includes('Devoluciones ('))
+chk('margen a los lados dentro del ancho del papel (border-box, 2 mm)', html.includes('box-sizing: border-box')
+  && html.includes('padding: 1mm 2mm 3mm') && html.includes('width: 72mm'))
 const propio = reporteCierreHtml({ ...reporte, cerrado_por: { id: 3, nombre: 'Ana', rol: 'cajero' } }, { anchoMm: 72 })
 chk('cierre propio: sin "Cerró" ni segunda firma', !propio.includes('Cerró') && (propio.match(/class="firma"/g) ?? []).length === 1)
 

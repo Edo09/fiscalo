@@ -6,7 +6,7 @@
 //   node scripts/test-pos-montos.ts
 import {
   coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, montoACentavos, normalizar, semaforo,
-  teclearMonto, centavosATexto,
+  teclearMonto, centavosATexto, descuentoLinea, totalesCarrito, formatoRnc,
 } from '../src/pos/montos.ts'
 
 let fallos = 0
@@ -39,7 +39,19 @@ chk('18% y 16% juntos: 116.00 al 16% = 16.00 más 25.00 al 18% = 3.81',
   itbisIncluido([{ importe: 11600, tasa: 16 }, { importe: 2500, tasa: 18 }]))
 chk('carrito vacío: 0', itbisIncluido([]) === 0)
 
+console.log('Descuento del cliente (V5), los montos de tools/test_pos_e31.php')
+chk('10% de 75.00 = 7.50; de 38.00 = 3.80', descuentoLinea(7500, 10) === 750 && descuentoLinea(3800, 10) === 380)
+chk('mitad hacia arriba: 5.5% de 9.00 = 0.495 → 0.50', descuentoLinea(900, 5.5) === 50, descuentoLinea(900, 5.5))
+chk('sin descuento: 0', descuentoLinea(7500, 0) === 0)
+const conDesc = totalesCarrito([{ precioCentavos: 2500, cantidad: 3, tasa: 18 }, { precioCentavos: 3800, cantidad: 1, tasa: 0 }], 10)
+chk('agua 3 × 25 + arroz 38 con 10%: total 101.70, descuento 11.30, ITBIS 10.30 (como el e-CF)',
+  conDesc.total === 10170 && conDesc.descuento === 1130 && conDesc.bruto === 11300 && conDesc.itbis === 1030, conDesc)
+const sinDesc = totalesCarrito([{ precioCentavos: 2500, cantidad: 7, tasa: 18 }])
+chk('sin cliente: 7 × 25 = 175.00 con ITBIS 26.69', sinDesc.total === 17500 && sinDesc.descuento === 0 && sinDesc.itbis === 2669, sinDesc)
+
 console.log('Formato')
+chk('RNC 131000001 → 1-31-00000-1; cédula 00112345678 → 001-1234567-8; incompleto tal cual',
+  formatoRnc('131000001') === '1-31-00000-1' && formatoRnc('00112345678') === '001-1234567-8' && formatoRnc('1310') === '1310')
 chk('1234.5 → "1,234.50"', formatoCentavos(123450) === '1,234.50', formatoCentavos(123450))
 chk('0 → "0.00"', formatoCentavos(0) === '0.00')
 

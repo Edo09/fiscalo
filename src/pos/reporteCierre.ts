@@ -15,6 +15,9 @@ export const SELECTOR_REPORTE = '.reporte'
  */
 export const ANCHO_UTIL_MM: Record<80 | 76 | 72, number> = { 80: 72, 76: 63.5, 72: 64 }
 
+/** Aire a cada lado del texto, dentro del ancho imprimible: sin él, los montos tocan el borde del papel. */
+export const MARGEN_LATERAL_MM = 2
+
 function esc(texto: string): string {
   return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -58,7 +61,7 @@ export function reporteCierreHtml(r: ReporteCierre, opts: { empresa?: string | n
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Cierre de turno ${r.turno_id}</title><style>
   html, body { margin: 0; background: #fff; color: #000; }
-  .reporte { width: ${opts.anchoMm}mm; padding: 1mm 0 3mm; font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; line-height: 1.35; }
+  .reporte { width: ${opts.anchoMm}mm; box-sizing: border-box; padding: 1mm ${MARGEN_LATERAL_MM}mm 3mm; font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; line-height: 1.35; }
   .c { text-align: center; }
   .t { font-size: 11pt; font-weight: bold; }
   .b { font-weight: bold; }

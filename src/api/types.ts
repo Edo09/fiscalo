@@ -33,6 +33,7 @@ export type EstadoDgii =
   | 'RFCE_RECHAZADO'
   | 'RFCE_NO_ENCONTRADO'
   | 'RFCE_PENDIENTE'
+  | 'ENVIO_PENDIENTE'
 
 // ---------------------------------------------------------------------------
 // Crear factura — POST /api/facturas

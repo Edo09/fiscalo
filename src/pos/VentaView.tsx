@@ -14,8 +14,11 @@
 // - Ventas canceladas y líneas quitadas se registran para el cierre (V4).
 // - Bloqueo de pantalla manual y a los 10 minutos sin actividad. El carrito se
 //   conserva (vive en carrito.ts).
+// - Crédito fiscal (F2 de la spec): el cajero escribe el RNC o la cédula y la
+//   venta pasa a E31 a nombre de ese cliente, con su descuento (V5).
 // - Teclado: F1 buscador; F9 / F2 / F3 cobrar en efectivo / tarjeta /
-//   transferencia; Esc limpia la búsqueda o ofrece cancelar la venta.
+//   transferencia; F4 crédito fiscal; Esc limpia la búsqueda o ofrece cancelar
+//   la venta.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { posApi, PosApiError, type EstadoPos, type FormaPago, type Reenvio, type TurnoCaja } from './api'
@@ -28,7 +31,8 @@ import { CantidadModal, ConfirmarModal } from './PosModales'
 import { CobroModal } from './CobroModal'
 import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } from './CajaModales'
 import { CierreModal } from './CierreModal'
-import { importeLinea } from './montos'
+import { ClienteRncModal } from './ClienteRncModal'
+import { totalesCarrito } from './montos'
 
 /** Minutos sin tocar la pantalla antes de bloquearla (docs/specs/pos.md §8, punto 5). */
 export const BLOQUEO_INACTIVIDAD_MIN = 10
@@ -53,6 +57,7 @@ type Modal =
   | { tipo: 'impresora' }
   | { tipo: 'turno' }
   | { tipo: 'supervisor' }
+  | { tipo: 'cliente' }
   /**
    * permiso: del supervisor (turno ajeno); null si cierra el propio o un supervisor.
    * turno: copia del que se cierra; el estado lo pierde apenas se cierra y el
@@ -78,7 +83,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const [bloqueando, setBloqueando] = useState(false)
   const ultimaActividad = useRef(Date.now())
 
-  const { lineas, catalogo, cobroEnDuda, agregar, cambiarCantidad, quitar, vaciar, guardarCatalogo } = useCarritoStore()
+  const { lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, vaciar, ponerCliente, guardarCatalogo } = useCarritoStore()
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState<number | null>(null)
@@ -215,13 +220,14 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     else setModal({ tipo: 'supervisor' })
   }, [turno, motivoNoCerrar, turnoPropio, sesion.empleado.rol, sesion.empleado.nombre])
 
-  // V4: lo que sale del carrito sin cobrarse queda registrado para el cierre.
+  // V4: lo que sale del carrito sin cobrarse queda registrado para el cierre
+  // (con el descuento del cliente, si lo hay: lo que se habría cobrado).
   const registrarEvento = useCallback((tipo: 'cancelada' | 'quitada', ls: LineaCarrito[]) => {
     if (ls.length === 0) return
-    const monto = ls.reduce((t, l) => t + importeLinea(l.precioCentavos, l.cantidad), 0)
+    const monto = totalesCarrito(ls, cliente?.descuento ?? 0).total
     posApi.evento(equipo.token, sesion.token, tipo, monto, ls.map((l) => ({ product_id: l.productoId, nombre: l.nombre, cantidad: l.cantidad })))
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
-  }, [equipo.token, sesion.token])
+  }, [equipo.token, sesion.token, cliente])
 
   const abrirCobro = useCallback((forma: FormaPago) => {
     if (cobroEnDuda) { setModal({ tipo: 'cobro', forma: cobroEnDuda.forma_pago }); return }
@@ -241,6 +247,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       } else if (e.key === 'F9' || e.key === 'F2' || e.key === 'F3') {
         e.preventDefault()
         abrirCobro(e.key === 'F9' ? 1 : e.key === 'F2' ? 3 : 2)
+      } else if (e.key === 'F4') {
+        e.preventDefault()
+        if (!cobroEnDuda) setModal({ tipo: 'cliente' })
       } else if (e.key === 'Escape') {
         if (busqueda !== '') { e.preventDefault(); setBusqueda('') } else if (lineas.length > 0 && !cobroEnDuda) { e.preventDefault(); setModal({ tipo: 'cancelar' }) }
       }
@@ -316,6 +325,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         />
         <CarritoPanel
           lineas={lineas}
+          cliente={cliente}
           enDuda={cobroEnDuda !== null}
           puedeCobrar={motivoNoCobrar === null}
           motivoNoCobrar={motivoNoCobrar}
@@ -327,6 +337,8 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           onCantidad={(l) => setModal({ tipo: 'cantidad', linea: l })}
           onQuitar={(l) => { registrarEvento('quitada', [l]); quitar(l.productoId) }}
           onCancelar={() => setModal({ tipo: 'cancelar' })}
+          onCliente={() => setModal({ tipo: 'cliente' })}
+          onQuitarCliente={() => ponerCliente(null)}
         />
       </main>
 
@@ -374,6 +386,15 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
             setEstado((e) => (e ? { ...e, turno_caja: t } : e))
             setModal(null)
           }}
+        />
+      )}
+      {modal?.tipo === 'cliente' && (
+        <ClienteRncModal
+          equipo={equipo}
+          sesion={sesion}
+          errorDeSesion={errorDeSesion}
+          onCerrar={() => setModal(null)}
+          onElegido={(c) => { ponerCliente(c); setModal(null) }}
         />
       )}
       {modal?.tipo === 'impresora' && <ImpresoraModal caja={equipo.caja.nombre} onCerrar={() => setModal(null)} />}

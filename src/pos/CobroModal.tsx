@@ -1,5 +1,7 @@
-// Cobro de la venta (api-gratex docs/specs/pos.md P1-P4, F5, F6): forma de
-// pago, efectivo con devuelta, emisión e impresión del recibo.
+// Cobro de la venta (api-gratex docs/specs/pos.md P1-P4, F1, F2, F5, F6): forma
+// de pago, efectivo con devuelta, emisión e impresión del recibo. Con cliente
+// de crédito fiscal en el carrito se emite E31 a su nombre y con su descuento;
+// sin cliente, E32.
 //
 // La clave de idempotencia nace al pulsar Cobrar y se guarda en el carrito
 // ANTES de mandar la petición. Si no llega respuesta (red caída), el carrito
@@ -10,11 +12,11 @@ import { Btn, Icon } from '@/components/ui'
 import { printHtml } from '@/lib/printHtml'
 import { reciboHtml, SELECTOR_RECIBO } from '@/features/invoices/reciboHtml'
 import { useImpresoraStore } from '@/stores/impresora'
-import { posApi, PosApiError, type FormaPago, type VentaCuerpo, type VentaRespuesta } from './api'
+import { posApi, PosApiError, type ClientePos, type FormaPago, type VentaCuerpo, type VentaRespuesta } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nuevaClave, useCarritoStore } from './carrito'
-import { centavosATexto, formatoCentavos, importeLinea, montoACentavos } from './montos'
+import { centavosATexto, formatoCentavos, montoACentavos, totalesCarrito } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 
@@ -24,7 +26,16 @@ const SIN_VENTA = new Set([
   'TOTAL_DISTINTO', 'COMPRADOR_REQUERIDO', 'FORMA_PAGO_INVALIDA', 'RECIBIDO_INSUFICIENTE', 'TURNO_REQUERIDO',
   'TURNO_AJENO', 'EQUIPO_SIN_RESPONSABLE', 'DESCUADRE', 'EMISION_FALLIDA', 'DGII_RECHAZO', 'CUERPO_INVALIDO',
   'CAJA_INACTIVA', 'POS_INACTIVO', 'SESION_REQUERIDA', 'EQUIPO_NO_HABILITADO',
+  'TIPO_INVALIDO', 'CLIENTE_REQUERIDO', 'CLIENTE_NO_EXISTE', 'CLIENTE_SIN_RNC', 'AUTOFACTURA',
 ])
+/**
+ * Errores del comprador: reintentar igual no sirve. Se vuelve a la venta para
+ * buscar el RNC (o quitar el cliente) a la vista del cajero; nunca se cambia
+ * solo de crédito fiscal a consumo.
+ */
+const DEL_COMPRADOR = new Set(['CLIENTE_REQUERIDO', 'CLIENTE_NO_EXISTE', 'CLIENTE_SIN_RNC', 'AUTOFACTURA', 'COMPRADOR_REQUERIDO'])
+/** Desde RD$250,000 la factura de consumo tiene que identificar al comprador (igual que el servidor). */
+const TOPE_CONSUMO_CENTAVOS = 25_000_000
 /** Errores del catálogo: hay que refrescarlo para que el carrito tome los precios nuevos. */
 const REFRESCAR_CATALOGO = new Set(['TOTAL_DISTINTO', 'PRODUCTO_NO_DISPONIBLE', 'PRECIO_CERO'])
 
@@ -45,7 +56,7 @@ type Fase =
   | { tipo: 'eligiendo' }
   | { tipo: 'enviando' }
   | { tipo: 'hecha'; r: VentaRespuesta; impresion: 'imprimiendo' | 'ok' | 'error' }
-  | { tipo: 'error'; mensaje: string }
+  | { tipo: 'error'; mensaje: string; soloVolver: boolean }
   | { tipo: 'duda'; mensaje: string }
 
 interface Props {
@@ -65,11 +76,14 @@ export function CobroModal({
   equipo, sesion, formaInicial, onCerrar, onNuevaVenta, errorDeSesion, onRefrescarCatalogo, onRefrescarEstado,
 }: Props) {
   const lineas = useCarritoStore((s) => s.lineas)
+  const cliente = useCarritoStore((s) => s.cliente)
+  const ponerCliente = useCarritoStore((s) => s.ponerCliente)
   const enDuda = useCarritoStore((s) => s.cobroEnDuda)
   const marcarCobroEnDuda = useCarritoStore((s) => s.marcarCobroEnDuda)
   const ancho = useImpresoraStore((s) => s.anchoTirilla)
 
-  const total = lineas.reduce((t, l) => t + importeLinea(l.precioCentavos, l.cantidad), 0)
+  const total = totalesCarrito(lineas, cliente?.descuento ?? 0).total
+  const faltaComprador = cliente === null && total >= TOPE_CONSUMO_CENTAVOS
   const [forma, setForma] = useState<FormaPago>(enDuda?.forma_pago ?? formaInicial)
   const [recibido, setRecibido] = useState('')
   const [fase, setFase] = useState<Fase>(() => (enDuda
@@ -108,6 +122,8 @@ export function CobroModal({
     const estado = useCarritoStore.getState()
     // Reintento: el MISMO cuerpo (misma clave) que quedó en duda.
     const cuerpo: VentaCuerpo = estado.cobroEnDuda ?? {
+      tipo_ecf: estado.cliente ? '31' : '32',
+      client_id: estado.cliente?.id ?? null,
       clave: nuevaClave(),
       lineas: estado.lineas.map((l) => ({ product_id: l.productoId, cantidad: l.cantidad })),
       total_centavos: total,
@@ -116,7 +132,7 @@ export function CobroModal({
       ancho,
       iniciada_ms: estado.iniciadaMs,
     }
-    if (!estado.cobroEnDuda && (cuerpo.lineas.length === 0 || !alcanza)) return
+    if (!estado.cobroEnDuda && (cuerpo.lineas.length === 0 || !alcanza || faltaComprador)) return
     enviandoRef.current = true
     // Antes de mandar: si la respuesta no llega, el carrito ya está congelado.
     marcarCobroEnDuda(cuerpo)
@@ -133,12 +149,15 @@ export function CobroModal({
         if (errorDeSesion(e)) return
         if (REFRESCAR_CATALOGO.has(codigo)) onRefrescarCatalogo()
         if (codigo.startsWith('TURNO_')) onRefrescarEstado()
-        setFase({ tipo: 'error', mensaje })
+        // El admin cambió el descuento del cliente: se toma el de ahora y el total se recalcula.
+        const fichaNueva = e instanceof PosApiError ? e.extra.cliente as ClientePos | null | undefined : undefined
+        if (codigo === 'TOTAL_DISTINTO' && fichaNueva && estado.cliente && fichaNueva.id === estado.cliente.id) ponerCliente(fichaNueva)
+        setFase({ tipo: 'error', mensaje, soloVolver: DEL_COMPRADOR.has(codigo) })
       } else if (codigo === 'GUARDADO_FALLIDO') {
         // La DGII la recibió pero no quedó en el sistema: no se reintenta (saldría
         // otro e-NCF). El texto del servidor dice qué hacer.
         marcarCobroEnDuda(null)
-        setFase({ tipo: 'error', mensaje })
+        setFase({ tipo: 'error', mensaje, soloVolver: true })
       } else {
         // Sin respuesta, o una que no dice si se emitió: se queda en duda.
         setFase({
@@ -151,8 +170,8 @@ export function CobroModal({
     } finally {
       enviandoRef.current = false
     }
-  }, [total, forma, recibidoCentavos, ancho, alcanza, marcarCobroEnDuda, equipo.token, sesion.token, imprimir,
-    errorDeSesion, onRefrescarCatalogo, onRefrescarEstado])
+  }, [total, forma, recibidoCentavos, ancho, alcanza, faltaComprador, marcarCobroEnDuda, ponerCliente, equipo.token, sesion.token,
+    imprimir, errorDeSesion, onRefrescarCatalogo, onRefrescarEstado])
 
   // Teclado: Enter confirma lo que toque; F9/F2/F3 cambian la forma; Esc cierra si se puede.
   useEffect(() => {
@@ -161,7 +180,7 @@ export function CobroModal({
         e.preventDefault()
         if (fase.tipo === 'eligiendo' || fase.tipo === 'duda') void cobrar()
         else if (fase.tipo === 'hecha') onNuevaVenta()
-        else if (fase.tipo === 'error') setFase({ tipo: 'eligiendo' })
+        else if (fase.tipo === 'error') { if (fase.soloVolver) onCerrar(); else setFase({ tipo: 'eligiendo' }) }
       } else if (fase.tipo === 'eligiendo' && (e.key === 'F9' || e.key === 'F2' || e.key === 'F3')) {
         e.preventDefault()
         setForma(e.key === 'F9' ? 1 : e.key === 'F2' ? 3 : 2)
@@ -182,8 +201,9 @@ export function CobroModal({
         <>
           <div className="pos-modal-cab">
             <div>
-              <small>Cobrar</small>
+              <small>{cliente ? 'Cobrar · crédito fiscal' : 'Cobrar'}</small>
               <b className="pos-cobro-total">RD$ {formatoCentavos(total)}</b>
+              {cliente && <small className="pos-cobro-cliente">{cliente.nombre}{cliente.descuento > 0 ? ` · ${cliente.descuento}% de descuento` : ''}</small>}
             </div>
             <Btn variant="ghost" icon="x" onClick={onCerrar} aria-label="Cerrar" />
           </div>
@@ -228,9 +248,15 @@ export function CobroModal({
               cuando el pago esté aprobado.
             </p>
           )}
+          {faltaComprador && (
+            <div className="pos-aviso" style={{ margin: '12px 0 0' }}>
+              <Icon name="alert-triangle" size={16} />
+              <span>Las ventas de RD$250,000 o más tienen que identificar al comprador. Vuelve y usa <b>Crédito fiscal (RNC)</b>.</span>
+            </div>
+          )}
           <div className="pos-modal-pie">
             <Btn className="pos-boton-grande" onClick={onCerrar}>Volver</Btn>
-            <Btn variant="primary" className="pos-boton-grande" icon="check" disabled={!alcanza || lineas.length === 0} onClick={() => void cobrar()}>
+            <Btn variant="primary" className="pos-boton-grande" icon="check" disabled={!alcanza || faltaComprador || lineas.length === 0} onClick={() => void cobrar()}>
               Cobrar RD$ {formatoCentavos(total)}
             </Btn>
           </div>
@@ -249,7 +275,10 @@ export function CobroModal({
         <div className="pos-cobro-estado">
           <span className="pos-cobro-ok"><Icon name="check" size={30} /></span>
           <b>Venta cobrada</b>
-          <p className="pos-sub" style={{ margin: 0 }}>Factura de consumo {fase.r.venta.e_ncf}</p>
+          <p className="pos-sub" style={{ margin: 0 }}>
+            {fase.r.venta.tipo_ecf === '31' ? 'Factura de crédito fiscal' : 'Factura de consumo'} {fase.r.venta.e_ncf}
+            {fase.r.venta.cliente && <><br />{fase.r.venta.cliente.nombre}</>}
+          </p>
           {fase.r.cobro.devuelta_centavos !== null ? (
             <div className={'pos-devuelta grande' + (fase.r.cobro.devuelta_centavos > 0 ? ' cambio' : '')}>
               <small>{fase.r.cobro.devuelta_centavos > 0 ? 'Devuelta' : 'Pago exacto'}</small>
@@ -261,12 +290,18 @@ export function CobroModal({
           {fase.r.repetida && (
             <div className="pos-info" style={{ margin: 0 }}><Icon name="info" size={16} /><span>Esta venta ya se había emitido: es la misma, no se emitió otra.</span></div>
           )}
-          {fase.r.venta.envio_pendiente && (
+          {fase.r.venta.envio_pendiente && (fase.r.venta.estado_dgii === 'ENVIADO' || fase.r.venta.estado_dgii === 'EN_PROCESO' ? (
+            // E31: la DGII lo recibió y da el veredicto después (normal en crédito fiscal).
+            <div className="pos-info" style={{ margin: 0 }}>
+              <Icon name="info" size={16} />
+              <span>La DGII recibió la factura y la está validando. El resultado se confirma solo.</span>
+            </div>
+          ) : (
             <div className="pos-aviso" style={{ margin: 0 }}>
               <Icon name="clock" size={16} />
               <span>La DGII no respondió a tiempo. La venta quedó registrada y se reenviará sola.</span>
             </div>
-          )}
+          ))}
           {fase.impresion === 'error' && (
             <div className="pos-error" style={{ margin: 0 }}><Icon name="printer" size={16} /><span>No se pudo imprimir el recibo. Revisa la impresora y reimprime.</span></div>
           )}
@@ -288,8 +323,14 @@ export function CobroModal({
           <b>No se cobró</b>
           <p className="pos-sub" style={{ margin: 0 }}>{fase.mensaje}</p>
           <div className="pos-modal-pie" style={{ width: '100%' }}>
-            <Btn className="pos-boton-grande" onClick={onCerrar}>Volver a la venta</Btn>
-            <Btn variant="primary" className="pos-boton-grande" onClick={() => setFase({ tipo: 'eligiendo' })}>Intentar de nuevo</Btn>
+            {fase.soloVolver ? (
+              <Btn variant="primary" className="pos-boton-grande" onClick={onCerrar}>Volver a la venta</Btn>
+            ) : (
+              <>
+                <Btn className="pos-boton-grande" onClick={onCerrar}>Volver a la venta</Btn>
+                <Btn variant="primary" className="pos-boton-grande" onClick={() => setFase({ tipo: 'eligiendo' })}>Intentar de nuevo</Btn>
+              </>
+            )}
           </div>
         </div>
       )}

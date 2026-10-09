@@ -234,7 +234,8 @@ export function SupervisorPinModal({ equipo, sesion, turno, onAutorizado, onCerr
 
 const ESTADO_DGII: Record<string, string> = {
   RFCE_ACEPTADO: 'Aceptada', ACEPTADO: 'Aceptada', RFCE_ACEPTADO_CONDICIONAL: 'Aceptada', ACEPTADO_CONDICIONAL: 'Aceptada',
-  RFCE_PENDIENTE: 'Sin confirmar DGII', RFCE_RECHAZADO: 'Rechazada', RECHAZADO: 'Rechazada',
+  RFCE_PENDIENTE: 'Sin confirmar DGII', ENVIO_PENDIENTE: 'Sin confirmar DGII', ENVIADO: 'DGII validando', EN_PROCESO: 'DGII validando',
+  RFCE_RECHAZADO: 'Rechazada', RECHAZADO: 'Rechazada',
 }
 
 export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar, onCerrarTurno, onAbrirTurno, onCerrar, errorDeSesion }: {
