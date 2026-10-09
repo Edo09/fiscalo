@@ -70,6 +70,8 @@ export interface Producto {
   /** Código DGII de unidad de medida (id del catálogo; 43 = Unidad). */
   unidadMedida: number
   estado: string
+  /** Foto: ruta relativa al API (public/uploads/productos/...); null = sin foto. */
+  imagen?: string | null
 }
 
 export interface Factura {

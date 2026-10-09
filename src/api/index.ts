@@ -48,7 +48,7 @@ export {
   getConducePdf,
   previewConduce,
 } from './conduces'
-export { listProducts, getProduct, createProduct, updateProduct, deleteProduct } from './products'
+export { listProducts, getProduct, createProduct, updateProduct, deleteProduct, subirFotoProducto, quitarFotoProducto } from './products'
 export { listProveedores, getProveedor, createProveedor, updateProveedor, deleteProveedor } from './proveedores'
 export { consultarRnc } from './rnc'
 export type { ConsultaRnc } from './rnc'

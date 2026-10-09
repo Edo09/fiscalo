@@ -128,6 +128,7 @@ export function mapProductRow(r: ProductRow): Producto {
     min,
     itbis,
     unidadMedida: Number(r.unidad_medida ?? 43) || 43,
+    imagen: r.imagen_path || null,
     estado,
   }
 }

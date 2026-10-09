@@ -1,11 +1,17 @@
 // FISCALO — Alta/edición/eliminación de un producto (CRUD contra /api/products).
-import { useEffect, useMemo, useState } from 'react'
+// La foto (una por producto) se elige y se ve al instante, ya reducida, pero se
+// sube al Guardar, después del producto: Cancelar no deja nada a medias.
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Switch, Seg, Icon } from '@/components/ui'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import { admiteDecimales, unidadValida, useUnidadesMedida } from '@/components/unidadesMedida'
-import { ApiError, createProduct, updateProduct, deleteProduct, listCategories, listWarehouses } from '@/api'
+import {
+  ApiError, createProduct, updateProduct, deleteProduct, listCategories, listWarehouses, subirFotoProducto, quitarFotoProducto,
+} from '@/api'
+import { API_BASE_URL } from '@/api/config'
+import { reducirFoto, TIPOS_FOTO, urlFoto } from '@/lib/fotoProducto'
 import type { UnidadMedida } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { redondear } from '@/features/invoices/montosLinea'
@@ -57,6 +63,12 @@ function problemaExistencia(
   return null
 }
 
+/** Foto en el formulario: la que ya tiene, una nueva sin subir todavía, o ninguna. */
+type Foto =
+  | { tipo: 'guardada'; ruta: string }
+  | { tipo: 'nueva'; blob: Blob; vista: string }
+  | { tipo: 'ninguna' }
+
 /** Valores con los que abrir el alta (p. ej. la línea de factura que se convierte). */
 export interface ProductoInicial {
   nombre?: string
@@ -104,6 +116,30 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
   const [stock, setStock] = useState(product?.stock != null ? String(product.stock) : '')
   const [stockMin, setStockMin] = useState(product?.min != null ? String(product.min) : '')
   const [activo, setActivo] = useState(product ? product.estado !== 'Inactivo' : true)
+  const [foto, setFoto] = useState<Foto>(product?.imagen ? { tipo: 'guardada', ruta: product.imagen } : { tipo: 'ninguna' })
+  const [preparandoFoto, setPreparandoFoto] = useState(false)
+  const [errorFoto, setErrorFoto] = useState<string | null>(null)
+  const [fotoRota, setFotoRota] = useState(false)
+  const elegirFotoRef = useRef<HTMLInputElement>(null)
+  // La vista previa de una foto nueva es un blob: se libera al cambiarla o al cerrar.
+  const vistaNueva = foto.tipo === 'nueva' ? foto.vista : null
+  useEffect(() => () => { if (vistaNueva) URL.revokeObjectURL(vistaNueva) }, [vistaNueva])
+  const srcFoto = foto.tipo === 'nueva' ? foto.vista : foto.tipo === 'guardada' ? urlFoto(API_BASE_URL, foto.ruta) : null
+
+  const elegirFoto = async (archivo: File | undefined) => {
+    if (!archivo) return
+    setErrorFoto(null)
+    setPreparandoFoto(true)
+    try {
+      const blob = await reducirFoto(archivo)
+      setFotoRota(false)
+      setFoto({ tipo: 'nueva', blob, vista: URL.createObjectURL(blob) })
+    } catch (e) {
+      setErrorFoto(e instanceof Error ? e.message : 'No se pudo usar esa foto.')
+    } finally {
+      setPreparandoFoto(false)
+    }
+  }
 
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -169,10 +205,13 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
     }
     try {
       let creado: Producto | null = null
+      let id: string
       if (editing && product) {
         await updateProduct({ id: product.id, ...payload })
+        id = product.id
       } else {
         const res = await createProduct(payload)
+        id = String(res.id)
         // Se arma con lo que se acaba de enviar en vez de recargar el catálogo:
         // el id es lo único que faltaba y ya viene en la respuesta.
         creado = {
@@ -190,11 +229,30 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
           itbis: gravado ? 18 : 0,
           unidadMedida,
           estado: activo ? 'Activo' : 'Inactivo',
+          imagen: null,
         }
+      }
+      // La foto va después: el producto ya quedó guardado aunque ella falle, y
+      // entonces se avisa sin dejar el formulario abierto (un segundo Guardar
+      // del alta crearía el producto dos veces).
+      let errorAlSubir: string | null = null
+      try {
+        if (foto.tipo === 'nueva') {
+          const r = await subirFotoProducto(id, foto.blob)
+          if (creado) creado = { ...creado, imagen: r.imagen_path }
+        } else if (foto.tipo === 'ninguna' && product?.imagen) {
+          await quitarFotoProducto(id)
+        }
+      } catch (e) {
+        errorAlSubir = e instanceof ApiError ? e.message : 'No se pudo guardar la foto.'
       }
       // Invalida la caché de productos en TODAS las vistas (lista y picker de factura).
       void queryClient.invalidateQueries({ queryKey: ['products'] })
-      toast.success(editing ? `Producto "${payload.nombre}" actualizado.` : `Producto "${payload.nombre}" creado.`)
+      if (errorAlSubir) {
+        toast.error(`El producto "${payload.nombre}" se guardó, pero la foto no: ${errorAlSubir}`)
+      } else {
+        toast.success(editing ? `Producto "${payload.nombre}" actualizado.` : `Producto "${payload.nombre}" creado.`)
+      }
       onSaved(creado)
       onClose()
     } catch (e) {
@@ -240,7 +298,7 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
             <Btn variant="ghost" icon="trash-2" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>Eliminar</Btn>
           ))}
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-          <Btn variant="primary" icon="save" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
+          <Btn variant="primary" icon="save" onClick={save} disabled={saving || preparandoFoto}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
         </>
       }
     >
@@ -254,6 +312,37 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
         <div className="field full">
           <label className="label">Nombre <span className="req">*</span></label>
           <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto o servicio" autoFocus maxLength={MAX_NOMBRE} />
+        </div>
+        <div className="field full">
+          <label className="label">Foto <span className="opt">(opcional)</span></label>
+          <div className="foto-producto">
+            <div className="foto-producto-vista">
+              {preparandoFoto ? <Icon name="loader" className="spin" size={22} />
+                : srcFoto && !fotoRota ? <img src={srcFoto} alt="" onError={() => setFotoRota(true)} />
+                : <Icon name={fotoRota ? 'alert-triangle' : 'package'} size={26} />}
+            </div>
+            <div className="foto-producto-acciones">
+              <div className="row gap-sm">
+                <Btn size="sm" icon="upload" onClick={() => elegirFotoRef.current?.click()} disabled={preparandoFoto || saving}>
+                  {foto.tipo === 'ninguna' ? 'Elegir foto' : 'Cambiar foto'}
+                </Btn>
+                {foto.tipo !== 'ninguna' && (
+                  <Btn size="sm" variant="ghost" icon="trash-2" style={{ color: 'var(--danger)' }} disabled={preparandoFoto || saving}
+                    onClick={() => { setErrorFoto(null); setFotoRota(false); setFoto({ tipo: 'ninguna' }) }}>Quitar</Btn>
+                )}
+              </div>
+              <span className="text-sm muted">
+                {errorFoto
+                  ? <span style={{ color: 'var(--danger)' }}>{errorFoto}</span>
+                  : fotoRota ? 'No se pudo cargar la foto guardada. Puedes cambiarla o quitarla.'
+                  : foto.tipo === 'nueva' ? 'Se sube al guardar.'
+                  : foto.tipo === 'ninguna' && product?.imagen ? 'Se quita al guardar.'
+                  : 'JPG, PNG o WebP. Se ve en el POS y en la lista de productos.'}
+              </span>
+            </div>
+            <input ref={elegirFotoRef} type="file" accept={TIPOS_FOTO.join(',')} hidden
+              onChange={(e) => { void elegirFoto(e.target.files?.[0]); e.target.value = '' }} />
+          </div>
         </div>
         <div className="field">
           <label className="label">SKU <span className="opt">(opcional)</span></label>

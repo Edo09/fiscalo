@@ -572,6 +572,8 @@ export interface ProductRow {
    */
   stock?: number | string | null
   stock_minimo?: number | string | null
+  /** Foto (migración 032): ruta relativa al API; null = sin foto. */
+  imagen_path?: string | null
   activo?: number | boolean | null
 }
 

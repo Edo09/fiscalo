@@ -25,6 +25,27 @@ export function updateProduct(input: CreateProductInput & { id: number | string 
   })
 }
 
+/**
+ * Sube (o cambia) la foto del producto: el JPEG ya reducido de reducirFoto.
+ * Responde la ruta nueva; la anterior la borra el servidor.
+ */
+export function subirFotoProducto(id: number | string, foto: Blob): Promise<{ id: number; imagen_path: string }> {
+  const form = new FormData()
+  form.append('id', String(id))
+  form.append('imagen', foto, 'foto.jpg')
+  // Sin Content-Type explícito: el navegador pone el boundary del multipart.
+  return request('/api/products/imagen', { method: 'POST', body: form })
+}
+
+/** Quita la foto del producto (y el servidor borra el archivo). */
+export function quitarFotoProducto(id: number | string): Promise<unknown> {
+  return request('/api/products/imagen', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+}
+
 export function deleteProduct(id: number | string): Promise<unknown> {
   return request('/api/products', {
     method: 'DELETE',

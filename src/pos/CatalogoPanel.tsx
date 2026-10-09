@@ -1,12 +1,15 @@
 // Catálogo táctil de la caja (api-gratex docs/specs/pos.md C3 y C4): buscador,
-// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad;
-// el − junto al contador quita una (con 1, saca el producto de la venta).
+// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad y
+// el contador de arriba a la derecha dice cuántas lleva la venta; restar o quitar
+// se hace en el panel de la venta (la tarjeta queda libre para la foto).
 // La búsqueda es en memoria y, mientras hay texto, busca en todas las categorías.
 // Vista (tarjetas, compacta, lista), orden y cuántos se pintan son preferencia
 // del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { colorFor, fmtCantidad } from '@/lib/format'
+import { API_BASE_URL } from '@/api/config'
+import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
 import {
@@ -28,13 +31,22 @@ interface Props {
   /** Cantidad de cada producto que ya está en el carrito. */
   enCarrito: Map<number, number>
   onAgregar: (p: ProductoPos) => void
-  /** Quita una unidad; con una sola, quita la línea (queda registrada, V4). */
-  onQuitarUno: (p: ProductoPos) => void
   /** Cobro sin confirmar: la venta no se puede cambiar hasta reintentarlo. */
   bloqueado?: boolean
 }
 
 const SIN_CATEGORIA = '#7a8699'
+
+/** La foto del producto o, sin foto (o si no carga), sus iniciales en el color de la categoría. */
+function Marca({ p, color }: { p: ProductoPos; color: string }) {
+  const [rota, setRota] = useState(false)
+  const src = urlFoto(API_BASE_URL, p.imagen)
+  return src && !rota ? (
+    <span className="pos-ini con-foto"><img src={src} alt="" loading="lazy" draggable={false} onError={() => setRota(true)} /></span>
+  ) : (
+    <span className="pos-ini" style={{ background: color }}>{iniciales(p.nombre)}</span>
+  )
+}
 
 /** Productos visibles con la búsqueda y la categoría (la búsqueda manda). */
 function filtrar(catalogo: CatalogoPos | null, busqueda: string, categoria: number | null): ProductoPos[] {
@@ -55,7 +67,7 @@ function Existencia({ p }: { p: ProductoPos }) {
 
 export function CatalogoPanel({
   catalogo, error, onReintentar, busqueda, onBusqueda, categoria, onCategoria, buscadorRef, enCarrito, onAgregar,
-  onQuitarUno, bloqueado = false,
+  bloqueado = false,
 }: Props) {
   const colores = useMemo(() => {
     const m = new Map<number, string>()
@@ -205,16 +217,14 @@ export function CatalogoPanel({
           visibles.map((p) => {
             const cant = enCarrito.get(p.id) ?? 0
             const agotado = p.stock !== null && p.stock <= 0
-            // El − va fuera de la tarjeta (un botón no puede ir dentro de otro) y se
-            // monta encima, a la izquierda del contador.
+            // El contador va encima de la tarjeta, arriba a la derecha: el mismo
+            // lugar en las tres vistas (en la lista, la tarjeta le guarda el hueco).
             return (
               <div key={p.id} className="pos-producto-celda">
                 <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
                   onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
                   <span className="pos-producto-top">
-                    <span className="pos-ini" style={{ background: p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA }}>
-                      {iniciales(p.nombre)}
-                    </span>
+                    <Marca key={p.imagen ?? ''} p={p} color={p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA} />
                   </span>
                   <span className="pos-producto-nombre">{p.nombre}</span>
                   {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
@@ -224,13 +234,7 @@ export function CatalogoPanel({
                   </span>
                 </button>
                 {cant > 0 && (
-                  <span className="pos-producto-marcas">
-                    <button type="button" className="pos-producto-menos" onClick={() => onQuitarUno(p)} disabled={bloqueado}
-                      aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
-                      <Icon name="minus" size={18} />
-                    </button>
-                    <span className="pos-producto-cant">×{fmtCantidad(cant)}</span>
-                  </span>
+                  <span className="pos-producto-marcas"><span className="pos-producto-cant">×{fmtCantidad(cant)}</span></span>
                 )}
               </div>
             )

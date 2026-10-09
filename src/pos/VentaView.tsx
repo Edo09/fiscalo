@@ -231,15 +231,6 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
   }, [equipo.token, sesion.token, cliente])
 
-  // − de la tarjeta del catálogo: una unidad menos; con una sola (o menos, si es
-  // fraccionaria), sale de la venta igual que con la papelera del carrito.
-  const quitarUno = useCallback((p: { id: number }) => {
-    const l = lineas.find((x) => x.productoId === p.id)
-    if (!l || cobroEnDuda) return
-    if (l.cantidad > 1) cambiarCantidad(l.productoId, Math.round((l.cantidad - 1) * 100) / 100)
-    else { registrarEvento('quitada', [l]); quitar(l.productoId) }
-  }, [lineas, cobroEnDuda, cambiarCantidad, registrarEvento, quitar])
-
   const abrirCobro = useCallback((forma: FormaPago) => {
     if (cobroEnDuda) { setModal({ tipo: 'cobro', forma: cobroEnDuda.forma_pago }); return }
     if (lineas.length === 0 || !estado || turnoAjeno) return
@@ -333,7 +324,6 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           buscadorRef={buscadorRef}
           enCarrito={enCarrito}
           onAgregar={agregar}
-          onQuitarUno={quitarUno}
           bloqueado={cobroEnDuda !== null}
         />
         <CarritoPanel

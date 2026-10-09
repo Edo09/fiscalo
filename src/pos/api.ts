@@ -155,6 +155,8 @@ export interface ProductoPos {
   unidad_medida: string
   /** ¿La cantidad admite decimales (kilo, libra, metro)? */
   decimales: boolean
+  /** Foto: ruta relativa al API; null = se pintan las iniciales. */
+  imagen?: string | null
 }
 
 export interface CategoriaPos {

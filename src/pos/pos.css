@@ -231,24 +231,19 @@
   width: 38px; height: 38px; border-radius: var(--r-md);
   display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
 }
+.pos-ini.con-foto { background: var(--surface-2); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+.pos-ini.con-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pos-producto-cant {
   min-width: 34px; height: 26px; padding: 0 8px; border-radius: var(--r-full);
   background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 13px;
   display: grid; place-items: center;
 }
-/* Arriba a la derecha, a la altura de las iniciales. El contador deja pasar el
-   toque a la tarjeta (agrega); solo el − lo atrapa. */
+/* Contador: arriba a la derecha, a la altura de la foto (padding 12 + borde 1 de
+   la tarjeta). Deja pasar el toque a la tarjeta (agrega). */
 .pos-producto-marcas {
-  position: absolute; top: 12px; right: 12px; height: 38px;
-  display: flex; align-items: center; gap: 6px; pointer-events: none;
+  position: absolute; top: 13px; right: 13px; height: 38px;
+  display: flex; align-items: center; pointer-events: none;
 }
-.pos-producto-menos {
-  pointer-events: auto; width: 38px; height: 38px; border-radius: var(--r-full);
-  display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
-  background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent);
-}
-.pos-producto-menos:active { background: var(--accent-soft); transform: scale(0.94); }
-.pos-producto-menos:disabled { opacity: 0.45; cursor: default; }
 
 /* Vista compacta: más productos por pantalla; sin código. */
 .pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
@@ -260,15 +255,14 @@
 .vista-compacta .pos-producto-pie { padding-top: 4px; }
 .vista-compacta .pos-producto-precio { font-size: 15px; }
 .vista-compacta .pos-exist { font-size: 11px; }
-.vista-compacta .pos-producto-marcas { top: 9px; right: 9px; height: 30px; gap: 4px; }
-.vista-compacta .pos-producto-menos { width: 32px; height: 32px; }
+.vista-compacta .pos-producto-marcas { top: 10px; right: 10px; height: 30px; }
 .vista-compacta .pos-producto-cant { height: 24px; min-width: 30px; padding: 0 6px; font-size: 12px; }
 
 /* Vista lista: una fila por producto; la columna de la derecha queda para el − y el contador. */
 .pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .vista-lista .pos-producto {
   display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
-  align-items: center; column-gap: 12px; row-gap: 0; min-height: 60px; padding: 8px 104px 8px 12px;
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 60px; padding: 8px 72px 8px 12px;
 }
 .vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
 .vista-lista .pos-ini { width: 34px; height: 34px; font-size: 12px; }
@@ -276,8 +270,7 @@
 .vista-lista .pos-producto-sku { grid-area: sku; }
 .vista-lista .pos-producto-pie { grid-area: pie; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; padding: 0; flex-wrap: nowrap; }
 .vista-lista .pos-producto-precio { font-size: 17px; }
-.vista-lista .pos-producto-marcas { top: 50%; right: 12px; transform: translateY(-50%); height: 36px; }
-.vista-lista .pos-producto-menos { width: 36px; height: 36px; }
+.vista-lista .pos-producto-marcas { top: 50%; right: 13px; transform: translateY(-50%); height: 36px; }
 .vista-lista .pos-producto:active { transform: scale(0.99); }
 .pos-producto-nombre {
   font-weight: 600; font-size: 14.5px; line-height: 1.25;
