@@ -77,6 +77,8 @@ export interface FacturaRow {
   codigo_seguridad?: string | null
   fecha_emision_dgii?: string | null
   secuencia_utilizada?: boolean | null
+  /** 1=Contado 2=Crédito 3=Gratuito (TipoPago DGII). El plazo del e-CF va en su XML (FechaLimitePago). */
+  tipo_pago?: number | string | null
   // Presentes en el listado (GET /api/facturas): resumen plano de la factura.
   company_name?: string | null
   description?: string | null

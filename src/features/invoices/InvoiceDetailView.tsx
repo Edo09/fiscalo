@@ -99,6 +99,43 @@ function lineasImpresas(items: FacturaItemRow[], xml: string | null | undefined)
   })
 }
 
+/** Texto de un nodo simple del e-CF firmado ('' si no está). */
+function campoXml(xml: string | null | undefined, tag: string): string {
+  const m = xml ? new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`).exec(xml) : null
+  return m ? m[1] : ''
+}
+
+/** Días entre dos fechas dd-mm-aaaa del e-CF (null si alguna no es válida). */
+function diasEntre(desde: string, hasta: string): number | null {
+  const utc = (s: string) => {
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s)
+    return m ? Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null
+  }
+  const a = utc(desde)
+  const b = utc(hasta)
+  return a == null || b == null ? null : Math.round((b - a) / 86_400_000)
+}
+
+/** TipoPago DGII. */
+const TIPO_PAGO: Record<string, string> = { '1': 'Contado', '2': 'Crédito', '3': 'Gratuito' }
+
+/**
+ * Condición de pago tal como se firmó: TipoPago y, a crédito, el plazo
+ * (FechaLimitePago − FechaEmision) y el vencimiento. Sin XML, el tipo_pago
+ * guardado. null si no hay ninguno de los dos.
+ */
+function condicionPago(xml: string | null | undefined, tipoPagoFila: unknown): { titulo: string; vence: string | null } | null {
+  const tipo = campoXml(xml, 'TipoPago') || (tipoPagoFila != null ? String(tipoPagoFila) : '')
+  if (!tipo) return null
+  if (tipo !== '2') return { titulo: TIPO_PAGO[tipo] ?? '—', vence: null }
+  const limite = campoXml(xml, 'FechaLimitePago')
+  const dias = diasEntre(campoXml(xml, 'FechaEmision'), limite)
+  return {
+    titulo: dias != null && dias > 0 ? `Crédito a ${dias} días` : 'Crédito',
+    vence: limite ? formatApiDate(limite) : null,
+  }
+}
+
 /**
  * IndicadorMontoGravado = 1 en el e-CF firmado: los precios y el MontoItem de
  * cada línea traen el ITBIS adentro. Mismo criterio que
@@ -233,6 +270,12 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const subtotalGravado = aNumero(det?.monto_gravado ?? f.subtotal ?? 0)
   const montoExento = aNumero(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
+  // Condición de pago: la del e-CF firmado. El método elegido al emitir
+  // (Transferencia, Tarjeta…) no se guarda; solo llega justo después de emitir,
+  // y de contado se muestra ese si vino.
+  const condicion = condicionPago(det?.xml_firmado, det?.tipo_pago)
+  const metodoContado = f.metodo && f.metodo !== '—' && !f.metodo.startsWith('Crédito') ? f.metodo : null
+  const tituloCondicion = condicion?.titulo === 'Contado' ? (metodoContado ?? 'Contado') : (condicion?.titulo ?? f.metodo)
   // Notas que modifican este comprobante y, si es una nota, lo que modifica. Del
   // detalle cuando llega; mientras, de la fila del listado (sale al instante).
   const vinculos = det ? mapFacturaRow(det) : f
@@ -431,7 +474,8 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           </div>
           <div>
             <span className="fx-eyebrow">Condiciones</span>
-            <div className="fx-parte-nombre" style={{ fontSize: 13.5 }}>{f.metodo}</div>
+            <div className="fx-parte-nombre" style={{ fontSize: 13.5 }}>{tituloCondicion}</div>
+            {condicion?.vence && <div className="fx-parte-linea">Vence el {condicion.vence}</div>}
             <div className="fx-parte-linea">Moneda: peso dominicano (DOP)</div>
           </div>
         </section>
