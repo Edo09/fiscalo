@@ -17,16 +17,20 @@
 // - Crédito fiscal (F2 de la spec): el cajero escribe el RNC o la cédula y la
 //   venta pasa a E31 a nombre de ese cliente, con su descuento (V5).
 // - Teclado: F1 buscador; F9 / F2 / F3 cobrar en efectivo / tarjeta /
-//   transferencia; F4 crédito fiscal; Esc limpia la búsqueda o ofrece cancelar
-//   la venta.
+//   transferencia; F4 crédito fiscal; F5 actualizar; F7 siguiente venta; F8
+//   venta nueva; Esc limpia la búsqueda o ofrece cancelar la venta.
+// - Ventas en espera: hasta 5 ventas abiertas por empleado, en pestañas bajo
+//   la barra (VentasTabs), guardadas en el equipo. Cobrar o cancelar la activa
+//   cierra su pestaña si hay otras; cerrar una con productos es cancelarla (V4).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { posApi, PosApiError, type EstadoPos, type FormaPago, type Reenvio, type TurnoCaja } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
-import { useCarritoStore, type LineaCarrito } from './carrito'
+import { nombreVenta, useCarritoStore, type LineaCarrito, type VentaAbierta } from './carrito'
 import { CatalogoPanel } from './CatalogoPanel'
 import { CarritoPanel } from './CarritoPanel'
+import { VentasTabs } from './VentasTabs'
 import { CantidadModal, ConfirmarModal } from './PosModales'
 import { CobroModal } from './CobroModal'
 import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } from './CajaModales'
@@ -54,6 +58,8 @@ interface Props {
 type Modal =
   | { tipo: 'cantidad'; linea: LineaCarrito }
   | { tipo: 'cancelar' }
+  /** Cerrar la pestaña de una venta con productos: es cancelarla. */
+  | { tipo: 'cerrarVenta'; venta: VentaAbierta }
   | { tipo: 'cobro'; forma: FormaPago }
   | { tipo: 'apertura' }
   | { tipo: 'impresora' }
@@ -88,7 +94,11 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
 
   const tema = useTemaPos((s) => s.tema)
   const alternarTema = useTemaPos((s) => s.alternar)
-  const { lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, vaciar, ponerCliente, guardarCatalogo } = useCarritoStore()
+  const {
+    lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, ponerCliente, guardarCatalogo,
+    ventas, activaId, nuevaVenta, cambiarA, cerrarVenta, terminarActiva,
+  } = useCarritoStore()
+  const ventaActiva = ventas.find((v) => v.id === activaId) ?? ventas[0]
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState<number | null>(null)
@@ -239,11 +249,14 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       : null
 
   // Cierre (K4, K6): el propio, o el de otro (supervisor en sesión, o con su PIN).
-  // El propio no con una venta a medias; ninguno con un cobro sin confirmar.
-  const motivoNoCerrar = cobroEnDuda
+  // El propio no con ventas a medias (también las en espera); ninguno con un
+  // cobro sin confirmar en cualquiera de las ventas abiertas.
+  const motivoNoCerrar = ventas.some((v) => v.cobroEnDuda)
     ? 'Hay un cobro sin confirmar: reinténtalo antes de cerrar el turno.'
-    : turnoPropio && lineas.length > 0
-      ? 'Hay una venta en curso: cóbrala o cancélala antes de cerrar el turno.'
+    : turnoPropio && ventas.some((v) => v.lineas.length > 0)
+      ? (ventas.length > 1
+        ? 'Hay ventas abiertas con productos: cóbralas o cancélalas antes de cerrar el turno.'
+        : 'Hay una venta en curso: cóbrala o cancélala antes de cerrar el turno.')
       : null
   const iniciarCierre = useCallback(() => {
     if (!turno || motivoNoCerrar) return
@@ -253,9 +266,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
 
   // V4: lo que sale del carrito sin cobrarse queda registrado para el cierre
   // (con el descuento del cliente, si lo hay: lo que se habría cobrado).
-  const registrarEvento = useCallback((tipo: 'cancelada' | 'quitada', ls: LineaCarrito[]) => {
+  const registrarEvento = useCallback((tipo: 'cancelada' | 'quitada', ls: LineaCarrito[], descuento = cliente?.descuento ?? 0) => {
     if (ls.length === 0) return
-    const monto = totalesCarrito(ls, cliente?.descuento ?? 0).total
+    const monto = totalesCarrito(ls, descuento).total
     posApi.evento(equipo.token, sesion.token, tipo, monto, ls.map((l) => ({ product_id: l.productoId, nombre: l.nombre, cantidad: l.cantidad })))
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
   }, [equipo.token, sesion.token, cliente])
@@ -283,6 +296,25 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     setModal({ tipo: 'cobro', forma })
   }, [cobroEnDuda, lineas.length, estado, turnoAjeno, turnoPropio])
 
+  // --- Ventas en espera (pestañas) -------------------------------------------
+  // Cerrar una pestaña con productos es cancelar esa venta: se confirma y queda
+  // registrada como cualquier cancelación (V4), con el descuento de SU cliente.
+  const pedirCerrarVenta = useCallback((v: VentaAbierta) => {
+    if (v.cobroEnDuda) return
+    if (v.lineas.length > 0) setModal({ tipo: 'cerrarVenta', venta: v })
+    else cerrarVenta(v.id)
+  }, [cerrarVenta])
+  const abrirNuevaVenta = useCallback(() => {
+    if (!nuevaVenta()) return
+    setBusqueda('')
+    buscadorRef.current?.focus()
+  }, [nuevaVenta])
+  const siguienteVenta = useCallback(() => {
+    if (ventas.length < 2) return
+    const i = ventas.findIndex((v) => v.id === activaId)
+    cambiarA(ventas[(i + 1) % ventas.length].id)
+  }, [ventas, activaId, cambiarA])
+
   // Atajos (V6). Con un diálogo abierto, manda el diálogo.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -305,13 +337,20 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       } else if (e.key === 'F4') {
         e.preventDefault()
         if (!cobroEnDuda) setModal({ tipo: 'cliente' })
+      } else if (e.key === 'F8') {
+        // F8 y no F6: Chrome puede quedarse con F6 para ir a la barra de direcciones.
+        e.preventDefault()
+        abrirNuevaVenta()
+      } else if (e.key === 'F7') {
+        e.preventDefault()
+        siguienteVenta()
       } else if (e.key === 'Escape') {
         if (busqueda !== '') { e.preventDefault(); setBusqueda('') } else if (lineas.length > 0 && !cobroEnDuda) { e.preventDefault(); setModal({ tipo: 'cancelar' }) }
       }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [modal, busqueda, lineas.length, cobroEnDuda, abrirCobro, recargar])
+  }, [modal, busqueda, lineas.length, cobroEnDuda, abrirCobro, recargar, abrirNuevaVenta, siguienteVenta])
 
   const enCarrito = useMemo(() => new Map(lineas.map((l) => [l.productoId, l.cantidad])), [lineas])
   const empresa = estado?.empresa.nombre ?? equipo.empresa ?? ''
@@ -368,6 +407,16 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         </div>
       )}
 
+      {/* Ventas abiertas a todo el ancho: en la columna del carrito no caben las cinco. */}
+      <VentasTabs
+        ventas={ventas}
+        activaId={activaId}
+        onCambiar={cambiarA}
+        onNueva={abrirNuevaVenta}
+        onCerrar={pedirCerrarVenta}
+        bloqueadas={modal !== null}
+      />
+
       <main className="pos-venta">
         <CatalogoPanel
           catalogo={catalogo}
@@ -403,6 +452,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           onCancelar={() => setModal({ tipo: 'cancelar' })}
           onCliente={() => setModal({ tipo: 'cliente' })}
           onQuitarCliente={() => ponerCliente(null)}
+          titulo={`Venta ${ventaActiva.numero}`}
         />
       </main>
 
@@ -419,7 +469,21 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           texto={`Se ${lineas.length === 1 ? 'quita el producto' : `quitan los ${lineas.length} productos`} del carrito. No se emite nada.`}
           confirmar="Sí, cancelar venta"
           onCerrar={() => setModal(null)}
-          onConfirmar={() => { registrarEvento('cancelada', lineas); vaciar(); setModal(null); setBusqueda('') }}
+          onConfirmar={() => { registrarEvento('cancelada', lineas); terminarActiva(); setModal(null); setBusqueda('') }}
+        />
+      )}
+      {modal?.tipo === 'cerrarVenta' && (
+        <ConfirmarModal
+          titulo={`¿Cerrar ${nombreVenta(modal.venta)}?`}
+          texto={`Tiene ${modal.venta.lineas.length === 1 ? 'un producto' : `${modal.venta.lineas.length} productos`}: se cancela esa venta. No se emite nada.`}
+          confirmar="Sí, cerrar y cancelar"
+          onCerrar={() => setModal(null)}
+          onConfirmar={() => {
+            // Con el descuento de SU cliente: puede no ser la venta activa.
+            registrarEvento('cancelada', modal.venta.lineas, modal.venta.cliente?.descuento ?? 0)
+            cerrarVenta(modal.venta.id)
+            setModal(null)
+          }}
         />
       )}
       {modal?.tipo === 'cobro' && (
@@ -429,7 +493,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           formaInicial={modal.forma}
           onCerrar={() => setModal(null)}
           onNuevaVenta={() => {
-            vaciar()
+            // Cobrada: si hay otras ventas abiertas se cierra su pestaña y se
+            // sigue con la anterior; si era la única, queda vacía.
+            terminarActiva()
             setModal(null)
             setBusqueda('')
             void cargarCatalogo()

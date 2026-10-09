@@ -28,6 +28,8 @@ interface Props {
   onCancelar: () => void
   onCliente: () => void
   onQuitarCliente: () => void
+  /** Nombre de la venta activa en la cabecera ("Venta 2"). */
+  titulo?: string
 }
 
 /** Existencia de la línea (V3): se vende igual, pero se avisa. */
@@ -40,7 +42,7 @@ function avisoExistencia(l: LineaCarrito): string | null {
 
 export function CarritoPanel({
   lineas, cliente, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, onQuitar, onCancelar,
-  onCliente, onQuitarCliente,
+  onCliente, onQuitarCliente, titulo = 'Venta',
 }: Props) {
   const t = totalesCarrito(lineas, cliente?.descuento ?? 0)
   const unidades = lineas.reduce((s, l) => s + l.cantidad, 0)
@@ -49,7 +51,7 @@ export function CarritoPanel({
     <aside className="pos-carrito" aria-label="Venta en curso">
       <div className="pos-carrito-cab">
         <div>
-          <b>Venta</b>
+          <b>{titulo}</b>
           <small>{lineas.length === 0 ? 'Sin artículos' : `${lineas.length} ${lineas.length === 1 ? 'producto' : 'productos'} · ${fmtCantidad(unidades)} ${unidades === 1 ? 'unidad' : 'unidades'}`}</small>
         </div>
         <Btn variant="ghost" icon="x-circle" onClick={onCancelar} disabled={lineas.length === 0 || enDuda}
