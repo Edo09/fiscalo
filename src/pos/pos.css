@@ -1,6 +1,61 @@
 /* FISCALO — POS (pos.fiscalpoint.com.do). Pantalla tactil primero: zonas
    tocables de 56 px o mas, nada que dependa del hover. Usa los tokens de
-   styles.css (claro/oscuro) y no redefine colores. */
+   styles.css; el unico tema propio es el gris oscuro de abajo. */
+
+/* ---- Tema gris oscuro (tema.ts) --------------------------------------------
+   El modo oscuro del POS se monta sobre el del sistema (data-theme="dark") con
+   una paleta mas clara: gris frio en vez de casi negro, el mismo azul de acento
+   y los mismos semanticos, aclarados lo justo para leer bien sobre gris (texto
+   secundario y estados con contraste de 4.5:1 o mas). Solo en el POS: app.* no
+   carga este archivo. */
+[data-theme="dark"][data-pos-tema="gris"] {
+  --accent: #649cf3;
+  --accent-hover: #72a6f4;
+  --accent-active: #80aff5;
+  --accent-soft: #2e3b52;
+  --accent-soft-2: #34445f;
+  --accent-text: #a6c5f8;
+  --on-accent: #0d1626;
+
+  --bg: #24272d;
+  --surface: #2c3037;
+  --surface-2: #282b32;
+  --surface-hover: #343941;
+  --surface-active: #3b4049;
+  --sidebar-bg: #262a30;
+  --border: #3b4049;
+  --border-strong: #4b515c;
+  --ring: rgba(100, 156, 243, 0.45);
+
+  --text: #eceef2;
+  --text-2: #bcc2cb;
+  --text-3: #979eaa;
+  --text-inverse: #24272d;
+
+  --success: #43c089;
+  --success-soft: #26392f;
+  --warning: #e4aa45;
+  --warning-soft: #3c3424;
+  --danger: #f17d7d;
+  --danger-soft: #45292c;
+  --info: #649cf3;
+  --info-soft: #2e3b52;
+  --neutral-soft: #353a42;
+
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --sh-md: 0 4px 14px rgba(0, 0, 0, 0.32);
+  --sh-lg: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
+}
+/* Franjas rojas con texto blanco: el rojo claro del gris no da contraste con
+   blanco; ahi va un rojo mas profundo. */
+[data-pos-tema="gris"] :is(.pos-alerta, .pos-sin-red) { background: #b23b3b; }
+[data-pos-tema="gris"] .pos-overlay, [data-pos-tema="gris"] .pos-confirmar-capa { background: rgba(10, 12, 16, 0.55); }
+/* Al cambiar de tema los colores se funden en vez de saltar (lo pone tema.ts un instante). */
+.pos-tema-cambiando, .pos-tema-cambiando *, .pos-tema-cambiando *::before, .pos-tema-cambiando *::after {
+  transition: background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease, fill .3s ease, stroke .3s ease !important;
+}
 
 .pos-root {
   min-height: 100vh;
@@ -162,6 +217,20 @@
   background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .pos-vistas button.on { background: var(--accent); color: var(--on-accent); }
+/* Actualizar: trae catálogo y estado sin recargar la página (que pediría el PIN).
+   Mismo alto y borde que las demás herramientas. */
+.pos-recargar {
+  width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .12s, color .12s, border-color .12s;
+}
+.pos-recargar:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.pos-recargar:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pos-recargar:disabled { cursor: progress; }
+.pos-recargar.girando svg { animation: pos-girar .8s linear infinite; }
+.pos-recargar.listo { color: var(--success); border-color: var(--success); }
+@keyframes pos-girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pos-recargar.girando svg { animation: none; } }
 /* Selector de la caja (orden, cuántos): botón con rótulo y valor, y un menú de
    filas grandes. Mismo alto que el buscador y la botonera de vistas. */
 .pos-sel {
@@ -366,6 +435,52 @@
   gap: 8px; color: var(--text-3); text-align: center; padding: 24px;
 }
 .pos-lineas-vacio p { margin: 0; }
+
+/* Ventas abiertas (VentasTabs): franja a todo el ancho bajo la barra, una
+   pestaña por venta. En pantallas angostas la fila se desliza (sin barra de
+   desplazamiento: se arrastra con el dedo). Alto de 44 px: se tocan con el dedo. */
+.pos-ventas-tabs {
+  display: flex; align-items: flex-end; gap: 4px; flex-shrink: 0;
+  padding: 6px 12px 0; border-bottom: 1px solid var(--border); background: var(--surface-2);
+  overflow-x: auto; scrollbar-width: none;
+}
+.pos-ventas-tabs::-webkit-scrollbar { display: none; }
+.pos-venta-tab {
+  display: flex; align-items: center; flex-shrink: 0; min-width: 0; max-width: 240px;
+  border: 1px solid var(--border); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0;
+  background: var(--surface); margin-bottom: -1px;
+}
+.pos-venta-tab.on { border-color: var(--border-strong); box-shadow: inset 0 3px 0 var(--accent); }
+.pos-venta-tab-btn {
+  display: flex; align-items: center; gap: 6px; height: 44px; min-width: 0; padding: 0 10px;
+  border: 0; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab.on .pos-venta-tab-btn { color: var(--text); }
+.pos-venta-tab-btn svg { flex-shrink: 0; }
+.pos-venta-tab-btn:disabled { cursor: default; opacity: .55; }
+.pos-venta-tab-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-venta-tab-n {
+  flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+/* Cobro sin confirmar: se ve desde cualquier pestaña. */
+.pos-venta-tab.duda .pos-venta-tab-btn { color: var(--warning); }
+.pos-venta-tab-cerrar {
+  width: 32px; height: 44px; flex-shrink: 0; display: grid; place-items: center; padding: 0;
+  border: 0; background: transparent; color: var(--text-3); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab-cerrar:hover:not(:disabled) { color: var(--danger); }
+.pos-venta-tab-cerrar:disabled { cursor: default; opacity: .4; }
+.pos-venta-tab-nueva {
+  width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; padding: 0;
+  border: 1px dashed var(--border-strong); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0;
+  background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab-nueva:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.pos-venta-tab-nueva:disabled { cursor: not-allowed; opacity: .4; }
+.pos-ventas-tabs :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
 .pos-linea {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px;
   padding: 12px 16px; border-bottom: 1px solid var(--border);
@@ -404,7 +519,12 @@
 .pos-cliente-barra > div > small:first-child { text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-text); font-weight: 600; }
 .pos-cliente-barra b { font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-cliente-barra .btn { flex-shrink: 0; }
-.pos-total-fila.pos-total-desc { color: var(--success); }
+/* "RD$" delante de un precio: más chico y suave, el número manda. */
+.pos-moneda { font-size: .68em; font-weight: 600; color: var(--text-3); margin-right: 3px; letter-spacing: .01em; }
+.pos-cliente-barra .pos-cliente-ahorro { color: var(--success); font-weight: 600; }
+/* "Quitar" el cliente: en rojo, es deshacer el crédito fiscal de la venta. */
+.pos-cliente-barra .pos-cliente-quitar { color: var(--danger); }
+.pos-cliente-barra .pos-cliente-quitar:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
 .pos-cliente-ficha { display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--r-md); }
 .pos-cliente-ficha > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pos-cliente-ficha b { font-size: 17px; }

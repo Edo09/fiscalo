@@ -5,8 +5,10 @@ import { Icon, Btn, Money, EstadoBadge, Card, Spinner, PageHead } from '@/compon
 import '@/styles/factura-doc.css'
 import {
   ApiError, getBranding, getEstado, getFactura, getDocumentBase64, dgiiLabel, isRechazo, formatApiDate, mapFacturaRow,
+  reenviarFactura,
 } from '@/api'
-import type { DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
+import type { CreateFacturaResponse, DocKind, FacturaItemRow, FormatoImpresion } from '@/api'
+import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { presentDocument } from '@/lib/file'
 import { aNumero, fmtCantidad, fmtPrecio } from '@/lib/format'
 import { useAnchoTirilla } from '@/stores/impresora'
@@ -97,6 +99,43 @@ function lineasImpresas(items: FacturaItemRow[], xml: string | null | undefined)
   })
 }
 
+/** Texto de un nodo simple del e-CF firmado ('' si no está). */
+function campoXml(xml: string | null | undefined, tag: string): string {
+  const m = xml ? new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`).exec(xml) : null
+  return m ? m[1] : ''
+}
+
+/** Días entre dos fechas dd-mm-aaaa del e-CF (null si alguna no es válida). */
+function diasEntre(desde: string, hasta: string): number | null {
+  const utc = (s: string) => {
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s)
+    return m ? Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null
+  }
+  const a = utc(desde)
+  const b = utc(hasta)
+  return a == null || b == null ? null : Math.round((b - a) / 86_400_000)
+}
+
+/** TipoPago DGII. */
+const TIPO_PAGO: Record<string, string> = { '1': 'Contado', '2': 'Crédito', '3': 'Gratuito' }
+
+/**
+ * Condición de pago tal como se firmó: TipoPago y, a crédito, el plazo
+ * (FechaLimitePago − FechaEmision) y el vencimiento. Sin XML, el tipo_pago
+ * guardado. null si no hay ninguno de los dos.
+ */
+function condicionPago(xml: string | null | undefined, tipoPagoFila: unknown): { titulo: string; vence: string | null } | null {
+  const tipo = campoXml(xml, 'TipoPago') || (tipoPagoFila != null ? String(tipoPagoFila) : '')
+  if (!tipo) return null
+  if (tipo !== '2') return { titulo: TIPO_PAGO[tipo] ?? '—', vence: null }
+  const limite = campoXml(xml, 'FechaLimitePago')
+  const dias = diasEntre(campoXml(xml, 'FechaEmision'), limite)
+  return {
+    titulo: dias != null && dias > 0 ? `Crédito a ${dias} días` : 'Crédito',
+    vence: limite ? formatApiDate(limite) : null,
+  }
+}
+
 /**
  * IndicadorMontoGravado = 1 en el e-CF firmado: los precios y el MontoItem de
  * cada línea traen el ITBIS adentro. Mismo criterio que
@@ -120,7 +159,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
 
   // La clave distingue los dos PDF (carta y tirilla): con solo el DocKind los
   // dos botones mostraban "Abriendo…" a la vez.
-  const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | null>(null)
+  const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | 'pdf-descarga' | null>(null)
   // Comprobante relacionado (nota o factura modificada) que se está abriendo.
   const [abriendo, setAbriendo] = useState<number | null>(null)
   const anchoTirilla = useAnchoTirilla()
@@ -155,6 +194,47 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
     return () => { enPantalla.current = null }
   }, [id])
 
+  // Reenvío de un rechazado que no consumió la secuencia. El backend lo emite
+  // como una factura nueva (otro id, mismo e-NCF) y archiva esta: se pasa a ver
+  // la nueva, también si la DGII la vuelve a rechazar (viene en el error).
+  const [reenviando, setReenviando] = useState(false)
+  const abrirReenviada = (res: Partial<CreateFacturaResponse> & { factura_id: number }) => {
+    if (!f || !enPantalla.current) return
+    nav('factura-ver', {
+      ...f,
+      id: String(res.factura_id),
+      facturaId: res.factura_id,
+      ncf: res.e_ncf ?? f.ncf,
+      fecha: res.fecha_emision_dgii ? formatApiDate(res.fecha_emision_dgii) : f.fecha,
+      dgii: res.estado_dgii ? dgiiLabel(res.estado_dgii) : f.dgii,
+      trackId: res.track_id ?? null,
+      codigoSeguridad: res.codigo_seguridad ?? null,
+      estadoDgiiRaw: res.estado_dgii ?? null,
+    }, { replace: true })
+  }
+  const reenviar = useAccionUnica(async () => {
+    if (id == null) return
+    setReenviando(true)
+    const tid = toast.loading('Reenviando a la DGII…')
+    try {
+      const res = await reenviarFactura(id)
+      void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+      toast.success(`e-CF ${res.e_ncf} reenviado (${dgiiLabel(res.estado_dgii)}).`, { id: tid })
+      abrirReenviada(res)
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo reenviar el comprobante.', { id: tid })
+      const nueva = e instanceof ApiError ? (e.datos as Partial<CreateFacturaResponse> | undefined) : undefined
+      if (nueva?.factura_id) {
+        void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+        abrirReenviada({ ...nueva, factura_id: nueva.factura_id })
+      } else {
+        estado.reload()
+      }
+    } finally {
+      setReenviando(false)
+    }
+  })
+
   if (!f) {
     return (
       <div className="page">
@@ -169,6 +249,10 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
+  // Mismas condiciones que el backend (handleReenviar): rechazado sin archivar y
+  // con la secuencia sin consumir (o sin la bandera, que se trata igual).
+  const puedeReenviar = ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO'].includes(estadoRaw ?? '')
+    && estadoData?.secuencia_utilizada !== true
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.
@@ -186,6 +270,12 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const subtotalGravado = aNumero(det?.monto_gravado ?? f.subtotal ?? 0)
   const montoExento = aNumero(det?.monto_exento ?? 0)
   const fecha = det?.fecha_emision_dgii ? formatApiDate(det.fecha_emision_dgii) : f.fecha
+  // Condición de pago: la del e-CF firmado. El método elegido al emitir
+  // (Transferencia, Tarjeta…) no se guarda; solo llega justo después de emitir,
+  // y de contado se muestra ese si vino.
+  const condicion = condicionPago(det?.xml_firmado, det?.tipo_pago)
+  const metodoContado = f.metodo && f.metodo !== '—' && !f.metodo.startsWith('Crédito') ? f.metodo : null
+  const tituloCondicion = condicion?.titulo === 'Contado' ? (metodoContado ?? 'Contado') : (condicion?.titulo ?? f.metodo)
   // Notas que modifican este comprobante y, si es una nota, lo que modifica. Del
   // detalle cuando llega; mientras, de la fila del listado (sale al instante).
   const vinculos = det ? mapFacturaRow(det) : f
@@ -216,7 +306,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const openDoc = async (kind: DocKind, download = false, formato: FormatoImpresion = 'carta') => {
     if (id == null) return
     const esPos = kind === 'pdf' && formato === 'pos'
-    setDocBusy(esPos ? 'pdf-pos' : kind)
+    setDocBusy(esPos ? 'pdf-pos' : kind === 'pdf' && download ? 'pdf-descarga' : kind)
     const tid = toast.loading(
       kind !== 'pdf' ? 'Obteniendo XML…' : esPos ? 'Generando recibo…' : 'Generando PDF…',
     )
@@ -256,7 +346,14 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
             <div key={i} className="text-sm" style={{ color: 'var(--danger)', marginTop: 6 }}>• {m.valor} {m.codigo ? `(cód. ${m.codigo})` : ''}</div>
           ))}
           {estadoData?.secuencia_utilizada === false && (
-            <div className="text-xs muted mt-sm">La secuencia no se consumió: puedes corregir y reemitir con el mismo e-NCF.</div>
+            <div className="text-xs muted mt-sm">La secuencia no se consumió: corrige la causa del rechazo y reenvíalo con el mismo e-NCF.</div>
+          )}
+          {puedeReenviar && (
+            <div className="row mt-sm">
+              <Btn variant="primary" size="sm" icon="send" onClick={() => void reenviar()} disabled={reenviando}>
+                {reenviando ? 'Reenviando…' : 'Reenviar a la DGII'}
+              </Btn>
+            </div>
           )}
           {estadoData?.secuencia_utilizada === true && (
             <div className="text-xs muted mt-sm">La secuencia se consumió: la reemisión tomará un nuevo e-NCF.</div>
@@ -377,7 +474,8 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           </div>
           <div>
             <span className="fx-eyebrow">Condiciones</span>
-            <div className="fx-parte-nombre" style={{ fontSize: 13.5 }}>{f.metodo}</div>
+            <div className="fx-parte-nombre" style={{ fontSize: 13.5 }}>{tituloCondicion}</div>
+            {condicion?.vence && <div className="fx-parte-linea">Vence el {condicion.vence}</div>}
             <div className="fx-parte-linea">Moneda: peso dominicano (DOP)</div>
           </div>
         </section>
@@ -457,8 +555,13 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           <b><Money value={total} cur={false} /></b>
         </div>
         <div className="row gap-sm">
-          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf')} disabled={id == null || docBusy != null}>
+          <Btn variant="secondary" icon="eye" onClick={() => openDoc('pdf')} disabled={id == null || docBusy != null}>
             {docBusy === 'pdf' ? 'Abriendo…' : 'Ver PDF'}
+          </Btn>
+          {/* Baja el archivo con su nombre (Factura_E31….pdf). Abierto en el
+              visor, el navegador lo guarda con un nombre de código. */}
+          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf', true)} disabled={id == null || docBusy != null}>
+            {docBusy === 'pdf-descarga' ? 'Descargando…' : 'Descargar PDF'}
           </Btn>
           {/* Mismo comprobante, papel de tirilla: lo que se entrega en mostrador. */}
           <Btn variant="secondary" icon="printer" onClick={() => openDoc('pdf', false, 'pos')} disabled={id == null || docBusy != null}>

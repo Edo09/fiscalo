@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { posApi, PosApiError, type LoginAdmin, type SesionPos } from './api'
 import { usePosStore, type EquipoGuardado } from './store'
+import { useCarritoStore } from './carrito'
 import { HabilitarEquipo } from './HabilitarEquipo'
 import { PinView } from './PinView'
 import { VentaView } from './VentaView'
@@ -108,6 +109,10 @@ export function PosApp() {
   }, [olvidarEquipo])
 
   const entro = useCallback((s: SesionPos) => {
+    // Las ventas abiertas son de cada empleado: antes de mostrar la pantalla,
+    // las suyas (guardadas en este equipo), no las del que estaba antes.
+    const caja = usePosStore.getState().equipo?.caja
+    if (caja) useCarritoStore.getState().abrirVentasDe(caja.id, s.empleado.id)
     abrirSesion(s.token, s.empleado)
     setPantalla({ tipo: 'venta' })
   }, [abrirSesion])

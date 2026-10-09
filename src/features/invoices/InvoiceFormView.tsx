@@ -18,6 +18,7 @@ import {
   MSG_UNIDAD, admiteDecimales, problemaCantidad, unidadValida, useUnidadesMedida,
 } from '@/components/unidadesMedida'
 import { presentDocument } from '@/lib/file'
+import { isoLocal } from '@/lib/date'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
@@ -48,12 +49,26 @@ interface Linea {
 }
 
 /**
- * Métodos de pago que son venta a CRÉDITO (TipoPago=2 ante DGII). El resto
- * —efectivo, transferencia, tarjeta, cheque— son formas de cobro de una venta
- * de contado y van como TipoPago=1.
+ * Métodos de pago que son venta a CRÉDITO (TipoPago=2 ante DGII), uno por
+ * plazo. El resto —efectivo, transferencia, tarjeta, cheque— son formas de
+ * cobro de una venta de contado y van como TipoPago=1.
  */
-const METODOS_CREDITO = ['Crédito 30 días']
+const PLAZOS_CREDITO = [30, 45, 60]
+const METODOS_CREDITO = PLAZOS_CREDITO.map((dias) => `Crédito ${dias} días`)
 const esMetodoCredito = (metodo: string) => METODOS_CREDITO.includes(metodo)
+
+/**
+ * FechaLimitePago del e-CF a crédito: hoy + el plazo elegido (hora local). Sin
+ * ella el backend pone emisión + 30 días, así que 45 y 60 tienen que viajar.
+ * Es la fecha que imprime la factura ("fecha límite del pago").
+ */
+function fechaLimitePago(metodo: string): string | undefined {
+  const i = METODOS_CREDITO.indexOf(metodo)
+  if (i < 0) return undefined
+  const d = new Date()
+  d.setDate(d.getDate() + PLAZOS_CREDITO[i])
+  return isoLocal(d)
+}
 
 /** Opciones de indicador de facturación DGII (tasa de ITBIS por línea). */
 const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
@@ -428,7 +443,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // puede corregirlo sin salir de la factura.
   const faltaRnc = cliente != null && !cliente.doc.trim() && ['31', '33', '34', '44', '45'].includes(tipo)
 
-  const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', 'Crédito 30 días', 'Cheque']
+  const metodos = ['Efectivo', 'Transferencia', 'Tarjeta', ...METODOS_CREDITO, 'Cheque']
   // Solo el crédito es TipoPago=2 ante DGII. Transferencia, tarjeta y cheque son
   // formas de cobro de una venta de CONTADO: mandarlas como crédito falsea el
   // comprobante (y ahora el backend las rechaza si el cliente no tiene crédito).
@@ -547,6 +562,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       user_id: user?.id ?? DEFAULT_USER_ID,
       tipo_ecf: tipo,
       tipo_pago: esCredito ? 2 : 1,
+      ...(esCredito ? { fecha_limite_pago: fechaLimitePago(metodo) } : {}),
       // El descuento de las líneas ya va en cada item; se manda explícito para
       // que el backend no vuelva a aplicar el del cliente encima.
       descuento: 0,
@@ -617,6 +633,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         ...(cliente ? { client_id: Number(cliente.id) } : {}),
         tipo_ecf: tipo,
         items,
+        // La fecha límite de pago impresa, igual que al emitir.
+        tipo_pago: esCredito ? 2 : 1,
+        ...(esCredito ? { fecha_limite_pago: fechaLimitePago(metodo) } : {}),
         // La vista previa de una nota muestra a qué factura modifica.
         ...(informacionReferencia ? { informacion_referencia: informacionReferencia } : {}),
       })

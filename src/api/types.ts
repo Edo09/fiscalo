@@ -77,6 +77,8 @@ export interface FacturaRow {
   codigo_seguridad?: string | null
   fecha_emision_dgii?: string | null
   secuencia_utilizada?: boolean | null
+  /** 1=Contado 2=Crédito 3=Gratuito (TipoPago DGII). El plazo del e-CF va en su XML (FechaLimitePago). */
+  tipo_pago?: number | string | null
   // Presentes en el listado (GET /api/facturas): resumen plano de la factura.
   company_name?: string | null
   description?: string | null
@@ -836,6 +838,8 @@ export interface CategoryRow {
   id: number
   nombre?: string | null
   descripcion?: string | null
+  /** Color en el POS, '#RRGGBB' (migración 034). Único por categoría; null = calculado del nombre. */
+  color?: string | null
   estado?: number | boolean | null
   created_at?: string
   updated_at?: string
@@ -844,6 +848,8 @@ export interface CategoryRow {
 export interface CreateCategoryInput {
   nombre: string
   descripcion?: string
+  /** '#RRGGBB' o null (automático). Ausente en un PUT = no se cambia. */
+  color?: string | null
   estado?: number
 }
 
@@ -1353,6 +1359,8 @@ export interface FacturaSimpleInput {
   date?: string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number
+  /** Plazo del crédito en días (30, 45, 60). null = contado; sin plazo, el backend asume 30. */
+  dias_credito?: number | null
   items: FacturaSimpleItemInput[]
 }
 
@@ -1385,6 +1393,8 @@ export interface FacturaSimpleRow {
   total: number | string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number | string | null
+  /** Plazo del crédito en días (migración 033). null = contado o crédito de 30. */
+  dias_credito?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
 }

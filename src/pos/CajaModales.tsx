@@ -50,7 +50,7 @@ export function AperturaTurnoModal({ equipo, sesion, onAbierto, onCerrar, errorD
   })
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>{equipo.caja.nombre}</small>
@@ -109,7 +109,7 @@ export function ImpresoraModal({ caja, onCerrar }: { caja: string; onCerrar: () 
   }
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>Este equipo</small>
@@ -204,7 +204,7 @@ export function SupervisorPinModal({ equipo, sesion, turno, onAutorizado, onCerr
   }, [tocar, onCerrar])
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>Autorización de supervisor</small>
@@ -280,7 +280,7 @@ export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar,
   const ajeno = turno !== null && turno.empleado_id !== sesion.empleado.id
 
   return (
-    <Overlay onCerrar={onCerrar} ancho={620}>
+    <Overlay ancho={620}>
       <div className="pos-modal-cab">
         <div>
           <small>{equipo.caja.nombre}</small>

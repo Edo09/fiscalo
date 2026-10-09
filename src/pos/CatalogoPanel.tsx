@@ -8,7 +8,8 @@
 // del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Btn, Icon } from '@/components/ui'
-import { colorFor, fmtCantidad } from '@/lib/format'
+import { fmtCantidad } from '@/lib/format'
+import { colorDeCategoria } from '@/features/categories/colores'
 import { API_BASE_URL } from '@/api/config'
 import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
@@ -23,6 +24,11 @@ interface Props {
   /** Error al cargar el catálogo (con catálogo previo, se sigue mostrando ese). */
   error: string | null
   onReintentar: () => void
+  /** Botón Actualizar (y F5): trae de nuevo catálogo y estado sin recargar la página (sin PIN). */
+  onRecargar: () => void
+  recargando: boolean
+  /** Recién actualizado: el botón muestra la marca de listo un instante. */
+  recargado: boolean
   busqueda: string
   onBusqueda: (texto: string) => void
   /** null = Todos. */
@@ -71,12 +77,13 @@ function Existencia({ p }: { p: ProductoPos }) {
 }
 
 export function CatalogoPanel({
-  catalogo, error, onReintentar, busqueda, onBusqueda, categoria, onCategoria, buscadorRef, enCarrito, onAgregar,
-  onQuitarUno, onQuitar, bloqueado = false,
+  catalogo, error, onReintentar, onRecargar, recargando, recargado, busqueda, onBusqueda, categoria, onCategoria,
+  buscadorRef, enCarrito, onAgregar, onQuitarUno, onQuitar, bloqueado = false,
 }: Props) {
   const colores = useMemo(() => {
     const m = new Map<number, string>()
-    for (const c of catalogo?.categorias ?? []) m.set(c.id, colorFor(c.nombre))
+    // El color elegido en app.* (Categorías) o, sin elegir, el calculado del nombre.
+    for (const c of catalogo?.categorias ?? []) m.set(c.id, colorDeCategoria(c.nombre, c.color))
     return m
   }, [catalogo])
   const [prefs, setPrefs] = useState<PreferenciasCatalogo>(cargarPreferencias)
@@ -152,6 +159,16 @@ export function CatalogoPanel({
             onCambio={(orden) => setPrefs((p) => ({ ...p, orden }))} />
           <SelectorCaja rotulo="Mostrar" titulo="Productos en pantalla" icono="layers" valor={prefs.limite} opciones={LIMITES}
             onCambio={(limite) => setPrefs((p) => ({ ...p, limite }))} />
+          <button
+            type="button"
+            className={'pos-recargar' + (recargando ? ' girando' : '') + (recargado ? ' listo' : '')}
+            onClick={onRecargar}
+            disabled={recargando}
+            title="Actualizar productos y precios (F5)"
+            aria-label={recargado ? 'Catálogo actualizado' : 'Actualizar productos y precios'}
+          >
+            <Icon name={recargado ? 'check' : 'refresh-cw'} size={20} />
+          </button>
         </div>
       </div>
 
@@ -226,7 +243,7 @@ export function CatalogoPanel({
                   <span className="pos-producto-nombre">{p.nombre}</span>
                   {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
                   <span className="pos-producto-pie">
-                    <b className="pos-producto-precio">{formatoCentavos(p.precio_centavos)}</b>
+                    <b className="pos-producto-precio"><span className="pos-moneda">RD$</span>{formatoCentavos(p.precio_centavos)}</b>
                     <Existencia p={p} />
                   </span>
                 </button>

@@ -216,10 +216,8 @@ export function CobroModal({
     return () => window.removeEventListener('keydown', h)
   }, [fase, cobrar, onNuevaVenta, onCerrar])
 
-  const sePuedeCerrar = fase.tipo === 'eligiendo' || fase.tipo === 'error'
-
   return (
-    <Overlay onCerrar={() => { if (sePuedeCerrar) onCerrar() }} ancho={fase.tipo === 'eligiendo' && forma === 1 ? 640 : 460}>
+    <Overlay ancho={fase.tipo === 'eligiendo' && forma === 1 ? 640 : 460}>
       {fase.tipo === 'eligiendo' && (
         <>
           <div className="pos-modal-cab">

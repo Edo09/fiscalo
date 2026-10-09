@@ -5,9 +5,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PosApp } from './PosApp'
+import { aplicarTema, leerTema } from './tema'
 import '../styles/styles.css'
 import '../styles/bold.css'
 import './pos.css'
+
+// El tema del equipo antes de pintar nada: con el oscuro, la página no destella en blanco.
+aplicarTema(leerTema())
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('No se encontró el elemento #root')

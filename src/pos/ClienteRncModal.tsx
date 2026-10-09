@@ -59,7 +59,7 @@ export function ClienteRncModal({ equipo, sesion, onElegido, onCerrar, errorDeSe
   }, [teclear, buscar, fase, onCerrar, onElegido])
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>Factura de crédito fiscal</small>
