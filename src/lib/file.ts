@@ -8,7 +8,29 @@ function base64ToBlob(content: string, mime: string): Blob {
   return new Blob([bytes], { type: mime || 'application/octet-stream' })
 }
 
-/** Abre un documento base64 en una pestaña nueva (PDF) o lo descarga (XML). */
+/**
+ * URLs de documentos abiertos en otra pestaña. No se liberan al minuto como las
+ * de una descarga: el visor de PDF del navegador vuelve a leer la URL al pulsar
+ * Guardar, y con la URL ya liberada guardaba un archivo de 0 KB. Se conservan
+ * las últimas MAX_ABIERTOS (un PDF pesa unos cientos de KB); el navegador las
+ * libera todas al cerrar o recargar la app.
+ */
+const MAX_ABIERTOS = 20
+const abiertos: string[] = []
+function retenerAbierto(url: string): void {
+  abiertos.push(url)
+  while (abiertos.length > MAX_ABIERTOS) {
+    const vieja = abiertos.shift()
+    if (vieja) URL.revokeObjectURL(vieja)
+  }
+}
+
+/**
+ * Abre un documento base64 en una pestaña nueva (PDF) o lo descarga con su
+ * nombre (`download`). Abierto, el visor lo ofrece guardar con un nombre de
+ * código (una URL en memoria no tiene nombre de archivo): para bajarlo con el
+ * suyo está la descarga.
+ */
 export function presentDocument(doc: DocBase64, opts: { download?: boolean } = {}): void {
   const blob = base64ToBlob(doc.content, doc.mime_type)
   const url = URL.createObjectURL(blob)
@@ -19,11 +41,12 @@ export function presentDocument(doc: DocBase64, opts: { download?: boolean } = {
     document.body.appendChild(a)
     a.click()
     a.remove()
+    // La descarga ya copió el archivo: la URL se puede soltar.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   } else {
     window.open(url, '_blank', 'noopener')
+    retenerAbierto(url)
   }
-  // Libera el objeto URL tras dar tiempo a que el navegador lo use.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 /**
@@ -67,7 +90,9 @@ export function printDocument(doc: DocBase64): Promise<boolean> {
       if (resuelto) return
       resuelto = true
       window.open(url, '_blank', 'noopener')
-      limpiar()
+      // La pestaña sigue usando la URL (Guardar del visor): no se libera.
+      retenerAbierto(url)
+      setTimeout(() => iframe.remove(), 60_000)
       resolve(false)
     }
 

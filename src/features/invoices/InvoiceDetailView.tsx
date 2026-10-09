@@ -159,7 +159,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
 
   // La clave distingue los dos PDF (carta y tirilla): con solo el DocKind los
   // dos botones mostraban "Abriendo…" a la vez.
-  const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | null>(null)
+  const [docBusy, setDocBusy] = useState<DocKind | 'pdf-pos' | 'pdf-descarga' | null>(null)
   // Comprobante relacionado (nota o factura modificada) que se está abriendo.
   const [abriendo, setAbriendo] = useState<number | null>(null)
   const anchoTirilla = useAnchoTirilla()
@@ -306,7 +306,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const openDoc = async (kind: DocKind, download = false, formato: FormatoImpresion = 'carta') => {
     if (id == null) return
     const esPos = kind === 'pdf' && formato === 'pos'
-    setDocBusy(esPos ? 'pdf-pos' : kind)
+    setDocBusy(esPos ? 'pdf-pos' : kind === 'pdf' && download ? 'pdf-descarga' : kind)
     const tid = toast.loading(
       kind !== 'pdf' ? 'Obteniendo XML…' : esPos ? 'Generando recibo…' : 'Generando PDF…',
     )
@@ -555,8 +555,13 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           <b><Money value={total} cur={false} /></b>
         </div>
         <div className="row gap-sm">
-          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf')} disabled={id == null || docBusy != null}>
+          <Btn variant="secondary" icon="eye" onClick={() => openDoc('pdf')} disabled={id == null || docBusy != null}>
             {docBusy === 'pdf' ? 'Abriendo…' : 'Ver PDF'}
+          </Btn>
+          {/* Baja el archivo con su nombre (Factura_E31….pdf). Abierto en el
+              visor, el navegador lo guarda con un nombre de código. */}
+          <Btn variant="secondary" icon="download" onClick={() => openDoc('pdf', true)} disabled={id == null || docBusy != null}>
+            {docBusy === 'pdf-descarga' ? 'Descargando…' : 'Descargar PDF'}
           </Btn>
           {/* Mismo comprobante, papel de tirilla: lo que se entrega en mostrador. */}
           <Btn variant="secondary" icon="printer" onClick={() => openDoc('pdf', false, 'pos')} disabled={id == null || docBusy != null}>
