@@ -96,3 +96,20 @@ export function iniciales(nombre: string): string {
   if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase()
   return (palabras[0][0] + palabras[1][0]).toUpperCase()
 }
+
+/** Texto escrito ("1500", "245.5") → centavos, o null si está vacío o no sirve. */
+export function montoACentavos(texto: string): number | null {
+  if (!/^\d{1,7}(\.\d{0,2})?$/.test(texto)) return null
+  return Math.round(Number(texto) * 100)
+}
+
+/** Aplica una tecla al texto del monto respetando el formato. */
+export function teclearMonto(actual: string, tecla: string): string {
+  if (tecla === '⌫') return actual.slice(0, -1)
+  if (tecla === 'C') return ''
+  if (tecla === '.') return actual.includes('.') ? actual : (actual === '' ? '0.' : actual + '.')
+  const [entero, dec] = actual.split('.')
+  if (dec !== undefined) return dec.length >= 2 ? actual : actual + tecla
+  if (entero.length >= 7) return actual
+  return actual === '0' ? tecla : actual + tecla
+}

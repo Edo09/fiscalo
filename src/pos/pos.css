@@ -282,6 +282,75 @@
   .pos-carrito { border-left: 0; border-top: 1px solid var(--border); max-height: 48vh; }
 }
 
+/* ---- Cobro (P1-P4) -------------------------------------------------------- */
+.pos-cobro-total { font-size: 30px !important; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pos-formas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.pos-forma {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 72px; padding: 8px; border-radius: var(--r-lg);
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text);
+  font-size: 15px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-forma small { font-size: 11px; color: var(--text-3); font-weight: 500; }
+.pos-forma.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent); }
+.pos-efectivo { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.pos-campo-monto {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.pos-campo-monto small { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-campo-monto b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.pos-campo-monto b.vacio { color: var(--text-2); }
+.pos-billetes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.pos-billete {
+  height: 48px; border-radius: var(--r-md); border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer;
+  font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent;
+}
+.pos-billete.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.pos-billete:disabled { opacity: 0.35; cursor: default; }
+.pos-devuelta {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-lg); background: var(--success-soft); color: var(--success);
+}
+.pos-devuelta small { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-devuelta b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.pos-devuelta.falta { background: var(--danger-soft); color: var(--danger); }
+.pos-devuelta.grande { width: 100%; flex-direction: column; align-items: center; padding: 14px; }
+.pos-devuelta.grande b { font-size: 40px; letter-spacing: -0.02em; }
+.pos-teclado-monto { gap: 8px; }
+.pos-teclado-monto .pos-tecla { height: 56px; font-size: 22px; }
+
+.pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
+.pos-cobro-estado > b { font-size: 20px; }
+.pos-cobro-estado .pos-sub { text-align: center; }
+.pos-cobro-ok, .pos-cobro-mal, .pos-cobro-duda {
+  width: 60px; height: 60px; border-radius: 99px; display: grid; place-items: center;
+}
+.pos-cobro-ok { background: var(--success-soft); color: var(--success); }
+.pos-cobro-mal { background: var(--danger-soft); color: var(--danger); }
+.pos-cobro-duda { background: var(--warning-soft); color: var(--warning); }
+
+/* ---- Avisos de la caja (turno, envíos pendientes, rechazos) -------------- */
+.pos-pendientes {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-full);
+  background: var(--warning-soft); color: var(--warning); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.pos-franja { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 14px; }
+.pos-franja.aviso { background: var(--warning-soft); color: var(--warning); }
+.pos-alerta {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  background: var(--danger); color: #fff; font-size: 14px;
+}
+.pos-alerta span { flex: 1; }
+.pos-producto:disabled { opacity: 0.55; cursor: default; }
+.pos-cant button:disabled.pos-cant-valor { opacity: 0.6; }
+
+@media (max-width: 720px) {
+  .pos-efectivo { grid-template-columns: 1fr; }
+  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
+}
+
 /* La empresa es lo primero que sobra: el cajero sabe donde trabaja. */
 @media (max-width: 720px) {
   .pos-barra { gap: 10px; }

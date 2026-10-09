@@ -5,7 +5,8 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-pos-montos.ts
 import {
-  coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, normalizar, semaforo,
+  coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, montoACentavos, normalizar, semaforo,
+  teclearMonto,
 } from '../src/pos/montos.ts'
 
 let fallos = 0
@@ -74,6 +75,18 @@ chk('vacío → "?"', iniciales('  ') === '?')
 chk('sin signos: "Huevos (unidad)" → "HU", "Papel higiénico (4 rollos)" → "PH"', iniciales('Huevos (unidad)') === 'HU'
   && iniciales('Papel higiénico (4 rollos)') === 'PH', [iniciales('Huevos (unidad)'), iniciales('Papel higiénico (4 rollos)')])
 chk('solo signos → "?"', iniciales('(--)') === '?')
+
+console.log('Montos escritos (efectivo recibido, fondo)')
+chk('"1500" → 150000, "245.5" → 24550, "0.05" → 5', montoACentavos('1500') === 150000 && montoACentavos('245.5') === 24550
+  && montoACentavos('0.05') === 5)
+chk('vacío, "1.234", "abc" → null', montoACentavos('') === null && montoACentavos('1.234') === null && montoACentavos('abc') === null)
+chk('"0.29" → 29 sin ruido binario', montoACentavos('0.29') === 29, montoACentavos('0.29'))
+const escribir = (teclas: string[]) => teclas.reduce((t, k) => teclearMonto(t, k), '')
+chk('teclear 2,4,5,.,5 → "245.5"', escribir(['2', '4', '5', '.', '5']) === '245.5')
+chk('un solo punto y 2 decimales: 1,.,.,2,3,4 → "1.23"', escribir(['1', '.', '.', '2', '3', '4']) === '1.23')
+chk('punto primero → "0.", cero a la izquierda no se repite', escribir(['.']) === '0.' && escribir(['0', '0', '7']) === '7')
+chk('borrar y limpiar', escribir(['1', '2', '⌫']) === '1' && escribir(['1', '2', 'C']) === '')
+chk('tope de 7 cifras', escribir(['1', '2', '3', '4', '5', '6', '7', '8']) === '1234567')
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

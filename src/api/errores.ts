@@ -151,7 +151,7 @@ const RE_CONSTANTE = /\b[A-Z][A-Z0-9]+_[A-Z][A-Z0-9_]{2,}\b/
 // …salvo los estados DGII de una factura, que las reglas de negocio citan
 // ("ya existe una factura … en estado EN_PROCESO") y el usuario ve en la lista.
 const RE_ESTADO_DGII =
-  /\b(RFCE_)?(ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|ACEPTADO|RECHAZADO|ENVIADO)\b/g
+  /\b(RFCE_)?(ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|PENDIENTE|ACEPTADO|RECHAZADO|ENVIADO)\b/g
 const RE_JERGA_INTERNA = /\b(php|pdo|sql|mysql|curl|openssl|fpdf|vendor|libxml)\b/i
 
 const RE_RUTA = /\/api\/|\/inventario\/|https?:\/\/|\bsub-?rutas?\b|\bendpoints?\b/i

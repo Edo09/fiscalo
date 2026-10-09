@@ -7,6 +7,7 @@
 // la de un admin) y un 401 significa cosas distintas segun el `codigo`:
 // EQUIPO_NO_HABILITADO lleva a habilitar el equipo, SESION_REQUERIDA al PIN.
 import { API_BASE_URL } from '@/api/config'
+import type { ReciboDatos } from '@/api/types'
 
 const TIMEOUT_MS = 30_000
 
@@ -46,6 +47,7 @@ export async function posFetch<T>(
   ruta: string,
   cred: Credenciales = {},
   cuerpo?: unknown,
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (cuerpo !== undefined) headers['Content-Type'] = 'application/json'
@@ -59,7 +61,7 @@ export async function posFetch<T>(
       method: metodo,
       headers,
       body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: 'no-store',
     })
   } catch {
@@ -167,6 +169,52 @@ export interface CatalogoPos {
   generado_at: string
 }
 
+/** Forma de pago (codigo DGII de TablaFormasPago): 1 efectivo, 2 transferencia/deposito, 3 tarjeta. */
+export type FormaPago = 1 | 2 | 3
+
+/** Cuerpo de POST /api/pos/ventas. El POS no manda precios: solo producto y cantidad. */
+export interface VentaCuerpo {
+  /** Una por intento de venta: repetirla nunca saca otro e-NCF (F5). */
+  clave: string
+  lineas: { product_id: number; cantidad: number }[]
+  /** El total que vio el cajero; si el servidor calcula otro, responde TOTAL_DISTINTO. */
+  total_centavos: number
+  forma_pago: FormaPago
+  recibido_centavos: number | null
+  ancho: number
+  iniciada_ms: number | null
+}
+
+export interface VentaRespuesta {
+  venta: {
+    factura_id: number
+    e_ncf: string
+    tipo_ecf: string
+    estado_dgii: string
+    /** La DGII no respondió a tiempo: se imprimió y se reenvía sola (F6). */
+    envio_pendiente: boolean
+    total_centavos: number
+  }
+  cobro: {
+    forma_pago: FormaPago
+    forma_pago_nombre: string
+    total_centavos: number
+    recibido_centavos: number | null
+    devuelta_centavos: number | null
+  }
+  /** null si no se pudo armar: se pide con posApi.recibo. */
+  recibo: ReciboDatos | null
+  /** true = esa clave ya tenía venta: es la misma, no otra. */
+  repetida: boolean
+}
+
+export interface Reenvio {
+  revisadas: number
+  aceptadas: number
+  rechazadas: { factura_id: number; e_ncf: string; motivo: string }[]
+  pendientes: number
+}
+
 export interface LoginAdmin {
   token: string
   user: { id: number; name: string; username: string; permissions?: string[] }
@@ -186,6 +234,15 @@ export const posApi = {
     posFetch<{ cerrada: boolean }>('DELETE', '/pos/sesion', { equipo, sesion }),
   catalogo: (equipo: string, sesion: string) =>
     posFetch<CatalogoPos>('GET', '/pos/catalogo', { equipo, sesion }),
+  abrirTurno: (equipo: string, sesion: string, fondoCentavos: number) =>
+    posFetch<{ turno_caja: TurnoCaja }>('POST', '/pos/turno', { equipo, sesion }, { fondo_centavos: fondoCentavos }),
+  // La emision puede esperar a la DGII (y, con doble toque, a la otra peticion): mas margen.
+  vender: (equipo: string, sesion: string, cuerpo: VentaCuerpo) =>
+    posFetch<VentaRespuesta>('POST', '/pos/ventas', { equipo, sesion }, cuerpo, 75_000),
+  recibo: (equipo: string, sesion: string, facturaId: number, ancho: number) =>
+    posFetch<{ recibo: ReciboDatos }>('GET', `/pos/ventas/${facturaId}/recibo?ancho=${ancho}`, { equipo, sesion }),
+  reenviarPendientes: (equipo: string) =>
+    posFetch<Reenvio>('POST', '/pos/pendientes/reenviar', { equipo }, {}, 75_000),
 
   // Admin, solo para habilitar el equipo
   login: (usuario: string, clave: string) =>

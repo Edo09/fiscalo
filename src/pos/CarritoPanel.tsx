@@ -1,6 +1,7 @@
 // Carrito de la venta en curso (api-gratex docs/specs/pos.md V1-V4): líneas con
 // − / cantidad / +, aviso de existencia, totales al centavo e ITBIS incluido.
-// El cobro (P1-P4) llega con la emisión: por ahora el botón está deshabilitado.
+// El cobro va en CobroModal; aquí se decide si se puede cobrar (turno, cobro
+// sin confirmar).
 import { Btn, Icon } from '@/components/ui'
 import { fmtCantidad } from '@/lib/format'
 import type { LineaCarrito } from './carrito'
@@ -8,6 +9,15 @@ import { formatoCentavos, importeLinea, itbisIncluido } from './montos'
 
 interface Props {
   lineas: LineaCarrito[]
+  /** Cobro sin confirmar: la venta queda congelada y el botón reintenta. */
+  enDuda: boolean
+  puedeCobrar: boolean
+  /** Por qué no se puede cobrar (turno de otro cajero, cargando...). */
+  motivoNoCobrar: string | null
+  /** La caja no tiene turno: el botón ofrece abrirlo. */
+  sinTurno: boolean
+  onCobrar: () => void
+  onAbrirTurno: () => void
   onMas: (l: LineaCarrito) => void
   onMenos: (l: LineaCarrito) => void
   onCantidad: (l: LineaCarrito) => void
@@ -23,7 +33,9 @@ function avisoExistencia(l: LineaCarrito): string | null {
   return null
 }
 
-export function CarritoPanel({ lineas, onMas, onMenos, onCantidad, onQuitar, onCancelar }: Props) {
+export function CarritoPanel({
+  lineas, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, onQuitar, onCancelar,
+}: Props) {
   const importes = lineas.map((l) => ({ importe: importeLinea(l.precioCentavos, l.cantidad), tasa: l.tasa }))
   const total = importes.reduce((s, i) => s + i.importe, 0)
   const itbis = itbisIncluido(importes)
@@ -36,10 +48,16 @@ export function CarritoPanel({ lineas, onMas, onMenos, onCantidad, onQuitar, onC
           <b>Venta</b>
           <small>{lineas.length === 0 ? 'Sin artículos' : `${lineas.length} ${lineas.length === 1 ? 'producto' : 'productos'} · ${fmtCantidad(unidades)} ${unidades === 1 ? 'unidad' : 'unidades'}`}</small>
         </div>
-        <Btn variant="ghost" icon="x-circle" onClick={onCancelar} disabled={lineas.length === 0}
-          style={lineas.length > 0 ? { color: 'var(--danger)' } : undefined}>Cancelar</Btn>
+        <Btn variant="ghost" icon="x-circle" onClick={onCancelar} disabled={lineas.length === 0 || enDuda}
+          style={lineas.length > 0 && !enDuda ? { color: 'var(--danger)' } : undefined}>Cancelar</Btn>
       </div>
 
+      {enDuda && (
+        <div className="pos-franja aviso" style={{ borderBottom: '1px solid var(--border)' }}>
+          <Icon name="wifi-off" size={16} />
+          <span>El último cobro no se confirmó. La venta no se puede cambiar: toca <b>Reintentar cobro</b>.</span>
+        </div>
+      )}
       <div className="pos-lineas">
         {lineas.length === 0 ? (
           <div className="pos-lineas-vacio">
@@ -57,16 +75,16 @@ export function CarritoPanel({ lineas, onMas, onMenos, onCantidad, onQuitar, onC
               </div>
               <b className="pos-linea-importe">{formatoCentavos(importes[i].importe)}</b>
               <div className="pos-cant">
-                <button type="button" onClick={() => onMenos(l)} disabled={l.cantidad <= 1} aria-label={`Quitar una unidad de ${l.nombre}`}>
+                <button type="button" onClick={() => onMenos(l)} disabled={l.cantidad <= 1 || enDuda} aria-label={`Quitar una unidad de ${l.nombre}`}>
                   <Icon name="minus" size={20} />
                 </button>
-                <button type="button" className="pos-cant-valor" onClick={() => onCantidad(l)} aria-label={`Cambiar la cantidad de ${l.nombre}`}>
+                <button type="button" className="pos-cant-valor" onClick={() => onCantidad(l)} disabled={enDuda} aria-label={`Cambiar la cantidad de ${l.nombre}`}>
                   {fmtCantidad(l.cantidad)}
                 </button>
-                <button type="button" onClick={() => onMas(l)} aria-label={`Agregar una unidad de ${l.nombre}`}>
+                <button type="button" onClick={() => onMas(l)} disabled={enDuda} aria-label={`Agregar una unidad de ${l.nombre}`}>
                   <Icon name="plus" size={20} />
                 </button>
-                <button type="button" className="pos-quitar" onClick={() => onQuitar(l)} aria-label={`Quitar ${l.nombre} de la venta`}>
+                <button type="button" className="pos-quitar" onClick={() => onQuitar(l)} disabled={enDuda} aria-label={`Quitar ${l.nombre} de la venta`}>
                   <Icon name="trash-2" size={19} />
                 </button>
               </div>
@@ -78,10 +96,18 @@ export function CarritoPanel({ lineas, onMas, onMenos, onCantidad, onQuitar, onC
       <div className="pos-totales">
         <div className="pos-total-fila"><span>ITBIS incluido</span><span>{formatoCentavos(itbis)}</span></div>
         <div className="pos-total-fila pos-total"><span>Total</span><span>RD$ {formatoCentavos(total)}</span></div>
-        <Btn variant="primary" className="pos-cobrar" icon="banknote" disabled title="El cobro llega en la próxima entrega">
-          Cobrar
-        </Btn>
-        <small className="pos-cobrar-nota">El cobro y la impresión llegan en la próxima entrega.</small>
+        {enDuda ? (
+          <Btn variant="primary" className="pos-cobrar" icon="refresh-cw" onClick={onCobrar}>Reintentar cobro</Btn>
+        ) : sinTurno ? (
+          <Btn variant="primary" className="pos-cobrar" icon="clock" onClick={onAbrirTurno}>Abrir turno</Btn>
+        ) : (
+          <Btn variant="primary" className="pos-cobrar" icon="banknote" disabled={!puedeCobrar || lineas.length === 0} onClick={onCobrar}>
+            Cobrar
+          </Btn>
+        )}
+        <small className="pos-cobrar-nota">
+          {motivoNoCobrar ?? (sinTurno ? 'Abre el turno con el fondo de la gaveta para empezar a cobrar.' : 'F9 efectivo · F2 tarjeta · F3 transferencia')}
+        </small>
       </div>
     </aside>
   )

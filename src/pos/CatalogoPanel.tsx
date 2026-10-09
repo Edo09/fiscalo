@@ -21,6 +21,8 @@ interface Props {
   /** Cantidad de cada producto que ya está en el carrito. */
   enCarrito: Map<number, number>
   onAgregar: (p: ProductoPos) => void
+  /** Cobro sin confirmar: la venta no se puede cambiar hasta reintentarlo. */
+  bloqueado?: boolean
 }
 
 const SIN_CATEGORIA = '#7a8699'
@@ -44,6 +46,7 @@ function Existencia({ p }: { p: ProductoPos }) {
 
 export function CatalogoPanel({
   catalogo, error, onReintentar, busqueda, onBusqueda, categoria, onCategoria, buscadorRef, enCarrito, onAgregar,
+  bloqueado = false,
 }: Props) {
   const colores = useMemo(() => {
     const m = new Map<number, string>()
@@ -63,7 +66,7 @@ export function CatalogoPanel({
           onChange={(e) => onBusqueda(e.target.value)}
           onKeyDown={(e) => {
             // Enter con un solo resultado lo agrega: búsqueda + Enter sin tocar la pantalla.
-            if (e.key === 'Enter' && productos.length === 1) {
+            if (e.key === 'Enter' && productos.length === 1 && !bloqueado) {
               e.preventDefault()
               onAgregar(productos[0])
               onBusqueda('')
@@ -134,7 +137,7 @@ export function CatalogoPanel({
             const agotado = p.stock !== null && p.stock <= 0
             return (
               <button key={p.id} type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
-                onClick={() => onAgregar(p)} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
+                onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
                 <span className="pos-producto-top">
                   <span className="pos-ini" style={{ background: p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA }}>
                     {iniciales(p.nombre)}

@@ -6,10 +6,11 @@ import { fmtCantidad } from '@/lib/format'
 import { leerCantidad } from './montos'
 import type { LineaCarrito } from './carrito'
 
-function Overlay({ children, onCerrar }: { children: ReactNode; onCerrar: () => void }) {
+/** Fondo oscuro + panel. Tocar fuera cierra (si `onCerrar` lo permite). */
+export function Overlay({ children, onCerrar, ancho }: { children: ReactNode; onCerrar: () => void; ancho?: number }) {
   return (
     <div className="pos-overlay" onPointerDown={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div className="pos-modal" role="dialog" aria-modal="true">{children}</div>
+      <div className="pos-modal" role="dialog" aria-modal="true" style={ancho ? { maxWidth: ancho } : undefined}>{children}</div>
     </div>
   )
 }
