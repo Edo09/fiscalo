@@ -36,13 +36,20 @@ export interface BloqueClienteProps {
   onLibreChange: (nombre: string) => void
   /** El botón +: quien lo usa abre NewClientModal. */
   onNuevoCliente: () => void
+  /**
+   * Ocupa todo el ancho de la hoja en vez de los 46ch del bloque de cliente:
+   * en el conduce no hay nada a su derecha y un nombre largo se partía en tres
+   * líneas dejando la mitad de la fila en blanco.
+   */
+  anchoCompleto?: boolean
 }
 
 export function BloqueCliente({
   cliente, clienteCompleto, clienteLibre, error, avisoSinDoc, onSeleccionar, onBusquedaChange, onLibreChange, onNuevoCliente,
+  anchoCompleto = false,
 }: BloqueClienteProps) {
   return (
-    <section className="fx-a-quien">
+    <section className={'fx-a-quien' + (anchoCompleto ? ' fx-a-quien--completo' : '')}>
       <span className="fx-eyebrow">Nombre o razón social <span className="req">*</span></span>
       <div className="fx-cliente-row">
         <div className="fx-cliente">
