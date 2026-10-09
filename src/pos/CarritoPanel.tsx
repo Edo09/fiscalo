@@ -112,7 +112,7 @@ export function CarritoPanel({
                 </small>
               )}
             </div>
-            <Btn variant="ghost" onClick={onQuitarCliente} disabled={enDuda} aria-label="Quitar el cliente: la venta vuelve a consumo">Quitar</Btn>
+            <Btn variant="ghost" className="pos-cliente-quitar" onClick={onQuitarCliente} disabled={enDuda} aria-label="Quitar el cliente: la venta vuelve a consumo">Quitar</Btn>
           </div>
         ) : !enDuda && (
           <Btn className="pos-cliente-boton" icon="building-2" onClick={onCliente}>Crédito fiscal (RNC)</Btn>

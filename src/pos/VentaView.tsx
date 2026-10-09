@@ -139,16 +139,18 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     return () => window.clearInterval(id)
   }, [cargarEstado])
 
-  // Catálogo (C1): al entrar y cada 5 minutos.
-  const cargarCatalogo = useCallback(async () => {
+  // Catálogo (C1): al entrar y cada 5 minutos. true = se cargó.
+  const cargarCatalogo = useCallback(async (): Promise<boolean> => {
     try {
       const c = await posApi.catalogo(equipo.token, sesion.token)
-      if (!vivoRef.current) return
+      if (!vivoRef.current) return false
       guardarCatalogo(c)
       setErrorCatalogo(null)
+      return true
     } catch (e) {
-      if (!vivoRef.current || errorDeSesion(e)) return
+      if (!vivoRef.current || errorDeSesion(e)) return false
       setErrorCatalogo(e instanceof PosApiError ? e.message : 'No se pudo cargar el catálogo.')
+      return false
     }
   }, [equipo.token, sesion.token, guardarCatalogo, errorDeSesion])
 
@@ -157,6 +159,30 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     const id = window.setInterval(() => void cargarCatalogo(), CATALOGO_CADA_MS)
     return () => window.clearInterval(id)
   }, [cargarCatalogo])
+
+  // Actualizar (botón del catálogo y F5): catálogo y estado de la caja, en el
+  // sitio. Recargar la página cierra la sesión del cajero y pide el PIN otra
+  // vez; esto trae los cambios hechos en app.* (productos, precios) sin eso.
+  const [recargando, setRecargando] = useState(false)
+  const [recargado, setRecargado] = useState(false)
+  const recargandoRef = useRef(false)
+  const recargar = useCallback(async () => {
+    if (recargandoRef.current) return
+    recargandoRef.current = true
+    setRecargando(true)
+    setRecargado(false)
+    try {
+      const [ok] = await Promise.all([cargarCatalogo(), cargarEstado()])
+      if (ok && vivoRef.current) {
+        // Un instante con la marca de "listo": si falló, lo dice el aviso del catálogo.
+        setRecargado(true)
+        window.setTimeout(() => { if (vivoRef.current) setRecargado(false) }, 1500)
+      }
+    } finally {
+      recargandoRef.current = false
+      if (vivoRef.current) setRecargando(false)
+    }
+  }, [cargarCatalogo, cargarEstado])
 
   // Envíos pendientes (F7): al entrar y cada 2 minutos.
   const reenviar = useCallback(async () => {
@@ -260,6 +286,14 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   // Atajos (V6). Con un diálogo abierto, manda el diálogo.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      // F5 actualiza en el sitio, también con un diálogo abierto: la recarga del
+      // navegador pediría el PIN (y a mitad de un cobro lo dejaría en duda).
+      // Ctrl+F5 y el botón del navegador siguen recargando de verdad.
+      if (e.key === 'F5' && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+        e.preventDefault()
+        if (modal === null) void recargar()
+        return
+      }
       if (modal !== null) return
       if (e.key === 'F1') {
         e.preventDefault()
@@ -277,7 +311,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [modal, busqueda, lineas.length, cobroEnDuda, abrirCobro])
+  }, [modal, busqueda, lineas.length, cobroEnDuda, abrirCobro, recargar])
 
   const enCarrito = useMemo(() => new Map(lineas.map((l) => [l.productoId, l.cantidad])), [lineas])
   const empresa = estado?.empresa.nombre ?? equipo.empresa ?? ''
@@ -339,6 +373,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           catalogo={catalogo}
           error={errorCatalogo}
           onReintentar={() => void cargarCatalogo()}
+          onRecargar={() => void recargar()}
+          recargando={recargando}
+          recargado={recargado}
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           categoria={categoria}

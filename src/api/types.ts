@@ -838,6 +838,8 @@ export interface CategoryRow {
   id: number
   nombre?: string | null
   descripcion?: string | null
+  /** Color en el POS, '#RRGGBB' (migración 034). Único por categoría; null = calculado del nombre. */
+  color?: string | null
   estado?: number | boolean | null
   created_at?: string
   updated_at?: string
@@ -846,6 +848,8 @@ export interface CategoryRow {
 export interface CreateCategoryInput {
   nombre: string
   descripcion?: string
+  /** '#RRGGBB' o null (automático). Ausente en un PUT = no se cambia. */
+  color?: string | null
   estado?: number
 }
 

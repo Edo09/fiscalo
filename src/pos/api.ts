@@ -162,6 +162,8 @@ export interface ProductoPos {
 export interface CategoriaPos {
   id: number
   nombre: string
+  /** '#RRGGBB' elegido en app.* (Categorías); null o ausente = calculado del nombre. */
+  color?: string | null
   productos: number
 }
 
