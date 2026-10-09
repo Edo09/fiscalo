@@ -113,3 +113,25 @@ export function teclearMonto(actual: string, tecla: string): string {
   if (entero.length >= 7) return actual
   return actual === '0' ? tecla : actual + tecla
 }
+
+// --- Conteo de la gaveta (cierre de turno, K6) --------------------------------
+
+/** Billetes y monedas dominicanos (en pesos), del mayor al menor. Mismo orden que PosCierre::DENOMINACIONES. */
+export const BILLETES = [2000, 1000, 500, 200, 100, 50, 20] as const
+export const MONEDAS = [25, 10, 5, 1] as const
+export const DENOMINACIONES = [...BILLETES, ...MONEDAS] as const
+
+/** Total contado en centavos: unidades por denominación más "otros / centavos". */
+export function contadoCentavos(conteo: Record<string, number>): number {
+  let total = conteo.otros_centavos ?? 0
+  for (const d of DENOMINACIONES) total += d * 100 * (conteo[String(d)] ?? 0)
+  return total
+}
+
+/** Tecla en un campo de unidades (entero, hasta 5 cifras). */
+export function teclearEntero(actual: string, tecla: string): string {
+  if (tecla === '⌫') return actual.slice(0, -1)
+  if (tecla === 'C') return ''
+  if (!/^\d$/.test(tecla) || actual.length >= 5) return actual
+  return actual === '0' ? tecla : actual + tecla
+}

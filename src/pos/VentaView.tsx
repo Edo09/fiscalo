@@ -9,13 +9,16 @@
 // - Envíos pendientes (F7): se reintentan cada 2 minutos, también con la
 //   pantalla en uso. Si la DGII rechaza una venta ya entregada, queda una
 //   alerta hasta que alguien la lea.
+// - Cierre (K6-K8): el propio o, con PIN de supervisor, el de otro cajero. Al
+//   terminar el propio, la pantalla se bloquea (cambio de turno).
+// - Ventas canceladas y líneas quitadas se registran para el cierre (V4).
 // - Bloqueo de pantalla manual y a los 10 minutos sin actividad. El carrito se
 //   conserva (vive en carrito.ts).
 // - Teclado: F1 buscador; F9 / F2 / F3 cobrar en efectivo / tarjeta /
 //   transferencia; Esc limpia la búsqueda o ofrece cancelar la venta.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
-import { posApi, PosApiError, type EstadoPos, type FormaPago, type Reenvio } from './api'
+import { posApi, PosApiError, type EstadoPos, type FormaPago, type Reenvio, type TurnoCaja } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { useCarritoStore, type LineaCarrito } from './carrito'
@@ -23,7 +26,9 @@ import { CatalogoPanel } from './CatalogoPanel'
 import { CarritoPanel } from './CarritoPanel'
 import { CantidadModal, ConfirmarModal } from './PosModales'
 import { CobroModal } from './CobroModal'
-import { AperturaTurnoModal, ImpresoraModal } from './CajaModales'
+import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } from './CajaModales'
+import { CierreModal } from './CierreModal'
+import { importeLinea } from './montos'
 
 /** Minutos sin tocar la pantalla antes de bloquearla (docs/specs/pos.md §8, punto 5). */
 export const BLOQUEO_INACTIVIDAD_MIN = 10
@@ -46,6 +51,14 @@ type Modal =
   | { tipo: 'cobro'; forma: FormaPago }
   | { tipo: 'apertura' }
   | { tipo: 'impresora' }
+  | { tipo: 'turno' }
+  | { tipo: 'supervisor' }
+  /**
+   * permiso: del supervisor (turno ajeno); null si cierra el propio o un supervisor.
+   * turno: copia del que se cierra; el estado lo pierde apenas se cierra y el
+   * resultado tiene que seguir en pantalla.
+   */
+  | { tipo: 'cierre'; permiso: string | null; propio: boolean; turno: TurnoCaja; cuenta: string }
   | null
 
 function useReloj(): string {
@@ -189,6 +202,27 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       ? `La caja tiene el turno abierto de ${turno?.empleado_nombre ?? 'otro cajero'}. Un supervisor tiene que cerrarlo.`
       : null
 
+  // Cierre (K4, K6): el propio, o el de otro (supervisor en sesión, o con su PIN).
+  // El propio no con una venta a medias; ninguno con un cobro sin confirmar.
+  const motivoNoCerrar = cobroEnDuda
+    ? 'Hay un cobro sin confirmar: reinténtalo antes de cerrar el turno.'
+    : turnoPropio && lineas.length > 0
+      ? 'Hay una venta en curso: cóbrala o cancélala antes de cerrar el turno.'
+      : null
+  const iniciarCierre = useCallback(() => {
+    if (!turno || motivoNoCerrar) return
+    if (turnoPropio || sesion.empleado.rol === 'supervisor') setModal({ tipo: 'cierre', permiso: null, propio: turnoPropio, turno, cuenta: sesion.empleado.nombre })
+    else setModal({ tipo: 'supervisor' })
+  }, [turno, motivoNoCerrar, turnoPropio, sesion.empleado.rol, sesion.empleado.nombre])
+
+  // V4: lo que sale del carrito sin cobrarse queda registrado para el cierre.
+  const registrarEvento = useCallback((tipo: 'cancelada' | 'quitada', ls: LineaCarrito[]) => {
+    if (ls.length === 0) return
+    const monto = ls.reduce((t, l) => t + importeLinea(l.precioCentavos, l.cantidad), 0)
+    posApi.evento(equipo.token, sesion.token, tipo, monto, ls.map((l) => ({ product_id: l.productoId, nombre: l.nombre, cantidad: l.cantidad })))
+      .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
+  }, [equipo.token, sesion.token])
+
   const abrirCobro = useCallback((forma: FormaPago) => {
     if (cobroEnDuda) { setModal({ tipo: 'cobro', forma: cobroEnDuda.forma_pago }); return }
     if (lineas.length === 0 || !estado || turnoAjeno) return
@@ -235,6 +269,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           </span>
         )}
         <span className="pos-reloj">{reloj}</span>
+        <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
         <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
         <Btn icon="lock" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
       </header>
@@ -252,7 +287,10 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       {turnoAjeno && turno && (
         <div className="pos-franja aviso">
           <Icon name="alert-triangle" size={16} />
-          <span>Turno abierto de <b>{turno.empleado_nombre}</b> desde las {hora(turno.abierto_at)}. Para vender, un supervisor tiene que cerrarlo primero.</span>
+          <span>Turno abierto de <b>{turno.empleado_nombre}</b> (desde las {hora(turno.abierto_at)}): para vender, un supervisor tiene que cerrarlo primero.</span>
+          <Btn size="sm" icon="lock" onClick={iniciarCierre} disabled={motivoNoCerrar !== null}>
+            {sesion.empleado.rol === 'supervisor' ? 'Cerrar su turno' : 'Cerrar su turno (supervisor)'}
+          </Btn>
         </div>
       )}
       {turnoPropio && turno && turno.de_dia_anterior && (
@@ -287,7 +325,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           onMas={(l) => cambiarCantidad(l.productoId, Math.min(l.cantidad + 1, 99999))}
           onMenos={(l) => { if (l.cantidad > 1) cambiarCantidad(l.productoId, Math.round((l.cantidad - 1) * 100) / 100) }}
           onCantidad={(l) => setModal({ tipo: 'cantidad', linea: l })}
-          onQuitar={(l) => quitar(l.productoId)}
+          onQuitar={(l) => { registrarEvento('quitada', [l]); quitar(l.productoId) }}
           onCancelar={() => setModal({ tipo: 'cancelar' })}
         />
       </main>
@@ -305,7 +343,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           texto={`Se ${lineas.length === 1 ? 'quita el producto' : `quitan los ${lineas.length} productos`} del carrito. No se emite nada.`}
           confirmar="Sí, cancelar venta"
           onCerrar={() => setModal(null)}
-          onConfirmar={() => { vaciar(); setModal(null); setBusqueda('') }}
+          onConfirmar={() => { registrarEvento('cancelada', lineas); vaciar(); setModal(null); setBusqueda('') }}
         />
       )}
       {modal?.tipo === 'cobro' && (
@@ -339,6 +377,52 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         />
       )}
       {modal?.tipo === 'impresora' && <ImpresoraModal caja={equipo.caja.nombre} onCerrar={() => setModal(null)} />}
+      {modal?.tipo === 'turno' && (
+        <TurnoModal
+          equipo={equipo}
+          sesion={sesion}
+          turno={turno}
+          puedeCerrar={turno !== null && motivoNoCerrar === null}
+          motivoNoCerrar={motivoNoCerrar}
+          onCerrarTurno={iniciarCierre}
+          onAbrirTurno={() => setModal({ tipo: 'apertura' })}
+          onCerrar={() => setModal(null)}
+          errorDeSesion={errorDeSesion}
+        />
+      )}
+      {modal?.tipo === 'supervisor' && turno && (
+        <SupervisorPinModal
+          equipo={equipo}
+          sesion={sesion}
+          turno={turno}
+          errorDeSesion={errorDeSesion}
+          onCerrar={() => setModal(null)}
+          onAutorizado={(permiso, supervisor) => setModal({ tipo: 'cierre', permiso, propio: false, turno, cuenta: supervisor })}
+        />
+      )}
+      {modal?.tipo === 'cierre' && (
+        <CierreModal
+          equipo={equipo}
+          sesion={sesion}
+          turno={modal.turno}
+          permiso={modal.permiso}
+          cuenta={modal.cuenta}
+          empresa={empresa || null}
+          errorDeSesion={errorDeSesion}
+          onCancelar={() => setModal(null)}
+          onCerrado={() => { void cargarEstado() }}
+          onTerminar={() => {
+            if (modal.propio) {
+              // Fin del turno propio: la caja queda lista para el siguiente.
+              setModal(null)
+              void bloquear()
+            } else {
+              aperturaOfrecida.current = true
+              setModal({ tipo: 'apertura' })
+            }
+          }}
+        />
+      )}
     </>
   )
 }

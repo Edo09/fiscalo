@@ -210,7 +210,7 @@ export function CobroModal({
                   <b>RD$ {formatoCentavos(Math.abs(devuelta ?? 0))}</b>
                 </div>
               </div>
-              <TecladoMonto valor={recibido} onCambio={setRecibido} />
+              <TecladoMonto onCambio={setRecibido} />
             </div>
           ) : (
             <p className="pos-sub" style={{ margin: '4px 0 0' }}>

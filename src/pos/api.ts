@@ -215,6 +215,56 @@ export interface Reenvio {
   pendientes: number
 }
 
+/** Conteo de la gaveta: unidades por denominación ("2000": 3...) y otros/centavos. */
+export type Conteo = Record<string, number>
+
+/** Foto del cierre de un turno (pos_turnos.totales_json, K8). Montos en centavos. */
+export interface ReporteCierre {
+  version: number
+  turno_id: number
+  caja: { id: number; nombre: string }
+  empleado: { id: number; nombre: string }
+  cerrado_por: { id: number; nombre: string; rol: 'cajero' | 'supervisor' }
+  abierto_at: string
+  cerrado_at: string
+  fondo_centavos: number
+  ventas: GrupoFormas
+  devoluciones: GrupoFormas
+  /** { "E32": 4 } */
+  comprobantes: Record<string, number>
+  canceladas: { cantidad: number; monto_centavos: number }
+  lineas_quitadas: { cantidad: number; monto_centavos: number }
+  pendientes: { e_ncf: string; total_centavos: number }[]
+  rechazadas: { e_ncf: string; total_centavos: number }[]
+  conteo: Conteo
+  efectivo_ventas_centavos: number
+  efectivo_devoluciones_centavos: number
+  esperado_centavos: number
+  contado_centavos: number
+  /** contado − esperado: + sobra, − falta. */
+  diferencia_centavos: number
+  nota?: string | null
+}
+
+export interface GrupoFormas {
+  cantidad: number
+  total_centavos: number
+  por_forma: { forma_pago: number; nombre: string; cantidad: number; monto_centavos: number }[]
+}
+
+/** Venta cobrada del turno (K9). */
+export interface VentaTurno {
+  factura_id: number
+  e_ncf: string
+  tipo_ecf: string
+  fecha: string
+  total_centavos: number
+  forma_pago: number
+  forma_pago_nombre: string
+  estado_dgii: string
+  envio_pendiente: boolean
+}
+
 export interface LoginAdmin {
   token: string
   user: { id: number; name: string; username: string; permissions?: string[] }
@@ -243,6 +293,24 @@ export const posApi = {
     posFetch<{ recibo: ReciboDatos }>('GET', `/pos/ventas/${facturaId}/recibo?ancho=${ancho}`, { equipo, sesion }),
   reenviarPendientes: (equipo: string) =>
     posFetch<Reenvio>('POST', '/pos/pendientes/reenviar', { equipo }, {}, 75_000),
+
+  // Turno: ventas, cierre y autorizaciones (K4-K9, S1, V4)
+  ventasTurno: (equipo: string, sesion: string) =>
+    posFetch<{ turno_caja: TurnoCaja | null; ventas: VentaTurno[] }>('GET', '/pos/ventas', { equipo, sesion }),
+  autorizar: (equipo: string, sesion: string, pin: string, turnoId: number) =>
+    posFetch<{ permiso: string; supervisor: { id: number; nombre: string }; vence_en_segundos: number }>(
+      'POST', '/pos/autorizar', { equipo, sesion }, { pin, accion: 'cerrar_turno', turno_id: turnoId },
+    ),
+  // El cierre espera a una venta que se esté emitiendo (candado del turno): más margen.
+  cerrarTurno: (equipo: string, sesion: string, turnoId: number, conteo: Conteo, permiso: string | null) =>
+    posFetch<{ turno: unknown; reporte: ReporteCierre }>(
+      'POST', '/pos/turno/cerrar', { equipo, sesion }, { turno_id: turnoId, conteo, permiso }, 75_000,
+    ),
+  notaTurno: (equipo: string, sesion: string, turnoId: number, nota: string) =>
+    posFetch<{ turno: unknown; reporte: ReporteCierre }>('POST', '/pos/turno/nota', { equipo, sesion }, { turno_id: turnoId, nota }),
+  evento: (equipo: string, sesion: string, tipo: 'cancelada' | 'quitada', montoCentavos: number,
+    lineas: { product_id: number; nombre: string; cantidad: number }[]) =>
+    posFetch<{ registrado: boolean }>('POST', '/pos/eventos', { equipo, sesion }, { tipo, monto_centavos: montoCentavos, lineas }),
 
   // Admin, solo para habilitar el equipo
   login: (usuario: string, clave: string) =>

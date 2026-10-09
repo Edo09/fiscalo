@@ -5,14 +5,18 @@ import { Icon } from '@/components/ui'
 import { teclearMonto } from './montos'
 
 interface Props {
-  valor: string
-  onCambio: (texto: string) => void
+  /**
+   * Recibe un actualizador (como el set de useState): cada tecla se aplica
+   * sobre el valor anterior, no sobre el del último render. Si no, varias
+   * teclas seguidas antes de redibujar se pisan ("100" quedaba en "0").
+   */
+  onCambio: (actualizar: (anterior: string) => string) => void
   /** Escuchar el teclado físico (solo el teclado visible a la vez). */
   fisico?: boolean
 }
 
-export function TecladoMonto({ valor, onCambio, fisico = true }: Props) {
-  const teclear = useCallback((t: string) => onCambio(teclearMonto(valor, t)), [valor, onCambio])
+export function TecladoMonto({ onCambio, fisico = true }: Props) {
+  const teclear = useCallback((t: string) => onCambio((anterior) => teclearMonto(anterior, t)), [onCambio])
 
   useEffect(() => {
     if (!fisico) return
