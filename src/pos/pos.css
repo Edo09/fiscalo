@@ -152,7 +152,38 @@
   background: transparent; color: var(--text-2); cursor: pointer;
 }
 
-.pos-chips { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; scrollbar-width: thin; }
+/* Buscador y herramientas (vista, orden, cuántos): en una fila; en pantallas angostas, en dos. */
+.pos-catalogo-cab { display: flex; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.pos-catalogo-cab .pos-buscador { flex: 1 1 280px; min-width: 0; }
+.pos-catalogo-herr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pos-vistas { display: inline-flex; height: 52px; padding: 3px; gap: 2px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); }
+.pos-vistas button {
+  width: 46px; display: grid; place-items: center; border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-vistas button.on { background: var(--accent); color: var(--on-accent); }
+.pos-selector {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; height: 52px; padding: 0 4px 0 12px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); font-size: 13px;
+}
+.pos-selector select {
+  height: 100%; border: 0; background: transparent; color: var(--text); font-size: 15px; font-weight: 600;
+  padding: 0 8px 0 0; cursor: pointer; max-width: 210px;
+}
+.pos-selector select:focus { outline: none; }
+.pos-selector:focus-within { outline: 2px solid var(--ring); border-color: var(--accent); }
+
+/* Categorías: una fila deslizable; "Todas" las despliega en varias filas. */
+.pos-chips-fila { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; min-width: 0; }
+.pos-chips { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.pos-chips-fila.abiertas .pos-chips { flex-wrap: wrap; overflow-x: hidden; overflow-y: auto; max-height: 34vh; }
+.pos-chips-mas {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  border: 1px dashed var(--border-strong); border-radius: var(--r-full); background: var(--surface-2);
+  color: var(--text); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.pos-chips-mas svg { transition: transform .15s; }
+.pos-chips-fila.abiertas .pos-chips-mas svg { transform: rotate(180deg); }
 .pos-chip {
   display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
   height: 44px; padding: 0 16px; border-radius: var(--r-full);
@@ -175,6 +206,13 @@
   padding: 48px 16px; color: var(--text-2); text-align: center;
 }
 .pos-grilla-vacia p { margin: 0; max-width: 420px; line-height: 1.5; }
+.pos-grilla-mas {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px; color: var(--text-2); font-size: 13.5px; text-align: center;
+}
+/* Celda: la tarjeta (botón que agrega) y, encima, el − y el contador. */
+.pos-producto-celda { position: relative; display: flex; min-width: 0; }
+.pos-producto-celda > .pos-producto { flex: 1; min-width: 0; }
 .pos-producto {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   min-height: 136px; padding: 12px; text-align: left;
@@ -198,6 +236,49 @@
   background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 13px;
   display: grid; place-items: center;
 }
+/* Arriba a la derecha, a la altura de las iniciales. El contador deja pasar el
+   toque a la tarjeta (agrega); solo el − lo atrapa. */
+.pos-producto-marcas {
+  position: absolute; top: 12px; right: 12px; height: 38px;
+  display: flex; align-items: center; gap: 6px; pointer-events: none;
+}
+.pos-producto-menos {
+  pointer-events: auto; width: 38px; height: 38px; border-radius: var(--r-full);
+  display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent);
+}
+.pos-producto-menos:active { background: var(--accent-soft); transform: scale(0.94); }
+.pos-producto-menos:disabled { opacity: 0.45; cursor: default; }
+
+/* Vista compacta: más productos por pantalla; sin código. */
+.pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+.vista-compacta .pos-producto { min-height: 100px; padding: 9px; gap: 2px; }
+.vista-compacta .pos-ini { width: 30px; height: 30px; font-size: 12px; }
+.vista-compacta .pos-producto-top { margin-bottom: 2px; }
+.vista-compacta .pos-producto-nombre { font-size: 13px; }
+.vista-compacta .pos-producto-sku { display: none; }
+.vista-compacta .pos-producto-pie { padding-top: 4px; }
+.vista-compacta .pos-producto-precio { font-size: 15px; }
+.vista-compacta .pos-exist { font-size: 11px; }
+.vista-compacta .pos-producto-marcas { top: 9px; right: 9px; height: 30px; gap: 4px; }
+.vista-compacta .pos-producto-menos { width: 32px; height: 32px; }
+.vista-compacta .pos-producto-cant { height: 24px; min-width: 30px; padding: 0 6px; font-size: 12px; }
+
+/* Vista lista: una fila por producto; la columna de la derecha queda para el − y el contador. */
+.pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.vista-lista .pos-producto {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 60px; padding: 8px 104px 8px 12px;
+}
+.vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
+.vista-lista .pos-ini { width: 34px; height: 34px; font-size: 12px; }
+.vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.vista-lista .pos-producto-sku { grid-area: sku; }
+.vista-lista .pos-producto-pie { grid-area: pie; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; padding: 0; flex-wrap: nowrap; }
+.vista-lista .pos-producto-precio { font-size: 17px; }
+.vista-lista .pos-producto-marcas { top: 50%; right: 12px; transform: translateY(-50%); height: 36px; }
+.vista-lista .pos-producto-menos { width: 36px; height: 36px; }
+.vista-lista .pos-producto:active { transform: scale(0.99); }
 .pos-producto-nombre {
   font-weight: 600; font-size: 14.5px; line-height: 1.25;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -422,6 +503,21 @@
 .pos-venta-fila:last-child { border-bottom: 0; }
 .pos-venta-fila > div { display: flex; flex-direction: column; min-width: 0; }
 .pos-venta-fila small { color: var(--text-2); font-size: 12.5px; }
+.pos-venta-fila .pos-venta-cliente { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-etiqueta-cf {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-full); vertical-align: 1px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 11px; font-weight: 700;
+}
+/* Ventas del día: total y una casilla por forma de pago. */
+.pos-dia-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.pos-dia-resumen > div {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.pos-dia-resumen small { font-size: 12px; color: var(--text-2); }
+.pos-dia-resumen b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.pos-dia-resumen .pos-dia-total { grid-column: 1 / -1; background: var(--accent-soft); border-color: var(--accent); }
+.pos-dia-resumen .pos-dia-total b { font-size: 24px; letter-spacing: -0.01em; }
 .pos-franja .btn { margin-left: auto; flex-shrink: 0; }
 
 @media (max-width: 720px) {

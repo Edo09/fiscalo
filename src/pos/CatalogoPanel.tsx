@@ -1,11 +1,18 @@
 // Catálogo táctil de la caja (api-gratex docs/specs/pos.md C3 y C4): buscador,
-// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad.
+// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad;
+// el − junto al contador quita una (con 1, saca el producto de la venta).
 // La búsqueda es en memoria y, mientras hay texto, busca en todas las categorías.
-import { useMemo, type RefObject } from 'react'
+// Vista (tarjetas, compacta, lista), orden y cuántos se pintan son preferencia
+// del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { colorFor, fmtCantidad } from '@/lib/format'
 import type { CatalogoPos, ProductoPos } from './api'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
+import {
+  cargarPreferencias, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS,
+  type Limite, type Orden, type PreferenciasCatalogo,
+} from './catalogoVista'
 
 interface Props {
   catalogo: CatalogoPos | null
@@ -21,6 +28,8 @@ interface Props {
   /** Cantidad de cada producto que ya está en el carrito. */
   enCarrito: Map<number, number>
   onAgregar: (p: ProductoPos) => void
+  /** Quita una unidad; con una sola, quita la línea (queda registrada, V4). */
+  onQuitarUno: (p: ProductoPos) => void
   /** Cobro sin confirmar: la venta no se puede cambiar hasta reintentarlo. */
   bloqueado?: boolean
 }
@@ -46,59 +55,120 @@ function Existencia({ p }: { p: ProductoPos }) {
 
 export function CatalogoPanel({
   catalogo, error, onReintentar, busqueda, onBusqueda, categoria, onCategoria, buscadorRef, enCarrito, onAgregar,
-  bloqueado = false,
+  onQuitarUno, bloqueado = false,
 }: Props) {
   const colores = useMemo(() => {
     const m = new Map<number, string>()
     for (const c of catalogo?.categorias ?? []) m.set(c.id, colorFor(c.nombre))
     return m
   }, [catalogo])
-  const productos = useMemo(() => filtrar(catalogo, busqueda, categoria), [catalogo, busqueda, categoria])
+  const [prefs, setPrefs] = useState<PreferenciasCatalogo>(cargarPreferencias)
+  useEffect(() => { guardarPreferencias(prefs) }, [prefs])
+  const productos = useMemo(() => ordenar(filtrar(catalogo, busqueda, categoria), prefs.orden), [catalogo, busqueda, categoria, prefs.orden])
+  const { visibles, ocultos } = limitar(productos, prefs.limite)
   const buscando = busqueda.trim() !== ''
+
+  // Categorías: una fila que se desliza; si no caben, "Todas" las muestra en varias filas.
+  const chipsRef = useRef<HTMLDivElement>(null)
+  const [desborda, setDesborda] = useState(false)
+  const [abiertas, setAbiertas] = useState(false)
+  useLayoutEffect(() => {
+    const el = chipsRef.current
+    if (!el) return
+    // Abiertas en varias filas nada desborda: vale lo medido con la fila plegada (si
+    // no, al plegar el botón "Todas" desaparecería un instante y la fila saltaría).
+    const medir = () => { if (!abiertas) setDesborda(el.scrollWidth > el.clientWidth + 1) }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [catalogo, abiertas])
+  const elegirCategoria = (c: number | null) => {
+    onBusqueda('')
+    onCategoria(c)
+    setAbiertas(false)
+  }
+  // Al plegarlas, que la elegida quede a la vista en la fila.
+  useEffect(() => {
+    if (!abiertas) chipsRef.current?.querySelector('.pos-chip.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [abiertas, categoria])
 
   return (
     <section className="pos-catalogo" aria-label="Catálogo">
-      <div className="pos-buscador">
-        <Icon name="search" size={20} />
-        <input
-          ref={buscadorRef}
-          value={busqueda}
-          onChange={(e) => onBusqueda(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter con un solo resultado lo agrega: búsqueda + Enter sin tocar la pantalla.
-            if (e.key === 'Enter' && productos.length === 1 && !bloqueado) {
-              e.preventDefault()
-              onAgregar(productos[0])
-              onBusqueda('')
-            }
-          }}
-          placeholder="Buscar por nombre o código (F1)"
-          aria-label="Buscar producto"
-          autoComplete="off"
-          spellCheck={false}
-        />
-        {busqueda !== '' && (
-          <button type="button" className="pos-buscador-limpiar" onClick={() => { onBusqueda(''); buscadorRef.current?.focus() }}
-            aria-label="Limpiar búsqueda">
-            <Icon name="x" size={18} />
-          </button>
-        )}
+      <div className="pos-catalogo-cab">
+        <div className="pos-buscador">
+          <Icon name="search" size={20} />
+          <input
+            ref={buscadorRef}
+            value={busqueda}
+            onChange={(e) => onBusqueda(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter con un solo resultado lo agrega: búsqueda + Enter sin tocar la pantalla.
+              if (e.key === 'Enter' && productos.length === 1 && !bloqueado) {
+                e.preventDefault()
+                onAgregar(productos[0])
+                onBusqueda('')
+              }
+            }}
+            placeholder="Buscar por nombre o código (F1)"
+            aria-label="Buscar producto"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {busqueda !== '' && (
+            <button type="button" className="pos-buscador-limpiar" onClick={() => { onBusqueda(''); buscadorRef.current?.focus() }}
+              aria-label="Limpiar búsqueda">
+              <Icon name="x" size={18} />
+            </button>
+          )}
+        </div>
+        <div className="pos-catalogo-herr">
+          <div className="pos-vistas" role="radiogroup" aria-label="Vista del catálogo">
+            {VISTAS.map((v) => (
+              <button key={v.valor} type="button" role="radio" aria-checked={prefs.vista === v.valor} title={v.nombre} aria-label={v.nombre}
+                className={prefs.vista === v.valor ? 'on' : ''} onClick={() => setPrefs((p) => ({ ...p, vista: v.valor }))}>
+                <Icon name={v.icono} size={20} />
+              </button>
+            ))}
+          </div>
+          <label className="pos-selector" title="Ordenar">
+            <Icon name="arrow-up-down" size={16} />
+            <select value={prefs.orden} aria-label="Ordenar productos"
+              onChange={(e) => setPrefs((p) => ({ ...p, orden: e.target.value as Orden }))}>
+              {ORDENES.map((o) => <option key={o.valor} value={o.valor}>{o.nombre}</option>)}
+            </select>
+          </label>
+          <label className="pos-selector" title="Productos en pantalla">
+            <span>Mostrar</span>
+            <select value={prefs.limite} aria-label="Cuántos productos mostrar"
+              onChange={(e) => setPrefs((p) => ({ ...p, limite: Number(e.target.value) as Limite }))}>
+              {LIMITES.map((l) => <option key={l.valor} value={l.valor}>{l.nombre}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
 
       {catalogo && catalogo.categorias.length > 0 && (
-        <div className="pos-chips" role="tablist" aria-label="Categorías">
-          <button type="button" role="tab" aria-selected={!buscando && categoria === null}
-            className={'pos-chip' + (!buscando && categoria === null ? ' on' : '')}
-            onClick={() => { onBusqueda(''); onCategoria(null) }}>
-            Todos <span>{catalogo.productos.length}</span>
-          </button>
-          {catalogo.categorias.map((c) => (
-            <button key={c.id} type="button" role="tab" aria-selected={!buscando && categoria === c.id}
-              className={'pos-chip' + (!buscando && categoria === c.id ? ' on' : '')}
-              onClick={() => { onBusqueda(''); onCategoria(c.id) }}>
-              <i style={{ background: colores.get(c.id) }} />{c.nombre} <span>{c.productos}</span>
+        <div className={'pos-chips-fila' + (abiertas ? ' abiertas' : '')}>
+          <div ref={chipsRef} className="pos-chips" role="tablist" aria-label="Categorías">
+            <button type="button" role="tab" aria-selected={!buscando && categoria === null}
+              className={'pos-chip' + (!buscando && categoria === null ? ' on' : '')}
+              onClick={() => elegirCategoria(null)}>
+              Todos <span>{catalogo.productos.length}</span>
             </button>
-          ))}
+            {catalogo.categorias.map((c) => (
+              <button key={c.id} type="button" role="tab" aria-selected={!buscando && categoria === c.id}
+                className={'pos-chip' + (!buscando && categoria === c.id ? ' on' : '')}
+                onClick={() => elegirCategoria(c.id)}>
+                <i style={{ background: colores.get(c.id) }} />{c.nombre} <span>{c.productos}</span>
+              </button>
+            ))}
+          </div>
+          {(desborda || abiertas) && (
+            <button type="button" className="pos-chips-mas" aria-expanded={abiertas} onClick={() => setAbiertas((a) => !a)}>
+              <Icon name="chevron-down" size={18} />{abiertas ? 'Menos' : `Todas (${catalogo.categorias.length})`}
+            </button>
+          )}
         </div>
       )}
 
@@ -109,7 +179,7 @@ export function CatalogoPanel({
         </div>
       )}
 
-      <div className="pos-grilla">
+      <div className={'pos-grilla vista-' + prefs.vista}>
         {!catalogo ? (
           error ? (
             <div className="pos-grilla-vacia">
@@ -132,27 +202,45 @@ export function CatalogoPanel({
             </p>
           </div>
         ) : (
-          productos.map((p) => {
+          visibles.map((p) => {
             const cant = enCarrito.get(p.id) ?? 0
             const agotado = p.stock !== null && p.stock <= 0
+            // El − va fuera de la tarjeta (un botón no puede ir dentro de otro) y se
+            // monta encima, a la izquierda del contador.
             return (
-              <button key={p.id} type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
-                onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
-                <span className="pos-producto-top">
-                  <span className="pos-ini" style={{ background: p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA }}>
-                    {iniciales(p.nombre)}
+              <div key={p.id} className="pos-producto-celda">
+                <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
+                  onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
+                  <span className="pos-producto-top">
+                    <span className="pos-ini" style={{ background: p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA }}>
+                      {iniciales(p.nombre)}
+                    </span>
                   </span>
-                  {cant > 0 && <span className="pos-producto-cant">×{fmtCantidad(cant)}</span>}
-                </span>
-                <span className="pos-producto-nombre">{p.nombre}</span>
-                {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
-                <span className="pos-producto-pie">
-                  <b className="pos-producto-precio">{formatoCentavos(p.precio_centavos)}</b>
-                  <Existencia p={p} />
-                </span>
-              </button>
+                  <span className="pos-producto-nombre">{p.nombre}</span>
+                  {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
+                  <span className="pos-producto-pie">
+                    <b className="pos-producto-precio">{formatoCentavos(p.precio_centavos)}</b>
+                    <Existencia p={p} />
+                  </span>
+                </button>
+                {cant > 0 && (
+                  <span className="pos-producto-marcas">
+                    <button type="button" className="pos-producto-menos" onClick={() => onQuitarUno(p)} disabled={bloqueado}
+                      aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
+                      <Icon name="minus" size={18} />
+                    </button>
+                    <span className="pos-producto-cant">×{fmtCantidad(cant)}</span>
+                  </span>
+                )}
+              </div>
             )
           })
+        )}
+        {ocultos > 0 && (
+          <div className="pos-grilla-mas">
+            <span>Se muestran {visibles.length} de {productos.length} productos. Busca o elige una categoría para encontrar los demás.</span>
+            <Btn size="sm" onClick={() => setPrefs((p) => ({ ...p, limite: 0 }))}>Mostrar todos</Btn>
+          </div>
         )}
       </div>
     </section>

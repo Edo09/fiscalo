@@ -13,6 +13,7 @@ import { formatoCentavos, montoACentavos } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 import { ANCHO_UTIL_MM, fechaHora } from './reporteCierre'
+import { estadoDgii } from './estados'
 
 export function AperturaTurnoModal({ equipo, sesion, onAbierto, onCerrar, errorDeSesion }: {
   equipo: EquipoGuardado
@@ -232,12 +233,6 @@ export function SupervisorPinModal({ equipo, sesion, turno, onAutorizado, onCerr
 
 // --- Panel del turno (K9) --------------------------------------------------------
 
-const ESTADO_DGII: Record<string, string> = {
-  RFCE_ACEPTADO: 'Aceptada', ACEPTADO: 'Aceptada', RFCE_ACEPTADO_CONDICIONAL: 'Aceptada', ACEPTADO_CONDICIONAL: 'Aceptada',
-  RFCE_PENDIENTE: 'Sin confirmar DGII', ENVIO_PENDIENTE: 'Sin confirmar DGII', ENVIADO: 'DGII validando', EN_PROCESO: 'DGII validando',
-  RFCE_RECHAZADO: 'Rechazada', RECHAZADO: 'Rechazada',
-}
-
 export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar, onCerrarTurno, onAbrirTurno, onCerrar, errorDeSesion }: {
   equipo: EquipoGuardado
   sesion: { token: string; empleado: Empleado }
@@ -311,7 +306,7 @@ export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar,
             <div key={v.factura_id} className="pos-venta-fila">
               <div>
                 <b>{v.e_ncf}</b>
-                <small>{fechaHora(v.fecha).split(' ').slice(1).join(' ')} · {v.forma_pago_nombre} · {ESTADO_DGII[v.estado_dgii] ?? v.estado_dgii}</small>
+                <small>{fechaHora(v.fecha).split(' ').slice(1).join(' ')} · {v.forma_pago_nombre} · {estadoDgii(v.estado_dgii)}</small>
               </div>
               <b className="pos-linea-importe">RD$ {formatoCentavos(v.total_centavos)}</b>
               <Btn size="sm" icon="printer" disabled={imprimiendo !== null} onClick={() => void reimprimir(v)} aria-label={`Reimprimir ${v.e_ncf}`}>

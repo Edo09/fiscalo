@@ -283,6 +283,19 @@ export interface VentaTurno {
   envio_pendiente: boolean
 }
 
+/** Ventas de hoy del cajero en esta caja, de todos sus turnos (GET /api/pos/ventas/dia). */
+export interface VentasDia {
+  fecha: string
+  caja: { id: number; nombre: string }
+  empleado: { id: number; nombre: string }
+  resumen: {
+    cantidad: number
+    total_centavos: number
+    por_forma: { forma_pago: number; nombre: string; cantidad: number; total_centavos: number }[]
+  }
+  ventas: (VentaTurno & { turno_id: number; cliente: string | null })[]
+}
+
 export interface LoginAdmin {
   token: string
   user: { id: number; name: string; username: string; permissions?: string[] }
@@ -318,6 +331,8 @@ export const posApi = {
   // Turno: ventas, cierre y autorizaciones (K4-K9, S1, V4)
   ventasTurno: (equipo: string, sesion: string) =>
     posFetch<{ turno_caja: TurnoCaja | null; ventas: VentaTurno[] }>('GET', '/pos/ventas', { equipo, sesion }),
+  ventasDia: (equipo: string, sesion: string) =>
+    posFetch<VentasDia>('GET', '/pos/ventas/dia', { equipo, sesion }),
   autorizar: (equipo: string, sesion: string, pin: string, turnoId: number) =>
     posFetch<{ permiso: string; supervisor: { id: number; nombre: string }; vence_en_segundos: number }>(
       'POST', '/pos/autorizar', { equipo, sesion }, { pin, accion: 'cerrar_turno', turno_id: turnoId },

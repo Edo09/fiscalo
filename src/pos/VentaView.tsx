@@ -32,6 +32,7 @@ import { CobroModal } from './CobroModal'
 import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } from './CajaModales'
 import { CierreModal } from './CierreModal'
 import { ClienteRncModal } from './ClienteRncModal'
+import { VentasDiaModal } from './VentasDiaModal'
 import { totalesCarrito } from './montos'
 
 /** Minutos sin tocar la pantalla antes de bloquearla (docs/specs/pos.md §8, punto 5). */
@@ -58,6 +59,7 @@ type Modal =
   | { tipo: 'turno' }
   | { tipo: 'supervisor' }
   | { tipo: 'cliente' }
+  | { tipo: 'ventasDia' }
   /**
    * permiso: del supervisor (turno ajeno); null si cierra el propio o un supervisor.
    * turno: copia del que se cierra; el estado lo pierde apenas se cierra y el
@@ -229,6 +231,15 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
   }, [equipo.token, sesion.token, cliente])
 
+  // − de la tarjeta del catálogo: una unidad menos; con una sola (o menos, si es
+  // fraccionaria), sale de la venta igual que con la papelera del carrito.
+  const quitarUno = useCallback((p: { id: number }) => {
+    const l = lineas.find((x) => x.productoId === p.id)
+    if (!l || cobroEnDuda) return
+    if (l.cantidad > 1) cambiarCantidad(l.productoId, Math.round((l.cantidad - 1) * 100) / 100)
+    else { registrarEvento('quitada', [l]); quitar(l.productoId) }
+  }, [lineas, cobroEnDuda, cambiarCantidad, registrarEvento, quitar])
+
   const abrirCobro = useCallback((forma: FormaPago) => {
     if (cobroEnDuda) { setModal({ tipo: 'cobro', forma: cobroEnDuda.forma_pago }); return }
     if (lineas.length === 0 || !estado || turnoAjeno) return
@@ -278,6 +289,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           </span>
         )}
         <span className="pos-reloj">{reloj}</span>
+        <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
         <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
         <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
         <Btn icon="lock" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
@@ -321,6 +333,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           buscadorRef={buscadorRef}
           enCarrito={enCarrito}
           onAgregar={agregar}
+          onQuitarUno={quitarUno}
           bloqueado={cobroEnDuda !== null}
         />
         <CarritoPanel
@@ -396,6 +409,9 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           onCerrar={() => setModal(null)}
           onElegido={(c) => { ponerCliente(c); setModal(null) }}
         />
+      )}
+      {modal?.tipo === 'ventasDia' && (
+        <VentasDiaModal equipo={equipo} sesion={sesion} errorDeSesion={errorDeSesion} onCerrar={() => setModal(null)} />
       )}
       {modal?.tipo === 'impresora' && <ImpresoraModal caja={equipo.caja.nombre} onCerrar={() => setModal(null)} />}
       {modal?.tipo === 'turno' && (
