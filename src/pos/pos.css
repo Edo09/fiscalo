@@ -461,7 +461,23 @@
 .pos-campo-monto small { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
 .pos-campo-monto b { font-size: 26px; font-variant-numeric: tabular-nums; }
 .pos-campo-monto b.vacio { color: var(--text-2); }
-.pos-billetes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+/* Billetes: el contador y el − sobresalen 8 px de las esquinas de arriba, así que
+   la grilla deja ese aire arriba y entre columnas. */
+.pos-billetes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 18px; margin: 16px 0 10px; }
+.pos-billete-celda { position: relative; display: flex; min-width: 0; }
+.pos-billete-celda > .pos-billete { flex: 1; min-width: 0; }
+.pos-billete.usado { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pos-billete-cuenta {
+  position: absolute; top: -8px; right: -8px; min-width: 26px; height: 22px; padding: 0 6px; pointer-events: none;
+  display: grid; place-items: center; border-radius: var(--r-full); background: var(--accent); color: var(--on-accent);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--surface);
+}
+.pos-billete-menos {
+  position: absolute; top: -8px; left: -8px; width: 28px; height: 28px; border-radius: var(--r-full);
+  display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: var(--danger-soft); color: var(--danger); border: 1.5px solid var(--danger); box-shadow: 0 0 0 2px var(--surface);
+}
+.pos-billete-menos:active { background: var(--danger); color: #fff; transform: scale(0.94); }
 .pos-billete {
   height: 48px; border-radius: var(--r-md); border: 1px solid var(--border-strong);
   background: var(--surface); color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer;

@@ -86,6 +86,29 @@ export function CobroModal({
   const faltaComprador = cliente === null && total >= TOPE_CONSUMO_CENTAVOS
   const [forma, setForma] = useState<FormaPago>(enDuda?.forma_pago ?? formaInicial)
   const [recibido, setRecibido] = useState('')
+  /**
+   * Cuántos billetes de cada denominación se tocaron (contador y − sobre cada
+   * botón). Lo recibido es lo tecleado más los billetes; si se usa el teclado
+   * el monto ya no se sabe en billetes y los contadores vuelven a cero.
+   */
+  const [billetes, setBilletes] = useState<Record<number, number>>({})
+  const sumarBillete = (b: number) => {
+    setRecibido((r) => centavosATexto((r === '' ? 0 : montoACentavos(r) ?? 0) + b * 100))
+    setBilletes((m) => ({ ...m, [b]: (m[b] ?? 0) + 1 }))
+  }
+  const restarBillete = (b: number) => {
+    if ((billetes[b] ?? 0) <= 0) return
+    // Si no queda nada recibido, vuelve a "Exacto".
+    setRecibido((r) => {
+      const c = (r === '' ? 0 : montoACentavos(r) ?? 0) - b * 100
+      return c > 0 ? centavosATexto(c) : ''
+    })
+    setBilletes((m) => ({ ...m, [b]: Math.max(0, (m[b] ?? 0) - 1) }))
+  }
+  const teclearRecibido = useCallback((actualizar: (anterior: string) => string) => {
+    setBilletes({})
+    setRecibido(actualizar)
+  }, [])
   const [fase, setFase] = useState<Fase>(() => (enDuda
     ? { tipo: 'duda', mensaje: 'El último cobro no se confirmó. Reinténtalo: si ya se había emitido, se recupera esa misma venta.' }
     : { tipo: 'eligiendo' }))
@@ -224,15 +247,31 @@ export function CobroModal({
                   <b className={recibido === '' ? 'vacio' : ''}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
                 </div>
                 <div className="pos-billetes">
-                  {BILLETES.map((b) => (
-                    <button key={b} type="button" className="pos-billete" aria-label={`Sumar un billete de ${b}`}
-                      onClick={() => setRecibido((r) => centavosATexto((r === '' ? 0 : montoACentavos(r) ?? 0) + b * 100))}>
-                      +{b.toLocaleString('es-DO')}
-                    </button>
-                  ))}
+                  {BILLETES.map((b) => {
+                    const n = billetes[b] ?? 0
+                    const nombre = b.toLocaleString('es-DO')
+                    // Contador y − van sobre el borde del botón, como en las tarjetas del catálogo.
+                    return (
+                      <div key={b} className="pos-billete-celda">
+                        <button type="button" className={'pos-billete' + (n > 0 ? ' usado' : '')} onClick={() => sumarBillete(b)}
+                          aria-label={n > 0 ? `Sumar un billete de ${nombre} (van ${n})` : `Sumar un billete de ${nombre}`}>
+                          +{nombre}
+                        </button>
+                        {n > 0 && (
+                          <>
+                            <button type="button" className="pos-billete-menos" onClick={() => restarBillete(b)}
+                              aria-label={`Quitar un billete de ${nombre}`}>
+                              <Icon name="minus" size={15} />
+                            </button>
+                            <span className="pos-billete-cuenta" aria-hidden="true">×{n}</span>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
                   {/* Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
                   <button type="button" className={'pos-billete' + (recibido === '' ? ' on' : '')} style={{ gridColumn: '1 / -1' }}
-                    onClick={() => setRecibido('')}>Exacto</button>
+                    onClick={() => { setRecibido(''); setBilletes({}) }}>Exacto</button>
                 </div>
                 {/* Verde = pago exacto; amarillo = hay que dar devuelta; rojo = falta. */}
                 <div className={'pos-devuelta' + (!alcanza ? ' falta' : (devuelta ?? 0) > 0 ? ' cambio' : '')}>
@@ -240,7 +279,7 @@ export function CobroModal({
                   <b>RD$ {formatoCentavos(Math.abs(devuelta ?? 0))}</b>
                 </div>
               </div>
-              <TecladoMonto onCambio={setRecibido} />
+              <TecladoMonto onCambio={teclearRecibido} />
             </div>
           ) : (
             <p className="pos-sub" style={{ margin: '4px 0 0' }}>
