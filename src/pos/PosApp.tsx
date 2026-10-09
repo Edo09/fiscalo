@@ -181,7 +181,9 @@ export function PosApp() {
           Sin conexión. No se puede emitir: usa el procedimiento de contingencia.
         </div>
       )}
-      {contenido}
+      {/* Envoltorio por pantalla: al cambiar (PIN, venta, habilitar...) entra con
+          un fundido. Solo opacidad: un transform aquí movería los diálogos fijos. */}
+      <div key={pantalla.tipo} className="pos-pantalla">{contenido}</div>
     </div>
   )
 }

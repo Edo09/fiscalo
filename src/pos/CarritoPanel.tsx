@@ -77,7 +77,7 @@ export function CarritoPanel({
                 <small>{formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{l.tasa === 0 ? ' · Exento' : ''}</small>
                 {aviso && <small className="pos-linea-aviso"><Icon name="alert-triangle" size={13} />{aviso}</small>}
               </div>
-              <b className="pos-linea-importe">{formatoCentavos(t.lineas[i].bruto)}</b>
+              <b key={t.lineas[i].bruto} className="pos-linea-importe pos-num">{formatoCentavos(t.lineas[i].bruto)}</b>
               <div className="pos-cant">
                 <button type="button" onClick={() => onMenos(l)} disabled={l.cantidad <= 1 || enDuda} aria-label={`Quitar una unidad de ${l.nombre}`}>
                   <Icon name="minus" size={20} />
@@ -118,7 +118,7 @@ export function CarritoPanel({
           </>
         )}
         <div className="pos-total-fila"><span>ITBIS incluido</span><span>{formatoCentavos(t.itbis)}</span></div>
-        <div className="pos-total-fila pos-total"><span>Total</span><span>RD$ {formatoCentavos(t.total)}</span></div>
+        <div className="pos-total-fila pos-total"><span>Total</span><span key={t.total} className="pos-num">RD$ {formatoCentavos(t.total)}</span></div>
         {enDuda ? (
           <Btn variant="primary" className="pos-cobrar" icon="refresh-cw" onClick={onCobrar}>Reintentar cobro</Btn>
         ) : sinTurno ? (

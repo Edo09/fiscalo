@@ -1,5 +1,6 @@
 // Teclado de montos en pesos (efectivo recibido, fondo del turno). Táctil y
 // con el teclado físico; el texto se valida aquí: hasta 7 cifras y 2 decimales.
+// "C" (o Supr en el teclado físico) deja el monto vacío.
 import { useCallback, useEffect } from 'react'
 import { Icon } from '@/components/ui'
 import { teclearMonto } from './montos'
@@ -40,6 +41,9 @@ export function TecladoMonto({ onCambio, fisico = true }: Props) {
           {t === '⌫' ? <Icon name="delete" size={24} /> : t}
         </button>
       ))}
+      <button type="button" className="pos-tecla pos-tecla-limpiar" onClick={() => teclear('C')} aria-label="Limpiar el monto">
+        C
+      </button>
     </div>
   )
 }

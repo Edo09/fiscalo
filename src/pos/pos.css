@@ -498,6 +498,11 @@
 .pos-devuelta.grande b { font-size: 40px; letter-spacing: -0.02em; }
 .pos-teclado-monto { gap: 8px; }
 .pos-teclado-monto .pos-tecla { height: 56px; font-size: 22px; }
+.pos-teclado-monto .pos-tecla-limpiar {
+  grid-column: 1 / -1; font-size: 20px; font-weight: 700; letter-spacing: .04em;
+  background: var(--danger-soft); border-color: var(--danger-soft); color: var(--danger);
+}
+.pos-teclado-monto .pos-tecla-limpiar:active { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 .pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
 .pos-cobro-estado > b { font-size: 20px; }
@@ -609,4 +614,209 @@
 }
 @media (max-width: 520px) {
   .pos-panel { padding: 22px 18px; }
+}
+
+/* ============================================================================
+   Movimiento — mecánica de caja registradora
+   Un solo sistema para todo el POS. Corto, preciso y físico: las teclas se
+   hunden, los montos ruedan en su visor como en una caja, los contadores saltan
+   como un marcador mecánico y la venta cobrada se "firma" (el ✓ se dibuja).
+   - Solo transform y opacity: no recalculan el diseño y van por la GPU.
+   - El hover, solo con mouse: en una pantalla táctil quedaría "pegado".
+   - Los diálogos y menús ENTRAN animados y CIERRAN al instante: una animación de
+     salida los dejaría vivos (con sus atajos de teclado) un instante más, y en
+     una caja un Enter doble sería una acción doble.
+   - "Reducir movimiento" del sistema deja todo quieto salvo los indicadores de
+     carga (al final de esta sección).
+   ============================================================================ */
+.pos-root, .pos-sel-menu {
+  --pos-t1: 110ms;   /* respuesta al toque */
+  --pos-t2: 190ms;   /* aparecer, cambiar de estado */
+  --pos-t3: 260ms;   /* pantallas y diálogos */
+  --pos-curva: cubic-bezier(.2, .8, .2, 1);      /* sale rápido, frena suave */
+  --pos-rebote: cubic-bezier(.34, 1.56, .64, 1); /* marcador mecánico */
+}
+
+@keyframes pos-fundido { from { opacity: 0; } }
+@keyframes pos-sube { from { opacity: 0; transform: translateY(8px); } }
+@keyframes pos-baja { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes pos-entra-dialogo { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+@keyframes pos-desliza { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes pos-salta { from { opacity: 0; transform: scale(.45); } }
+/* Un monto nuevo rueda hacia su lugar, como el visor de una caja registradora. */
+@keyframes pos-rueda { from { opacity: 0; transform: translateY(45%); } }
+@keyframes pos-trazo { to { stroke-dashoffset: 0; } }
+@keyframes pos-onda { from { opacity: .45; transform: scale(1); } to { opacity: 0; transform: scale(1.65); } }
+@keyframes pos-sacude { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@keyframes pos-brillo { to { transform: translateX(100%); } }
+
+/* ---- Pantallas y paneles ---------------------------------------------------- */
+/* Envoltorio de cada pantalla (PosApp): solo opacidad, porque un transform en un
+   ancestro movería los diálogos de posición fija. */
+.pos-pantalla { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: pos-fundido var(--pos-t3) ease-out; }
+.pos-panel { animation: pos-sube var(--pos-t3) var(--pos-curva); }
+.pos-sin-red, .pos-alerta, .pos-franja { animation: pos-baja var(--pos-t2) var(--pos-curva); }
+.pos-error, .pos-aviso, .pos-info { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-pendientes { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Diálogos -------------------------------------------------------------- */
+.pos-overlay { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-modal { animation: pos-entra-dialogo var(--pos-t3) var(--pos-curva); }
+.pos-confirmar-capa { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-confirmar-capa > * { animation: pos-entra-dialogo var(--pos-t3) var(--pos-curva); }
+/* Cambio de fase dentro de un diálogo (cobrando → cobrada / error / sin confirmar). */
+.pos-cobro-estado, .pos-cliente-ficha { animation: pos-sube var(--pos-t2) var(--pos-curva); }
+
+/* ---- Teclas y botones: se hunden al presionar --------------------------------- */
+.pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-producto, .pos-cant button,
+  .pos-forma, .pos-billete, .pos-billete-menos, .pos-producto-menos, .pos-producto-quitar, .pos-conteo-fila,
+  .pos-buscador-limpiar, .pos-sel, .pos-sel-op, .pos-enlace) {
+  transition:
+    background-color var(--pos-t1) ease-out, border-color var(--pos-t1) ease-out, color var(--pos-t1) ease-out,
+    box-shadow var(--pos-t2) ease-out, opacity var(--pos-t2) ease-out, filter var(--pos-t1) ease-out,
+    transform var(--pos-t1) var(--pos-curva);
+}
+.pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-cant button, .pos-forma,
+  .pos-billete, .pos-conteo-fila, .pos-sel):not(:disabled):active {
+  transform: translateY(1px) scale(.97);
+  transition-duration: 40ms;
+}
+.pos-sel-op:not(:disabled):active { transform: scale(.985); transition-duration: 40ms; }
+/* Lo elegido se marca con un pequeño salto, no solo con el color. */
+.pos-forma.on .lucide, .pos-vistas button.on .lucide { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Hover y foco (con mouse / teclado) --------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .pos-root :where(.pos-tecla:not(.secundaria):not(.pos-tecla-limpiar), .pos-billete:not(.on):not(.usado),
+    .pos-forma:not(.on), .pos-caja, .pos-conteo-fila:not(.on), .pos-cant button):not(:disabled):hover {
+    background-color: var(--surface-hover); border-color: var(--text-3);
+  }
+  .pos-root .pos-chip:not(.on):hover { background-color: var(--surface-hover); border-color: var(--text-3); }
+  .pos-root .pos-chips-mas:hover { border-color: var(--accent); color: var(--accent-text); }
+  .pos-root .pos-vistas button:not(.on):hover { background-color: var(--surface-hover); color: var(--text); }
+  .pos-root .pos-producto:not(:disabled):hover { box-shadow: var(--sh-md); }
+  .pos-root .pos-producto:not(:disabled):not(.en-carrito):hover { border-color: var(--border-strong); }
+  .pos-root .pos-tecla-limpiar:hover { border-color: var(--danger); }
+  .pos-root :where(.pos-producto-menos, .pos-billete-menos):hover { background-color: var(--danger); color: #fff; }
+  .pos-root .pos-producto-quitar:hover { filter: brightness(.92); }
+}
+.pos-root :where(.pos-tecla, .pos-chip, .pos-chips-mas, .pos-forma, .pos-billete, .pos-caja, .pos-producto, .pos-cant button,
+  .pos-vistas button, .pos-conteo-fila, .pos-producto-menos, .pos-producto-quitar, .pos-billete-menos):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.pos-root :where(.pos-buscador input, .pos-campo input, .pos-nota) {
+  transition: border-color var(--pos-t1) ease-out, box-shadow var(--pos-t2) ease-out;
+}
+.pos-root :where(.pos-buscador input, .pos-campo input, .pos-nota):focus { box-shadow: 0 0 0 4px var(--accent-soft); }
+.pos-buscador-limpiar { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Catálogo ---------------------------------------------------------------- */
+/* Llega en cascada corta (las primeras 18; el resto, juntas). Al cambiar de vista
+   la grilla se rearma y vuelve a entrar; al buscar o cambiar de categoría solo
+   entran las tarjetas nuevas. */
+.pos-producto-celda { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-grilla > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
+.pos-grilla > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
+.pos-grilla > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
+.pos-grilla > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
+.pos-grilla > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
+.pos-grilla > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
+.pos-grilla > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
+.pos-grilla > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
+.pos-grilla > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
+.pos-grilla > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
+.pos-grilla > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
+.pos-grilla > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
+.pos-grilla > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
+.pos-grilla > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
+.pos-grilla > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
+.pos-grilla > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
+.pos-grilla > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
+.pos-chips-fila.abiertas .pos-chips { animation: pos-fundido var(--pos-t2) ease-out; }
+/* Contador y botones de la tarjeta: entran saltando; el contador vuelve a saltar
+   con cada unidad (la clave lo remonta). */
+.pos-producto-paso, .pos-producto-quitar, .pos-producto-cant { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-producto-paso .pos-producto-cant { animation-duration: var(--pos-t3); }
+
+/* Cargando: tarjetas fantasma con un brillo que las recorre. */
+.pos-esqueleto {
+  position: relative; overflow: hidden; min-height: 200px; border-radius: var(--r-lg);
+  background: var(--neutral-soft); border: 1px solid var(--border);
+}
+.vista-compacta .pos-esqueleto { min-height: 150px; }
+.vista-lista .pos-esqueleto { min-height: 64px; }
+.pos-esqueleto::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--surface) 75%, transparent) 50%, transparent 80%);
+  animation: pos-brillo 1.3s ease-in-out infinite;
+}
+.pos-esqueleto:nth-child(2)::after { animation-delay: 60ms; }
+.pos-esqueleto:nth-child(3)::after { animation-delay: 120ms; }
+.pos-esqueleto:nth-child(4)::after { animation-delay: 180ms; }
+.pos-esqueleto:nth-child(5)::after { animation-delay: 240ms; }
+.pos-esqueleto:nth-child(6)::after { animation-delay: 300ms; }
+.pos-esqueleto:nth-child(7)::after { animation-delay: 360ms; }
+.pos-esqueleto:nth-child(8)::after { animation-delay: 420ms; }
+.pos-esqueleto:nth-child(9)::after { animation-delay: 480ms; }
+.pos-esqueleto:nth-child(10)::after { animation-delay: 540ms; }
+.pos-esqueleto:nth-child(11)::after { animation-delay: 600ms; }
+.pos-esqueleto:nth-child(12)::after { animation-delay: 660ms; }
+
+/* ---- Venta en curso ---------------------------------------------------------- */
+.pos-linea { animation: pos-desliza var(--pos-t2) var(--pos-curva); }
+.pos-lineas-vacio { animation: pos-fundido var(--pos-t3) ease-out; }
+.pos-cliente-barra { animation: pos-sube var(--pos-t2) var(--pos-curva); }
+/* Montos (total, importe de la línea, recibido, devuelta): al cambiar, el valor
+   nuevo rueda hacia su lugar. */
+.pos-num { display: inline-block; animation: pos-rueda var(--pos-t2) var(--pos-curva); }
+
+/* ---- Cobro ------------------------------------------------------------------- */
+.pos-devuelta, .pos-campo-monto { transition: background-color var(--pos-t2) ease-out, color var(--pos-t2) ease-out, border-color var(--pos-t2) ease-out; }
+.pos-billete-cuenta, .pos-billete-menos { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+/* La venta cobrada se firma: el círculo salta, el ✓ se dibuja y sale una onda. */
+.pos-cobro-ok { position: relative; animation: pos-salta var(--pos-t3) var(--pos-rebote); }
+.pos-cobro-ok .lucide :is(path, polyline) { stroke-dasharray: 24; stroke-dashoffset: 24; animation: pos-trazo .34s .14s var(--pos-curva) forwards; }
+.pos-cobro-ok::after, .pos-cobro-duda::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid currentColor; pointer-events: none;
+  opacity: 0; /* invisible antes y después de la onda */
+  animation: pos-onda .9s .2s ease-out;
+}
+/* Sin confirmar: la onda se repite despacio mientras se espera. */
+.pos-cobro-duda { position: relative; }
+.pos-cobro-duda::after { animation: pos-onda 1.8s ease-out infinite; }
+/* No se cobró: el círculo entra y niega con la cabeza, una vez. */
+.pos-cobro-mal { animation: pos-salta var(--pos-t2) var(--pos-rebote), pos-sacude .36s .2s ease-in-out; }
+
+/* ---- PIN --------------------------------------------------------------------- */
+.pos-punto.lleno { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-mensaje-pin.error { animation: pos-fundido var(--pos-t2) ease-out; }
+
+/* ---- Listas (ventas del día, del turno) -------------------------------------- */
+.pos-venta-fila { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(2) { animation-delay: 25ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(3) { animation-delay: 50ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(4) { animation-delay: 75ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(5) { animation-delay: 100ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(6) { animation-delay: 125ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(7) { animation-delay: 150ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(8) { animation-delay: 175ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(9) { animation-delay: 200ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(10) { animation-delay: 225ms; }
+.pos-dia-resumen > div { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-dia-resumen > div:nth-child(2) { animation-delay: 40ms; }
+.pos-dia-resumen > div:nth-child(3) { animation-delay: 70ms; }
+.pos-dia-resumen > div:nth-child(4) { animation-delay: 100ms; }
+
+/* ---- Reducir movimiento ------------------------------------------------------ */
+/* Todo queda quieto y en su estado final; los indicadores de carga (spinner y
+   el ícono que gira) siguen, porque dicen que algo está pasando. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-root *:not(.spinner):not(.spin), .pos-root *::before, .pos-root *::after,
+  .pos-sel-menu, .pos-sel-menu *, .pos-pantalla {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0s !important;
+  }
 }

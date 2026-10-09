@@ -186,7 +186,7 @@ export function CatalogoPanel({
         </div>
       )}
 
-      <div className={'pos-grilla vista-' + prefs.vista}>
+      <div key={prefs.vista} className={'pos-grilla vista-' + prefs.vista}>
         {!catalogo ? (
           error ? (
             <div className="pos-grilla-vacia">
@@ -195,7 +195,8 @@ export function CatalogoPanel({
               <Btn variant="primary" icon="refresh-cw" onClick={onReintentar}>Reintentar</Btn>
             </div>
           ) : (
-            <div className="pos-grilla-vacia"><div className="spinner" style={{ width: 30, height: 30, borderWidth: 3 }} /></div>
+            // Cargando: tarjetas fantasma con el tamaño de la vista elegida.
+            Array.from({ length: 12 }, (_, i) => <div key={i} className="pos-esqueleto" aria-hidden="true" />)
           )
         ) : productos.length === 0 ? (
           <div className="pos-grilla-vacia">
@@ -240,7 +241,7 @@ export function CatalogoPanel({
                         aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
                         <Icon name="minus" size={17} />
                       </button>
-                      <span className="pos-producto-cant">×{fmtCantidad(cant)}</span>
+                      <span key={cant} className="pos-producto-cant">×{fmtCantidad(cant)}</span>
                     </span>
                   </>
                 )}

@@ -291,7 +291,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         </div>
         <div className="pos-barra-espacio" />
         {pendientes > 0 && (
-          <span className="pos-pendientes" title="Ventas que la DGII todavía no confirmó: se reenvían solas">
+          <span key={pendientes} className="pos-pendientes" title="Ventas que la DGII todavía no confirmó: se reenvían solas">
             <Icon name="clock" size={15} />{pendientes} <span className="ocultable">sin confirmar DGII</span>
           </span>
         )}

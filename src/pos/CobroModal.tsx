@@ -244,7 +244,7 @@ export function CobroModal({
               <div>
                 <div className="pos-campo-monto">
                   <small>Recibido</small>
-                  <b className={recibido === '' ? 'vacio' : ''}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
+                  <b key={recibido} className={'pos-num' + (recibido === '' ? ' vacio' : '')}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
                 </div>
                 <div className="pos-billetes">
                   {BILLETES.map((b) => {
@@ -263,7 +263,7 @@ export function CobroModal({
                               aria-label={`Quitar un billete de ${nombre}`}>
                               <Icon name="minus" size={15} />
                             </button>
-                            <span className="pos-billete-cuenta" aria-hidden="true">×{n}</span>
+                            <span key={n} className="pos-billete-cuenta" aria-hidden="true">×{n}</span>
                           </>
                         )}
                       </div>
@@ -276,7 +276,7 @@ export function CobroModal({
                 {/* Verde = pago exacto; amarillo = hay que dar devuelta; rojo = falta. */}
                 <div className={'pos-devuelta' + (!alcanza ? ' falta' : (devuelta ?? 0) > 0 ? ' cambio' : '')}>
                   <small>{!alcanza ? 'Falta' : (devuelta ?? 0) > 0 ? 'Devuelta' : 'Pago exacto'}</small>
-                  <b>RD$ {formatoCentavos(Math.abs(devuelta ?? 0))}</b>
+                  <b key={devuelta ?? 0} className="pos-num">RD$ {formatoCentavos(Math.abs(devuelta ?? 0))}</b>
                 </div>
               </div>
               <TecladoMonto onCambio={teclearRecibido} />
