@@ -11,7 +11,10 @@ import { useImpresoraStore } from '@/stores/impresora'
 import { posApi, PosApiError, type Conteo, type ReporteCierre, type TurnoCaja } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
-import { BILLETES, contadoCentavos, DENOMINACIONES, formatoCentavos, montoACentavos, teclearEntero, teclearMonto } from './montos'
+import {
+  BILLETES, contadoCentavos, DENOMINACIONES, formatoCentavos, montoACentavos, pegarEntero, pegarMonto, teclearEntero, teclearMonto,
+} from './montos'
+import { usePegar } from './pegar'
 import { ANCHO_UTIL_MM, reporteCierreHtml, SELECTOR_REPORTE, textoDiferencia } from './reporteCierre'
 import { Overlay } from './PosModales'
 
@@ -140,6 +143,11 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
     return () => window.removeEventListener('keydown', h)
   }, [fase.tipo, teclear, mover, activa, otrosValido, cerrar, onCancelar])
 
+  // Pegar en la fila activa: unidades (enteras) o, en "otros", un monto.
+  usePegar((texto) => {
+    setValores((v) => ({ ...v, [activa]: activa === 'otros' ? pegarMonto(texto) : pegarEntero(texto) }))
+  }, fase.tipo === 'conteo')
+
   // Al imprimir, el foco queda en el iframe del reporte: se devuelve a "Terminar".
   const listo = fase.tipo === 'resultado' && fase.impresion !== 'imprimiendo'
   useEffect(() => {
@@ -185,7 +193,7 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
             <div>
               <div className="pos-teclado pos-teclado-monto">
                 {['1', '2', '3', '4', '5', '6', '7', '8', '9', activa === 'otros' ? '.' : 'C', '0', '⌫'].map((t) => (
-                  <button key={t} type="button" className={'pos-tecla' + (t === '⌫' || t === 'C' ? ' secundaria' : '')} onClick={() => teclear(t)}
+                  <button key={t} type="button" className={'pos-tecla' + (t === '⌫' ? ' secundaria' : t === 'C' ? ' pos-tecla-c' : '')} onClick={() => teclear(t)}
                     aria-label={t === '⌫' ? 'Borrar' : t === 'C' ? 'Limpiar' : t}>
                     {t === '⌫' ? <Icon name="delete" size={24} /> : t}
                   </button>

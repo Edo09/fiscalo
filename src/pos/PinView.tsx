@@ -10,6 +10,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
 import { posApi, PosApiError, type EstadoPos, type SesionPos } from './api'
 import type { EquipoGuardado } from './store'
+import { soloDigitos } from './montos'
+import { usePegar } from './pegar'
 
 export const DIGITOS_PIN = 4
 
@@ -163,6 +165,14 @@ export function PinView({ equipo, onEntro, onEquipoInvalido, onSinPos, onRehabil
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [tocar, borrar])
+
+  // Pegar el PIN: solo dígitos, hasta DIGITOS_PIN. Completo, se envía solo
+  // (el mismo efecto de arriba), una vez, como si se hubiera tecleado.
+  usePegar((texto) => {
+    if (deshabilitado) return
+    setMensaje(null)
+    setPin(soloDigitos(texto).slice(0, DIGITOS_PIN))
+  })
 
   const empresa = estado?.empresa.nombre ?? equipo.empresa ?? ''
   const caja = estado?.caja?.nombre ?? equipo.caja.nombre

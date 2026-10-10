@@ -155,6 +155,11 @@
 .pos-tecla:active { background: var(--accent-soft); border-color: var(--accent); }
 .pos-tecla:disabled { opacity: 0.4; cursor: default; }
 .pos-tecla.secundaria { background: transparent; border-color: transparent; color: var(--text-2); font-size: 15px; }
+/* "C" (limpiar) amarilla en todos los teclados: se ve de un vistazo y no se
+   confunde con un error (rojo) ni con una cifra. Amarillo sólido con texto
+   oscuro (contraste ~11:1), el mismo en modo claro y oscuro. */
+.pos-tecla.pos-tecla-c { background: #f5c518; border-color: #e0b20f; color: #2b2100; font-weight: 700; }
+.pos-tecla.pos-tecla-c:active { background: #ddb00f; border-color: #c99d08; color: #2b2100; }
 .pos-mensaje-pin { min-height: 44px; text-align: center; margin-top: 14px; font-size: 14px; }
 .pos-mensaje-pin.error { color: var(--danger); }
 .pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
@@ -618,11 +623,8 @@
 .pos-devuelta.grande b { font-size: 40px; letter-spacing: -0.02em; }
 .pos-teclado-monto { gap: 8px; }
 .pos-teclado-monto .pos-tecla { height: 56px; font-size: 22px; }
-.pos-teclado-monto .pos-tecla-limpiar {
-  grid-column: 1 / -1; font-size: 20px; font-weight: 700; letter-spacing: .04em;
-  background: var(--danger-soft); border-color: var(--danger-soft); color: var(--danger);
-}
-.pos-teclado-monto .pos-tecla-limpiar:active { background: var(--danger); border-color: var(--danger); color: #fff; }
+/* La "C" del monto ocupa toda la fila; el color amarillo lo da .pos-tecla-c. */
+.pos-teclado-monto .pos-tecla-limpiar { grid-column: 1 / -1; font-size: 20px; letter-spacing: .04em; }
 
 .pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
 .pos-cobro-estado > b { font-size: 20px; }

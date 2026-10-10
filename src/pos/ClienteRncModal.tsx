@@ -8,7 +8,8 @@ import { posApi, PosApiError, type ClientePos } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { Overlay } from './PosModales'
-import { formatoRnc } from './montos'
+import { formatoRnc, soloDigitos } from './montos'
+import { usePegar } from './pegar'
 
 type Fase =
   | { tipo: 'escribiendo'; error: string | null }
@@ -58,6 +59,9 @@ export function ClienteRncModal({ equipo, sesion, onElegido, onCerrar, errorDeSe
     return () => window.removeEventListener('keydown', h)
   }, [teclear, buscar, fase, onCerrar, onElegido])
 
+  // Pegar un RNC o cédula copiado, con o sin guiones: "1-31-25643-2" → 131256432.
+  usePegar((texto) => setRnc(soloDigitos(texto).slice(0, 11)), fase.tipo === 'escribiendo')
+
   return (
     <Overlay>
       <div className="pos-modal-cab">
@@ -103,7 +107,7 @@ export function ClienteRncModal({ equipo, sesion, onElegido, onCerrar, errorDeSe
           </div>
           <div className="pos-teclado">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((t) => (
-              <button key={t} type="button" className={'pos-tecla' + (t === '⌫' || t === 'C' ? ' secundaria' : '')}
+              <button key={t} type="button" className={'pos-tecla' + (t === '⌫' ? ' secundaria' : t === 'C' ? ' pos-tecla-c' : '')}
                 disabled={fase.tipo === 'buscando'} onClick={() => teclear(t)} aria-label={t === '⌫' ? 'Borrar' : t === 'C' ? 'Limpiar' : t}>
                 {t === '⌫' ? <Icon name="delete" size={24} /> : t}
               </button>

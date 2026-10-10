@@ -9,8 +9,9 @@ import type { AnchoTirilla } from '@/api/types'
 import { posApi, PosApiError, type TurnoCaja, type VentaTurno } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
-import { formatoCentavos, montoACentavos } from './montos'
+import { formatoCentavos, montoACentavos, soloDigitos } from './montos'
 import { Overlay } from './PosModales'
+import { usePegar } from './pegar'
 import { TecladoMonto } from './TecladoMonto'
 import { ANCHO_UTIL_MM, fechaHora } from './reporteCierre'
 import { estadoDgii } from './estados'
@@ -202,6 +203,9 @@ export function SupervisorPinModal({ equipo, sesion, turno, onAutorizado, onCerr
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [tocar, onCerrar])
+
+  // Pegar el PIN del supervisor: solo dígitos, hasta 4; completo, se envía solo.
+  usePegar((texto) => { if (!enviando) setPin(soloDigitos(texto).slice(0, 4)) })
 
   return (
     <Overlay>

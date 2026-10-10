@@ -1,9 +1,11 @@
 // Teclado de montos en pesos (efectivo recibido, fondo del turno). Táctil y
 // con el teclado físico; el texto se valida aquí: hasta 7 cifras y 2 decimales.
-// "C" (o Supr en el teclado físico) deja el monto vacío.
+// "C" (o Supr en el teclado físico) deja el monto vacío. Ctrl+V pega un monto
+// ("RD$ 1,250.50") en lugar del que había.
 import { useCallback, useEffect } from 'react'
 import { Icon } from '@/components/ui'
-import { teclearMonto } from './montos'
+import { pegarMonto, teclearMonto } from './montos'
+import { usePegar } from './pegar'
 
 interface Props {
   /**
@@ -33,6 +35,8 @@ export function TecladoMonto({ onCambio, fisico = true }: Props) {
     return () => window.removeEventListener('keydown', h)
   }, [fisico, teclear])
 
+  usePegar((texto) => onCambio(() => pegarMonto(texto)), fisico)
+
   return (
     <div className="pos-teclado pos-teclado-monto">
       {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((t) => (
@@ -41,7 +45,7 @@ export function TecladoMonto({ onCambio, fisico = true }: Props) {
           {t === '⌫' ? <Icon name="delete" size={24} /> : t}
         </button>
       ))}
-      <button type="button" className="pos-tecla pos-tecla-limpiar" onClick={() => teclear('C')} aria-label="Limpiar el monto">
+      <button type="button" className="pos-tecla pos-tecla-c pos-tecla-limpiar" onClick={() => teclear('C')} aria-label="Limpiar el monto">
         C
       </button>
     </div>
