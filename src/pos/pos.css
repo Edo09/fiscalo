@@ -58,7 +58,11 @@
 }
 
 .pos-root {
-  min-height: 100vh;
+  /* Tamaño de la pantalla elegido en el equipo (tamano.ts): zoom escala todo
+     junto. El alto se divide por el zoom para que, achicado o agrandado, el POS
+     siga ocupando la pantalla exacta. */
+  zoom: var(--pos-zoom, 1);
+  min-height: calc(100vh / var(--pos-zoom, 1));
   background: var(--bg);
   color: var(--text);
   display: flex;
@@ -176,6 +180,24 @@
 .pos-barra-espacio { flex: 1; }
 .pos-reloj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .pos-barra .btn { white-space: nowrap; flex-shrink: 0; }
+/* Tamaño de la pantalla: A− · 100% · A+ en un solo grupo, del alto de los botones de la barra. */
+.pos-tamano {
+  display: inline-flex; align-items: stretch; flex-shrink: 0; height: 34px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
+  box-shadow: var(--sh-xs); overflow: hidden;
+}
+.pos-tamano button {
+  min-width: 38px; padding: 0 8px; border: 0; background: transparent; color: var(--text);
+  font-size: 14px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-tamano button span { font-size: 12px; margin-left: 1px; }
+.pos-tamano button:hover:not(:disabled) { background: var(--surface-hover); }
+.pos-tamano button:disabled { color: var(--text-3); cursor: default; }
+.pos-tamano .pos-tamano-valor {
+  min-width: 48px; font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+.pos-tamano :focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .pos-cuerpo { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
 
 /* ---- Sin conexion ------------------------------------------------------- */
@@ -188,7 +210,10 @@
 /* ---- Venta: catalogo + carrito (C3, V1) ---------------------------------
    En venta la pagina ocupa exactamente la pantalla: la grilla y las lineas
    hacen scroll por dentro y el boton de cobrar siempre esta a la vista. */
-.pos-root.en-venta { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.pos-root.en-venta {
+  height: calc(100vh / var(--pos-zoom, 1)); height: calc(100dvh / var(--pos-zoom, 1));
+  min-height: 0; overflow: hidden;
+}
 .pos-venta {
   flex: 1; min-height: 0;
   display: grid; grid-template-columns: minmax(0, 1fr) 400px;
@@ -257,9 +282,14 @@
 .pos-sel-flecha { flex-shrink: 0; color: var(--text-3); transition: transform .18s ease; }
 .pos-sel.abierto .pos-sel-flecha { transform: rotate(180deg); color: var(--accent); }
 
+/* El menú vive en <body> (fuera de .pos-root): lleva el zoom del POS por su
+   cuenta, y sus topes de pantalla se dividen por el zoom (SelectorCaja convierte
+   la posición). */
 .pos-sel-menu {
-  position: fixed; z-index: 80; width: max-content; min-width: 280px; max-width: min(360px, calc(100vw - 16px));
-  max-height: calc(100vh - 32px); overflow-y: auto;
+  zoom: var(--pos-zoom, 1);
+  position: fixed; z-index: 80; width: max-content; min-width: 280px;
+  max-width: min(360px, calc((100vw - 16px) / var(--pos-zoom, 1)));
+  max-height: calc((100vh - 32px) / var(--pos-zoom, 1)); overflow-y: auto;
   padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
   box-shadow: var(--sh-pop); animation: pos-sel-abre .16s cubic-bezier(.2, .8, .2, 1);
 }
@@ -441,21 +471,27 @@
 }
 .pos-lineas-vacio p { margin: 0; }
 
-/* Ventas abiertas (VentasTabs): franja a todo el ancho bajo la barra, una
-   pestaña por venta. En pantallas angostas la fila se desliza (sin barra de
-   desplazamiento: se arrastra con el dedo). Alto de 44 px: se tocan con el dedo. */
+/* Columna de productos: el catálogo arriba y las ventas abiertas al pie, solo
+   del ancho de los productos (no bajo el carrito). */
+.pos-columna-catalogo { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.pos-columna-catalogo > .pos-catalogo { flex: 1; }
+
+/* Ventas abiertas (VentasTabs): pestañas al pie de los productos, colgando del
+   borde de arriba como las hojas de una planilla. En pantallas angostas la fila
+   se desliza (sin barra de desplazamiento: se arrastra con el dedo). Alto de
+   44 px: se tocan con el dedo. */
 .pos-ventas-tabs {
-  display: flex; align-items: flex-end; gap: 4px; flex-shrink: 0;
-  padding: 6px 12px 0; border-bottom: 1px solid var(--border); background: var(--surface-2);
+  display: flex; align-items: flex-start; gap: 4px; flex-shrink: 0;
+  padding: 0 12px 8px; border-top: 1px solid var(--border); background: var(--surface-2);
   overflow-x: auto; scrollbar-width: none;
 }
 .pos-ventas-tabs::-webkit-scrollbar { display: none; }
 .pos-venta-tab {
   display: flex; align-items: center; flex-shrink: 0; min-width: 0; max-width: 240px;
-  border: 1px solid var(--border); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0;
-  background: var(--surface); margin-bottom: -1px;
+  border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--r-md) var(--r-md);
+  background: var(--surface); margin-top: -1px;
 }
-.pos-venta-tab.on { border-color: var(--border-strong); box-shadow: inset 0 3px 0 var(--accent); }
+.pos-venta-tab.on { border-color: var(--border-strong); box-shadow: inset 0 -3px 0 var(--accent); }
 .pos-venta-tab-btn {
   display: flex; align-items: center; gap: 6px; height: 44px; min-width: 0; padding: 0 10px;
   border: 0; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 600;
@@ -479,7 +515,7 @@
 .pos-venta-tab-cerrar:disabled { cursor: default; opacity: .4; }
 .pos-venta-tab-nueva {
   width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; padding: 0;
-  border: 1px dashed var(--border-strong); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0;
+  border: 1px dashed var(--border-strong); border-top: 0; border-radius: 0 0 var(--r-md) var(--r-md);
   background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .pos-venta-tab-nueva:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }

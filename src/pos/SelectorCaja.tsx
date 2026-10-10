@@ -45,16 +45,20 @@ export function SelectorCaja<T extends string | number>({ rotulo, titulo, icono,
     const boton = botonRef.current?.getBoundingClientRect()
     const menu = menuRef.current
     if (!boton || !menu) return
-    const ancho = Math.max(boton.width, menu.offsetWidth)
-    const alto = menu.offsetHeight
+    // El menú va en <body> (fuera de .pos-root) con el mismo zoom que el POS
+    // (tamano.ts). Las medidas del botón llegan en píxeles de pantalla; las del
+    // menú y su posición van en los suyos, que el zoom multiplica: se convierten.
+    const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pos-zoom')) || 1
+    const ancho = Math.max(boton.width, menu.offsetWidth * z)
+    const alto = menu.offsetHeight * z
     const izquierda = Math.max(MARGEN, Math.min(boton.left, window.innerWidth - MARGEN - ancho))
     const abajo = window.innerHeight - boton.bottom - SEPARACION - MARGEN
     const arriba = boton.top - SEPARACION - MARGEN
     const haciaArriba = abajo < alto && arriba > abajo
     setPos({
-      left: izquierda,
-      minWidth: boton.width,
-      ...(haciaArriba ? { bottom: window.innerHeight - boton.top + SEPARACION } : { top: boton.bottom + SEPARACION }),
+      left: izquierda / z,
+      minWidth: boton.width / z,
+      ...(haciaArriba ? { bottom: (window.innerHeight - boton.top + SEPARACION) / z } : { top: (boton.bottom + SEPARACION) / z }),
       transformOrigin: haciaArriba ? 'bottom left' : 'top left',
     })
   }, [])

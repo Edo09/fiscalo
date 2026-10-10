@@ -19,8 +19,8 @@
 // - Teclado: F1 buscador; F9 / F2 / F3 cobrar en efectivo / tarjeta /
 //   transferencia; F4 crédito fiscal; F5 actualizar; F7 siguiente venta; F8
 //   venta nueva; Esc limpia la búsqueda o ofrece cancelar la venta.
-// - Ventas en espera: hasta 5 ventas abiertas por empleado, en pestañas bajo
-//   la barra (VentasTabs), guardadas en el equipo. Cobrar o cancelar la activa
+// - Ventas en espera: hasta 5 ventas abiertas por empleado, en pestañas al pie
+//   de los productos (VentasTabs), guardadas en el equipo. Cobrar o cancelar la activa
 //   cierra su pestaña si hay otras; cerrar una con productos es cancelarla (V4).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
@@ -38,6 +38,7 @@ import { CierreModal } from './CierreModal'
 import { ClienteRncModal } from './ClienteRncModal'
 import { VentasDiaModal } from './VentasDiaModal'
 import { useTemaPos } from './tema'
+import { TAMANOS, useTamanoPos } from './tamano'
 import { totalesCarrito } from './montos'
 
 /** Minutos sin tocar la pantalla antes de bloquearla (docs/specs/pos.md §8, punto 5). */
@@ -94,6 +95,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
 
   const tema = useTemaPos((s) => s.tema)
   const alternarTema = useTemaPos((s) => s.alternar)
+  const { tamano, achicar, agrandar, normal: tamanoNormal } = useTamanoPos()
   const {
     lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, ponerCliente, guardarCatalogo,
     ventas, activaId, nuevaVenta, cambiarA, cerrarVenta, terminarActiva,
@@ -375,6 +377,20 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
         <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
         <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
+        {/* Tamaño de la pantalla (preferencia del equipo): en pantallas de poca
+            resolución todo se veía grande. El % vuelve al 100. */}
+        <div className="pos-tamano" role="group" aria-label="Tamaño de la pantalla">
+          <button type="button" onClick={achicar} disabled={tamano === TAMANOS[0]} aria-label="Achicar textos" title="Achicar textos">
+            A<span aria-hidden="true">−</span>
+          </button>
+          <button type="button" className="pos-tamano-valor" onClick={tamanoNormal}
+            title="Volver al 100 %" aria-label={`Tamaño ${tamano} %. Volver al 100 %`}>
+            {tamano}%
+          </button>
+          <button type="button" onClick={agrandar} disabled={tamano === TAMANOS[TAMANOS.length - 1]} aria-label="Agrandar textos" title="Agrandar textos">
+            A<span aria-hidden="true">+</span>
+          </button>
+        </div>
         <Btn icon={tema === 'oscuro' ? 'sun' : 'moon'} onClick={alternarTema}
           aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'} />
@@ -407,35 +423,37 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         </div>
       )}
 
-      {/* Ventas abiertas a todo el ancho: en la columna del carrito no caben las cinco. */}
-      <VentasTabs
-        ventas={ventas}
-        activaId={activaId}
-        onCambiar={cambiarA}
-        onNueva={abrirNuevaVenta}
-        onCerrar={pedirCerrarVenta}
-        bloqueadas={modal !== null}
-      />
-
       <main className="pos-venta">
-        <CatalogoPanel
-          catalogo={catalogo}
-          error={errorCatalogo}
-          onReintentar={() => void cargarCatalogo()}
-          onRecargar={() => void recargar()}
-          recargando={recargando}
-          recargado={recargado}
-          busqueda={busqueda}
-          onBusqueda={setBusqueda}
-          categoria={categoria}
-          onCategoria={setCategoria}
-          buscadorRef={buscadorRef}
-          enCarrito={enCarrito}
-          onAgregar={agregar}
-          onQuitarUno={quitarUno}
-          onQuitar={quitarDeVenta}
-          bloqueado={cobroEnDuda !== null}
-        />
+        {/* Columna de productos con las ventas abiertas al pie, solo de su ancho
+            (no bajo el carrito). */}
+        <div className="pos-columna-catalogo">
+          <CatalogoPanel
+            catalogo={catalogo}
+            error={errorCatalogo}
+            onReintentar={() => void cargarCatalogo()}
+            onRecargar={() => void recargar()}
+            recargando={recargando}
+            recargado={recargado}
+            busqueda={busqueda}
+            onBusqueda={setBusqueda}
+            categoria={categoria}
+            onCategoria={setCategoria}
+            buscadorRef={buscadorRef}
+            enCarrito={enCarrito}
+            onAgregar={agregar}
+            onQuitarUno={quitarUno}
+            onQuitar={quitarDeVenta}
+            bloqueado={cobroEnDuda !== null}
+          />
+          <VentasTabs
+            ventas={ventas}
+            activaId={activaId}
+            onCambiar={cambiarA}
+            onNueva={abrirNuevaVenta}
+            onCerrar={pedirCerrarVenta}
+            bloqueadas={modal !== null}
+          />
+        </div>
         <CarritoPanel
           lineas={lineas}
           cliente={cliente}
