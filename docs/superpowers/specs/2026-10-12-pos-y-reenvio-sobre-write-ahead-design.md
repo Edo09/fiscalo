@@ -16,7 +16,8 @@ Además, `PosVenta.php` llama a `facturaModel::saveFacturaConECF`, que Release 1
 
 **Dentro:**
 - el merge de `master`/`main` en las dos ramas;
-- la venta del POS sobre el gancho write-ahead;
+- la venta del POS sobre el gancho write-ahead, que nunca se detiene: factura simple si falla el certificado, número siguiente si se agota la secuencia;
+- los avisos al admin en la app;
 - tres arreglos al reenvío automático que ya trae el POS;
 - «Reenviar a la DGII» para rechazadas, sobre el write-ahead;
 - los cambios mínimos de front;
@@ -39,6 +40,9 @@ Además, `PosVenta.php` llama a `facturaModel::saveFacturaConECF`, que Release 1
 | U5 | 10-08 / 10-12 | Las ventas del POS sin confirmar las termina el reenvío automático del POS: consulta primero, reenvía el XML guardado y nunca re-firma. No hay botón para el cajero. |
 | U6 | 10-12 | Se mantiene «Reenviar a la DGII» para rechazadas (commit `4007eea`). Se pidió porque una factura fue rechazada por una fecha mal escrita, y reemitir con los datos de la rechazada es más fácil que esperar a un desarrollador. |
 | U7 | 10-12 | La decisión 7 de Release 1 queda así: la app **nunca** reenvía una factura *sin confirmar*. **Sí** puede reemitir una *rechazada*. |
+| U8 | 10-12 | Una venta del POS no se detiene por nada: ni por falta de certificado ni por secuencia agotada. El certificado no decide si hay venta o no. |
+| U9 | 10-12 | Si el certificado falla, o cualquier otra cosa impide generar el e-CF, la venta sale **automáticamente** como **factura simple**: la factura interna que ya existe, sin e-NCF, sin ITBIS y sin envío a la DGII. El cajero no ve nada; el admin ve un aviso en la app. |
+| U10 | 10-12 | Si la secuencia se agota (o vence), la venta usa el **número siguiente al último**, se guarda como e-CF y se imprime. **No se envía** hasta que exista un rango autorizado registrado que incluya ese número; en ese momento la manda el reenvío automático del POS. La app avisa cuando quedan pocos números y cuando se agotan. |
 
 ## 4. Diseño
 
@@ -74,22 +78,33 @@ Además, `PosVenta.php` llama a `facturaModel::saveFacturaConECF`, que Release 1
    - `formas_pago`;
    - `reclamar_secuencia = false`: el número de una venta del POS nunca vuelve al contador, porque ya está impreso;
    - `autenticar_despues_de_reservar = true`: el token de la DGII se pide después de guardar. Si la DGII no responde al pedirlo, la venta queda guardada «sin confirmar» en vez de fallar (U3).
+   - `numerar_sin_rango = true`: si ningún rango vigente tiene números libres, se usa el siguiente al último y la venta no se envía (punto 6).
 
    Para la app nada cambia: el token se sigue pidiendo antes de guardar. Así, con la DGII caída, la factura no se crea y se reintenta después, sin dejar trabajo a soporte.
 4. **Cualquier resultado después de guardar se entrega** (U3, U4): aceptada, rechazada, `ERROR`, `NO_ENCONTRADO`, en proceso o sin respuesta (`EcfEnvioInciertoException`). La respuesta es 201 con el recibo.
-   - Solo un fallo **antes** de guardar responde 502 `EMISION_FALLIDA`, que significa que no se emitió nada y el número volvió al contador. Ejemplos: sin certificado, secuencia agotada, base caída. Ninguno es un problema de la DGII.
-5. **Entregar es una sola función idempotente** (`entregarVenta`), que se ejecuta bajo el candado de la clave:
+5. **Fallo antes de guardar: factura simple automática** (U8, U9).
+   - **Cuándo aplica:** si el e-CF no se puede generar. Ejemplos: certificado ausente, vencido o con clave incorrecta; fallo de firma; `emisor_config` incompleto; cualquier excepción antes de la reserva, que ya devuelve el número al contador.
+   - **Qué hace:** la venta se guarda como **factura simple** (`tipo_ecf` nulo) con las mismas líneas y el mismo total, y con las columnas del POS (clave, turno, empleado), así que la idempotencia sigue igual. La entrega es la misma (punto 7: caja, inventario, auditoría) y la respuesta es 201 con el recibo de factura simple.
+   - **Aviso:** se registra un evento de auditoría para el aviso del admin (4.6). El cajero no ve nada distinto.
+   - **Excepciones:** las validaciones de la venta (total distinto, cliente E31 sin RNC, efectivo insuficiente…) siguen respondiendo 4xx, porque son errores de captura, no de emisión.
+   - **Lo único que todavía detiene una venta** es que el servidor o la base de datos no estén disponibles, porque no hay dónde guardarla. Vender sin conexión queda fuera de alcance.
+6. **Secuencia agotada o vencida** (U10).
+   - **Cuándo aplica:** solo en el POS, cuando ningún rango vigente tiene números libres.
+   - **Qué hace:** la venta toma el **número siguiente al último usado** de ese tipo y ambiente, y el contador sigue avanzando. Se firma, se guarda y se imprime normal, marcada en su meta como `sin_rango`, y **no se envía**: la DGII rechaza los números fuera de un rango autorizado.
+   - **E32:** el XML no lleva fecha de vencimiento de la secuencia, así que queda listo para enviarse tal cual.
+   - **E31:** el XML lleva la fecha del último rango conocido. Si la DGII la rechaza al enviarla, se reemite con «Reenviar a la DGII» (4.4).
+7. **Entregar es una sola función idempotente** (`entregarVenta`), que se ejecuta bajo el candado de la clave:
    - el movimiento de caja, si la factura aún no tiene uno;
    - el inventario una sola vez (`yaMovioDocumento('factura', id)` + `registrarVenta`);
    - la auditoría `POS_VENTA`.
 
    Una venta repetida con la misma clave devuelve la misma venta y completa lo que falte, por ejemplo si el servidor cayó entre guardar y registrar la caja.
-6. **`envio_pendiente`** se escribe en la **misma sentencia** que `estado_dgii`, y solo en filas del POS (`pos_idempotency_key IS NOT NULL`):
+8. **`envio_pendiente`** se escribe en la **misma sentencia** que `estado_dgii`, y solo en filas del POS (`pos_idempotency_key IS NOT NULL`):
    - en la reserva: `1`;
    - en `confirmar`: `1` si el veredicto sigue abierto (`ENVIADO`, `EN_PROCESO`, `RFCE_ENVIADO`, `RFCE_EN_PROCESO`); `0` en cualquier otro caso;
    - en `incierto`: `1`.
-7. **El recibo** usa `RepresentacionImpresa::datosRecibo`, que no lee `estado_dgii`. Regla: el recibo nunca depende del estado de la DGII.
-8. **Rechazo de una venta ya entregada**, al cobrar o más tarde:
+9. **El recibo** usa `RepresentacionImpresa::datosRecibo`, que no lee `estado_dgii`. Regla: el recibo nunca depende del estado de la DGII.
+10. **Rechazo de una venta ya entregada**, al cobrar o más tarde:
    - la caja y el inventario quedan;
    - el número no vuelve al contador;
    - el cierre la lista como rechazada;
@@ -99,9 +114,10 @@ Además, `PosVenta.php` llama a `facturaModel::saveFacturaConECF`, que Release 1
 
 Se conserva tal como está en `master`: lo dispara la pantalla del POS al abrir, cada 2 minutos y tras cada venta; consulta primero, reenvía el XML guardado, no re-firma y no devuelve números. Recibe cuatro arreglos:
 1. **Flujo por XML guardado:** RFCE si `rfce_xml` no es nulo, e-CF completo si no. Hoy se decide por el prefijo `RFCE_` del estado, y las filas `PENDIENTE_ENVIO`/`ENVIO_INCIERTO` no lo tienen.
-2. **Selección:** filas del POS con `envio_pendiente = 1`, que incluye las de 4.2.6. Se excluyen las `PENDIENTE_ENVIO` de menos de 2 minutos, porque la venta todavía está en curso.
+2. **Selección:** filas del POS con `envio_pendiente = 1`, que incluye las de 4.2.8. Se excluyen las `PENDIENTE_ENVIO` de menos de 2 minutos, porque la venta todavía está en curso.
 3. **Escrituras con compare-and-set:** `UPDATE ... WHERE id = :id AND estado_dgii = :leido`, con `envio_pendiente` en la misma sentencia. Nunca pisa un estado final escrito por otro proceso.
 4. **Sin cambios en la respuesta** (`revisadas`, `aceptadas`, `rechazadas`, `pendientes`): el front del POS la usa.
+5. **Ventas `sin_rango` (4.2.6):** se saltan hasta que exista un rango autorizado registrado que incluya su número. A partir de ahí se envían como cualquier otra pendiente.
 
 ### 4.4 «Reenviar a la DGII» para rechazadas (`handleReenviar`, de `4007eea`)
 
@@ -125,6 +141,14 @@ Se conserva tal como está en `master`: lo dispara la pantalla del POS al abrir,
   - Las listas del POS (ventas del día, turno, cierre) no muestran estados de la DGII.
   - La llamada a `/pos/pendientes/reenviar` cada 2 minutos sigue, en silencio.
 - **App:** se mantiene el botón «Reenviar a la DGII» de `main` en el detalle de una rechazada, junto con lo que agregó Release 1 (filtro Pendientes, indicador Sin confirmar, tarjeta en vuelo).
+- **Recibo de factura simple:** el POS imprime el formato de factura simple cuando la venta salió así (4.2.5).
+
+### 4.6 Avisos al admin (solo en la app, nunca en la caja)
+
+Un aviso en el panel de e-CF de la app, visible para quien administra:
+- **«El certificado falló: N ventas del POS salieron como factura simple»**, desde la primera venta de hoy que salió así.
+- **«Quedan pocos números»** para un tipo de e-CF, cuando el rango vigente tiene 50 o menos libres; y **«Secuencia agotada»** cuando ya no tiene.
+- **«N ventas esperando un rango autorizado»**: las ventas `sin_rango`. Se enviarán solas al registrar el rango.
 
 ## 5. Pruebas
 
@@ -136,7 +160,11 @@ Se conserva tal como está en `master`: lo dispara la pantalla del POS al abrir,
    - `autenticar_despues_de_reservar` con la DGII caída deja la venta guardada y sin confirmar;
    - el 1062 de la clave del POS se trata como venta repetida;
    - la reemisión con el mismo e-NCF archiva la rechazada;
-   - el recibo de una venta sin confirmar es igual al de una aceptada.
+   - el recibo de una venta sin confirmar es igual al de una aceptada;
+   - con el certificado fallando, la venta sale como factura simple, con caja, inventario y clave de idempotencia;
+   - con la secuencia agotada, la venta usa el número siguiente, queda `sin_rango` y no se envía;
+   - el reenvío del POS salta las `sin_rango` hasta que se registra un rango que las cubre, y entonces las envía;
+   - los datos de los avisos de 4.6.
 3. **Suites del POS de `master`** (backend 100, venta 48, cierre 50, e31 35) en las bases scratch existentes:
    - **Distribución de bases:** el rol master va en `smhynzte_wa_scratch_sin_gate`, con las tablas master mínimas (`tenants`, `pos_equipos`, `pos_handoff_codes`, `tenant_id` en `users`/`api_tokens`, `permite_decimales`). El tenant A es `smhynzte_wa_scratch` y el tenant B es `sin_gate`.
    - **Preparación:** un script idempotente con guarda: solo corre sobre bases marcadas y con nombre `*_scratch`. La copia `sin_gate` conserva su estado sin 027/028.
@@ -151,4 +179,9 @@ Se conserva tal como está en `master`: lo dispara la pantalla del POS al abrir,
 - **QR de una reemisión:** si una venta del POS se reemite con el mismo número, el QR del papel original tiene el código de seguridad de la primera firma y no validará en la DGII. Es aceptable, porque los rechazos son raros. Si el cliente necesita el comprobante válido, se le reimprime desde la app.
 - **Ambiente `certecf`:** ahí no hay `ConsultaTrackIds`. Una E31 del POS sin trackId no se puede confirmar sola y queda pendiente para soporte. Las RFCE (E32 < 250k) sí se consultan.
 - **DGII caída:** con la DGII caída, la app no puede crear facturas (como hoy), mientras el POS sigue vendiendo.
+- **Factura simple:** no es un comprobante fiscal. Las ventas que salen así por un fallo del certificado no llevan ITBIS ni entran en el 607. Conviene confirmar con el contador cómo regularizarlas.
+- **Números fuera de rango:**
+  - Si la DGII autoriza un rango nuevo que **no** incluye los números ya usados fuera de rango, esas ventas nunca se envían solas. Quedan en el aviso de 4.6 para soporte.
+  - Una E31 fuera de rango lleva en el XML la fecha del último rango, y puede necesitar «Reenviar a la DGII».
+- **Sin servidor o sin base:** lo único que aún detiene una venta del POS es que el servidor o la base no estén disponibles.
 - **Merges futuros:** `master` sigue cambiando en la misma zona, así que el merge se repite antes de integrar.
