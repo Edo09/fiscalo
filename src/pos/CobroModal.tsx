@@ -19,6 +19,7 @@ import { nuevaClave, useCarritoStore } from './carrito'
 import { centavosATexto, formatoCentavos, montoACentavos, totalesCarrito } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
+import { tituloVenta } from './estados'
 
 /** Códigos con los que el servidor NO emitió nada: se puede corregir y cobrar con otra clave. */
 const SIN_VENTA = new Set([
@@ -313,7 +314,7 @@ export function CobroModal({
           <span className="pos-cobro-ok"><Icon name="check" size={30} /></span>
           <b>Venta cobrada</b>
           <p className="pos-sub" style={{ margin: 0 }}>
-            {fase.r.venta.tipo_ecf === '31' ? 'Factura de crédito fiscal' : 'Factura de consumo'} {fase.r.venta.e_ncf}
+            {tituloVenta(fase.r.venta.tipo_ecf)} {fase.r.venta.e_ncf ?? ''}
             {fase.r.venta.cliente && <><br />{fase.r.venta.cliente.nombre}</>}
           </p>
           {fase.r.cobro.devuelta_centavos !== null ? (
@@ -327,18 +328,6 @@ export function CobroModal({
           {fase.r.repetida && (
             <div className="pos-info" style={{ margin: 0 }}><Icon name="info" size={16} /><span>Esta venta ya se había emitido: es la misma, no se emitió otra.</span></div>
           )}
-          {fase.r.venta.envio_pendiente && (fase.r.venta.estado_dgii === 'ENVIADO' || fase.r.venta.estado_dgii === 'EN_PROCESO' ? (
-            // E31: la DGII lo recibió y da el veredicto después (normal en crédito fiscal).
-            <div className="pos-info" style={{ margin: 0 }}>
-              <Icon name="info" size={16} />
-              <span>La DGII recibió la factura y la está validando. El resultado se confirma solo.</span>
-            </div>
-          ) : (
-            <div className="pos-aviso" style={{ margin: 0 }}>
-              <Icon name="clock" size={16} />
-              <span>La DGII no respondió a tiempo. La venta quedó registrada y se reenviará sola.</span>
-            </div>
-          ))}
           {fase.impresion === 'error' && (
             <div className="pos-error" style={{ margin: 0 }}><Icon name="printer" size={16} /><span>No se pudo imprimir el recibo. Revisa la impresora y reimprime.</span></div>
           )}

@@ -77,7 +77,7 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
     setFase({ tipo: 'resultado', reporte, impresion: 'imprimiendo' })
     try {
       const mm = ANCHO_UTIL_MM[ancho]
-      await printHtml(reporteCierreHtml(reporte, { empresa, anchoMm: mm }), { anchoMm: mm, selector: SELECTOR_REPORTE })
+      await printHtml(reporteCierreHtml(reporte, { empresa, anchoMm: mm, mostrarDgii: false }), { anchoMm: mm, selector: SELECTOR_REPORTE })
       setFase({ tipo: 'resultado', reporte, impresion: 'ok' })
     } catch {
       setFase({ tipo: 'resultado', reporte, impresion: 'error' })

@@ -205,14 +205,13 @@ export interface VentaCuerpo {
 export interface VentaRespuesta {
   venta: {
     factura_id: number
-    e_ncf: string
-    tipo_ecf: string
+    /** null si la venta salió como factura simple (sin e-NCF). */
+    e_ncf: string | null
+    /** null si la venta salió como factura simple. */
+    tipo_ecf: string | null
+    /** El POS no lo muestra: la pantalla del cajero no sabe nada de la DGII. */
     estado_dgii: string
-    /**
-     * Sin veredicto de la DGII todavía: no respondió a tiempo (RFCE_PENDIENTE /
-     * ENVIO_PENDIENTE) o, en un E31, recibió el e-CF y lo está validando
-     * (ENVIADO / EN_PROCESO). Se imprimió y se confirma solo (F6, F7).
-     */
+    /** Sin veredicto todavía: el servidor lo confirma solo (reenvío automático). El POS no lo muestra. */
     envio_pendiente: boolean
     total_centavos: number
     cliente: ClientePos | null
@@ -277,8 +276,9 @@ export interface GrupoFormas {
 /** Venta cobrada del turno (K9). */
 export interface VentaTurno {
   factura_id: number
-  e_ncf: string
-  tipo_ecf: string
+  /** null si la venta salió como factura simple (sin e-NCF). */
+  e_ncf: string | null
+  tipo_ecf: string | null
   fecha: string
   total_centavos: number
   forma_pago: number

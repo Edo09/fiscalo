@@ -14,7 +14,7 @@ import { Overlay } from './PosModales'
 import { usePegar } from './pegar'
 import { TecladoMonto } from './TecladoMonto'
 import { ANCHO_UTIL_MM, fechaHora } from './reporteCierre'
-import { estadoDgii } from './estados'
+import { numeroVenta } from './estados'
 
 export function AperturaTurnoModal({ equipo, sesion, onAbierto, onCerrar, errorDeSesion }: {
   equipo: EquipoGuardado
@@ -309,11 +309,11 @@ export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar,
           ) : ventas.map((v) => (
             <div key={v.factura_id} className="pos-venta-fila">
               <div>
-                <b>{v.e_ncf}</b>
-                <small>{fechaHora(v.fecha).split(' ').slice(1).join(' ')} · {v.forma_pago_nombre} · {estadoDgii(v.estado_dgii)}</small>
+                <b>{numeroVenta(v)}</b>
+                <small>{fechaHora(v.fecha).split(' ').slice(1).join(' ')} · {v.forma_pago_nombre}</small>
               </div>
               <b className="pos-linea-importe">RD$ {formatoCentavos(v.total_centavos)}</b>
-              <Btn size="sm" icon="printer" disabled={imprimiendo !== null} onClick={() => void reimprimir(v)} aria-label={`Reimprimir ${v.e_ncf}`}>
+              <Btn size="sm" icon="printer" disabled={imprimiendo !== null} onClick={() => void reimprimir(v)} aria-label={`Reimprimir ${numeroVenta(v)}`}>
                 {imprimiendo === v.factura_id ? '…' : 'Reimprimir'}
               </Btn>
             </div>

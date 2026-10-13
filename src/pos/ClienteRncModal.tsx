@@ -85,7 +85,7 @@ export function ClienteRncModal({ equipo, sesion, onElegido, onCerrar, errorDeSe
           </div>
           {fase.estado && fase.estado !== 'ACTIVO' && (
             <div className="pos-aviso"><Icon name="alert-triangle" size={16} />
-              <span>El registro dice que este contribuyente está <b>{fase.estado.toLowerCase()}</b>: la DGII podría rechazar el crédito fiscal.</span>
+              <span>El registro dice que este contribuyente está <b>{fase.estado.toLowerCase()}</b>: puede que el crédito fiscal no le sirva. Confírmalo con el cliente.</span>
             </div>
           )}
           <div className="pos-modal-pie">

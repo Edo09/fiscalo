@@ -11,7 +11,7 @@ import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { formatoCentavos } from './montos'
 import { Overlay } from './PosModales'
-import { diaLargo, estadoDgii, horaDe } from './estados'
+import { diaLargo, horaDe, numeroVenta } from './estados'
 
 export function VentasDiaModal({ equipo, sesion, onCerrar, errorDeSesion }: {
   equipo: EquipoGuardado
@@ -87,12 +87,12 @@ export function VentasDiaModal({ equipo, sesion, onCerrar, errorDeSesion }: {
             ) : datos.ventas.map((v) => (
               <div key={v.factura_id} className="pos-venta-fila">
                 <div>
-                  <b>{v.e_ncf}{v.tipo_ecf === '31' && <span className="pos-etiqueta-cf">Crédito fiscal</span>}</b>
+                  <b>{numeroVenta(v)}{v.tipo_ecf === '31' && <span className="pos-etiqueta-cf">Crédito fiscal</span>}</b>
                   {v.cliente && <small className="pos-venta-cliente">{v.cliente}</small>}
-                  <small>{horaDe(v.fecha)} · {v.forma_pago_nombre} · {estadoDgii(v.estado_dgii)}</small>
+                  <small>{horaDe(v.fecha)} · {v.forma_pago_nombre}</small>
                 </div>
                 <b className="pos-linea-importe">RD$ {formatoCentavos(v.total_centavos)}</b>
-                <Btn size="sm" icon="printer" disabled={imprimiendo !== null} onClick={() => void reimprimir(v.factura_id)} aria-label={`Reimprimir ${v.e_ncf}`}>
+                <Btn size="sm" icon="printer" disabled={imprimiendo !== null} onClick={() => void reimprimir(v.factura_id)} aria-label={`Reimprimir ${numeroVenta(v)}`}>
                   {imprimiendo === v.factura_id ? '…' : 'Reimprimir'}
                 </Btn>
               </div>

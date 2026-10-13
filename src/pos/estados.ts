@@ -1,13 +1,21 @@
-// Estado DGII de una venta del POS en palabras del cajero (ventas del turno y
-// del día). Lo que no está aquí se muestra tal cual.
-export const ESTADO_DGII: Record<string, string> = {
-  RFCE_ACEPTADO: 'Aceptada', ACEPTADO: 'Aceptada', RFCE_ACEPTADO_CONDICIONAL: 'Aceptada', ACEPTADO_CONDICIONAL: 'Aceptada',
-  RFCE_PENDIENTE: 'Sin confirmar DGII', ENVIO_PENDIENTE: 'Sin confirmar DGII', ENVIADO: 'DGII validando', EN_PROCESO: 'DGII validando',
-  RFCE_RECHAZADO: 'Rechazada', RECHAZADO: 'Rechazada',
+// Textos de la caja sobre una venta (pantalla de cobro y listas de ventas del
+// turno y del día). La pantalla del cajero no muestra nada de la DGII (decisión
+// U3 de la spec del POS sobre el write-ahead): ni el estado de la venta ni si se
+// envió. Lo vigila scripts/test-pos-sin-dgii.ts.
+
+/**
+ * Número de una venta para el cajero: el e-NCF o, si la venta salió como
+ * factura simple (sin e-NCF), "Factura <id>".
+ */
+export function numeroVenta(v: { e_ncf: string | null; factura_id: number }): string {
+  return v.e_ncf ? v.e_ncf : `Factura ${v.factura_id}`
 }
 
-export function estadoDgii(estado: string): string {
-  return ESTADO_DGII[estado] ?? estado
+/** Título de la venta cobrada por tipo de comprobante; una factura simple (tipo null) es solo "Factura". */
+export function tituloVenta(tipoEcf: string | null): string {
+  if (tipoEcf === '31') return 'Factura de crédito fiscal'
+  if (tipoEcf === '32') return 'Factura de consumo'
+  return 'Factura'
 }
 
 /** "9:41 a. m." de una fecha "2026-10-09 09:41:00". */

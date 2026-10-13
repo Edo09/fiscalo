@@ -6,9 +6,9 @@
 // - Catálogo: se pide al entrar, cada 5 minutos y después de cada venta (C1).
 // - Turno: sin turno propio abierto no se cobra. Al entrar sin turno se ofrece
 //   abrirlo; con el de otro cajero se avisa (lo cierra un supervisor, K4).
-// - Envíos pendientes (F7): se reintentan cada 2 minutos, también con la
-//   pantalla en uso. Si la DGII rechaza una venta ya entregada, queda una
-//   alerta hasta que alguien la lea.
+// - Envíos pendientes (F7): se reintentan solos cada 2 minutos, también con la
+//   pantalla en uso y sin mostrar nada: el POS no se detiene ni avisa por la
+//   DGII (decisión U3). Lo que haya que revisar lo ve el administrador en la app.
 // - Cierre (K6-K8): el propio o, con PIN de supervisor, el de otro cajero. Al
 //   terminar el propio, la pantalla se bloquea (cambio de turno).
 // - Ventas canceladas y líneas quitadas se registran para el cierre (V4).
@@ -24,7 +24,7 @@
 //   cierra su pestaña si hay otras; cerrar una con productos es cancelarla (V4).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
-import { posApi, PosApiError, type EstadoPos, type FormaPago, type Reenvio, type TurnoCaja } from './api'
+import { posApi, PosApiError, type EstadoPos, type FormaPago, type TurnoCaja } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nombreVenta, useCarritoStore, type LineaCarrito, type VentaAbierta } from './carrito'
@@ -106,8 +106,6 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const [categoria, setCategoria] = useState<number | null>(null)
   const [modal, setModal] = useState<Modal>(null)
   const buscadorRef = useRef<HTMLInputElement>(null)
-  const [pendientes, setPendientes] = useState(0)
-  const [rechazadas, setRechazadas] = useState<Reenvio['rechazadas']>([])
   const aperturaOfrecida = useRef(false)
 
   const bloquear = useCallback(async () => {
@@ -196,15 +194,11 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     }
   }, [cargarCatalogo, cargarEstado])
 
-  // Envíos pendientes (F7): al entrar y cada 2 minutos.
+  // Envíos pendientes (F7): al entrar, cada 2 minutos y tras cada venta, en
+  // silencio. La respuesta no se muestra: el cajero no ve nada de la DGII.
   const reenviar = useCallback(async () => {
     try {
-      const r = await posApi.reenviarPendientes(equipo.token)
-      if (!vivoRef.current) return
-      setPendientes(r.pendientes)
-      if (r.rechazadas.length > 0) {
-        setRechazadas((prev) => [...prev, ...r.rechazadas.filter((x) => !prev.some((p) => p.factura_id === x.factura_id))])
-      }
+      await posApi.reenviarPendientes(equipo.token)
     } catch {
       // Sin red: se intenta en la próxima vuelta.
     }
@@ -368,11 +362,6 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           <b>{sesion.empleado.nombre}</b>
         </div>
         <div className="pos-barra-espacio" />
-        {pendientes > 0 && (
-          <span key={pendientes} className="pos-pendientes" title="Ventas que la DGII todavía no confirmó: se reenvían solas">
-            <Icon name="clock" size={15} />{pendientes} <span className="ocultable">sin confirmar DGII</span>
-          </span>
-        )}
         <span className="pos-reloj">{reloj}</span>
         <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
         <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
@@ -397,16 +386,6 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         <Btn icon="lock" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
       </header>
 
-      {rechazadas.length > 0 && (
-        <div className="pos-alerta" role="alert">
-          <Icon name="alert-triangle" size={18} />
-          <span>
-            <b>La DGII rechazó {rechazadas.length === 1 ? 'una venta que ya se había entregado' : `${rechazadas.length} ventas que ya se habían entregado`}:</b>{' '}
-            {rechazadas.map((r) => `${r.e_ncf} (${r.motivo})`).join(' · ')} Avisa al supervisor.
-          </span>
-          <Btn size="sm" onClick={() => setRechazadas([])}>Entendido</Btn>
-        </div>
-      )}
       {turnoAjeno && turno && (
         <div className="pos-franja aviso">
           <Icon name="alert-triangle" size={16} />

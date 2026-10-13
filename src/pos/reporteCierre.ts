@@ -40,7 +40,15 @@ export function textoDiferencia(centavos: number): string {
 const fila = (etiqueta: string, valor: string, clase = '') =>
   `<div class="fila${clase ? ' ' + clase : ''}"><span>${esc(etiqueta)}</span><span>${esc(valor)}</span></div>`
 
-export function reporteCierreHtml(r: ReporteCierre, opts: { empresa?: string | null; anchoMm: number }): string {
+/**
+ * mostrarDgii (por defecto sí): las listas "Pendientes de la DGII" y "Rechazadas
+ * por la DGII". La reimpresión del administrador en app.* las lleva; la caja
+ * imprime con mostrarDgii: false, porque el cajero no ve nada de la DGII (U3).
+ */
+export function reporteCierreHtml(
+  r: ReporteCierre,
+  opts: { empresa?: string | null; anchoMm: number; mostrarDgii?: boolean },
+): string {
   const ventas = r.ventas.por_forma
     .map((f) => fila(`  ${f.nombre} (${f.cantidad})`, formatoCentavos(f.monto_centavos)))
     .join('')
@@ -58,6 +66,7 @@ export function reporteCierreHtml(r: ReporteCierre, opts: { empresa?: string | n
     ? ''
     : `<div class="b">${esc(titulo)} (${xs.length})</div>` + xs.map((x) => fila(`  ${x.e_ncf}`, formatoCentavos(x.total_centavos))).join('')
   const cerroOtro = r.cerrado_por.id !== r.empleado.id
+  const mostrarDgii = opts.mostrarDgii !== false
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Cierre de turno ${r.turno_id}</title><style>
   html, body { margin: 0; background: #fff; color: #000; }
@@ -87,8 +96,7 @@ export function reporteCierreHtml(r: ReporteCierre, opts: { empresa?: string | n
   ${fila('Comprobantes', comprobantes)}
   ${fila(`Ventas canceladas (${r.canceladas.cantidad})`, formatoCentavos(r.canceladas.monto_centavos))}
   ${fila(`Líneas quitadas (${r.lineas_quitadas.cantidad})`, formatoCentavos(r.lineas_quitadas.monto_centavos))}
-  ${lista('Pendientes de la DGII', r.pendientes)}
-  ${lista('Rechazadas por la DGII', r.rechazadas)}
+  ${mostrarDgii ? lista('Pendientes de la DGII', r.pendientes) + lista('Rechazadas por la DGII', r.rechazadas) : ''}
   <hr class="sep">
   <div class="b">EFECTIVO</div>
   ${fila('  Fondo inicial', formatoCentavos(r.fondo_centavos))}

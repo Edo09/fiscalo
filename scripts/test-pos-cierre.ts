@@ -80,5 +80,17 @@ chk('margen a los lados dentro del ancho del papel (border-box, 2 mm)', html.inc
 const propio = reporteCierreHtml({ ...reporte, cerrado_por: { id: 3, nombre: 'Ana', rol: 'cajero' } }, { anchoMm: 72 })
 chk('cierre propio: sin "Cerró" ni segunda firma', !propio.includes('Cerró') && (propio.match(/class="firma"/g) ?? []).length === 1)
 
+// La caja no muestra nada de la DGII (U3); la reimpresión del administrador en app.* sí lleva las listas.
+const conDgiiRechazada = { ...reporte, rechazadas: [{ e_ncf: 'E320000000021', total_centavos: 1200 }] }
+const deCaja = reporteCierreHtml(conDgiiRechazada, { anchoMm: 72, mostrarDgii: false })
+chk('caja (mostrarDgii: false): sin las listas de la DGII ni sus e-NCF',
+  !deCaja.includes('DGII') && !deCaja.includes('E320000000020') && !deCaja.includes('E320000000021'))
+chk('caja: el resto del reporte no cambia (ventas, efectivo y diferencia)',
+  deCaja.includes('VENTAS (4)') && deCaja.includes('1,729.50') && deCaja.includes('Faltan RD$ 0.25'))
+const deAdmin = reporteCierreHtml(conDgiiRechazada, { anchoMm: 72 })
+chk('app (por defecto): sigue con las pendientes y las rechazadas',
+  deAdmin.includes('Pendientes de la DGII (1)') && deAdmin.includes('E320000000020')
+  && deAdmin.includes('Rechazadas por la DGII (1)') && deAdmin.includes('E320000000021'))
+
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)
