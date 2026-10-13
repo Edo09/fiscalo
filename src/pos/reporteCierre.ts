@@ -4,7 +4,7 @@
 // guardó el servidor (pos_turnos.totales_json): las dos copias dicen lo mismo.
 // Sale como página web por printHtml, igual que el recibo de venta.
 import type { ReporteCierre } from './api.ts'
-import { DENOMINACIONES, formatoCentavos } from './montos.ts'
+import { denominacionesDelConteo, formatoCentavos } from './montos.ts'
 
 /** Selector del contenedor que mide printHtml para fijar el largo del papel. */
 export const SELECTOR_REPORTE = '.reporte'
@@ -49,7 +49,7 @@ export function reporteCierreHtml(r: ReporteCierre, opts: { empresa?: string | n
       + r.devoluciones.por_forma.map((f) => fila(`  ${f.nombre} (${f.cantidad})`, formatoCentavos(f.monto_centavos))).join('')
     : ''
   const comprobantes = Object.entries(r.comprobantes).map(([t, n]) => `${t}: ${n}`).join(' · ') || 'ninguno'
-  const conteo = DENOMINACIONES
+  const conteo = denominacionesDelConteo(r.conteo)
     .filter((d) => (r.conteo[String(d)] ?? 0) > 0)
     .map((d) => fila(`  ${d.toLocaleString('es-DO')} × ${r.conteo[String(d)]}`, formatoCentavos(d * 100 * r.conteo[String(d)])))
     .join('')

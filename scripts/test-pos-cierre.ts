@@ -5,7 +5,7 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-pos-cierre.ts
 import type { ReporteCierre } from '../src/pos/api.ts'
-import { contadoCentavos, DENOMINACIONES, teclearEntero } from '../src/pos/montos.ts'
+import { contadoCentavos, DENOMINACIONES, denominacionesDelConteo, teclearEntero } from '../src/pos/montos.ts'
 import { fechaHora, reporteCierreHtml, textoDiferencia } from '../src/pos/reporteCierre.ts'
 
 let fallos = 0
@@ -17,10 +17,13 @@ const chk = (desc: string, ok: boolean, obtenido?: unknown) => {
 }
 
 console.log('Conteo')
-chk('denominaciones dominicanas, del billete mayor a la moneda menor',
-  DENOMINACIONES.join() === '2000,1000,500,200,100,50,20,25,10,5,1')
-const cuenta = { 1000: 1, 500: 1, 200: 1, 20: 1, 5: 1, 1: 4, otros_centavos: 25 }
-chk('1000 + 500 + 200 + 20 + 5 + 4×1 + 0.25 = 1,729.25', contadoCentavos(cuenta) === 172925, contadoCentavos(cuenta))
+chk('denominaciones dominicanas, del billete mayor a la moneda menor (sin el billete de 20)',
+  DENOMINACIONES.join() === '2000,1000,500,200,100,50,25,10,5,1')
+const cuenta = { 1000: 1, 500: 1, 200: 1, 10: 2, 5: 1, 1: 4, otros_centavos: 25 }
+chk('1000 + 500 + 200 + 2×10 + 5 + 4×1 + 0.25 = 1,729.25', contadoCentavos(cuenta) === 172925, contadoCentavos(cuenta))
+chk('un cierre viejo con billetes de 20: su fila va tras los billetes; en 0 no aparece',
+  denominacionesDelConteo({ 20: 1, 50: 0 }).join() === '2000,1000,500,200,100,50,20,25,10,5,1'
+  && denominacionesDelConteo({ 20: 0 }).join() === DENOMINACIONES.join(), denominacionesDelConteo({ 20: 1 }))
 chk('vacío = 0', contadoCentavos({}) === 0)
 chk('3 de 2000 y 7 de 25 = 6,175.00', contadoCentavos({ 2000: 3, 25: 7 }) === 617500)
 
@@ -71,6 +74,8 @@ chk('canceladas, líneas quitadas y la pendiente', html.includes('Ventas cancela
   && html.includes('Líneas quitadas (2)') && html.includes('E320000000020'))
 chk('efectivo: fondo, esperado, conteo solo de lo que hay, contado y diferencia', html.includes('1,500.00') && html.includes('1,729.50')
   && html.includes('1,000 × 1') && !html.includes('2,000 × 0') && html.includes('1,729.25') && html.includes('Faltan RD$ 0.25'))
+// Este reporte es de antes de quitar el billete de 20 (su conteo lo trae): al reimprimirlo, la fila sigue.
+chk('cierre viejo: el billete de 20 contado sigue saliendo al reimprimir', html.includes('20 × 1') && html.includes('20.00'))
 chk('cerró un supervisor: aparece con su firma; y la nota', html.includes('Luis (supervisor)') && html.includes('Firma de Luis')
   && html.includes('Faltan 25 centavos'))
 chk('los nombres se escapan (nada de HTML inyectado)', !html.includes('<script>') && html.includes('Ana &lt;script&gt;'))

@@ -16,7 +16,7 @@ import { posApi, PosApiError, type ClientePos, type FormaPago, type VentaCuerpo,
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nuevaClave, useCarritoStore } from './carrito'
-import { centavosATexto, formatoCentavos, MONEDAS, montoACentavos, totalesCarrito } from './montos'
+import { BILLETES, centavosATexto, formatoCentavos, MONEDAS, montoACentavos, totalesCarrito } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 
@@ -44,14 +44,13 @@ const FORMAS: { forma: FormaPago; nombre: string; tecla: string; icono: 'banknot
   { forma: 3, nombre: 'Tarjeta', tecla: 'F2', icono: 'wallet' },
   { forma: 2, nombre: 'Transferencia', tecla: 'F3', icono: 'landmark' },
 ]
-/**
- * Billetes de atajo para el efectivo recibido (en pesos). Se SUMAN: el cliente
- * paga 2,342.30 con 2,000 + 500 → se tocan los dos. Antes cada botón ponía un
- * solo billete y, si no alcanzaba, quedaba desactivado: con un total mayor de
- * 2,000 no servía ninguno. Las monedas (MONEDAS, las mismas del cierre) van
- * en su propia fila y suman igual.
+/*
+ * Billetes y monedas de atajo para el efectivo recibido: BILLETES y MONEDAS de
+ * montos.ts, los mismos del cierre. Se SUMAN: el cliente paga 2,342.30 con
+ * 2,000 + 500 → se tocan los dos. Antes cada botón ponía un solo billete y, si
+ * no alcanzaba, quedaba desactivado: con un total mayor de 2,000 no servía
+ * ninguno. Las monedas van en su propia fila y suman igual.
  */
-const BILLETES = [2000, 1000, 500, 200, 100, 50]
 
 type Fase =
   | { tipo: 'eligiendo' }

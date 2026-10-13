@@ -154,10 +154,27 @@ export function teclearMonto(actual: string, tecla: string): string {
 
 // --- Conteo de la gaveta (cierre de turno, K6) --------------------------------
 
-/** Billetes y monedas dominicanos (en pesos), del mayor al menor. Mismo orden que PosCierre::DENOMINACIONES. */
-export const BILLETES = [2000, 1000, 500, 200, 100, 50, 20] as const
+/**
+ * Billetes y monedas dominicanos (en pesos), del mayor al menor. Mismo orden que
+ * PosCierre::DENOMINACIONES. El billete de 20 salió el 2026-10-13: ya no circula.
+ */
+export const BILLETES = [2000, 1000, 500, 200, 100, 50] as const
 export const MONEDAS = [25, 10, 5, 1] as const
 export const DENOMINACIONES = [...BILLETES, ...MONEDAS] as const
+
+/**
+ * Denominaciones con que se pinta un conteo GUARDADO: las de hoy y, detrás de
+ * los billetes, las que un cierre viejo todavía trae con unidades (el de 20).
+ * Sin esto, reimprimir ese cierre perdería la fila y no sumaría el "Contado".
+ */
+export function denominacionesDelConteo(conteo: Record<string, number>): number[] {
+  const vigentes: readonly number[] = DENOMINACIONES
+  const viejas = Object.keys(conteo)
+    .filter((k) => /^\d+$/.test(k) && !vigentes.includes(Number(k)) && (conteo[k] ?? 0) > 0)
+    .map(Number)
+    .sort((a, b) => b - a)
+  return [...BILLETES, ...viejas, ...MONEDAS]
+}
 
 /** Total contado en centavos: unidades por denominación más "otros / centavos". */
 export function contadoCentavos(conteo: Record<string, number>): number {

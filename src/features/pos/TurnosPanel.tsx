@@ -10,7 +10,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { printHtml } from '@/lib/printHtml'
 import { getAnchoTirilla } from '@/stores/impresora'
 import type { ReporteCierre } from '@/pos/api'
-import { DENOMINACIONES, formatoCentavos } from '@/pos/montos'
+import { denominacionesDelConteo, formatoCentavos } from '@/pos/montos'
 import { ANCHO_UTIL_MM, fechaHora, reporteCierreHtml, SELECTOR_REPORTE, textoDiferencia } from '@/pos/reporteCierre'
 
 const pesos = (n: number | null) => (n === null ? '—' : `RD$ ${formatoCentavos(Math.round(n * 100))}`)
@@ -160,7 +160,7 @@ function TurnoDetalleModal({ turno, onClose }: { turno: PosTurno; onClose: () =>
           </div>
           <Bloque titulo="Conteo">
             <div className="text-sm muted">
-              {DENOMINACIONES.filter((d) => (r.conteo[String(d)] ?? 0) > 0)
+              {denominacionesDelConteo(r.conteo).filter((d) => (r.conteo[String(d)] ?? 0) > 0)
                 .map((d) => `${d.toLocaleString('es-DO')} × ${r.conteo[String(d)]}`).join(' · ') || 'Sin billetes ni monedas'}
               {(r.conteo.otros_centavos ?? 0) > 0 && ` · otros ${formatoCentavos(r.conteo.otros_centavos)}`}
             </div>
