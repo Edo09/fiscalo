@@ -174,6 +174,26 @@ export function teclearEntero(actual: string, tecla: string): string {
   return actual === '0' ? tecla : actual + tecla
 }
 
+// --- Pegar en los teclados (Ctrl+V) ------------------------------------------
+// Lo pegado REEMPLAZA lo que había y entra como si el cajero lo tecleara, tecla
+// por tecla: con los mismos topes (cifras, decimales) que el teclado.
+
+/** Solo los dígitos: "1-31-25643-2" → "131256432". */
+export const soloDigitos = (texto: string): string => texto.replace(/\D/g, '')
+
+/**
+ * Un monto pegado: "RD$ 1,250.50" → "1250.50". Cuentan los dígitos y el punto;
+ * la coma es separador de miles (formato dominicano) y se descarta.
+ */
+export function pegarMonto(texto: string): string {
+  return [...texto.replace(/[^\d.]/g, '')].reduce(teclearMonto, '')
+}
+
+/** Unidades pegadas (conteo de la gaveta): "1,500" → "1500", con el tope de 5 cifras. */
+export function pegarEntero(texto: string): string {
+  return [...soloDigitos(texto)].reduce(teclearEntero, '')
+}
+
 /** RNC y cédula como se escriben: 131000001 → 1-31-00000-1; 00112345678 → 001-1234567-8. */
 export function formatoRnc(digitos: string): string {
   if (digitos.length === 9) return `${digitos[0]}-${digitos.slice(1, 3)}-${digitos.slice(3, 8)}-${digitos[8]}`

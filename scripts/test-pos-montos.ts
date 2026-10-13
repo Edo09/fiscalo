@@ -6,7 +6,7 @@
 //   node scripts/test-pos-montos.ts
 import {
   coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, montoACentavos, normalizar, semaforo,
-  teclearMonto, centavosATexto, descuentoLinea, totalesCarrito, formatoRnc,
+  teclearMonto, centavosATexto, descuentoLinea, totalesCarrito, formatoRnc, pegarMonto, pegarEntero, soloDigitos,
 } from '../src/pos/montos.ts'
 
 let fallos = 0
@@ -112,6 +112,17 @@ const sumar = (texto: string, billete: number) => centavosATexto((texto === '' ?
 const recibido = [2000, 500].reduce(sumar, '')
 chk('billetes 2,000 + 500 → recibido "2500", devuelta 157.70', recibido === '2500' && (montoACentavos(recibido) ?? 0) - 234230 === 15770)
 chk('se puede seguir tecleando sobre lo sumado: "2500" + ".5" → 2500.5', montoACentavos(teclearMonto(teclearMonto(recibido, '.'), '5')) === 250050)
+
+console.log('Pegar en los teclados (Ctrl+V)')
+chk('monto con símbolo y miles: "RD$ 1,250.50" → "1250.50"', pegarMonto('RD$ 1,250.50') === '1250.50', pegarMonto('RD$ 1,250.50'))
+chk('monto con espacios y salto de línea: " 9,263.00\\n" → "9263.00"', pegarMonto(' 9,263.00\n') === '9263.00', pegarMonto(' 9,263.00\n'))
+chk('mismos topes que el teclado: 3 decimales → 2, 8 cifras → 7', pegarMonto('12.345') === '12.34' && pegarMonto('12345678') === '1234567',
+  [pegarMonto('12.345'), pegarMonto('12345678')])
+chk('dos puntos: cuenta el primero', pegarMonto('1.2.3') === '1.23', pegarMonto('1.2.3'))
+chk('sin cifras → vacío', pegarMonto('hola') === '')
+chk('unidades del conteo: "1,500" → "1500", tope de 5 cifras', pegarEntero('1,500') === '1500' && pegarEntero('1234567') === '12345')
+chk('RNC con guiones: "1-31-25643-2" → "131256432"; cédula "001-1234567-8" → 11 dígitos',
+  soloDigitos('1-31-25643-2') === '131256432' && soloDigitos('001-1234567-8') === '00112345678')
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

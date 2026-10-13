@@ -5,6 +5,7 @@ import { Btn, Icon } from '@/components/ui'
 import { fmtCantidad } from '@/lib/format'
 import { leerCantidad } from './montos'
 import type { LineaCarrito } from './carrito'
+import { usePegar } from './pegar'
 
 /** Fondo oscuro + panel. Tocar fuera cierra (si `onCerrar` lo permite). */
 /**
@@ -23,6 +24,19 @@ export function Overlay({ children, ancho }: { children: ReactNode; ancho?: numb
 /** Máximo de caracteres de una cantidad: 99999.99 */
 const MAX_LARGO = 8
 
+/** Una tecla en el campo de cantidad: decimales solo si la unidad los admite, hasta 2. */
+function teclearCantidad(actual: string, t: string, decimales: boolean): string {
+  if (t === '⌫') return actual.slice(0, -1)
+  if (actual.length >= MAX_LARGO) return actual
+  if (t === '.') {
+    if (!decimales || actual.includes('.')) return actual
+    return actual === '' ? '0.' : actual + '.'
+  }
+  const [, dec] = actual.split('.')
+  if (dec !== undefined && dec.length >= 2) return actual
+  return actual === '0' ? t : actual + t
+}
+
 export function CantidadModal({ linea, onAceptar, onCerrar }: {
   linea: LineaCarrito
   onAceptar: (cantidad: number) => void
@@ -31,17 +45,10 @@ export function CantidadModal({ linea, onAceptar, onCerrar }: {
   const [texto, setTexto] = useState('')
   const valor = leerCantidad(texto, linea.decimales)
 
-  const teclear = (t: string) => setTexto((actual) => {
-    if (t === '⌫') return actual.slice(0, -1)
-    if (actual.length >= MAX_LARGO) return actual
-    if (t === '.') {
-      if (!linea.decimales || actual.includes('.')) return actual
-      return actual === '' ? '0.' : actual + '.'
-    }
-    const [, dec] = actual.split('.')
-    if (dec !== undefined && dec.length >= 2) return actual
-    return actual === '0' ? t : actual + t
-  })
+  const teclear = (t: string) => setTexto((actual) => teclearCantidad(actual, t, linea.decimales))
+  // Pegar: reemplaza la cantidad, tecla por tecla con las mismas reglas ("1,5" no
+  // es 1.5: la coma es de miles y se descarta, como en los montos).
+  usePegar((pegado) => setTexto([...pegado.replace(/[^\d.]/g, '')].reduce((a, t) => teclearCantidad(a, t, linea.decimales), '')))
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
