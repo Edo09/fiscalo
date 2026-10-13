@@ -660,6 +660,9 @@
   font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent;
 }
 .pos-billete.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+/* Monedas: fila propia de 4, más bajas y redondas que los billetes. */
+.pos-monedas { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 18px; }
+.pos-billete.moneda { height: 40px; border-radius: var(--r-full); font-size: 15px; background: var(--surface-2); }
 .pos-billete:disabled { opacity: 0.35; cursor: default; }
 .pos-devuelta {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
