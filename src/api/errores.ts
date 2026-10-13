@@ -83,14 +83,19 @@ const MSG_TARDO = 'El servidor tardó demasiado en responder. Inténtalo de nuev
 const MSG_TARDO_ESCRITURA =
   'El servidor tardó demasiado en responder. Puede que sí se haya guardado: revisa el listado antes de intentarlo otra vez.'
 // La emisión (POST /api/facturas) guarda la factura ANTES de enviarla a la
-// DGII: si el navegador se rindió, la factura está en el filtro Pendientes con
-// su e-NCF. Emitir otra vez gastaría otro número para la misma venta.
+// DGII: si el navegador se rindió, la factura está guardada con su e-NCF.
+// Emitir otra vez gastaría otro número para la misma venta. No se sabe en qué
+// estado quedó: si el servidor terminó la emisión, la DGII ya contestó y la fila
+// está aceptada o rechazada, y esas NO salen en el filtro Pendientes. Por eso se
+// manda a Todos y Pendientes solo se nombra como el lugar de las que esperan.
+// (Solo el 502 incierto del servidor, con la fila ya en ENVIO_INCIERTO, manda a
+// Pendientes a secas: el API lo dice y ahí sí es el único lugar.)
 const MSG_TARDO_EMISION =
-  'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+  'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
 // Lo mismo cuando la conexion se corta (no es un timeout) en plena emision:
 // la fila pudo quedar guardada y hasta enviada, y reintentar quemaria otro e-NCF.
 const MSG_SIN_CONEXION_EMISION =
-  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
 const MSG_SIN_PERMISO = 'No tienes permiso para hacer esto. Pídele acceso a un administrador.'
 const MSG_NO_DISPONIBLE = 'Esta opción no está disponible ahora mismo. Recarga la página; si sigue pasando, avisa a soporte.'
 const MSG_MUY_GRANDE = 'El archivo es demasiado grande. Usa uno más liviano.'
@@ -284,8 +289,8 @@ function textoServidor(ctx: ContextoError): string {
   if (esLogin(ctx)) return MSG_LOGIN_SERVIDOR
   if (esEmisionEcf(ctx)) {
     // Un fallo a mitad de la emisión puede haber dejado el e-CF guardado y
-    // enviado: antes de repetir hay que mirar el filtro Pendientes.
-    return 'No se pudo completar la emisión del e-CF. Revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+    // enviado (y ya aceptado o rechazado): antes de repetir hay que mirar el listado.
+    return 'No se pudo completar la emisión del e-CF. Revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
   }
   if (esEstadoDgii(ctx)) return 'No se pudo consultar el estado en la DGII. Inténtalo de nuevo en unos minutos.'
   if (esDocumento(ctx)) return 'No se pudo generar el documento. Inténtalo de nuevo en unos minutos.'

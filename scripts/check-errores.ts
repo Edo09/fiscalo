@@ -87,15 +87,15 @@ const FACTURA_NOTA_ENVIADO_SIN_TRACK =
   'La DGII recibió este comprobante, pero no devolvió su número de seguimiento y por eso no se puede consultar su estado desde aquí. Si necesitas confirmarlo, avisa a soporte con el número %s.'
 // Textos propios del front (errores.ts no los exporta): se comparan literales.
 const MSG_TARDO_EMISION =
-  'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+  'El servidor tardó demasiado en responder. Puede que el comprobante sí se haya emitido: revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
 const MSG_TARDO_ESCRITURA =
   'El servidor tardó demasiado en responder. Puede que sí se haya guardado: revisa el listado antes de intentarlo otra vez.'
 const MSG_TARDO = 'El servidor tardó demasiado en responder. Inténtalo de nuevo.'
 const MSG_SIN_CONEXION = 'No se pudo conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.'
 const MSG_SIN_CONEXION_EMISION =
-  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+  'Se perdió la conexión mientras se emitía. Puede que el comprobante sí se haya emitido: revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
 const TEXTO_SERVIDOR_EMISION =
-  'No se pudo completar la emisión del e-CF. Revisa el filtro Pendientes del listado de facturas antes de intentarlo otra vez.'
+  'No se pudo completar la emisión del e-CF. Revisa el listado de facturas, en Todos (las que esperan respuesta de la DGII están en Pendientes), antes de intentarlo otra vez.'
 
 const ENCF = 'E310000000123'
 const conNcf = (texto: string): string => texto.replace('%s', ENCF)
@@ -155,7 +155,7 @@ igual('504 de otra escritura -> MSG_TARDO_ESCRITURA de siempre',
   chk(`clasificar(MSG_SIN_CONEXION_EMISION) -> null, no 'interno' (dio ${tipo})`, tipo === null)
 }
 const caido = humanizar('', 500, EMISION).mensaje
-chk(`500 sin texto en POST /api/facturas -> manda al filtro Pendientes (dio "${caido}")`,
+chk(`500 sin texto en POST /api/facturas -> manda al listado, en Todos (dio "${caido}")`,
   caido.startsWith(TEXTO_SERVIDOR_EMISION))
 
 // --- Textos del front para una factura en vuelo (enVuelo.ts) -----------------
