@@ -1085,3 +1085,18 @@ button.menu-item:focus-visible { background: var(--surface-hover); }
 .role-card.add:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); transform: none; }
 .role-card.add .role-ic { background: var(--neutral-soft); color: var(--text-2); }
 .role-card.add:hover .role-ic { background: var(--accent-soft-2); color: var(--accent); }
+
+/* ---- Foto del producto (formulario y lista de productos) ------------------ */
+.foto-producto { display: flex; align-items: center; gap: 14px; }
+.foto-producto-vista {
+  width: 88px; height: 88px; flex-shrink: 0; border-radius: var(--r-md); overflow: hidden;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--text-3);
+  border: 1px solid var(--border);
+}
+.foto-producto-vista img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-producto-acciones { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.producto-mini {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; overflow: hidden;
+  display: grid; place-items: center; background: var(--neutral-soft); color: var(--text-2);
+}
+.producto-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }

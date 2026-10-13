@@ -3,8 +3,23 @@ import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, PageHead, LoadingSt
 import { listCategories, listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { fmtCantidad } from '@/lib/format'
+import { API_BASE_URL } from '@/api/config'
+import { urlFoto } from '@/lib/fotoProducto'
 import { ProductFormModal } from './ProductFormModal'
 import type { Producto } from '@/types/domain'
+
+/** Miniatura de la lista: la foto si tiene (y carga); si no, el ícono de bien o servicio. */
+function FotoMini({ p }: { p: Producto }) {
+  const [rota, setRota] = useState(false)
+  const src = urlFoto(API_BASE_URL, p.imagen)
+  return (
+    <span className="producto-mini">
+      {src && !rota
+        ? <img src={src} alt="" loading="lazy" onError={() => setRota(true)} />
+        : <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} />}
+    </span>
+  )
+}
 
 /* FISCALO — Productos y servicios (GET /api/products) */
 export function ProductsView() {
@@ -98,7 +113,7 @@ export function ProductsView() {
               <tbody>
                 {rows.map((p) => (
                   <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => setModal({ product: p })}>
-                    <td><div className="row gap-sm"><span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 30, height: 30 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span><div><span className="cell-main">{p.nombre}</span><div className="cell-sub">{p.tipo} · {p.itbis > 0 ? `ITBIS ${p.itbis}%` : 'Exento'}</div></div></div></td>
+                    <td><div className="row gap-sm"><FotoMini key={p.imagen ?? ''} p={p} /><div><span className="cell-main">{p.nombre}</span><div className="cell-sub">{p.tipo} · {p.itbis > 0 ? `ITBIS ${p.itbis}%` : 'Exento'}</div></div></div></td>
                     <td className="mono text-sm muted">{p.sku || '—'}</td>
                     <td className="text-sm">{p.cat}</td>
                     <td className="num muted">{p.costo ? <Money value={p.costo} cur={false} /> : '—'}</td>

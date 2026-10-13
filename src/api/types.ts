@@ -35,6 +35,10 @@ export type EstadoDgii =
   // En vuelo: guardada antes de enviar a la DGII, sin respuesta todavía.
   | 'PENDIENTE_ENVIO'
   | 'ENVIO_INCIERTO'
+  // Estados del POS de main que la API ya no produce (los reemplaza ENVIO_INCIERTO);
+  // siguen en el tipo mientras algún componente de main los compare.
+  | 'RFCE_PENDIENTE'
+  | 'ENVIO_PENDIENTE'
 
 // ---------------------------------------------------------------------------
 // Crear factura — POST /api/facturas
@@ -78,6 +82,8 @@ export interface FacturaRow {
   codigo_seguridad?: string | null
   fecha_emision_dgii?: string | null
   secuencia_utilizada?: boolean | null
+  /** 1=Contado 2=Crédito 3=Gratuito (TipoPago DGII). El plazo del e-CF va en su XML (FechaLimitePago). */
+  tipo_pago?: number | string | null
   // Presentes en el listado (GET /api/facturas): resumen plano de la factura.
   company_name?: string | null
   description?: string | null
@@ -586,6 +592,8 @@ export interface ProductRow {
    */
   stock?: number | string | null
   stock_minimo?: number | string | null
+  /** Foto (migración 032): ruta relativa al API; null = sin foto. */
+  imagen_path?: string | null
   activo?: number | boolean | null
 }
 
@@ -848,6 +856,8 @@ export interface CategoryRow {
   id: number
   nombre?: string | null
   descripcion?: string | null
+  /** Color en el POS, '#RRGGBB' (migración 034). Único por categoría; null = calculado del nombre. */
+  color?: string | null
   estado?: number | boolean | null
   created_at?: string
   updated_at?: string
@@ -856,6 +866,8 @@ export interface CategoryRow {
 export interface CreateCategoryInput {
   nombre: string
   descripcion?: string
+  /** '#RRGGBB' o null (automático). Ausente en un PUT = no se cambia. */
+  color?: string | null
   estado?: number
 }
 
@@ -1365,6 +1377,8 @@ export interface FacturaSimpleInput {
   date?: string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number
+  /** Plazo del crédito en días (30, 45, 60). null = contado; sin plazo, el backend asume 30. */
+  dias_credito?: number | null
   items: FacturaSimpleItemInput[]
 }
 
@@ -1397,6 +1411,8 @@ export interface FacturaSimpleRow {
   total: number | string
   /** 1=Contado 2=Crédito 3=Gratuito 4=Permuta 5=Otros (códigos DGII). */
   tipo_pago?: number | string | null
+  /** Plazo del crédito en días (migración 033). null = contado o crédito de 30. */
+  dias_credito?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
 }

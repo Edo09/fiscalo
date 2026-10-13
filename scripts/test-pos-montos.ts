@@ -5,7 +5,8 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-pos-montos.ts
 import {
-  coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, normalizar, semaforo,
+  coincide, formatoCentavos, importeLinea, iniciales, itbisIncluido, leerCantidad, montoACentavos, normalizar, semaforo,
+  teclearMonto, centavosATexto, descuentoLinea, totalesCarrito, formatoRnc, pegarMonto, pegarEntero, soloDigitos,
 } from '../src/pos/montos.ts'
 
 let fallos = 0
@@ -38,7 +39,25 @@ chk('18% y 16% juntos: 116.00 al 16% = 16.00 más 25.00 al 18% = 3.81',
   itbisIncluido([{ importe: 11600, tasa: 16 }, { importe: 2500, tasa: 18 }]))
 chk('carrito vacío: 0', itbisIncluido([]) === 0)
 
+console.log('Descuento del cliente (V5), los montos de tools/test_pos_e31.php')
+chk('10% de 75.00 = 7.50; de 38.00 = 3.80', descuentoLinea(7500, 10) === 750 && descuentoLinea(3800, 10) === 380)
+chk('mitad hacia arriba: 5.5% de 9.00 = 0.495 → 0.50', descuentoLinea(900, 5.5) === 50, descuentoLinea(900, 5.5))
+chk('sin descuento: 0', descuentoLinea(7500, 0) === 0)
+const conDesc = totalesCarrito([{ precioCentavos: 2500, cantidad: 3, tasa: 18 }, { precioCentavos: 3800, cantidad: 1, tasa: 0 }], 10)
+chk('agua 3 × 25 + arroz 38 con 10%: total 101.70, descuento 11.30, ITBIS 10.30 (como el e-CF)',
+  conDesc.total === 10170 && conDesc.descuento === 1130 && conDesc.bruto === 11300 && conDesc.itbis === 1030, conDesc)
+const sinDesc = totalesCarrito([{ precioCentavos: 2500, cantidad: 7, tasa: 18 }])
+chk('sin cliente: 7 × 25 = 175.00 con ITBIS 26.69', sinDesc.total === 17500 && sinDesc.descuento === 0 && sinDesc.itbis === 2669, sinDesc)
+chk('subtotal sin ITBIS (el del recibo): 148.31 + 26.69 = 175.00', sinDesc.subtotal === 14831 && sinDesc.subtotal + sinDesc.itbis === sinDesc.total, sinDesc)
+chk('con el 10%: subtotal 91.40 (agua 57.20 + arroz exento 34.20, como el e-CF) + ITBIS 10.30 = 101.70',
+  conDesc.subtotal === 9140 && conDesc.subtotal + conDesc.itbis === conDesc.total, conDesc)
+const soloExento = totalesCarrito([{ precioCentavos: 3800, cantidad: 2, tasa: 0 }])
+chk('solo exento: subtotal = total, ITBIS 0', soloExento.subtotal === 7600 && soloExento.itbis === 0 && soloExento.total === 7600, soloExento)
+chk('carrito vacío: todo en 0', JSON.stringify(totalesCarrito([])) === JSON.stringify({ lineas: [], bruto: 0, descuento: 0, total: 0, itbis: 0, subtotal: 0 }))
+
 console.log('Formato')
+chk('RNC 131000001 → 1-31-00000-1; cédula 00112345678 → 001-1234567-8; incompleto tal cual',
+  formatoRnc('131000001') === '1-31-00000-1' && formatoRnc('00112345678') === '001-1234567-8' && formatoRnc('1310') === '1310')
 chk('1234.5 → "1,234.50"', formatoCentavos(123450) === '1,234.50', formatoCentavos(123450))
 chk('0 → "0.00"', formatoCentavos(0) === '0.00')
 
@@ -74,6 +93,36 @@ chk('vacío → "?"', iniciales('  ') === '?')
 chk('sin signos: "Huevos (unidad)" → "HU", "Papel higiénico (4 rollos)" → "PH"', iniciales('Huevos (unidad)') === 'HU'
   && iniciales('Papel higiénico (4 rollos)') === 'PH', [iniciales('Huevos (unidad)'), iniciales('Papel higiénico (4 rollos)')])
 chk('solo signos → "?"', iniciales('(--)') === '?')
+
+console.log('Montos escritos (efectivo recibido, fondo)')
+chk('"1500" → 150000, "245.5" → 24550, "0.05" → 5', montoACentavos('1500') === 150000 && montoACentavos('245.5') === 24550
+  && montoACentavos('0.05') === 5)
+chk('vacío, "1.234", "abc" → null', montoACentavos('') === null && montoACentavos('1.234') === null && montoACentavos('abc') === null)
+chk('"0.29" → 29 sin ruido binario', montoACentavos('0.29') === 29, montoACentavos('0.29'))
+const escribir = (teclas: string[]) => teclas.reduce((t, k) => teclearMonto(t, k), '')
+chk('teclear 2,4,5,.,5 → "245.5"', escribir(['2', '4', '5', '.', '5']) === '245.5')
+chk('un solo punto y 2 decimales: 1,.,.,2,3,4 → "1.23"', escribir(['1', '.', '.', '2', '3', '4']) === '1.23')
+chk('punto primero → "0.", cero a la izquierda no se repite', escribir(['.']) === '0.' && escribir(['0', '0', '7']) === '7')
+chk('borrar y limpiar', escribir(['1', '2', '⌫']) === '1' && escribir(['1', '2', 'C']) === '')
+chk('tope de 7 cifras', escribir(['1', '2', '3', '4', '5', '6', '7', '8']) === '1234567')
+chk('centavos a texto: 250000 → "2500", 234230 → "2342.30", 5 → "0.05"', centavosATexto(250000) === '2500'
+  && centavosATexto(234230) === '2342.30' && centavosATexto(5) === '0.05')
+// Billetes que se suman (CobroModal): 2,000 + 500 para un total de 2,342.30.
+const sumar = (texto: string, billete: number) => centavosATexto((texto === '' ? 0 : montoACentavos(texto) ?? 0) + billete * 100)
+const recibido = [2000, 500].reduce(sumar, '')
+chk('billetes 2,000 + 500 → recibido "2500", devuelta 157.70', recibido === '2500' && (montoACentavos(recibido) ?? 0) - 234230 === 15770)
+chk('se puede seguir tecleando sobre lo sumado: "2500" + ".5" → 2500.5', montoACentavos(teclearMonto(teclearMonto(recibido, '.'), '5')) === 250050)
+
+console.log('Pegar en los teclados (Ctrl+V)')
+chk('monto con símbolo y miles: "RD$ 1,250.50" → "1250.50"', pegarMonto('RD$ 1,250.50') === '1250.50', pegarMonto('RD$ 1,250.50'))
+chk('monto con espacios y salto de línea: " 9,263.00\\n" → "9263.00"', pegarMonto(' 9,263.00\n') === '9263.00', pegarMonto(' 9,263.00\n'))
+chk('mismos topes que el teclado: 3 decimales → 2, 8 cifras → 7', pegarMonto('12.345') === '12.34' && pegarMonto('12345678') === '1234567',
+  [pegarMonto('12.345'), pegarMonto('12345678')])
+chk('dos puntos: cuenta el primero', pegarMonto('1.2.3') === '1.23', pegarMonto('1.2.3'))
+chk('sin cifras → vacío', pegarMonto('hola') === '')
+chk('unidades del conteo: "1,500" → "1500", tope de 5 cifras', pegarEntero('1,500') === '1500' && pegarEntero('1234567') === '12345')
+chk('RNC con guiones: "1-31-25643-2" → "131256432"; cédula "001-1234567-8" → 11 dígitos',
+  soloDigitos('1-31-25643-2') === '131256432' && soloDigitos('001-1234567-8') === '00112345678')
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

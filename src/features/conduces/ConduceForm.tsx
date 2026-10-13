@@ -398,6 +398,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
           onBusquedaChange={(texto) => { setBusquedaCliente(texto); quitarErrCliente() }}
           onLibreChange={(v) => { setClienteLibre(v); quitarErrCliente() }}
           onNuevoCliente={() => setNuevoCliente(true)}
+          anchoCompleto
         />
 
         {/* --- Líneas: cantidad, unidad y descripción; los montos no se ven --- */}

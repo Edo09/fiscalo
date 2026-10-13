@@ -161,7 +161,7 @@ const RE_CONSTANTE = /\b[A-Z][A-Z0-9]+_[A-Z][A-Z0-9_]{2,}\b/
 // ("ya existe una factura … en estado EN_PROCESO") y el usuario ve en la lista.
 // Los dos primeros son los de una factura en vuelo (guardada antes de enviarla).
 const RE_ESTADO_DGII =
-  /\b(RFCE_)?(PENDIENTE_ENVIO|ENVIO_INCIERTO|ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|ACEPTADO|RECHAZADO|ENVIADO)\b/g
+  /\b(RFCE_)?(PENDIENTE_ENVIO|ENVIO_INCIERTO|ENVIO_PENDIENTE|ACEPTADO_CONDICIONAL|RECHAZADO_ARCHIVADO|EN_PROCESO|NO_ENCONTRADO|PENDIENTE_EMISION|PENDIENTE|ACEPTADO|RECHAZADO|ENVIADO)\b/g
 const RE_JERGA_INTERNA = /\b(php|pdo|sql|mysql|curl|openssl|fpdf|vendor|libxml)\b/i
 
 const RE_RUTA = /\/api\/|\/inventario\/|https?:\/\/|\bsub-?rutas?\b|\bendpoints?\b/i
@@ -262,7 +262,9 @@ const esLogin = (ctx: ContextoError) => /\/api\/auth\/login\b/.test(rutaDe(ctx))
 const esVistaPrevia = (ctx: ContextoError) => /\/preview\b/.test(rutaDe(ctx))
 const esDocumento = (ctx: ContextoError) => /\/(pdf|xml)\b/.test(rutaDe(ctx))
 const esEstadoDgii = (ctx: ContextoError) => /\/estado\b/.test(rutaDe(ctx))
-const esEmisionEcf = (ctx: ContextoError) => metodoDe(ctx) === 'POST' && /^\/api\/facturas\/?$/.test(rutaDe(ctx))
+// El reenvío de un rechazado también emite: un fallo a mitad pudo dejarlo enviado.
+const esEmisionEcf = (ctx: ContextoError) =>
+  metodoDe(ctx) === 'POST' && /^\/api\/facturas(\/\d+\/reenviar)?\/?$/.test(rutaDe(ctx))
 
 /**
  * ¿La petición pudo dejar algo guardado? Decide si un timeout o una respuesta

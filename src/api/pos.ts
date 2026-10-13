@@ -5,6 +5,7 @@
 // El PIN de un empleado llega UNA sola vez (al crearlo o al generar uno nuevo):
 // el API no lo puede volver a mostrar, solo reemplazar.
 import { getJson, postJson, request } from './http'
+import type { ReporteCierre } from '@/pos/api'
 
 export interface PosCaja {
   id: number
@@ -85,4 +86,45 @@ export async function listPosEquipos(): Promise<PosEquipo[]> {
 /** Revoca un equipo: deja de funcionar como caja y sus sesiones se cierran. */
 export function revocarPosEquipo(id: number): Promise<unknown> {
   return request(`/api/pos-admin/equipos/${id}`, jsonInit('DELETE'))
+}
+
+// --- Turnos (cierres de caja, K8) -------------------------------------------------
+export interface PosTurno {
+  id: number
+  caja_id: number
+  caja_nombre: string | null
+  empleado_id: number
+  empleado_nombre: string | null
+  abierto: boolean
+  abierto_at: string
+  cerrado_at: string | null
+  /** Empleado que contó: el del turno, o un supervisor si era de otro. */
+  cerrado_por: number | null
+  cerrado_por_nombre: string | null
+  fondo_inicial: number
+  efectivo_esperado: number | null
+  efectivo_contado: number | null
+  /** contado − esperado: + sobra, − falta. */
+  diferencia: number | null
+  nota: string | null
+}
+
+export interface FiltrosTurnos {
+  caja_id?: number
+  empleado_id?: number
+  /** AAAA-MM-DD (fecha de apertura). */
+  desde?: string
+  hasta?: string
+}
+
+export async function listPosTurnos(f: FiltrosTurnos = {}): Promise<PosTurno[]> {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== '' && v !== null) q.set(k, String(v))
+  const qs = q.toString()
+  return (await getJson<{ turnos: PosTurno[] }>(`/api/pos-admin/turnos${qs ? `?${qs}` : ''}`)).turnos
+}
+
+/** El turno y la foto de su cierre (null si sigue abierto): lo mismo que se imprimió al cerrar. */
+export function getPosTurno(id: number): Promise<{ turno: PosTurno; reporte: ReporteCierre | null }> {
+  return getJson(`/api/pos-admin/turnos/${id}`)
 }

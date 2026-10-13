@@ -5,17 +5,37 @@ import { Btn, Icon } from '@/components/ui'
 import { fmtCantidad } from '@/lib/format'
 import { leerCantidad } from './montos'
 import type { LineaCarrito } from './carrito'
+import { usePegar } from './pegar'
 
-function Overlay({ children, onCerrar }: { children: ReactNode; onCerrar: () => void }) {
+/** Fondo oscuro + panel. Tocar fuera cierra (si `onCerrar` lo permite). */
+/**
+ * Fondo y caja de todos los diálogos del POS. Tocar fuera NO cierra: un toque
+ * de más en la pantalla táctil (o el cliente apoyando la mano) cerraba el cobro
+ * a medias. Cada diálogo se cierra solo con sus botones.
+ */
+export function Overlay({ children, ancho }: { children: ReactNode; ancho?: number }) {
   return (
-    <div className="pos-overlay" onPointerDown={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div className="pos-modal" role="dialog" aria-modal="true">{children}</div>
+    <div className="pos-overlay">
+      <div className="pos-modal" role="dialog" aria-modal="true" style={ancho ? { maxWidth: ancho } : undefined}>{children}</div>
     </div>
   )
 }
 
 /** Máximo de caracteres de una cantidad: 99999.99 */
 const MAX_LARGO = 8
+
+/** Una tecla en el campo de cantidad: decimales solo si la unidad los admite, hasta 2. */
+function teclearCantidad(actual: string, t: string, decimales: boolean): string {
+  if (t === '⌫') return actual.slice(0, -1)
+  if (actual.length >= MAX_LARGO) return actual
+  if (t === '.') {
+    if (!decimales || actual.includes('.')) return actual
+    return actual === '' ? '0.' : actual + '.'
+  }
+  const [, dec] = actual.split('.')
+  if (dec !== undefined && dec.length >= 2) return actual
+  return actual === '0' ? t : actual + t
+}
 
 export function CantidadModal({ linea, onAceptar, onCerrar }: {
   linea: LineaCarrito
@@ -25,17 +45,10 @@ export function CantidadModal({ linea, onAceptar, onCerrar }: {
   const [texto, setTexto] = useState('')
   const valor = leerCantidad(texto, linea.decimales)
 
-  const teclear = (t: string) => setTexto((actual) => {
-    if (t === '⌫') return actual.slice(0, -1)
-    if (actual.length >= MAX_LARGO) return actual
-    if (t === '.') {
-      if (!linea.decimales || actual.includes('.')) return actual
-      return actual === '' ? '0.' : actual + '.'
-    }
-    const [, dec] = actual.split('.')
-    if (dec !== undefined && dec.length >= 2) return actual
-    return actual === '0' ? t : actual + t
-  })
+  const teclear = (t: string) => setTexto((actual) => teclearCantidad(actual, t, linea.decimales))
+  // Pegar: reemplaza la cantidad, tecla por tecla con las mismas reglas ("1,5" no
+  // es 1.5: la coma es de miles y se descarta, como en los montos).
+  usePegar((pegado) => setTexto([...pegado.replace(/[^\d.]/g, '')].reduce((a, t) => teclearCantidad(a, t, linea.decimales), '')))
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -54,7 +67,7 @@ export function CantidadModal({ linea, onAceptar, onCerrar }: {
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', linea.decimales ? '.' : '', '0', '⌫']
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div>
           <small>Cantidad</small>
@@ -105,7 +118,7 @@ export function ConfirmarModal({ titulo, texto, confirmar, onConfirmar, onCerrar
   }, [onCerrar])
 
   return (
-    <Overlay onCerrar={onCerrar}>
+    <Overlay>
       <div className="pos-modal-cab">
         <div><b>{titulo}</b></div>
       </div>

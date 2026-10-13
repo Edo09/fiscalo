@@ -7,6 +7,7 @@
 // la de un admin) y un 401 significa cosas distintas segun el `codigo`:
 // EQUIPO_NO_HABILITADO lleva a habilitar el equipo, SESION_REQUERIDA al PIN.
 import { API_BASE_URL } from '@/api/config'
+import type { ReciboDatos } from '@/api/types'
 
 const TIMEOUT_MS = 30_000
 
@@ -46,6 +47,7 @@ export async function posFetch<T>(
   ruta: string,
   cred: Credenciales = {},
   cuerpo?: unknown,
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (cuerpo !== undefined) headers['Content-Type'] = 'application/json'
@@ -59,7 +61,7 @@ export async function posFetch<T>(
       method: metodo,
       headers,
       body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: 'no-store',
     })
   } catch {
@@ -153,11 +155,15 @@ export interface ProductoPos {
   unidad_medida: string
   /** ¿La cantidad admite decimales (kilo, libra, metro)? */
   decimales: boolean
+  /** Foto: ruta relativa al API; null = se pintan las iniciales. */
+  imagen?: string | null
 }
 
 export interface CategoriaPos {
   id: number
   nombre: string
+  /** '#RRGGBB' elegido en app.* (Categorías); null o ausente = calculado del nombre. */
+  color?: string | null
   productos: number
 }
 
@@ -165,6 +171,133 @@ export interface CatalogoPos {
   productos: ProductoPos[]
   categorias: CategoriaPos[]
   generado_at: string
+}
+
+/** Forma de pago (codigo DGII de TablaFormasPago): 1 efectivo, 2 transferencia/deposito, 3 tarjeta. */
+export type FormaPago = 1 | 2 | 3
+
+/** Cliente de crédito fiscal (POST /api/pos/clientes/rnc, F2). */
+export interface ClientePos {
+  id: number
+  /** Razón social (o el nombre que tenga). */
+  nombre: string
+  rnc: string
+  /** % de descuento del cliente (V5); 0 = sin descuento. */
+  descuento: number
+}
+
+/** Cuerpo de POST /api/pos/ventas. El POS no manda precios: solo producto y cantidad. */
+export interface VentaCuerpo {
+  /** '32' consumo (sin cliente) o '31' crédito fiscal (con client_id). */
+  tipo_ecf: '32' | '31'
+  client_id: number | null
+  /** Una por intento de venta: repetirla nunca saca otro e-NCF (F5). */
+  clave: string
+  lineas: { product_id: number; cantidad: number }[]
+  /** El total que vio el cajero; si el servidor calcula otro, responde TOTAL_DISTINTO. */
+  total_centavos: number
+  forma_pago: FormaPago
+  recibido_centavos: number | null
+  ancho: number
+  iniciada_ms: number | null
+}
+
+export interface VentaRespuesta {
+  venta: {
+    factura_id: number
+    e_ncf: string
+    tipo_ecf: string
+    estado_dgii: string
+    /**
+     * Sin veredicto de la DGII todavía: no respondió a tiempo (RFCE_PENDIENTE /
+     * ENVIO_PENDIENTE) o, en un E31, recibió el e-CF y lo está validando
+     * (ENVIADO / EN_PROCESO). Se imprimió y se confirma solo (F6, F7).
+     */
+    envio_pendiente: boolean
+    total_centavos: number
+    cliente: ClientePos | null
+  }
+  cobro: {
+    forma_pago: FormaPago
+    forma_pago_nombre: string
+    total_centavos: number
+    recibido_centavos: number | null
+    devuelta_centavos: number | null
+  }
+  /** null si no se pudo armar: se pide con posApi.recibo. */
+  recibo: ReciboDatos | null
+  /** true = esa clave ya tenía venta: es la misma, no otra. */
+  repetida: boolean
+}
+
+export interface Reenvio {
+  revisadas: number
+  aceptadas: number
+  rechazadas: { factura_id: number; e_ncf: string; motivo: string }[]
+  pendientes: number
+}
+
+/** Conteo de la gaveta: unidades por denominación ("2000": 3...) y otros/centavos. */
+export type Conteo = Record<string, number>
+
+/** Foto del cierre de un turno (pos_turnos.totales_json, K8). Montos en centavos. */
+export interface ReporteCierre {
+  version: number
+  turno_id: number
+  caja: { id: number; nombre: string }
+  empleado: { id: number; nombre: string }
+  cerrado_por: { id: number; nombre: string; rol: 'cajero' | 'supervisor' }
+  abierto_at: string
+  cerrado_at: string
+  fondo_centavos: number
+  ventas: GrupoFormas
+  devoluciones: GrupoFormas
+  /** { "E32": 4 } */
+  comprobantes: Record<string, number>
+  canceladas: { cantidad: number; monto_centavos: number }
+  lineas_quitadas: { cantidad: number; monto_centavos: number }
+  pendientes: { e_ncf: string; total_centavos: number }[]
+  rechazadas: { e_ncf: string; total_centavos: number }[]
+  conteo: Conteo
+  efectivo_ventas_centavos: number
+  efectivo_devoluciones_centavos: number
+  esperado_centavos: number
+  contado_centavos: number
+  /** contado − esperado: + sobra, − falta. */
+  diferencia_centavos: number
+  nota?: string | null
+}
+
+export interface GrupoFormas {
+  cantidad: number
+  total_centavos: number
+  por_forma: { forma_pago: number; nombre: string; cantidad: number; monto_centavos: number }[]
+}
+
+/** Venta cobrada del turno (K9). */
+export interface VentaTurno {
+  factura_id: number
+  e_ncf: string
+  tipo_ecf: string
+  fecha: string
+  total_centavos: number
+  forma_pago: number
+  forma_pago_nombre: string
+  estado_dgii: string
+  envio_pendiente: boolean
+}
+
+/** Ventas de hoy del cajero en esta caja, de todos sus turnos (GET /api/pos/ventas/dia). */
+export interface VentasDia {
+  fecha: string
+  caja: { id: number; nombre: string }
+  empleado: { id: number; nombre: string }
+  resumen: {
+    cantidad: number
+    total_centavos: number
+    por_forma: { forma_pago: number; nombre: string; cantidad: number; total_centavos: number }[]
+  }
+  ventas: (VentaTurno & { turno_id: number; cliente: string | null })[]
 }
 
 export interface LoginAdmin {
@@ -186,6 +319,38 @@ export const posApi = {
     posFetch<{ cerrada: boolean }>('DELETE', '/pos/sesion', { equipo, sesion }),
   catalogo: (equipo: string, sesion: string) =>
     posFetch<CatalogoPos>('GET', '/pos/catalogo', { equipo, sesion }),
+  // Consulta el registro de contribuyentes si el cliente no existe (hasta ~5 s).
+  clienteRnc: (equipo: string, sesion: string, rnc: string) =>
+    posFetch<{ cliente: ClientePos; nuevo: boolean; estado_dgii: string | null }>('POST', '/pos/clientes/rnc', { equipo, sesion }, { rnc }, 30_000),
+  abrirTurno: (equipo: string, sesion: string, fondoCentavos: number) =>
+    posFetch<{ turno_caja: TurnoCaja }>('POST', '/pos/turno', { equipo, sesion }, { fondo_centavos: fondoCentavos }),
+  // La emision puede esperar a la DGII (y, con doble toque, a la otra peticion): mas margen.
+  vender: (equipo: string, sesion: string, cuerpo: VentaCuerpo) =>
+    posFetch<VentaRespuesta>('POST', '/pos/ventas', { equipo, sesion }, cuerpo, 75_000),
+  recibo: (equipo: string, sesion: string, facturaId: number, ancho: number) =>
+    posFetch<{ recibo: ReciboDatos }>('GET', `/pos/ventas/${facturaId}/recibo?ancho=${ancho}`, { equipo, sesion }),
+  reenviarPendientes: (equipo: string) =>
+    posFetch<Reenvio>('POST', '/pos/pendientes/reenviar', { equipo }, {}, 75_000),
+
+  // Turno: ventas, cierre y autorizaciones (K4-K9, S1, V4)
+  ventasTurno: (equipo: string, sesion: string) =>
+    posFetch<{ turno_caja: TurnoCaja | null; ventas: VentaTurno[] }>('GET', '/pos/ventas', { equipo, sesion }),
+  ventasDia: (equipo: string, sesion: string) =>
+    posFetch<VentasDia>('GET', '/pos/ventas/dia', { equipo, sesion }),
+  autorizar: (equipo: string, sesion: string, pin: string, turnoId: number) =>
+    posFetch<{ permiso: string; supervisor: { id: number; nombre: string }; vence_en_segundos: number }>(
+      'POST', '/pos/autorizar', { equipo, sesion }, { pin, accion: 'cerrar_turno', turno_id: turnoId },
+    ),
+  // El cierre espera a una venta que se esté emitiendo (candado del turno): más margen.
+  cerrarTurno: (equipo: string, sesion: string, turnoId: number, conteo: Conteo, permiso: string | null) =>
+    posFetch<{ turno: unknown; reporte: ReporteCierre }>(
+      'POST', '/pos/turno/cerrar', { equipo, sesion }, { turno_id: turnoId, conteo, permiso }, 75_000,
+    ),
+  notaTurno: (equipo: string, sesion: string, turnoId: number, nota: string) =>
+    posFetch<{ turno: unknown; reporte: ReporteCierre }>('POST', '/pos/turno/nota', { equipo, sesion }, { turno_id: turnoId, nota }),
+  evento: (equipo: string, sesion: string, tipo: 'cancelada' | 'quitada', montoCentavos: number,
+    lineas: { product_id: number; nombre: string; cantidad: number }[]) =>
+    posFetch<{ registrado: boolean }>('POST', '/pos/eventos', { equipo, sesion }, { tipo, monto_centavos: montoCentavos, lineas }),
 
   // Admin, solo para habilitar el equipo
   login: (usuario: string, clave: string) =>

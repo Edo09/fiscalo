@@ -3,14 +3,16 @@
 // y los equipos habilitados se administran aquí, contra /api/pos-admin.
 // Visible con el módulo `pos` y si la empresa tiene el POS activo (navigation.ts).
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, RefreshButton, Badge, Card, PageHead, Tabs, EmptyState, LoadingState, ErrorState } from '@/components/ui'
 import { listPosCajas, listPosEmpleados, listPosEquipos } from '@/api/pos'
 import type { PosCaja, PosEmpleado, PosEquipo } from '@/api/pos'
 import { useApiQuery, type ApiQueryState } from '@/hooks/useApiQuery'
 import { EmpleadoModal, PinModal, CajaModal, RevocarEquipoModal } from './PosModals'
 import { ROL_LABEL, fmtFecha } from './textos'
+import { TurnosPanel } from './TurnosPanel'
 
-type Pestana = 'empleados' | 'cajas'
+type Pestana = 'empleados' | 'cajas' | 'turnos'
 
 type ModalPos =
   | { tipo: 'empleado'; empleado: PosEmpleado | null }
@@ -26,7 +28,9 @@ export function PuntoVentaView() {
   const cajas = useApiQuery(['pos', 'cajas'], listPosCajas)
   const equipos = useApiQuery(['pos', 'equipos'], listPosEquipos)
 
-  const recargar = () => Promise.all([empleados.reload(), cajas.reload(), equipos.reload()])
+  const qc = useQueryClient()
+  const recargar = () => Promise.all([empleados.reload(), cajas.reload(), equipos.reload(),
+    qc.invalidateQueries({ queryKey: ['pos', 'turnos'] })])
   const equipoDe = (cajaId: number) => equipos.data?.find((e) => e.caja_id === cajaId) ?? null
 
   return (
@@ -38,17 +42,22 @@ export function PuntoVentaView() {
             <RefreshButton onRefresh={recargar} />
             {pestana === 'empleados'
               ? <Btn variant="primary" icon="user-plus" onClick={() => setModal({ tipo: 'empleado', empleado: null })}>Nuevo empleado</Btn>
-              : <Btn variant="primary" icon="plus" onClick={() => setModal({ tipo: 'caja', caja: null })}>Nueva caja</Btn>}
+              : pestana === 'cajas'
+                ? <Btn variant="primary" icon="plus" onClick={() => setModal({ tipo: 'caja', caja: null })}>Nueva caja</Btn>
+                : null}
           </>
         } />
 
       <Tabs active={pestana} onChange={(id) => setPestana(id as Pestana)} tabs={[
         { id: 'empleados', label: 'Empleados', count: empleados.data?.length },
         { id: 'cajas', label: 'Cajas y equipos', count: cajas.data?.length },
+        { id: 'turnos', label: 'Turnos' },
       ]} />
 
       <div className="mt-md">
-        {pestana === 'empleados'
+        {pestana === 'turnos'
+          ? <TurnosPanel cajas={cajas.data ?? []} empleados={empleados.data ?? []} />
+          : pestana === 'empleados'
           ? <EmpleadosTabla q={empleados} onAbrir={(e) => setModal({ tipo: 'empleado', empleado: e })}
               onNuevo={() => setModal({ tipo: 'empleado', empleado: null })} />
           : <CajasTabla cajas={cajas} equipos={equipos} equipoDe={equipoDe}

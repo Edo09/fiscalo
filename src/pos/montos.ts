@@ -20,6 +20,39 @@ export function importeLinea(precioCentavos: number, cantidad: number): number {
   return Math.floor((precioCentavos * aCentesimas(cantidad) + 50) / 100)
 }
 
+/**
+ * Descuento del cliente en una línea (V5): round(bruto × % / 100, 2), igual que
+ * EcfItemMapper::aplicarDescuentoPorcentaje y PosVenta::armarLineas. El % lleva
+ * a lo sumo 2 decimales (clients.descuento DECIMAL(5,2)).
+ */
+export function descuentoLinea(brutoCentavos: number, porcentaje: number): number {
+  const pct100 = Math.round(porcentaje * 100)
+  return pct100 > 0 ? Math.floor((brutoCentavos * pct100 + 5000) / 10000) : 0
+}
+
+/**
+ * Totales del carrito con el descuento del cliente: lo que se cobra y lo que dirá
+ * el e-CF. `subtotal` es el total sin ITBIS (gravado sin ITBIS + exento), el
+ * mismo "Subtotal" del recibo: subtotal + itbis = total.
+ */
+export function totalesCarrito(
+  lineas: { precioCentavos: number; cantidad: number; tasa: number }[],
+  descuentoPct = 0,
+): {
+  lineas: { bruto: number; descuento: number; neto: number }[]
+  bruto: number; descuento: number; total: number; itbis: number; subtotal: number
+} {
+  const detalle = lineas.map((l) => {
+    const bruto = importeLinea(l.precioCentavos, l.cantidad)
+    const descuento = descuentoLinea(bruto, descuentoPct)
+    return { bruto, descuento, neto: bruto - descuento }
+  })
+  const suma = (k: 'bruto' | 'descuento' | 'neto') => detalle.reduce((s, d) => s + d[k], 0)
+  const total = suma('neto')
+  const itbis = itbisIncluido(detalle.map((d, i) => ({ importe: d.neto, tasa: lineas[i].tasa })))
+  return { lineas: detalle, bruto: suma('bruto'), descuento: suma('descuento'), total, itbis, subtotal: total - itbis }
+}
+
 /** División entera redondeando la mitad hacia arriba (a y b positivos). */
 function divRedondeo(a: number, b: number): number {
   return Math.floor((2 * a + b) / (2 * b))
@@ -95,4 +128,75 @@ export function iniciales(nombre: string): string {
   if (palabras.length === 0) return '?'
   if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase()
   return (palabras[0][0] + palabras[1][0]).toUpperCase()
+}
+
+/** Texto escrito ("1500", "245.5") → centavos, o null si está vacío o no sirve. */
+export function montoACentavos(texto: string): number | null {
+  if (!/^\d{1,7}(\.\d{0,2})?$/.test(texto)) return null
+  return Math.round(Number(texto) * 100)
+}
+
+/** Centavos → texto del campo de monto: 250000 → "2500", 234230 → "2342.30". */
+export function centavosATexto(centavos: number): string {
+  return centavos % 100 === 0 ? String(centavos / 100) : (centavos / 100).toFixed(2)
+}
+
+/** Aplica una tecla al texto del monto respetando el formato. */
+export function teclearMonto(actual: string, tecla: string): string {
+  if (tecla === '⌫') return actual.slice(0, -1)
+  if (tecla === 'C') return ''
+  if (tecla === '.') return actual.includes('.') ? actual : (actual === '' ? '0.' : actual + '.')
+  const [entero, dec] = actual.split('.')
+  if (dec !== undefined) return dec.length >= 2 ? actual : actual + tecla
+  if (entero.length >= 7) return actual
+  return actual === '0' ? tecla : actual + tecla
+}
+
+// --- Conteo de la gaveta (cierre de turno, K6) --------------------------------
+
+/** Billetes y monedas dominicanos (en pesos), del mayor al menor. Mismo orden que PosCierre::DENOMINACIONES. */
+export const BILLETES = [2000, 1000, 500, 200, 100, 50, 20] as const
+export const MONEDAS = [25, 10, 5, 1] as const
+export const DENOMINACIONES = [...BILLETES, ...MONEDAS] as const
+
+/** Total contado en centavos: unidades por denominación más "otros / centavos". */
+export function contadoCentavos(conteo: Record<string, number>): number {
+  let total = conteo.otros_centavos ?? 0
+  for (const d of DENOMINACIONES) total += d * 100 * (conteo[String(d)] ?? 0)
+  return total
+}
+
+/** Tecla en un campo de unidades (entero, hasta 5 cifras). */
+export function teclearEntero(actual: string, tecla: string): string {
+  if (tecla === '⌫') return actual.slice(0, -1)
+  if (tecla === 'C') return ''
+  if (!/^\d$/.test(tecla) || actual.length >= 5) return actual
+  return actual === '0' ? tecla : actual + tecla
+}
+
+// --- Pegar en los teclados (Ctrl+V) ------------------------------------------
+// Lo pegado REEMPLAZA lo que había y entra como si el cajero lo tecleara, tecla
+// por tecla: con los mismos topes (cifras, decimales) que el teclado.
+
+/** Solo los dígitos: "1-31-25643-2" → "131256432". */
+export const soloDigitos = (texto: string): string => texto.replace(/\D/g, '')
+
+/**
+ * Un monto pegado: "RD$ 1,250.50" → "1250.50". Cuentan los dígitos y el punto;
+ * la coma es separador de miles (formato dominicano) y se descarta.
+ */
+export function pegarMonto(texto: string): string {
+  return [...texto.replace(/[^\d.]/g, '')].reduce(teclearMonto, '')
+}
+
+/** Unidades pegadas (conteo de la gaveta): "1,500" → "1500", con el tope de 5 cifras. */
+export function pegarEntero(texto: string): string {
+  return [...soloDigitos(texto)].reduce(teclearEntero, '')
+}
+
+/** RNC y cédula como se escriben: 131000001 → 1-31-00000-1; 00112345678 → 001-1234567-8. */
+export function formatoRnc(digitos: string): string {
+  if (digitos.length === 9) return `${digitos[0]}-${digitos.slice(1, 3)}-${digitos.slice(3, 8)}-${digitos[8]}`
+  if (digitos.length === 11) return `${digitos.slice(0, 3)}-${digitos.slice(3, 10)}-${digitos[10]}`
+  return digitos
 }

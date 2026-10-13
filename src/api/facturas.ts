@@ -82,6 +82,17 @@ export async function createFactura(input: CreateFacturaInput): Promise<CreateFa
   return postJson<CreateFacturaResponse>('/api/facturas', r.data)
 }
 
+/**
+ * Reenvía a la DGII un e-CF rechazado SIN consumir la secuencia (p. ej. cód. 145,
+ * fecha de vencimiento de la secuencia): el backend lo arma igual que estaba y
+ * lo emite otra vez con el mismo e-NCF. Responde como una emisión: una factura
+ * nueva (otro factura_id) y la rechazada queda archivada. Si la DGII vuelve a
+ * rechazarlo, el ApiError trae en `datos` la factura nueva.
+ */
+export function reenviarFactura(id: number): Promise<CreateFacturaResponse> {
+  return postJson<CreateFacturaResponse>(`/api/facturas/${id}/reenviar`, {})
+}
+
 export function previewFactura(
   input: Partial<CreateFacturaInput>,
   formato: FormatoImpresion = 'carta',

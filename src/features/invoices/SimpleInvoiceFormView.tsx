@@ -102,11 +102,27 @@ function pctDescuento(monto: number, cantidad: number, precio: number): number {
 }
 
 /**
- * Metodos de pago que son venta a CREDITO (tipo_pago=2). Igual que en la factura
- * con comprobante: transferencia, tarjeta y cheque son cobros de contado.
+ * Metodos de pago que son venta a CREDITO (tipo_pago=2), uno por plazo. Igual
+ * que en la factura con comprobante: transferencia, tarjeta y cheque son cobros
+ * de contado. El plazo se guarda en dias (dias_credito) y la factura impresa
+ * calcula con el la fecha limite de pago.
  */
-const METODOS_CREDITO = ['Credito 30 dias']
+const PLAZOS_CREDITO = [30, 45, 60]
+const METODOS_CREDITO = PLAZOS_CREDITO.map((dias) => `Crédito ${dias} días`)
 const esMetodoCredito = (m: string) => METODOS_CREDITO.includes(m)
+/** Dias de credito del metodo elegido (null = contado). */
+const diasCredito = (m: string): number | null => {
+  const i = METODOS_CREDITO.indexOf(m)
+  return i >= 0 ? PLAZOS_CREDITO[i] : null
+}
+/** Metodo que corresponde a una factura guardada. Credito sin plazo = 30 dias. */
+const metodoGuardado = (tipoPago: unknown, dias: unknown): string => {
+  if (Number(tipoPago ?? 1) !== 2) return 'Efectivo'
+  const i = PLAZOS_CREDITO.indexOf(Number(dias))
+  return METODOS_CREDITO[i >= 0 ? i : 0]
+}
+/** Lo que distingue un metodo al guardar: el plazo, o "contado" para los demas. */
+const claveMetodo = (m: string) => (esMetodoCredito(m) ? m : 'contado')
 
 /* FISCALO — Facturas simples: alta y edición (POST/PUT /api/facturas-simples).
    La pantalla tiene forma de documento: se escribe sobre el papel y cada dato
@@ -234,9 +250,9 @@ export function SimpleInvoiceFormView({
             .then((row) => { if (vivo && row) setClienteGuardado(mapClientRow(row)) })
             .catch(() => {})
         }
-        // El backend solo guarda contado/credito: cualquier cobro de contado
-        // vuelve como Efectivo.
-        const metodoCargado = Number(f.tipo_pago ?? 1) === 2 ? METODOS_CREDITO[0] : 'Efectivo'
+        // El backend guarda contado/credito y el plazo: cualquier cobro de
+        // contado vuelve como Efectivo.
+        const metodoCargado = metodoGuardado(f.tipo_pago, f.dias_credito)
         setMetodo(metodoCargado)
         if (f.date) setFecha(String(f.date).slice(0, 10))
         const cargadas: Linea[] = (f.items ?? []).map((it, i) => {
@@ -304,7 +320,7 @@ export function SimpleInvoiceFormView({
   }, [clienteDetalle.data, cliente])
 
   // Lista de metodos que ofrece el formulario (el credito depende del cliente).
-  const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Credito 30 dias', 'Cheque']
+  const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', ...METODOS_CREDITO, 'Cheque']
 
   /**
    * Elegir cliente arrastra sus condiciones: su % de descuento pasa a todas las
@@ -386,9 +402,9 @@ export function SimpleInvoiceFormView({
   }
   const clienteCambiado = original != null && (cliente != null || clienteLibre.trim() !== '')
   const fechaCambiada = original != null && original.fecha !== fecha
-  // Solo cuenta pasar de contado a credito o al reves: Efectivo, Transferencia,
-  // Tarjeta y Cheque se guardan igual (tipo_pago=1).
-  const metodoCambiado = original != null && esMetodoCredito(original.metodo) !== esMetodoCredito(metodo)
+  // Cuenta pasar de contado a credito o al reves, y cambiar el plazo: Efectivo,
+  // Transferencia, Tarjeta y Cheque se guardan igual (tipo_pago=1).
+  const metodoCambiado = original != null && claveMetodo(original.metodo) !== claveMetodo(metodo)
   const lineasBorradas = original != null && original.lineas.some((o) => !lineas.some((l) => l.id === o.id))
   const lineasCambiadas = original != null && (
     lineasBorradas ||
@@ -508,6 +524,12 @@ export function SimpleInvoiceFormView({
     }))
 
   /**
+   * Parte de pago del payload: contado o crédito y su plazo. La vista previa lo
+   * manda también, para que imprima la misma fecha límite que la factura guardada.
+   */
+  const pago = () => ({ tipo_pago: esMetodoCredito(metodo) ? 2 : 1, dias_credito: diasCredito(metodo) })
+
+  /**
    * Parte de cliente del payload: lo que el usuario eligió o escribió.
    * En edición, si no lo tocó se omite (el PUT es parcial y conserva el actual);
    * `incluirActual` lo fuerza para la vista previa, que sí exige un cliente.
@@ -566,7 +588,7 @@ export function SimpleInvoiceFormView({
       // contra sus líneas guardadas, igual que al guardar (ver cantidadHeredada).
       // Sin él, una línea vieja que sí se deja guardar no se dejaba ver.
       const input: FacturaSimpleInput & { factura_id?: number } = {
-        ...clienteBody(true), date: fecha, items: items(), ...(facturaId != null ? { factura_id: facturaId } : {}),
+        ...clienteBody(true), date: fecha, ...pago(), items: items(), ...(facturaId != null ? { factura_id: facturaId } : {}),
       }
       if (formato === 'pos') setPreviaRecibo(await previewReciboFacturaSimple(input))
       else presentDocument(await previewFacturaSimple(input))
@@ -614,11 +636,11 @@ export function SimpleInvoiceFormView({
     let id: number | undefined
     try {
       if (editando && facturaId != null) {
-        await updateFacturaSimple(facturaId, { ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
+        await updateFacturaSimple(facturaId, { ...clienteBody(), date: fecha, ...pago(), items: items() })
         id = facturaId
         toast.success('Factura simple actualizada.')
       } else {
-        const creada = await createFacturaSimple({ ...clienteBody(), date: fecha, tipo_pago: esMetodoCredito(metodo) ? 2 : 1, items: items() })
+        const creada = await createFacturaSimple({ ...clienteBody(), date: fecha, ...pago(), items: items() })
         id = creada?.id
         toast.success(`Factura simple ${creada?.no_factura ?? ''} creada.`)
       }

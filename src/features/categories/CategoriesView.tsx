@@ -4,6 +4,7 @@ import { listCategories } from '@/api'
 import type { CategoryRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { CategoryFormModal } from './CategoryFormModal'
+import { colorDeCategoria } from './colores'
 
 const PAGE_SIZE = 20
 
@@ -64,7 +65,8 @@ export function CategoriesView() {
                   const activo = c.estado === undefined || c.estado === null ? true : Boolean(Number(c.estado))
                   return (
                     <tr key={c.id} onClick={() => setModal({ category: c })}>
-                      <td><div className="row gap-sm"><span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 30, height: 30 }}><Icon name="tag" size={15} /></span><span className="cell-main">{c.nombre || '—'}</span></div></td>
+                      {/* La etiqueta con el color de la categoría en el POS. */}
+                      <td><div className="row gap-sm"><span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: colorDeCategoria(c.nombre, c.color), width: 30, height: 30 }} title={c.color ?? 'Color automático'}><Icon name="tag" size={15} /></span><span className="cell-main">{c.nombre || '—'}</span></div></td>
                       <td className="text-sm muted">{c.descripcion || '—'}</td>
                       <td><Badge tone={activo ? 'success' : 'neutral'} dot>{activo ? 'Activo' : 'Inactivo'}</Badge></td>
                       <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>

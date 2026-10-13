@@ -6,6 +6,7 @@
 //   node scripts/check-errores.ts
 import { dgiiLabel, isEnVuelo, isRechazo } from '../src/api/estadosDgii.ts'
 import { clasificar, humanizar, networkError } from '../src/api/errores.ts'
+import type { EstadoDgii } from '../src/api/types.ts'
 import {
   PIE_DOCUMENTO_EN_VUELO, textoChipSinConfirmar, textoTarjetaEnVuelo,
 } from '../src/features/invoices/enVuelo.ts'
@@ -155,6 +156,38 @@ for (const [desc, texto] of [
   const tipo = clasificar(texto)
   chk(`${desc} -> null (dio ${tipo})`, tipo === null)
 }
+
+// --- Merge con main (Task 2): estados y reenvío de las dos ramas -------------
+// types.ts une los estados de las dos ramas. Lo comprueba tsc: scripts/ entra en
+// el typecheck (el runtime de node borra el `satisfies`).
+const ESTADOS_DE_LAS_DOS_RAMAS = [
+  'PENDIENTE_ENVIO', 'ENVIO_INCIERTO', // Release 1: en vuelo
+  'RFCE_PENDIENTE', 'ENVIO_PENDIENTE', // main: ventas del POS sin respuesta (la API ya no los produce)
+] as const satisfies readonly EstadoDgii[]
+console.log('merge con main: estados y textos de las dos ramas')
+chk(`EstadoDgii une los estados en vuelo y los del POS de main (${ESTADOS_DE_LAS_DOS_RAMAS.length})`,
+  ESTADOS_DE_LAS_DOS_RAMAS.length === 4)
+{
+  // RE_ESTADO_DGII une los dos regex: citar un estado de main no parece técnico.
+  const tipo = clasificar(`La venta ${ENCF} está en estado ENVIO_PENDIENTE.`)
+  chk(`texto que cita ENVIO_PENDIENTE -> null (dio ${tipo})`, tipo === null)
+}
+// POST /api/facturas/{id}/reenviar emite un e-CF nuevo (main): un fallo a mitad
+// pudo dejarlo ya enviado, así que usa los textos de la emisión y no los de una
+// escritura cualquiera.
+const REENVIO = { metodo: 'POST', path: '/api/facturas/41/reenviar' }
+console.warn = () => {}
+try {
+  igual('timeout de POST /reenviar -> MSG_TARDO_EMISION',
+    networkError(new DOMException('', 'TimeoutError'), REENVIO).message, MSG_TARDO_EMISION)
+  igual('corte de red en POST /reenviar -> MSG_SIN_CONEXION_EMISION',
+    networkError(new TypeError('Failed to fetch'), REENVIO).message, MSG_SIN_CONEXION_EMISION)
+  igual('corte de red en GET /api/facturas/41/reenviar -> MSG_SIN_CONEXION de siempre',
+    networkError(new TypeError('Failed to fetch'), { metodo: 'GET', path: '/api/facturas/41/reenviar' }).message, MSG_SIN_CONEXION)
+} finally {
+  console.warn = warn
+}
+igual('504 de POST /reenviar -> MSG_TARDO_EMISION', humanizar('', 504, REENVIO).mensaje, MSG_TARDO_EMISION)
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

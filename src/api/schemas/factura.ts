@@ -95,6 +95,9 @@ export const createFacturaSchema = z.object({
   user_id: z.number().int().optional(),
   fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha no es válida.').optional(),
   tipo_pago: z.number().optional(),
+  // FechaLimitePago (solo a crédito, TipoPago=2). Sin ella el backend pone
+  // emisión + 30 días.
+  fecha_limite_pago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha límite de pago no es válida.').optional(),
   // % de descuento del documento. Si se omite, el backend aplica el del cliente
   // (clients.descuento). El formulario manda 0 porque ya baja el descuento a
   // cada línea como `descuento_monto`: lo que se ve es lo que se emite.

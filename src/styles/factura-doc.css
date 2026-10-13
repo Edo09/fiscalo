@@ -421,6 +421,8 @@
 }
 
 .fx-a-quien { max-width: 46ch; }
+/* Sin nada a su derecha (conduce): el cliente usa toda la fila. */
+.fx-a-quien.fx-a-quien--completo { max-width: none; }
 
 /* ---------- Líneas ------------------------------------------ */
 .fx-items { margin-top: 6px; }

@@ -1,9 +1,68 @@
 /* FISCALO — POS (pos.fiscalpoint.com.do). Pantalla tactil primero: zonas
    tocables de 56 px o mas, nada que dependa del hover. Usa los tokens de
-   styles.css (claro/oscuro) y no redefine colores. */
+   styles.css; el unico tema propio es el gris oscuro de abajo. */
+
+/* ---- Tema gris oscuro (tema.ts) --------------------------------------------
+   El modo oscuro del POS se monta sobre el del sistema (data-theme="dark") con
+   una paleta mas clara: gris frio en vez de casi negro, el mismo azul de acento
+   y los mismos semanticos, aclarados lo justo para leer bien sobre gris (texto
+   secundario y estados con contraste de 4.5:1 o mas). Solo en el POS: app.* no
+   carga este archivo. */
+[data-theme="dark"][data-pos-tema="gris"] {
+  --accent: #649cf3;
+  --accent-hover: #72a6f4;
+  --accent-active: #80aff5;
+  --accent-soft: #2e3b52;
+  --accent-soft-2: #34445f;
+  --accent-text: #a6c5f8;
+  --on-accent: #0d1626;
+
+  --bg: #24272d;
+  --surface: #2c3037;
+  --surface-2: #282b32;
+  --surface-hover: #343941;
+  --surface-active: #3b4049;
+  --sidebar-bg: #262a30;
+  --border: #3b4049;
+  --border-strong: #4b515c;
+  --ring: rgba(100, 156, 243, 0.45);
+
+  --text: #eceef2;
+  --text-2: #bcc2cb;
+  --text-3: #979eaa;
+  --text-inverse: #24272d;
+
+  --success: #43c089;
+  --success-soft: #26392f;
+  --warning: #e4aa45;
+  --warning-soft: #3c3424;
+  --danger: #f17d7d;
+  --danger-soft: #45292c;
+  --info: #649cf3;
+  --info-soft: #2e3b52;
+  --neutral-soft: #353a42;
+
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --sh-md: 0 4px 14px rgba(0, 0, 0, 0.32);
+  --sh-lg: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
+}
+/* Franjas rojas con texto blanco: el rojo claro del gris no da contraste con
+   blanco; ahi va un rojo mas profundo. */
+[data-pos-tema="gris"] :is(.pos-alerta, .pos-sin-red) { background: #b23b3b; }
+[data-pos-tema="gris"] .pos-overlay, [data-pos-tema="gris"] .pos-confirmar-capa { background: rgba(10, 12, 16, 0.55); }
+/* Al cambiar de tema los colores se funden en vez de saltar (lo pone tema.ts un instante). */
+.pos-tema-cambiando, .pos-tema-cambiando *, .pos-tema-cambiando *::before, .pos-tema-cambiando *::after {
+  transition: background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease, fill .3s ease, stroke .3s ease !important;
+}
 
 .pos-root {
-  min-height: 100vh;
+  /* Tamaño de la pantalla elegido en el equipo (tamano.ts): zoom escala todo
+     junto. El alto se divide por el zoom para que, achicado o agrandado, el POS
+     siga ocupando la pantalla exacta. */
+  zoom: var(--pos-zoom, 1);
+  min-height: calc(100vh / var(--pos-zoom, 1));
   background: var(--bg);
   color: var(--text);
   display: flex;
@@ -100,6 +159,11 @@
 .pos-tecla:active { background: var(--accent-soft); border-color: var(--accent); }
 .pos-tecla:disabled { opacity: 0.4; cursor: default; }
 .pos-tecla.secundaria { background: transparent; border-color: transparent; color: var(--text-2); font-size: 15px; }
+/* "C" (limpiar) amarilla en todos los teclados: se ve de un vistazo y no se
+   confunde con un error (rojo) ni con una cifra. Amarillo sólido con texto
+   oscuro (contraste ~11:1), el mismo en modo claro y oscuro. */
+.pos-tecla.pos-tecla-c { background: #f5c518; border-color: #e0b20f; color: #2b2100; font-weight: 700; }
+.pos-tecla.pos-tecla-c:active { background: #ddb00f; border-color: #c99d08; color: #2b2100; }
 .pos-mensaje-pin { min-height: 44px; text-align: center; margin-top: 14px; font-size: 14px; }
 .pos-mensaje-pin.error { color: var(--danger); }
 .pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
@@ -116,6 +180,24 @@
 .pos-barra-espacio { flex: 1; }
 .pos-reloj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .pos-barra .btn { white-space: nowrap; flex-shrink: 0; }
+/* Tamaño de la pantalla: A− · 100% · A+ en un solo grupo, del alto de los botones de la barra. */
+.pos-tamano {
+  display: inline-flex; align-items: stretch; flex-shrink: 0; height: 34px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
+  box-shadow: var(--sh-xs); overflow: hidden;
+}
+.pos-tamano button {
+  min-width: 38px; padding: 0 8px; border: 0; background: transparent; color: var(--text);
+  font-size: 14px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-tamano button span { font-size: 12px; margin-left: 1px; }
+.pos-tamano button:hover:not(:disabled) { background: var(--surface-hover); }
+.pos-tamano button:disabled { color: var(--text-3); cursor: default; }
+.pos-tamano .pos-tamano-valor {
+  min-width: 48px; font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+.pos-tamano :focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .pos-cuerpo { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
 
 /* ---- Sin conexion ------------------------------------------------------- */
@@ -128,7 +210,10 @@
 /* ---- Venta: catalogo + carrito (C3, V1) ---------------------------------
    En venta la pagina ocupa exactamente la pantalla: la grilla y las lineas
    hacen scroll por dentro y el boton de cobrar siempre esta a la vista. */
-.pos-root.en-venta { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.pos-root.en-venta {
+  height: calc(100vh / var(--pos-zoom, 1)); height: calc(100dvh / var(--pos-zoom, 1));
+  min-height: 0; overflow: hidden;
+}
 .pos-venta {
   flex: 1; min-height: 0;
   display: grid; grid-template-columns: minmax(0, 1fr) 400px;
@@ -152,7 +237,103 @@
   background: transparent; color: var(--text-2); cursor: pointer;
 }
 
-.pos-chips { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; scrollbar-width: thin; }
+/* Buscador y herramientas (vista, orden, cuántos): en una fila; en pantallas angostas, en dos. */
+.pos-catalogo-cab { display: flex; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.pos-catalogo-cab .pos-buscador { flex: 1 1 280px; min-width: 0; }
+.pos-catalogo-herr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pos-vistas { display: inline-flex; height: 52px; padding: 3px; gap: 2px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); }
+.pos-vistas button {
+  width: 46px; display: grid; place-items: center; border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-vistas button.on { background: var(--accent); color: var(--on-accent); }
+/* Actualizar: trae catálogo y estado sin recargar la página (que pediría el PIN).
+   Mismo alto y borde que las demás herramientas. */
+.pos-recargar {
+  width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .12s, color .12s, border-color .12s;
+}
+.pos-recargar:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.pos-recargar:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pos-recargar:disabled { cursor: progress; }
+.pos-recargar.girando svg { animation: pos-girar .8s linear infinite; }
+.pos-recargar.listo { color: var(--success); border-color: var(--success); }
+@keyframes pos-girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pos-recargar.girando svg { animation: none; } }
+/* Selector de la caja (orden, cuántos): botón con rótulo y valor, y un menú de
+   filas grandes. Mismo alto que el buscador y la botonera de vistas. */
+.pos-sel {
+  display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 10px 0 8px; min-width: 0;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface); color: var(--text);
+  cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.pos-sel:hover { background: var(--surface-hover); }
+.pos-sel:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pos-sel.abierto { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
+.pos-sel-ic {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.pos-sel-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.pos-sel-txt small { font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+.pos-sel-txt b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-sel-flecha { flex-shrink: 0; color: var(--text-3); transition: transform .18s ease; }
+.pos-sel.abierto .pos-sel-flecha { transform: rotate(180deg); color: var(--accent); }
+
+/* El menú vive en <body> (fuera de .pos-root): lleva el zoom del POS por su
+   cuenta, y sus topes de pantalla se dividen por el zoom (SelectorCaja convierte
+   la posición). */
+.pos-sel-menu {
+  zoom: var(--pos-zoom, 1);
+  position: fixed; z-index: 80; width: max-content; min-width: 280px;
+  max-width: min(360px, calc((100vw - 16px) / var(--pos-zoom, 1)));
+  max-height: calc((100vh - 32px) / var(--pos-zoom, 1)); overflow-y: auto;
+  padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  box-shadow: var(--sh-pop); animation: pos-sel-abre .16s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes pos-sel-abre { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.pos-sel-titulo {
+  padding: 8px 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3);
+}
+.pos-sel-op {
+  width: 100%; display: grid; grid-template-columns: 38px minmax(0, 1fr) 20px; align-items: center; gap: 12px;
+  min-height: 56px; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .1s;
+}
+.pos-sel-op:hover, .pos-sel-op:focus-visible { background: var(--surface-hover); outline: none; }
+.pos-sel-op:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.pos-sel-op:active { background: var(--surface-active); }
+.pos-sel-op.on { background: var(--accent-soft); }
+.pos-sel-glifo {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--neutral-soft); color: var(--text-2); font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.pos-sel-op.on .pos-sel-glifo { background: var(--accent); color: var(--on-accent); }
+.pos-sel-op-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pos-sel-op-txt b { font-size: 15px; font-weight: 600; }
+.pos-sel-op.on .pos-sel-op-txt b { color: var(--accent-text); font-weight: 700; }
+.pos-sel-op-txt small { font-size: 12.5px; color: var(--text-3); line-height: 1.3; }
+.pos-sel-check { color: var(--accent); opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+.pos-sel-op.on .pos-sel-check { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pos-sel-menu { animation: none; }
+  .pos-sel-flecha, .pos-sel-check { transition: none; }
+}
+
+/* Categorías: una fila deslizable; "Todas" las despliega en varias filas. */
+.pos-chips-fila { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; min-width: 0; }
+.pos-chips { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.pos-chips-fila.abiertas .pos-chips { flex-wrap: wrap; overflow-x: hidden; overflow-y: auto; max-height: 34vh; }
+.pos-chips-mas {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  border: 1px dashed var(--border-strong); border-radius: var(--r-full); background: var(--surface-2);
+  color: var(--text); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.pos-chips-mas svg { transition: transform .15s; }
+.pos-chips-fila.abiertas .pos-chips-mas svg { transform: rotate(180deg); }
 .pos-chip {
   display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
   height: 44px; padding: 0 16px; border-radius: var(--r-full);
@@ -165,16 +346,26 @@
 .pos-chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .pos-chip.on span { color: inherit; opacity: 0.8; }
 
+/* Los botones de la tarjeta sobresalen 9 px de sus esquinas de arriba: la grilla
+   deja ese aire arriba y a los lados (si no, el borde del área con scroll los
+   corta) y entre columnas (los de dos vecinas no se montan). */
 .pos-grilla {
   flex: 1; min-height: 0; overflow-y: auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
-  gap: 10px; align-content: start; padding-bottom: 16px;
+  gap: 14px 20px; align-content: start; padding: 11px 11px 16px;
 }
 .pos-grilla-vacia {
   grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 48px 16px; color: var(--text-2); text-align: center;
 }
 .pos-grilla-vacia p { margin: 0; max-width: 420px; line-height: 1.5; }
+.pos-grilla-mas {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px; color: var(--text-2); font-size: 13.5px; text-align: center;
+}
+/* Celda: la tarjeta (botón que agrega) y, encima, el − y el contador. */
+.pos-producto-celda { position: relative; display: flex; min-width: 0; }
+.pos-producto-celda > .pos-producto { flex: 1; min-width: 0; }
 .pos-producto {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   min-height: 136px; padding: 12px; text-align: left;
@@ -188,16 +379,69 @@
 .pos-producto:active { transform: scale(0.97); border-color: var(--accent); background: var(--accent-soft); }
 .pos-producto.en-carrito { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .pos-producto.agotado .pos-producto-precio { color: var(--text-2); }
-.pos-producto-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+/* Foto (o iniciales) grande y centrada. Empieza debajo de los botones de las
+   esquinas (bajan 25 px dentro de la tarjeta): en una tarjeta angosta el − y el
+   contador llegan hasta el centro y la taparían. */
+.pos-producto-top { display: flex; align-items: center; justify-content: center; margin: 13px 0 6px; }
 .pos-ini {
-  width: 38px; height: 38px; border-radius: var(--r-md);
-  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
+  width: 72px; height: 72px; border-radius: var(--r-lg);
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 22px;
 }
+/* Tarjetas verticales: la foto, cuadrada, ocupa el 72 % del ancho y crece con la
+   tarjeta; con el nombre y el precio debajo, la tarjeta siempre queda más alta que
+   ancha. Sin aspect-ratio fijo: con un nombre de dos líneas el contenido se salía. */
+.vista-tarjetas .pos-ini { width: 72%; max-width: 200px; height: auto; aspect-ratio: 1; font-size: 26px; }
+.pos-ini.con-foto { background: var(--surface-2); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+.pos-ini.con-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pos-producto-cant {
   min-width: 34px; height: 26px; padding: 0 8px; border-radius: var(--r-full);
   background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 13px;
   display: grid; place-items: center;
 }
+/* Sobre el borde de la tarjeta, en las esquinas de arriba (sobresalen 9 px). Un
+   anillo del color del fondo los despega del borde. */
+.pos-producto-paso {
+  position: absolute; top: -9px; right: -9px; display: flex; align-items: center; gap: 4px;
+  pointer-events: none;
+}
+.pos-producto-paso .pos-producto-cant { box-shadow: 0 0 0 3px var(--bg); }
+.pos-producto-menos, .pos-producto-quitar {
+  width: 34px; height: 34px; border-radius: var(--r-full); display: grid; place-items: center;
+  cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; box-shadow: 0 0 0 3px var(--bg);
+}
+.pos-producto-menos { background: var(--danger-soft); color: var(--danger); border: 1.5px solid var(--danger); }
+.pos-producto-menos:active { background: var(--danger); color: #fff; transform: scale(0.94); }
+.pos-producto-quitar { position: absolute; top: -9px; left: -9px; background: var(--danger); color: #fff; border: 0; }
+.pos-producto-quitar:active { filter: brightness(0.88); transform: scale(0.94); }
+.pos-producto-menos:disabled, .pos-producto-quitar:disabled { opacity: 0.45; cursor: default; }
+
+/* Vista compacta: más productos por pantalla; sin código. */
+.pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px 18px; }
+.vista-compacta .pos-producto { min-height: 100px; padding: 9px; gap: 2px; }
+.vista-compacta .pos-ini { width: 62%; max-width: 140px; height: auto; aspect-ratio: 1; font-size: 18px; border-radius: var(--r-md); }
+.vista-compacta .pos-producto-top { margin: 13px 0 4px; }
+.vista-compacta .pos-producto-nombre { font-size: 13px; }
+.vista-compacta .pos-producto-sku { display: none; }
+.vista-compacta .pos-producto-pie { padding-top: 4px; }
+.vista-compacta .pos-producto-precio { font-size: 15px; }
+.vista-compacta .pos-exist { font-size: 11px; }
+.vista-compacta .pos-producto-cant { height: 24px; min-width: 30px; padding: 0 6px; font-size: 12px; }
+.vista-compacta .pos-producto-menos, .vista-compacta .pos-producto-quitar { width: 30px; height: 30px; }
+
+/* Vista lista: una fila por producto. Los botones de las esquinas quedan sobre el
+   borde de la fila; la foto y el precio se corren para no quedar debajo. */
+.pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.vista-lista .pos-producto {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 30px;
+}
+.vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
+.vista-lista .pos-ini { width: 40px; height: 40px; font-size: 13px; border-radius: var(--r-md); }
+.vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.vista-lista .pos-producto-sku { grid-area: sku; }
+.vista-lista .pos-producto-pie { grid-area: pie; flex-direction: column; align-items: flex-end; gap: 0; margin: 0; padding: 0; flex-wrap: nowrap; }
+.vista-lista .pos-producto-precio { font-size: 17px; }
+.vista-lista .pos-producto:active { transform: scale(0.99); }
 .pos-producto-nombre {
   font-weight: 600; font-size: 14.5px; line-height: 1.25;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -226,6 +470,58 @@
   gap: 8px; color: var(--text-3); text-align: center; padding: 24px;
 }
 .pos-lineas-vacio p { margin: 0; }
+
+/* Columna de productos: el catálogo arriba y las ventas abiertas al pie, solo
+   del ancho de los productos (no bajo el carrito). */
+.pos-columna-catalogo { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.pos-columna-catalogo > .pos-catalogo { flex: 1; }
+
+/* Ventas abiertas (VentasTabs): pestañas al pie de los productos, colgando del
+   borde de arriba como las hojas de una planilla. En pantallas angostas la fila
+   se desliza (sin barra de desplazamiento: se arrastra con el dedo). Alto de
+   44 px: se tocan con el dedo. */
+.pos-ventas-tabs {
+  display: flex; align-items: flex-start; gap: 4px; flex-shrink: 0;
+  padding: 0 12px 8px; border-top: 1px solid var(--border); background: var(--surface-2);
+  overflow-x: auto; scrollbar-width: none;
+}
+.pos-ventas-tabs::-webkit-scrollbar { display: none; }
+.pos-venta-tab {
+  display: flex; align-items: center; flex-shrink: 0; min-width: 0; max-width: 240px;
+  border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--r-md) var(--r-md);
+  background: var(--surface); margin-top: -1px;
+}
+.pos-venta-tab.on { border-color: var(--border-strong); box-shadow: inset 0 -3px 0 var(--accent); }
+.pos-venta-tab-btn {
+  display: flex; align-items: center; gap: 6px; height: 44px; min-width: 0; padding: 0 10px;
+  border: 0; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab.on .pos-venta-tab-btn { color: var(--text); }
+.pos-venta-tab-btn svg { flex-shrink: 0; }
+.pos-venta-tab-btn:disabled { cursor: default; opacity: .55; }
+.pos-venta-tab-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-venta-tab-n {
+  flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+/* Cobro sin confirmar: se ve desde cualquier pestaña. */
+.pos-venta-tab.duda .pos-venta-tab-btn { color: var(--warning); }
+.pos-venta-tab-cerrar {
+  width: 32px; height: 44px; flex-shrink: 0; display: grid; place-items: center; padding: 0;
+  border: 0; background: transparent; color: var(--text-3); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab-cerrar:hover:not(:disabled) { color: var(--danger); }
+.pos-venta-tab-cerrar:disabled { cursor: default; opacity: .4; }
+.pos-venta-tab-nueva {
+  width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; padding: 0;
+  border: 1px dashed var(--border-strong); border-top: 0; border-radius: 0 0 var(--r-md) var(--r-md);
+  background: transparent; color: var(--text-2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-venta-tab-nueva:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+.pos-venta-tab-nueva:disabled { cursor: not-allowed; opacity: .4; }
+.pos-ventas-tabs :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
 .pos-linea {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px;
   padding: 12px 16px; border-bottom: 1px solid var(--border);
@@ -252,6 +548,31 @@
 .pos-total-fila.pos-total { color: var(--text); font-size: 28px; font-weight: 800; margin: 6px 0 12px; letter-spacing: -0.02em; }
 .pos-cobrar { width: 100%; height: 64px; font-size: 20px; justify-content: center; }
 .pos-cobrar-nota { display: block; text-align: center; color: var(--text-3); font-size: 12px; margin-top: 6px; }
+
+/* ---- Cliente de crédito fiscal (E31) ------------------------------------- */
+.pos-cliente-boton { width: 100%; height: 48px; justify-content: center; margin-bottom: 10px; }
+.pos-cliente-barra {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 6px 8px 12px;
+  border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-soft); color: var(--accent-text);
+}
+.pos-cliente-barra > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pos-cliente-barra small { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pos-cliente-barra > div > small:first-child { text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-text); font-weight: 600; }
+.pos-cliente-barra b { font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-cliente-barra .btn { flex-shrink: 0; }
+/* "RD$" delante de un precio: más chico y suave, el número manda. */
+.pos-moneda { font-size: .68em; font-weight: 600; color: var(--text-3); margin-right: 3px; letter-spacing: .01em; }
+.pos-cliente-barra .pos-cliente-ahorro { color: var(--success); font-weight: 600; }
+/* "Quitar" el cliente: en rojo, es deshacer el crédito fiscal de la venta. */
+.pos-cliente-barra .pos-cliente-quitar { color: var(--danger); }
+.pos-cliente-barra .pos-cliente-quitar:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
+.pos-cliente-ficha { display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.pos-cliente-ficha > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pos-cliente-ficha b { font-size: 17px; }
+.pos-cliente-ficha small { color: var(--text-2); font-size: 13px; }
+.pos-cliente-ficha .pos-cliente-desc { color: var(--success); font-weight: 600; }
+.pos-cliente-ficha .pos-cobro-ok { flex-shrink: 0; }
+.pos-modal-cab .pos-cobro-cliente { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text-2); margin-top: 2px; }
 
 /* ---- Dialogos (cantidad, confirmar) ------------------------------------- */
 .pos-overlay {
@@ -282,6 +603,167 @@
   .pos-carrito { border-left: 0; border-top: 1px solid var(--border); max-height: 48vh; }
 }
 
+/* ---- Cobro (P1-P4) -------------------------------------------------------- */
+.pos-cobro-total { font-size: 30px !important; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pos-formas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.pos-forma {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 72px; padding: 8px; border-radius: var(--r-lg);
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text);
+  font-size: 15px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pos-forma small { font-size: 11px; color: var(--text-3); font-weight: 500; }
+.pos-forma.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent); }
+.pos-efectivo { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.pos-campo-monto {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.pos-campo-monto small { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-campo-monto b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.pos-campo-monto b.vacio { color: var(--text-2); }
+/* Billetes: el contador y el − sobresalen 8 px de las esquinas de arriba, así que
+   la grilla deja ese aire arriba y entre columnas. */
+.pos-billetes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 18px; margin: 16px 0 10px; }
+.pos-billete-celda { position: relative; display: flex; min-width: 0; }
+.pos-billete-celda > .pos-billete { flex: 1; min-width: 0; }
+.pos-billete.usado { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pos-billete-cuenta {
+  position: absolute; top: -8px; right: -8px; min-width: 26px; height: 22px; padding: 0 6px; pointer-events: none;
+  display: grid; place-items: center; border-radius: var(--r-full); background: var(--accent); color: var(--on-accent);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--surface);
+}
+.pos-billete-menos {
+  position: absolute; top: -8px; left: -8px; width: 28px; height: 28px; border-radius: var(--r-full);
+  display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: var(--danger-soft); color: var(--danger); border: 1.5px solid var(--danger); box-shadow: 0 0 0 2px var(--surface);
+}
+.pos-billete-menos:active { background: var(--danger); color: #fff; transform: scale(0.94); }
+.pos-billete {
+  height: 48px; border-radius: var(--r-md); border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); font-size: 16px; font-weight: 600; cursor: pointer;
+  font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent;
+}
+.pos-billete.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.pos-billete:disabled { opacity: 0.35; cursor: default; }
+.pos-devuelta {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-lg); background: var(--success-soft); color: var(--success);
+}
+.pos-devuelta small { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-devuelta b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.pos-devuelta.falta { background: var(--danger-soft); color: var(--danger); }
+/* Hay que dar devuelta: amarillo, para que el cajero no lo pase por alto. */
+.pos-devuelta.cambio { background: var(--warning-soft); color: var(--warning); }
+.pos-devuelta.grande { width: 100%; flex-direction: column; align-items: center; padding: 14px; }
+.pos-devuelta.grande b { font-size: 40px; letter-spacing: -0.02em; }
+.pos-teclado-monto { gap: 8px; }
+.pos-teclado-monto .pos-tecla { height: 56px; font-size: 22px; }
+/* La "C" del monto ocupa toda la fila; el color amarillo lo da .pos-tecla-c. */
+.pos-teclado-monto .pos-tecla-limpiar { grid-column: 1 / -1; font-size: 20px; letter-spacing: .04em; }
+
+.pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
+.pos-cobro-estado > b { font-size: 20px; }
+.pos-cobro-estado .pos-sub { text-align: center; }
+.pos-cobro-ok, .pos-cobro-mal, .pos-cobro-duda {
+  width: 60px; height: 60px; border-radius: 99px; display: grid; place-items: center;
+}
+.pos-cobro-ok { background: var(--success-soft); color: var(--success); }
+.pos-cobro-mal { background: var(--danger-soft); color: var(--danger); }
+.pos-cobro-duda { background: var(--warning-soft); color: var(--warning); }
+
+/* ---- Avisos de la caja (turno, envíos pendientes, rechazos) -------------- */
+.pos-pendientes {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-full);
+  background: var(--warning-soft); color: var(--warning); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.pos-franja { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 14px; }
+.pos-franja.aviso { background: var(--warning-soft); color: var(--warning); }
+.pos-alerta {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  background: var(--danger); color: #fff; font-size: 14px;
+}
+.pos-alerta span { flex: 1; }
+.pos-producto:disabled { opacity: 0.55; cursor: default; }
+.pos-cant button:disabled.pos-cant-valor { opacity: 0.6; }
+
+@media (max-width: 720px) {
+  .pos-efectivo { grid-template-columns: 1fr; }
+  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
+}
+
+/* ---- Cierre de turno (K6-K8) y panel del turno (K9) ---------------------- */
+.pos-modal { position: relative; max-height: calc(100dvh - 32px); overflow-y: auto; }
+.pos-conteo { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; align-items: start; }
+.pos-conteo-filas {
+  display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto;
+  padding-right: 4px; scrollbar-width: thin;
+}
+.pos-conteo-fila {
+  display: grid; grid-template-columns: minmax(0, 1fr) 96px 104px; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 12px; border-radius: var(--r-md);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+}
+.pos-conteo-fila.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.pos-conteo-den { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-conteo-cant { font-size: 17px; font-variant-numeric: tabular-nums; text-align: right; }
+.pos-conteo-cant.vacio { color: var(--text-3); font-weight: 500; }
+.pos-conteo-sub { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.pos-conteo-total {
+  display: flex; align-items: baseline; justify-content: space-between; margin-top: 14px;
+  padding: 10px 14px; border-radius: var(--r-lg); background: var(--surface-2); border: 1px solid var(--border-strong);
+}
+.pos-conteo-total span { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.pos-conteo-total b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.pos-confirmar-capa {
+  position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 16px;
+  background: rgba(15, 23, 42, 0.35); border-radius: var(--r-xl);
+}
+.pos-cierre-cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.pos-cierre-cifras div {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px;
+  border-radius: var(--r-md); background: var(--surface-2); text-align: left;
+}
+.pos-cierre-cifras small { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-cierre-cifras b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.pos-nota {
+  width: 100%; min-height: 56px; padding: 10px 12px; font: inherit; font-size: 15px; resize: none;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text);
+  margin-bottom: 6px;
+}
+.pos-nota:focus { outline: 2px solid var(--ring); border-color: var(--accent); }
+.pos-ventas-turno { max-height: 46vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-lg); }
+.pos-venta-fila {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.pos-venta-fila:last-child { border-bottom: 0; }
+.pos-venta-fila > div { display: flex; flex-direction: column; min-width: 0; }
+.pos-venta-fila small { color: var(--text-2); font-size: 12.5px; }
+.pos-venta-fila .pos-venta-cliente { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-etiqueta-cf {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-full); vertical-align: 1px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 11px; font-weight: 700;
+}
+/* Ventas del día: total y una casilla por forma de pago. */
+.pos-dia-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.pos-dia-resumen > div {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.pos-dia-resumen small { font-size: 12px; color: var(--text-2); }
+.pos-dia-resumen b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.pos-dia-resumen .pos-dia-total { grid-column: 1 / -1; background: var(--accent-soft); border-color: var(--accent); }
+.pos-dia-resumen .pos-dia-total b { font-size: 24px; letter-spacing: -0.01em; }
+.pos-franja .btn { margin-left: auto; flex-shrink: 0; }
+
+@media (max-width: 720px) {
+  .pos-conteo { grid-template-columns: 1fr; }
+  .pos-conteo-filas { max-height: 34vh; }
+  .pos-cierre-cifras { grid-template-columns: 1fr; }
+}
+
 /* La empresa es lo primero que sobra: el cajero sabe donde trabaja. */
 @media (max-width: 720px) {
   .pos-barra { gap: 10px; }
@@ -290,4 +772,209 @@
 }
 @media (max-width: 520px) {
   .pos-panel { padding: 22px 18px; }
+}
+
+/* ============================================================================
+   Movimiento — mecánica de caja registradora
+   Un solo sistema para todo el POS. Corto, preciso y físico: las teclas se
+   hunden, los montos ruedan en su visor como en una caja, los contadores saltan
+   como un marcador mecánico y la venta cobrada se "firma" (el ✓ se dibuja).
+   - Solo transform y opacity: no recalculan el diseño y van por la GPU.
+   - El hover, solo con mouse: en una pantalla táctil quedaría "pegado".
+   - Los diálogos y menús ENTRAN animados y CIERRAN al instante: una animación de
+     salida los dejaría vivos (con sus atajos de teclado) un instante más, y en
+     una caja un Enter doble sería una acción doble.
+   - "Reducir movimiento" del sistema deja todo quieto salvo los indicadores de
+     carga (al final de esta sección).
+   ============================================================================ */
+.pos-root, .pos-sel-menu {
+  --pos-t1: 110ms;   /* respuesta al toque */
+  --pos-t2: 190ms;   /* aparecer, cambiar de estado */
+  --pos-t3: 260ms;   /* pantallas y diálogos */
+  --pos-curva: cubic-bezier(.2, .8, .2, 1);      /* sale rápido, frena suave */
+  --pos-rebote: cubic-bezier(.34, 1.56, .64, 1); /* marcador mecánico */
+}
+
+@keyframes pos-fundido { from { opacity: 0; } }
+@keyframes pos-sube { from { opacity: 0; transform: translateY(8px); } }
+@keyframes pos-baja { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes pos-entra-dialogo { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+@keyframes pos-desliza { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes pos-salta { from { opacity: 0; transform: scale(.45); } }
+/* Un monto nuevo rueda hacia su lugar, como el visor de una caja registradora. */
+@keyframes pos-rueda { from { opacity: 0; transform: translateY(45%); } }
+@keyframes pos-trazo { to { stroke-dashoffset: 0; } }
+@keyframes pos-onda { from { opacity: .45; transform: scale(1); } to { opacity: 0; transform: scale(1.65); } }
+@keyframes pos-sacude { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@keyframes pos-brillo { to { transform: translateX(100%); } }
+
+/* ---- Pantallas y paneles ---------------------------------------------------- */
+/* Envoltorio de cada pantalla (PosApp): solo opacidad, porque un transform en un
+   ancestro movería los diálogos de posición fija. */
+.pos-pantalla { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: pos-fundido var(--pos-t3) ease-out; }
+.pos-panel { animation: pos-sube var(--pos-t3) var(--pos-curva); }
+.pos-sin-red, .pos-alerta, .pos-franja { animation: pos-baja var(--pos-t2) var(--pos-curva); }
+.pos-error, .pos-aviso, .pos-info { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-pendientes { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Diálogos -------------------------------------------------------------- */
+.pos-overlay { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-modal { animation: pos-entra-dialogo var(--pos-t3) var(--pos-curva); }
+.pos-confirmar-capa { animation: pos-fundido var(--pos-t2) ease-out; }
+.pos-confirmar-capa > * { animation: pos-entra-dialogo var(--pos-t3) var(--pos-curva); }
+/* Cambio de fase dentro de un diálogo (cobrando → cobrada / error / sin confirmar). */
+.pos-cobro-estado, .pos-cliente-ficha { animation: pos-sube var(--pos-t2) var(--pos-curva); }
+
+/* ---- Teclas y botones: se hunden al presionar --------------------------------- */
+.pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-producto, .pos-cant button,
+  .pos-forma, .pos-billete, .pos-billete-menos, .pos-producto-menos, .pos-producto-quitar, .pos-conteo-fila,
+  .pos-buscador-limpiar, .pos-sel, .pos-sel-op, .pos-enlace) {
+  transition:
+    background-color var(--pos-t1) ease-out, border-color var(--pos-t1) ease-out, color var(--pos-t1) ease-out,
+    box-shadow var(--pos-t2) ease-out, opacity var(--pos-t2) ease-out, filter var(--pos-t1) ease-out,
+    transform var(--pos-t1) var(--pos-curva);
+}
+.pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-cant button, .pos-forma,
+  .pos-billete, .pos-conteo-fila, .pos-sel):not(:disabled):active {
+  transform: translateY(1px) scale(.97);
+  transition-duration: 40ms;
+}
+.pos-sel-op:not(:disabled):active { transform: scale(.985); transition-duration: 40ms; }
+/* Lo elegido se marca con un pequeño salto, no solo con el color. */
+.pos-forma.on .lucide, .pos-vistas button.on .lucide { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Hover y foco (con mouse / teclado) --------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .pos-root :where(.pos-tecla:not(.secundaria):not(.pos-tecla-limpiar), .pos-billete:not(.on):not(.usado),
+    .pos-forma:not(.on), .pos-caja, .pos-conteo-fila:not(.on), .pos-cant button):not(:disabled):hover {
+    background-color: var(--surface-hover); border-color: var(--text-3);
+  }
+  .pos-root .pos-chip:not(.on):hover { background-color: var(--surface-hover); border-color: var(--text-3); }
+  .pos-root .pos-chips-mas:hover { border-color: var(--accent); color: var(--accent-text); }
+  .pos-root .pos-vistas button:not(.on):hover { background-color: var(--surface-hover); color: var(--text); }
+  .pos-root .pos-producto:not(:disabled):hover { box-shadow: var(--sh-md); }
+  .pos-root .pos-producto:not(:disabled):not(.en-carrito):hover { border-color: var(--border-strong); }
+  .pos-root .pos-tecla-limpiar:hover { border-color: var(--danger); }
+  .pos-root :where(.pos-producto-menos, .pos-billete-menos):hover { background-color: var(--danger); color: #fff; }
+  .pos-root .pos-producto-quitar:hover { filter: brightness(.92); }
+}
+.pos-root :where(.pos-tecla, .pos-chip, .pos-chips-mas, .pos-forma, .pos-billete, .pos-caja, .pos-producto, .pos-cant button,
+  .pos-vistas button, .pos-conteo-fila, .pos-producto-menos, .pos-producto-quitar, .pos-billete-menos):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.pos-root :where(.pos-buscador input, .pos-campo input, .pos-nota) {
+  transition: border-color var(--pos-t1) ease-out, box-shadow var(--pos-t2) ease-out;
+}
+.pos-root :where(.pos-buscador input, .pos-campo input, .pos-nota):focus { box-shadow: 0 0 0 4px var(--accent-soft); }
+.pos-buscador-limpiar { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+
+/* ---- Catálogo ---------------------------------------------------------------- */
+/* Llega en cascada corta (las primeras 18; el resto, juntas). Al cambiar de vista
+   la grilla se rearma y vuelve a entrar; al buscar o cambiar de categoría solo
+   entran las tarjetas nuevas. */
+.pos-producto-celda { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-grilla > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
+.pos-grilla > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
+.pos-grilla > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
+.pos-grilla > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
+.pos-grilla > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
+.pos-grilla > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
+.pos-grilla > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
+.pos-grilla > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
+.pos-grilla > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
+.pos-grilla > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
+.pos-grilla > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
+.pos-grilla > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
+.pos-grilla > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
+.pos-grilla > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
+.pos-grilla > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
+.pos-grilla > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
+.pos-grilla > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
+.pos-chips-fila.abiertas .pos-chips { animation: pos-fundido var(--pos-t2) ease-out; }
+/* Contador y botones de la tarjeta: entran saltando; el contador vuelve a saltar
+   con cada unidad (la clave lo remonta). */
+.pos-producto-paso, .pos-producto-quitar, .pos-producto-cant { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-producto-paso .pos-producto-cant { animation-duration: var(--pos-t3); }
+
+/* Cargando: tarjetas fantasma con un brillo que las recorre. */
+.pos-esqueleto {
+  position: relative; overflow: hidden; min-height: 200px; border-radius: var(--r-lg);
+  background: var(--neutral-soft); border: 1px solid var(--border);
+}
+.vista-compacta .pos-esqueleto { min-height: 150px; }
+.vista-lista .pos-esqueleto { min-height: 64px; }
+.pos-esqueleto::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--surface) 75%, transparent) 50%, transparent 80%);
+  animation: pos-brillo 1.3s ease-in-out infinite;
+}
+.pos-esqueleto:nth-child(2)::after { animation-delay: 60ms; }
+.pos-esqueleto:nth-child(3)::after { animation-delay: 120ms; }
+.pos-esqueleto:nth-child(4)::after { animation-delay: 180ms; }
+.pos-esqueleto:nth-child(5)::after { animation-delay: 240ms; }
+.pos-esqueleto:nth-child(6)::after { animation-delay: 300ms; }
+.pos-esqueleto:nth-child(7)::after { animation-delay: 360ms; }
+.pos-esqueleto:nth-child(8)::after { animation-delay: 420ms; }
+.pos-esqueleto:nth-child(9)::after { animation-delay: 480ms; }
+.pos-esqueleto:nth-child(10)::after { animation-delay: 540ms; }
+.pos-esqueleto:nth-child(11)::after { animation-delay: 600ms; }
+.pos-esqueleto:nth-child(12)::after { animation-delay: 660ms; }
+
+/* ---- Venta en curso ---------------------------------------------------------- */
+.pos-linea { animation: pos-desliza var(--pos-t2) var(--pos-curva); }
+.pos-lineas-vacio { animation: pos-fundido var(--pos-t3) ease-out; }
+.pos-cliente-barra { animation: pos-sube var(--pos-t2) var(--pos-curva); }
+/* Montos (total, importe de la línea, recibido, devuelta): al cambiar, el valor
+   nuevo rueda hacia su lugar. */
+.pos-num { display: inline-block; animation: pos-rueda var(--pos-t2) var(--pos-curva); }
+
+/* ---- Cobro ------------------------------------------------------------------- */
+.pos-devuelta, .pos-campo-monto { transition: background-color var(--pos-t2) ease-out, color var(--pos-t2) ease-out, border-color var(--pos-t2) ease-out; }
+.pos-billete-cuenta, .pos-billete-menos { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+/* La venta cobrada se firma: el círculo salta, el ✓ se dibuja y sale una onda. */
+.pos-cobro-ok { position: relative; animation: pos-salta var(--pos-t3) var(--pos-rebote); }
+.pos-cobro-ok .lucide :is(path, polyline) { stroke-dasharray: 24; stroke-dashoffset: 24; animation: pos-trazo .34s .14s var(--pos-curva) forwards; }
+.pos-cobro-ok::after, .pos-cobro-duda::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid currentColor; pointer-events: none;
+  opacity: 0; /* invisible antes y después de la onda */
+  animation: pos-onda .9s .2s ease-out;
+}
+/* Sin confirmar: la onda se repite despacio mientras se espera. */
+.pos-cobro-duda { position: relative; }
+.pos-cobro-duda::after { animation: pos-onda 1.8s ease-out infinite; }
+/* No se cobró: el círculo entra y niega con la cabeza, una vez. */
+.pos-cobro-mal { animation: pos-salta var(--pos-t2) var(--pos-rebote), pos-sacude .36s .2s ease-in-out; }
+
+/* ---- PIN --------------------------------------------------------------------- */
+.pos-punto.lleno { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-mensaje-pin.error { animation: pos-fundido var(--pos-t2) ease-out; }
+
+/* ---- Listas (ventas del día, del turno) -------------------------------------- */
+.pos-venta-fila { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(2) { animation-delay: 25ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(3) { animation-delay: 50ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(4) { animation-delay: 75ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(5) { animation-delay: 100ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(6) { animation-delay: 125ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(7) { animation-delay: 150ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(8) { animation-delay: 175ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(9) { animation-delay: 200ms; }
+.pos-ventas-turno > .pos-venta-fila:nth-child(10) { animation-delay: 225ms; }
+.pos-dia-resumen > div { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
+.pos-dia-resumen > div:nth-child(2) { animation-delay: 40ms; }
+.pos-dia-resumen > div:nth-child(3) { animation-delay: 70ms; }
+.pos-dia-resumen > div:nth-child(4) { animation-delay: 100ms; }
+
+/* ---- Reducir movimiento ------------------------------------------------------ */
+/* Todo queda quieto y en su estado final; los indicadores de carga (spinner y
+   el ícono que gira) siguen, porque dicen que algo está pasando. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-root *:not(.spinner):not(.spin), .pos-root *::before, .pos-root *::after,
+  .pos-sel-menu, .pos-sel-menu *, .pos-pantalla {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0s !important;
+  }
 }
