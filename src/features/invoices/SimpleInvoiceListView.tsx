@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  Icon, Btn, RefreshButton, Money, Card, Modal, PageHead, Pagination,
+  Icon, Btn, Badge, RefreshButton, Money, Card, Modal, PageHead, Pagination,
   EmptyState, LoadingState, ErrorState,
 } from '@/components/ui'
 import { ApiError, listFacturasSimples, deleteFacturaSimple, getFacturaSimplePdf } from '@/api'
@@ -176,43 +176,51 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((f) => (
-                  <tr key={f.id} onClick={() => nav('factura-simple-editar', { kind: 'factura-simple', id: f.id })}>
-                    <td>
-                      <span className="mono text-sm fw6">{f.no_factura}</span>
-                      {f.description && <div className="cell-desc" title={f.description}>{f.description}</div>}
-                    </td>
-                    <td>
-                      <span className="cell-main">{cliente(f)}</span>
-                      {f.company_name && f.client_name !== f.company_name && (
-                        <div className="cell-sub">{f.company_name}</div>
-                      )}
-                    </td>
-                    <td className="muted text-sm">{fecha(f.date)}</td>
-                    <td className="num fw6"><Money value={Number(f.total ?? 0)} cur={false} /></td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="row gap-xs">
-                        <Btn
-                          variant="ghost" size="sm" icon="download"
-                          onClick={() => void verPdf(f)}
-                          disabled={pdfBusy === f.id}
-                          aria-label={`Ver PDF de ${f.no_factura}`}
-                        />
-                        <Btn
-                          variant="ghost" size="sm" icon="printer"
-                          onClick={() => void verPdf(f, 'pos')}
-                          disabled={pdfBusy === f.id}
-                          aria-label={`Imprimir recibo de ${anchoTirilla} mm de ${f.no_factura}`}
-                        />
-                        <Btn
-                          variant="ghost" size="sm" icon="trash-2"
-                          onClick={() => setConfirmDel(f)}
-                          aria-label={`Eliminar ${f.no_factura}`}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((f) => {
+                  // La venta de respaldo del POS no se edita ni se elimina (el API responde 409):
+                  // se puede ver e imprimir, nada más.
+                  const esPos = !!f.pos_idempotency_key
+                  return (
+                    <tr key={f.id} onClick={esPos ? undefined : () => nav('factura-simple-editar', { kind: 'factura-simple', id: f.id })}>
+                      <td>
+                        <span className="mono text-sm fw6">{f.no_factura}</span>
+                        {esPos && <> <Badge tone="info">Venta del POS</Badge></>}
+                        {f.description && <div className="cell-desc" title={f.description}>{f.description}</div>}
+                      </td>
+                      <td>
+                        <span className="cell-main">{cliente(f)}</span>
+                        {f.company_name && f.client_name !== f.company_name && (
+                          <div className="cell-sub">{f.company_name}</div>
+                        )}
+                      </td>
+                      <td className="muted text-sm">{fecha(f.date)}</td>
+                      <td className="num fw6"><Money value={Number(f.total ?? 0)} cur={false} /></td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div className="row gap-xs">
+                          <Btn
+                            variant="ghost" size="sm" icon="download"
+                            onClick={() => void verPdf(f)}
+                            disabled={pdfBusy === f.id}
+                            aria-label={`Ver PDF de ${f.no_factura}`}
+                          />
+                          <Btn
+                            variant="ghost" size="sm" icon="printer"
+                            onClick={() => void verPdf(f, 'pos')}
+                            disabled={pdfBusy === f.id}
+                            aria-label={`Imprimir recibo de ${anchoTirilla} mm de ${f.no_factura}`}
+                          />
+                          {!esPos && (
+                            <Btn
+                              variant="ghost" size="sm" icon="trash-2"
+                              onClick={() => setConfirmDel(f)}
+                              aria-label={`Eliminar ${f.no_factura}`}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--surface-2)' }}>

@@ -1437,6 +1437,11 @@ export interface FacturaSimpleRow {
   dias_credito?: number | string | null
   /** Descripciones de las lineas concatenadas (para la columna Concepto). */
   description?: string | null
+  /**
+   * Clave de idempotencia del POS: la factura es la venta de respaldo del POS (el e-CF no se
+   * pudo generar). El API no deja editarla ni eliminarla (409): el listado oculta esas acciones.
+   */
+  pos_idempotency_key?: string | null
 }
 
 /**
