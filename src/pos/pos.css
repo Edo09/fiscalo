@@ -426,14 +426,18 @@
 .pos-producto-quitar { position: absolute; top: -9px; left: -9px; background: var(--danger); color: #fff; border: 0; }
 .pos-producto-quitar:active { filter: brightness(0.88); transform: scale(0.94); }
 .pos-producto-menos:disabled, .pos-producto-quitar:disabled { opacity: 0.45; cursor: default; }
-/* Estrella de favorito: dentro de la tarjeta, junto a la foto, por debajo del
-   botón de quitar (que baja hasta 25 px). Siempre a la vista, tenue: en una
-   pantalla táctil no hay "pasar el mouse". Marcada, amarilla como la tecla C. */
+/* Estrella de favorito: en la esquina de arriba a la izquierda, sobre el borde,
+   como el botón de quitar (que la reemplaza mientras el producto está en la
+   venta). Siempre a la vista, tenue: en una pantalla táctil no hay "pasar el
+   mouse". Marcada, amarilla como la tecla C. */
 .pos-producto-estrella {
-  position: absolute; top: 28px; left: 4px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-full);
-  display: grid; place-items: center; background: transparent; color: var(--text-3); cursor: pointer;
+  position: absolute; top: -9px; left: -9px; width: 34px; height: 34px; padding: 0; border-radius: var(--r-full);
+  display: grid; place-items: center; background: var(--surface); color: var(--text-3); cursor: pointer;
+  border: 1.5px solid var(--border-strong); box-shadow: 0 0 0 3px var(--bg);
   -webkit-tap-highlight-color: transparent;
 }
+.pos-producto-estrella.on { border-color: #e0b20f; }
+.vista-compacta .pos-producto-estrella { width: 30px; height: 30px; }
 /* El trazo, más oscuro en el tema claro: sobre blanco el amarillo solo se pierde
    (3:1 como mínimo para un ícono que dice un estado). En el gris oscuro, más claro. */
 .pos-producto-estrella.on { color: #b88a00; }
@@ -463,10 +467,8 @@
 .pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .vista-lista .pos-producto {
   display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
-  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 38px;
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 30px;
 }
-/* En la fila, la estrella va abajo a la izquierda: arriba está el botón de quitar. */
-.vista-lista .pos-producto-estrella { top: auto; bottom: 6px; left: 5px; }
 .vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
 .vista-lista .pos-ini { width: 40px; height: 40px; font-size: 13px; border-radius: var(--r-md); }
 .vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }

@@ -3,8 +3,9 @@
 // La foto (o las iniciales) va grande y centrada; con el producto en la venta,
 // sobre el borde de la tarjeta: arriba a la derecha el − y el contador, arriba a
 // la izquierda el botón que lo quita de la venta.
-// La estrella (arriba a la izquierda, junto a la foto) marca el producto como
-// favorito del empleado: los favoritos van primero (favoritos.ts).
+// La estrella (esquina de arriba a la izquierda, mientras el producto no está en
+// la venta) lo marca como favorito del empleado: los favoritos van primero, y
+// Mostrar → Favoritos deja solo esos (favoritos.ts).
 // La búsqueda es en memoria y, mientras hay texto, busca en todas las categorías.
 // Vista (tarjetas, compacta, lista), orden y cuántos se pintan son preferencia
 // del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
@@ -17,7 +18,8 @@ import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
 import {
-  cargarPreferencias, favoritosPrimero, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS, type PreferenciasCatalogo,
+  cargarPreferencias, favoritosPrimero, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, PREFERENCIAS_POR_DEFECTO,
+  soloFavoritos, VISTAS, type PreferenciasCatalogo,
 } from './catalogoVista'
 import { useFavoritos, useFavoritosStore } from './favoritos'
 import { SelectorCaja } from './SelectorCaja'
@@ -95,11 +97,16 @@ export function CatalogoPanel({
   }, [catalogo])
   const [prefs, setPrefs] = useState<PreferenciasCatalogo>(cargarPreferencias)
   useEffect(() => { guardarPreferencias(prefs) }, [prefs])
-  // Favoritos primero, y antes del límite: nunca quedan fuera de la grilla.
-  const productos = useMemo(() => favoritosPrimero(ordenar(filtrar(catalogo, busqueda, categoria), prefs.orden), favoritos),
-    [catalogo, busqueda, categoria, prefs.orden, favoritos])
-  const { visibles, ocultos } = limitar(productos, prefs.limite)
   const buscando = busqueda.trim() !== ''
+  // Mostrar → Favoritos deja solo los marcados (con la categoría elegida); la
+  // búsqueda manda, como con las categorías: busca en todo el catálogo.
+  const soloFavs = prefs.limite === 'favoritos' && !buscando
+  // Si no, favoritos primero, y antes del límite: nunca quedan fuera de la grilla.
+  const productos = useMemo(() => {
+    const lista = ordenar(filtrar(catalogo, busqueda, categoria), prefs.orden)
+    return soloFavs ? soloFavoritos(lista, favoritos) : favoritosPrimero(lista, favoritos)
+  }, [catalogo, busqueda, categoria, prefs.orden, favoritos, soloFavs])
+  const { visibles, ocultos } = limitar(productos, prefs.limite)
 
   // Categorías: una fila que se desliza; si no caben, "Todas" las muestra en varias filas.
   const chipsRef = useRef<HTMLDivElement>(null)
@@ -224,6 +231,16 @@ export function CatalogoPanel({
             // Cargando: tarjetas fantasma con el tamaño de la vista elegida.
             Array.from({ length: 12 }, (_, i) => <div key={i} className="pos-esqueleto" aria-hidden="true" />)
           )
+        ) : productos.length === 0 && soloFavs ? (
+          <div className="pos-grilla-vacia">
+            <Icon name="star" size={30} style={{ color: 'var(--text-3)' }} />
+            <p>
+              {favoritos.size === 0
+                ? 'Todavía no tienes favoritos: toca la estrella de un producto para marcarlo.'
+                : 'No tienes favoritos en esta categoría.'}
+            </p>
+            <Btn onClick={() => setPrefs((p) => ({ ...p, limite: PREFERENCIAS_POR_DEFECTO.limite }))}>Ver todos</Btn>
+          </div>
         ) : productos.length === 0 ? (
           <div className="pos-grilla-vacia">
             <Icon name={buscando ? 'search' : 'package'} size={30} style={{ color: 'var(--text-3)' }} />
@@ -262,14 +279,17 @@ export function CatalogoPanel({
                         <Existencia p={p} />
                       </span>
                     </button>
-                    {/* Fuera de la tarjeta (un botón no va dentro de otro), sobre ella junto a la foto.
-                        Marcarla no toca la venta: vale también con un cobro sin confirmar. */}
-                    <button type="button" className={'pos-producto-estrella' + (fav ? ' on' : '')} aria-pressed={fav}
-                      onClick={() => alternarFavorito(empleadoId, p.id)}
-                      aria-label={fav ? `Quitar ${p.nombre} de favoritos` : `Marcar ${p.nombre} como favorito`}
-                      title={fav ? 'Quitar de favoritos' : 'Marcar como favorito'}>
-                      <Icon key={String(fav)} name="star" size={18} />
-                    </button>
+                    {/* Estrella en la esquina de arriba a la izquierda, sobre el borde. Esa
+                        esquina es del botón de quitar mientras el producto está en la venta:
+                        entonces la estrella no se pinta. Marcarla no toca la venta. */}
+                    {cant === 0 && (
+                      <button type="button" className={'pos-producto-estrella' + (fav ? ' on' : '')} aria-pressed={fav}
+                        onClick={() => alternarFavorito(empleadoId, p.id)}
+                        aria-label={fav ? `Quitar ${p.nombre} de favoritos` : `Marcar ${p.nombre} como favorito`}
+                        title={fav ? 'Quitar de favoritos' : 'Marcar como favorito'}>
+                        <Icon key={String(fav)} name="star" size={17} />
+                      </button>
+                    )}
                     {cant > 0 && (
                       <>
                         <button type="button" className="pos-producto-quitar" onClick={() => onQuitar(p)} disabled={bloqueado}
