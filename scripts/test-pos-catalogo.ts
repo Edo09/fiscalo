@@ -1,10 +1,12 @@
-// Vista del catálogo del POS: orden, cuántos se pintan y las preferencias del
-// equipo (src/pos/catalogoVista.ts).
+// Vista del catálogo del POS: orden, cuántos se pintan, favoritos y las
+// preferencias del equipo (src/pos/catalogoVista.ts).
 //
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-pos-catalogo.ts
 import type { ProductoPos } from '../src/pos/api.ts'
-import { leerPreferencias, limitar, ordenar, PREFERENCIAS_POR_DEFECTO } from '../src/pos/catalogoVista.ts'
+import {
+  alternarFavorito, favoritosPrimero, leerFavoritos, leerPreferencias, limitar, ordenar, PREFERENCIAS_POR_DEFECTO,
+} from '../src/pos/catalogoVista.ts'
 
 let fallos = 0
 let total = 0
@@ -48,6 +50,31 @@ chk('500 de 1000', limitar(mil, 500).visibles.length === 500 && limitar(mil, 500
 chk('Todos (0): los 1000', limitar(mil, 0).visibles.length === 1000 && limitar(mil, 0).ocultos === 0)
 chk('menos que el límite: todos, nada fuera', limitar(mil.slice(0, 150), 200).ocultos === 0 && limitar(mil.slice(0, 150), 200).visibles.length === 150)
 chk('justo el límite: nada fuera', limitar(mil.slice(0, 300), 300).ocultos === 0)
+
+console.log('Favoritos')
+const porNombre = ordenar(productos, 'nombre')
+chk('sin favoritos: el mismo orden', ids(favoritosPrimero(porNombre, new Set())) === ids(porNombre))
+chk('los favoritos van primero; cada grupo conserva el orden elegido (A–Z)',
+  ids(favoritosPrimero(porNombre, new Set([6, 1]))) === '1,6,4,2,3,5', ids(favoritosPrimero(porNombre, new Set([6, 1]))))
+const porPrecio = ordenar(productos, 'precio_desc')
+chk('con otro orden (precio, mayor a menor) igual: favoritos primero, y en su orden',
+  ids(favoritosPrimero(porPrecio, new Set([2, 3]))) === '3,2,1,6,5,4', ids(favoritosPrimero(porPrecio, new Set([2, 3]))))
+chk('un favorito que no está en la lista (otra categoría, búsqueda) no estorba',
+  ids(favoritosPrimero(porNombre, new Set([999, 4]))) === '4,2,1,3,6,5', ids(favoritosPrimero(porNombre, new Set([999, 4]))))
+chk('no cambia la lista original', ids(porNombre) === '4,2,1,3,6,5')
+const largos = Array.from({ length: 1000 }, (_, i) => p(i + 1, `P ${String(i + 1).padStart(4, '0')}`, 100, null, 1))
+const vis = limitar(favoritosPrimero(largos, new Set([1000])), 200).visibles
+chk('el favorito nunca queda fuera del límite: el #1000 sale primero de los 200', vis.length === 200 && vis[0].id === 1000, vis[0]?.id)
+chk('alternar: marca, desmarca y no repite', alternarFavorito([], 5).join() === '5' && alternarFavorito([3, 5], 5).join() === '3'
+  && alternarFavorito([3], 7).join() === '3,7')
+chk('leer lo guardado: por empleado', JSON.stringify(leerFavoritos('{"7":[1,2],"8":[3]}')) === '{"7":[1,2],"8":[3]}')
+chk('leer lo guardado: nada, JSON dañado o algo que no es objeto → vacío',
+  JSON.stringify(leerFavoritos(null)) === '{}' && JSON.stringify(leerFavoritos('{x')) === '{}' && JSON.stringify(leerFavoritos('[1]')) === '{}')
+chk('leer lo guardado: descarta ids que no son enteros positivos y repetidos',
+  JSON.stringify(leerFavoritos('{"7":[1,"2",-3,1.5,1,4],"8":"x"}')) === '{"7":[1,4]}', leerFavoritos('{"7":[1,"2",-3,1.5,1,4],"8":"x"}'))
+const raro = leerFavoritos('{"__proto__":[5],"x":[6],"9":[7]}')
+chk('claves que no son ids de empleado ("__proto__", "x") se ignoran', JSON.stringify(raro) === '{"9":[7]}'
+  && Object.getPrototypeOf(raro) === Object.prototype, raro)
 
 console.log('Preferencias del equipo')
 chk('sin nada guardado: tarjetas, por nombre, 200', JSON.stringify(leerPreferencias(null)) === JSON.stringify(PREFERENCIAS_POR_DEFECTO)

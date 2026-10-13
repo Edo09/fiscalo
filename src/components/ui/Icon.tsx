@@ -14,7 +14,7 @@ import {
   Wrench, Box, MapPin, CircleDot, HandCoins, Tag, Layers, Percent, Sheet,
   GitCompare, Key, Hash, Pause, Banknote, HelpCircle, Zap, EyeOff, LineChart,
   ArrowLeft, Briefcase, File, Info, History,
-  Lock, Delete, Monitor, WifiOff, Store, LayoutGrid, Grid3x3, List, ArrowUpDown,
+  Lock, Delete, Monitor, WifiOff, Store, LayoutGrid, Grid3x3, List, ArrowUpDown, Star,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -53,6 +53,7 @@ const ICONS = {
   // POS (pos.fiscalpoint.com.do): bloqueo, teclado de PIN, equipo, sin red, tienda.
   lock: Lock, delete: Delete, monitor: Monitor, 'wifi-off': WifiOff, store: Store,
   'layout-grid': LayoutGrid, 'grid-3x3': Grid3x3, list: List, 'arrow-up-down': ArrowUpDown,
+  star: Star,
 } satisfies Record<string, LucideIcon>
 
 /** Nombres válidos. Añadir uno = importarlo arriba y agregarlo al mapa. */

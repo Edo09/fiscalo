@@ -169,17 +169,29 @@
 .pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
 
 /* ---- Barra de la caja (con sesion) -------------------------------------- */
+/* La barra es un contenedor (container query): lo que se oculta depende de SU
+   ancho, que ya viene dividido por el zoom de tamano.ts. Con @media, un 120 %
+   en 1024 px se salía por la derecha sin que ninguna regla se enterara. */
 .pos-barra {
-  height: 60px; display: flex; align-items: center; gap: 16px;
-  padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  container: barra / inline-size;
+  height: 60px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.pos-barra-dato { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.pos-barra-dato small { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-barra-fila { height: 100%; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+.pos-barra-dato { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; overflow: hidden; }
+.pos-barra-dato small {
+  font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* Un nombre largo se corta con puntos suspensivos: nunca parte la barra en dos lineas. */
 .pos-barra-dato b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 .pos-barra-espacio { flex: 1; }
 .pos-reloj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .pos-barra .btn { white-space: nowrap; flex-shrink: 0; }
+/* Tonos de la barra: Turno en amarillo y Bloquear en rojo, suaves para no gritar. */
+.pos-barra .btn.pos-btn-turno { background: var(--warning-soft); color: var(--warning); border-color: var(--warning); }
+.pos-barra .btn.pos-btn-bloquear { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+.pos-barra .btn.pos-btn-turno:hover:not(:disabled),
+.pos-barra .btn.pos-btn-bloquear:hover:not(:disabled) { filter: brightness(0.96); }
 /* Tamaño de la pantalla: A− · 100% · A+ en un solo grupo, del alto de los botones de la barra. */
 .pos-tamano {
   display: inline-flex; align-items: stretch; flex-shrink: 0; height: 34px;
@@ -414,6 +426,24 @@
 .pos-producto-quitar { position: absolute; top: -9px; left: -9px; background: var(--danger); color: #fff; border: 0; }
 .pos-producto-quitar:active { filter: brightness(0.88); transform: scale(0.94); }
 .pos-producto-menos:disabled, .pos-producto-quitar:disabled { opacity: 0.45; cursor: default; }
+/* Estrella de favorito: dentro de la tarjeta, junto a la foto, por debajo del
+   botón de quitar (que baja hasta 25 px). Siempre a la vista, tenue: en una
+   pantalla táctil no hay "pasar el mouse". Marcada, amarilla como la tecla C. */
+.pos-producto-estrella {
+  position: absolute; top: 28px; left: 4px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-full);
+  display: grid; place-items: center; background: transparent; color: var(--text-3); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* El trazo, más oscuro en el tema claro: sobre blanco el amarillo solo se pierde
+   (3:1 como mínimo para un ícono que dice un estado). En el gris oscuro, más claro. */
+.pos-producto-estrella.on { color: #b88a00; }
+[data-pos-tema="gris"] .pos-producto-estrella.on { color: #d9a400; }
+.pos-producto-estrella.on svg { fill: #f5c518; animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-producto-estrella:active { transform: scale(0.9); }
+.pos-producto-estrella:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) {
+  .pos-producto-estrella:not(.on):hover { color: var(--text-2); }
+}
 
 /* Vista compacta: más productos por pantalla; sin código. */
 .pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px 18px; }
@@ -433,8 +463,10 @@
 .pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .vista-lista .pos-producto {
   display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
-  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 30px;
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 38px;
 }
+/* En la fila, la estrella va abajo a la izquierda: arriba está el botón de quitar. */
+.vista-lista .pos-producto-estrella { top: auto; bottom: 6px; left: 5px; }
 .vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
 .vista-lista .pos-ini { width: 40px; height: 40px; font-size: 13px; border-radius: var(--r-md); }
 .vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
@@ -586,8 +618,11 @@
 .pos-modal-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .pos-modal-cab small { display: block; font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
 .pos-modal-cab b { font-size: 18px; line-height: 1.3; }
-.pos-modal-pie { display: flex; gap: 10px; margin-top: 16px; }
-.pos-modal-pie .btn { flex: 1; }
+/* Botones del pie a partes iguales; si el texto de uno no cabe ("Terminar y
+   bloquear" junto a "Reimprimir" en pantalla angosta), bajan a otra línea a lo
+   ancho, sin cortar ni desbordar el texto. */
+.pos-modal-pie { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.pos-modal-pie .btn { flex: 1 1 0; min-width: fit-content; }
 .pos-cantidad-visor {
   height: 64px; display: grid; place-items: center; font-size: 34px; font-weight: 700;
   font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--r-lg);
@@ -645,6 +680,9 @@
   font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent;
 }
 .pos-billete.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+/* Monedas: fila propia de 4, más bajas y redondas que los billetes. */
+.pos-monedas { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 18px; }
+.pos-billete.moneda { height: 40px; border-radius: var(--r-full); font-size: 15px; background: var(--surface-2); }
 .pos-billete:disabled { opacity: 0.35; cursor: default; }
 .pos-devuelta {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
@@ -662,6 +700,10 @@
 /* La "C" del monto ocupa toda la fila; el color amarillo lo da .pos-tecla-c. */
 .pos-teclado-monto .pos-tecla-limpiar { grid-column: 1 / -1; font-size: 20px; letter-spacing: .04em; }
 
+/* Spinner dentro de un botón: toma el color del texto, para verse sobre el acento. */
+/* Ocupado no es deshabilitado: el botón que trabaja no se apaga a media opacidad. */
+.pos-root .btn[aria-busy="true"]:disabled { opacity: 1; cursor: progress; }
+.pos-spinner-boton { width: 16px; height: 16px; border-color: color-mix(in srgb, currentColor 35%, transparent); border-top-color: currentColor; flex-shrink: 0; }
 .pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
 .pos-cobro-estado > b { font-size: 20px; }
 .pos-cobro-estado .pos-sub { text-align: center; }
@@ -689,7 +731,6 @@
 
 @media (max-width: 720px) {
   .pos-efectivo { grid-template-columns: 1fr; }
-  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
 }
 
 /* ---- Cierre de turno (K6-K8) y panel del turno (K9) ---------------------- */
@@ -764,11 +805,37 @@
   .pos-cierre-cifras { grid-template-columns: 1fr; }
 }
 
-/* La empresa es lo primero que sobra: el cajero sabe donde trabaja. */
-@media (max-width: 720px) {
-  .pos-barra { gap: 10px; }
+/* La barra se va soltando cosas según su ancho, de lo que menos falta a lo que
+   más: la empresa (el cajero sabe dónde trabaja), los textos de los botones (el
+   ícono queda, con su aria-label), el texto de Bloquear y el % del tamaño, el
+   reloj y el logo, el nombre de la caja y, en un teléfono con el tamaño
+   agrandado, el botón del tema. Medido con la barra
+   completa en 1215 px; los cortes dejan margen para nombres largos. */
+@container barra (max-width: 1239px) {
   .pos-barra-dato.ocultable { display: none; }
+}
+@container barra (max-width: 1079px) {
+  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
+}
+@container barra (max-width: 859px) {
+  .pos-barra-fila { gap: 10px; }
   .pos-barra-dato b { max-width: 140px; }
+  .pos-barra-txt-bloquear, .pos-tamano .pos-tamano-valor { display: none; }
+  .pos-tamano button + button { border-left: 1px solid var(--border); }
+}
+@container barra (max-width: 639px) {
+  .pos-barra-fila { gap: 8px; padding: 0 12px; }
+  .pos-barra-logo, .pos-reloj { display: none; }
+}
+@container barra (max-width: 479px) {
+  .pos-barra-fila { gap: 6px; }
+  .pos-barra-caja { display: none; }
+  .pos-barra .btn { padding-inline: 9px; }
+  .pos-tamano button { min-width: 34px; padding: 0 6px; }
+}
+/* Teléfono con el tamaño agrandado: el tema es lo único que no hace falta para vender. */
+@container barra (max-width: 379px) {
+  .pos-barra-tema { display: none; }
 }
 @media (max-width: 520px) {
   .pos-panel { padding: 22px 18px; }
@@ -869,27 +936,29 @@
 .pos-buscador-limpiar { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
 
 /* ---- Catálogo ---------------------------------------------------------------- */
-/* Llega en cascada corta (las primeras 18; el resto, juntas). Al cambiar de vista
-   la grilla se rearma y vuelve a entrar; al buscar o cambiar de categoría solo
-   entran las tarjetas nuevas. */
+/* Llega en cascada corta (las primeras 18 de cada grupo; el resto, juntas). Al
+   cambiar de vista la grilla se rearma y vuelve a entrar; al buscar o cambiar de
+   categoría solo entran las tarjetas nuevas; al marcar una estrella, solo esa.
+   Los grupos (favoritos y resto) no ocupan lugar: sus tarjetas van en la grilla. */
+.pos-grilla-grupo { display: contents; }
 .pos-producto-celda { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
-.pos-grilla > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
-.pos-grilla > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
-.pos-grilla > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
-.pos-grilla > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
-.pos-grilla > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
-.pos-grilla > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
-.pos-grilla > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
-.pos-grilla > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
-.pos-grilla > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
-.pos-grilla > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
-.pos-grilla > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
-.pos-grilla > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
-.pos-grilla > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
-.pos-grilla > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
-.pos-grilla > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
-.pos-grilla > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
-.pos-grilla > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
 .pos-chips-fila.abiertas .pos-chips { animation: pos-fundido var(--pos-t2) ease-out; }
 /* Contador y botones de la tarjeta: entran saltando; el contador vuelve a saltar
    con cada unidad (la clave lo remonta). */

@@ -16,7 +16,7 @@ import { posApi, PosApiError, type ClientePos, type FormaPago, type VentaCuerpo,
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nuevaClave, useCarritoStore } from './carrito'
-import { centavosATexto, formatoCentavos, montoACentavos, totalesCarrito } from './montos'
+import { BILLETES, centavosATexto, formatoCentavos, MONEDAS, montoACentavos, totalesCarrito } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 import { tituloVenta } from './estados'
@@ -45,13 +45,13 @@ const FORMAS: { forma: FormaPago; nombre: string; tecla: string; icono: 'banknot
   { forma: 3, nombre: 'Tarjeta', tecla: 'F2', icono: 'wallet' },
   { forma: 2, nombre: 'Transferencia', tecla: 'F3', icono: 'landmark' },
 ]
-/**
- * Billetes de atajo para el efectivo recibido (en pesos). Se SUMAN: el cliente
- * paga 2,342.30 con 2,000 + 500 → se tocan los dos. Antes cada botón ponía un
- * solo billete y, si no alcanzaba, quedaba desactivado: con un total mayor de
- * 2,000 no servía ninguno.
+/*
+ * Billetes y monedas de atajo para el efectivo recibido: BILLETES y MONEDAS de
+ * montos.ts, los mismos del cierre. Se SUMAN: el cliente paga 2,342.30 con
+ * 2,000 + 500 → se tocan los dos. Antes cada botón ponía un solo billete y, si
+ * no alcanzaba, quedaba desactivado: con un total mayor de 2,000 no servía
+ * ninguno. Las monedas van en su propia fila y suman igual.
  */
-const BILLETES = [2000, 1000, 500, 200, 100, 50]
 
 type Fase =
   | { tipo: 'eligiendo' }
@@ -99,12 +99,34 @@ export function CobroModal({
   }
   const restarBillete = (b: number) => {
     if ((billetes[b] ?? 0) <= 0) return
-    // Si no queda nada recibido, vuelve a "Exacto".
+    // Si no queda nada recibido, vuelve a "Pago Exacto".
     setRecibido((r) => {
       const c = (r === '' ? 0 : montoACentavos(r) ?? 0) - b * 100
       return c > 0 ? centavosATexto(c) : ''
     })
     setBilletes((m) => ({ ...m, [b]: Math.max(0, (m[b] ?? 0) - 1) }))
+  }
+  // Botón de un billete o una moneda: contador y − van sobre el borde del
+  // botón, como en las tarjetas del catálogo.
+  const celdaEfectivo = (b: number, tipo: 'billete' | 'moneda') => {
+    const n = billetes[b] ?? 0
+    const nombre = `${tipo === 'billete' ? 'un billete' : 'una moneda'} de ${b.toLocaleString('es-DO')}`
+    return (
+      <div key={b} className="pos-billete-celda">
+        <button type="button" className={'pos-billete' + (tipo === 'moneda' ? ' moneda' : '') + (n > 0 ? ' usado' : '')}
+          onClick={() => sumarBillete(b)} aria-label={n > 0 ? `Sumar ${nombre} (van ${n})` : `Sumar ${nombre}`}>
+          +{b.toLocaleString('es-DO')}
+        </button>
+        {n > 0 && (
+          <>
+            <button type="button" className="pos-billete-menos" onClick={() => restarBillete(b)} aria-label={`Quitar ${nombre}`}>
+              <Icon name="minus" size={15} />
+            </button>
+            <span key={n} className="pos-billete-cuenta" aria-hidden="true">×{n}</span>
+          </>
+        )}
+      </div>
+    )
   }
   const teclearRecibido = useCallback((actualizar: (anterior: string) => string) => {
     setBilletes({})
@@ -243,34 +265,15 @@ export function CobroModal({
               <div>
                 <div className="pos-campo-monto">
                   <small>Recibido</small>
-                  <b key={recibido} className={'pos-num' + (recibido === '' ? ' vacio' : '')}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
+                  <b key={recibido} className={'pos-num' + (recibido === '' ? ' vacio' : '')}>{recibido === '' ? 'Pago Exacto' : `RD$ ${recibido}`}</b>
                 </div>
                 <div className="pos-billetes">
-                  {BILLETES.map((b) => {
-                    const n = billetes[b] ?? 0
-                    const nombre = b.toLocaleString('es-DO')
-                    // Contador y − van sobre el borde del botón, como en las tarjetas del catálogo.
-                    return (
-                      <div key={b} className="pos-billete-celda">
-                        <button type="button" className={'pos-billete' + (n > 0 ? ' usado' : '')} onClick={() => sumarBillete(b)}
-                          aria-label={n > 0 ? `Sumar un billete de ${nombre} (van ${n})` : `Sumar un billete de ${nombre}`}>
-                          +{nombre}
-                        </button>
-                        {n > 0 && (
-                          <>
-                            <button type="button" className="pos-billete-menos" onClick={() => restarBillete(b)}
-                              aria-label={`Quitar un billete de ${nombre}`}>
-                              <Icon name="minus" size={15} />
-                            </button>
-                            <span key={n} className="pos-billete-cuenta" aria-hidden="true">×{n}</span>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                  {/* Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
+                  {BILLETES.map((b) => celdaEfectivo(b, 'billete'))}
+                  {/* Monedas: su propia fila, más baja y redonda, para distinguirlas de un vistazo. */}
+                  <div className="pos-monedas">{MONEDAS.map((m) => celdaEfectivo(m, 'moneda'))}</div>
+                  {/* Pago Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
                   <button type="button" className={'pos-billete' + (recibido === '' ? ' on' : '')} style={{ gridColumn: '1 / -1' }}
-                    onClick={() => { setRecibido(''); setBilletes({}) }}>Exacto</button>
+                    onClick={() => { setRecibido(''); setBilletes({}) }}>Pago Exacto</button>
                 </div>
                 {/* Verde = pago exacto; amarillo = hay que dar devuelta; rojo = falta. */}
                 <div className={'pos-devuelta' + (!alcanza ? ' falta' : (devuelta ?? 0) > 0 ? ' cambio' : '')}>
