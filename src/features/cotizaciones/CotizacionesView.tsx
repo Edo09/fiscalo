@@ -1,48 +1,22 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
 import {
-  Icon, Btn, RefreshButton, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState, Dropdown, MenuItem,
+  Icon, Btn, RefreshButton, Money, Avatar, Card, PageHead, EmptyState, LoadingState, ErrorState,
 } from '@/components/ui'
-import { ApiError, listCotizaciones, getCotizacionPdf, formatApiDate } from '@/api'
+import { listCotizaciones, formatApiDate } from '@/api'
 import type { CotizacionRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { presentDocument } from '@/lib/file'
-import { aNumero } from '@/lib/format'
-import { useSession } from '@/stores/auth'
-import { puedeVerVista, type Nav } from '@/config/navigation'
-import type { FacturaPrefill } from '@/types/domain'
-import { formatoDeFila, useCotizacionFormato, type FormatoId } from './formatos'
-import { useFormatoTenant } from './formatos/useFormatoTenant'
-import { ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill } from './formatos/ferreteria/conversion'
+import type { Nav } from '@/config/navigation'
+import { useCotizacionFormato, type FormatoId } from './formatos'
+import { AccionesCotizacion } from './AccionesCotizacion'
+import { usePermisosCotizacion } from './permisosCotizacion'
 
 const PAGE_SIZE = 15
-
-/** Borrador de factura a partir de una cotización (cliente + líneas). */
-function toFacturaPrefill(c: CotizacionRow): FacturaPrefill {
-  return {
-    kind: 'factura-prefill',
-    clienteId: c.client_id != null ? String(c.client_id) : '',
-    clienteNombre: c.client_name || '',
-    origen: c.code || `#${c.id}`,
-    lineas: (c.items ?? [])
-      .filter((it) => (it.description ?? '').trim() !== '')
-      // Llegan como texto DECIMAL. La cantidad pasa tal cual (0.5 ya no sube a
-      // 1): si no sirve para el e-CF, la factura lo marca en la línea al emitir.
-      .map((it) => ({
-        nombre: (it.description ?? '').trim(),
-        cantidad: aNumero(it.quantity ?? 1),
-        precio: aNumero(it.amount),
-      })),
-  }
-}
 
 /* FISCALO — Cotizaciones (GET /api/cotizaciones) */
 export function CotizacionesView({ nav }: { nav: Nav }) {
   const [page, setPage] = useState(1)
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  const [pdfBusy, setPdfBusy] = useState<number | null>(null)
-  const { user } = useSession()
 
   // Las columnas siguen el formato del tenant; las acciones, el de cada fila
   // (una cotización guardada con otro formato se factura con sus reglas). Si
@@ -50,14 +24,7 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
   // lectura y no hay nada que se pueda guardar mal.
   const formatoTenant = useCotizacionFormato()
   const columnas: FormatoId = formatoTenant.error != null ? 'gratex' : formatoTenant.formato
-  // Facturar ofrece solo los destinos que el rol puede abrir (mismo criterio que el sidebar).
-  const puedeEcf = puedeVerVista(user, 'factura-nueva')
-  const puedeSimple = puedeVerVista(user, 'factura-simple-nueva')
-  // "Conduce" sale cuando el formato de la empresa SE SABE y es Ferretería: el
-  // mismo criterio que muestra la página de Conduces (mientras branding carga,
-  // o si falló, no sale).
-  const { formato: formatoConocido } = useFormatoTenant()
-  const puedeConduce = formatoConocido === 'ferreteria' && puedeVerVista(user, 'conduce-editar', formatoConocido)
+  const permisos = usePermisosCotizacion()
 
   // Crear y editar viven en su propia pantalla (el editor "en papel", igual que
   // el de factura), no en un modal.
@@ -74,17 +41,6 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
   const total = data?.total ?? null
   const hasNext = total != null ? page * PAGE_SIZE < total : rows.length === PAGE_SIZE
   const submitSearch = () => { setQuery(input.trim()); setPage(1) }
-
-  const openPdf = async (c: CotizacionRow) => {
-    setPdfBusy(c.id)
-    try {
-      presentDocument(await getCotizacionPdf(c.id))
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'No se pudo generar el PDF.')
-    } finally {
-      setPdfBusy(null)
-    }
-  }
 
   return (
     <div className="page page-wide">
@@ -130,7 +86,7 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
                   <th>Fecha</th>
                   <th className="num">Total</th>
                   {/* Ferretería con conduces lleva tres botones (PDF, Conduce, Facturar). */}
-                  <th style={{ width: columnas === 'gratex' ? 190 : puedeConduce ? 320 : 210 }}></th>
+                  <th style={{ width: columnas === 'gratex' ? 190 : permisos.puedeConduce ? 320 : 210 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -145,50 +101,7 @@ export function CotizacionesView({ nav }: { nav: Nav }) {
                     <td className="num fw6"><Money value={Number(c.total ?? 0)} cur={false} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-                        <Btn variant="ghost" size="sm" icon="printer" onClick={() => openPdf(c)} disabled={pdfBusy === c.id}>
-                          {pdfBusy === c.id ? '…' : 'PDF'}
-                        </Btn>
-                        {formatoDeFila(c) === 'ferreteria' ? (
-                          <>
-                            {/* Conduce: fuera de la condición de Facturar, porque un rol
-                                sin facturas también entrega mercancía. */}
-                            {puedeConduce && (
-                              <Btn variant="secondary" size="sm" icon="truck" title="Crear un conduce de mercancía con esta cotización"
-                                onClick={() => nav('conduce-editar', { kind: 'conduce-desde-cotizacion', cotizacionId: c.id })}>
-                                Conduce
-                              </Btn>
-                            )}
-                            {/* Ferretería factura a e-CF o a factura simple. Cada destino
-                                sale solo si el rol puede abrirlo; sin ninguno, no hay botón. */}
-                            {(puedeEcf || puedeSimple) && (
-                              <Dropdown
-                                align="right"
-                                width={220}
-                                trigger={
-                                  <Btn variant="secondary" size="sm" icon="file-text" iconRight="chevron-down" title="Convertir en factura">
-                                    Facturar
-                                  </Btn>
-                                }
-                              >
-                                {puedeEcf && (
-                                  <MenuItem icon="file-text" onClick={() => nav('factura-nueva', ferreteriaAFacturaPrefill(c))}>
-                                    Factura electrónica (e-CF)
-                                  </MenuItem>
-                                )}
-                                {puedeSimple && (
-                                  <MenuItem icon="file" onClick={() => nav('factura-simple-nueva', ferreteriaAFacturaSimplePrefill(c))}>
-                                    Factura simple
-                                  </MenuItem>
-                                )}
-                              </Dropdown>
-                            )}
-                          </>
-                        ) : (
-                          <Btn variant="secondary" size="sm" icon="file-text" title="Convertir a factura e-CF"
-                            onClick={() => nav('factura-nueva', toFacturaPrefill(c))}>
-                            Facturar
-                          </Btn>
-                        )}
+                        <AccionesCotizacion cotizacion={c} nav={nav} permisos={permisos} />
                       </div>
                     </td>
                   </tr>

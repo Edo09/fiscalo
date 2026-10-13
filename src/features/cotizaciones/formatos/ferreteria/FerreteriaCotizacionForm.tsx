@@ -29,6 +29,8 @@ import {
 import { BloqueCliente } from './BloqueCliente'
 import { DescripcionLinea } from './DescripcionLinea'
 import { clienteDeFila, formatearRnc, lineaDesdeProducto, lineaLibre, lineasDeFila, siguienteId } from './lineas'
+import { AccionesCotizacion } from '../../AccionesCotizacion'
+import { usePermisosCotizacion } from '../../permisosCotizacion'
 import '@/styles/factura-doc.css'
 
 /* FISCALO — Cotización con el formato de Ferretería (spec 8.1).
@@ -154,6 +156,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
   // Qué unidades admiten fracciones (metro, kilo) y cuáles se cuentan enteras.
   const unidades = useUnidadesMedida()
+  // PDF, Conduce y Facturar de la cotización guardada (las mismas del listado).
+  const permisos = usePermisosCotizacion()
 
   // --- Carga al editar ---
   // Misma clave que CotizacionEditor: la fila ya está en la caché.
@@ -378,7 +382,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
   return (
     <div className="page fx-desk">
-      <div className="row between" style={{ marginBottom: 14 }}>
+      <div className="row between" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('cotizaciones')}>Cotizaciones</Btn>
         {editando && confirmDel ? (
           <span className="row gap-sm" style={{ alignItems: 'center' }}>
@@ -389,9 +393,26 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
             </Btn>
           </span>
         ) : editando ? (
-          <Btn variant="ghost" size="sm" icon="trash-2" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>
-            Eliminar
-          </Btn>
+          // marginLeft auto: si baja sola a otra línea, sigue a la derecha.
+          <span className="row gap-sm" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+            {/* Salen de la cotización GUARDADA: con cambios en pantalla, el PDF,
+                el conduce o la factura no serían lo que el usuario está viendo. */}
+            {listo && detalle.data && (
+              <AccionesCotizacion
+                cotizacion={detalle.data}
+                nav={nav}
+                permisos={permisos}
+                bloqueo={
+                  guardando ? 'Guardando la cotización…'
+                    : hayCambios ? 'Guarda los cambios primero: el PDF, el conduce y la factura salen de la cotización guardada.'
+                      : null
+                }
+              />
+            )}
+            <Btn variant="ghost" size="sm" icon="trash-2" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>
+              Eliminar
+            </Btn>
+          </span>
         ) : null}
       </div>
 
