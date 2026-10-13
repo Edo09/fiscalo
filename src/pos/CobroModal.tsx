@@ -98,7 +98,7 @@ export function CobroModal({
   }
   const restarBillete = (b: number) => {
     if ((billetes[b] ?? 0) <= 0) return
-    // Si no queda nada recibido, vuelve a "Exacto".
+    // Si no queda nada recibido, vuelve a "Pago Exacto".
     setRecibido((r) => {
       const c = (r === '' ? 0 : montoACentavos(r) ?? 0) - b * 100
       return c > 0 ? centavosATexto(c) : ''
@@ -264,15 +264,15 @@ export function CobroModal({
               <div>
                 <div className="pos-campo-monto">
                   <small>Recibido</small>
-                  <b key={recibido} className={'pos-num' + (recibido === '' ? ' vacio' : '')}>{recibido === '' ? 'Exacto' : `RD$ ${recibido}`}</b>
+                  <b key={recibido} className={'pos-num' + (recibido === '' ? ' vacio' : '')}>{recibido === '' ? 'Pago Exacto' : `RD$ ${recibido}`}</b>
                 </div>
                 <div className="pos-billetes">
                   {BILLETES.map((b) => celdaEfectivo(b, 'billete'))}
                   {/* Monedas: su propia fila, más baja y redonda, para distinguirlas de un vistazo. */}
                   <div className="pos-monedas">{MONEDAS.map((m) => celdaEfectivo(m, 'moneda'))}</div>
-                  {/* Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
+                  {/* Pago Exacto también sirve para empezar de nuevo: el próximo billete suma desde cero. */}
                   <button type="button" className={'pos-billete' + (recibido === '' ? ' on' : '')} style={{ gridColumn: '1 / -1' }}
-                    onClick={() => { setRecibido(''); setBilletes({}) }}>Exacto</button>
+                    onClick={() => { setRecibido(''); setBilletes({}) }}>Pago Exacto</button>
                 </div>
                 {/* Verde = pago exacto; amarillo = hay que dar devuelta; rojo = falta. */}
                 <div className={'pos-devuelta' + (!alcanza ? ' falta' : (devuelta ?? 0) > 0 ? ' cambio' : '')}>
