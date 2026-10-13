@@ -450,6 +450,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
             onQuitarUno={quitarUno}
             onQuitar={quitarDeVenta}
             bloqueado={cobroEnDuda !== null}
+            empleadoId={sesion.empleado.id}
           />
           <VentasTabs
             ventas={ventas}

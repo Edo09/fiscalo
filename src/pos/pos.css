@@ -426,6 +426,24 @@
 .pos-producto-quitar { position: absolute; top: -9px; left: -9px; background: var(--danger); color: #fff; border: 0; }
 .pos-producto-quitar:active { filter: brightness(0.88); transform: scale(0.94); }
 .pos-producto-menos:disabled, .pos-producto-quitar:disabled { opacity: 0.45; cursor: default; }
+/* Estrella de favorito: dentro de la tarjeta, junto a la foto, por debajo del
+   botón de quitar (que baja hasta 25 px). Siempre a la vista, tenue: en una
+   pantalla táctil no hay "pasar el mouse". Marcada, amarilla como la tecla C. */
+.pos-producto-estrella {
+  position: absolute; top: 28px; left: 4px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-full);
+  display: grid; place-items: center; background: transparent; color: var(--text-3); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* El trazo, más oscuro en el tema claro: sobre blanco el amarillo solo se pierde
+   (3:1 como mínimo para un ícono que dice un estado). En el gris oscuro, más claro. */
+.pos-producto-estrella.on { color: #b88a00; }
+[data-pos-tema="gris"] .pos-producto-estrella.on { color: #d9a400; }
+.pos-producto-estrella.on svg { fill: #f5c518; animation: pos-salta var(--pos-t2) var(--pos-rebote); }
+.pos-producto-estrella:active { transform: scale(0.9); }
+.pos-producto-estrella:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) {
+  .pos-producto-estrella:not(.on):hover { color: var(--text-2); }
+}
 
 /* Vista compacta: más productos por pantalla; sin código. */
 .pos-grilla.vista-compacta { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px 18px; }
@@ -445,8 +463,10 @@
 .pos-grilla.vista-lista { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .vista-lista .pos-producto {
   display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: "ini nombre pie" "ini sku pie";
-  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 30px;
+  align-items: center; column-gap: 12px; row-gap: 0; min-height: 64px; padding: 10px 84px 10px 38px;
 }
+/* En la fila, la estrella va abajo a la izquierda: arriba está el botón de quitar. */
+.vista-lista .pos-producto-estrella { top: auto; bottom: 6px; left: 5px; }
 .vista-lista .pos-producto-top { grid-area: ini; margin: 0; }
 .vista-lista .pos-ini { width: 40px; height: 40px; font-size: 13px; border-radius: var(--r-md); }
 .vista-lista .pos-producto-nombre { grid-area: nombre; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
@@ -916,27 +936,29 @@
 .pos-buscador-limpiar { animation: pos-salta var(--pos-t2) var(--pos-rebote); }
 
 /* ---- Catálogo ---------------------------------------------------------------- */
-/* Llega en cascada corta (las primeras 18; el resto, juntas). Al cambiar de vista
-   la grilla se rearma y vuelve a entrar; al buscar o cambiar de categoría solo
-   entran las tarjetas nuevas. */
+/* Llega en cascada corta (las primeras 18 de cada grupo; el resto, juntas). Al
+   cambiar de vista la grilla se rearma y vuelve a entrar; al buscar o cambiar de
+   categoría solo entran las tarjetas nuevas; al marcar una estrella, solo esa.
+   Los grupos (favoritos y resto) no ocupan lugar: sus tarjetas van en la grilla. */
+.pos-grilla-grupo { display: contents; }
 .pos-producto-celda { animation: pos-sube var(--pos-t2) var(--pos-curva) backwards; }
-.pos-grilla > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
-.pos-grilla > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
-.pos-grilla > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
-.pos-grilla > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
-.pos-grilla > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
-.pos-grilla > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
-.pos-grilla > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
-.pos-grilla > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
-.pos-grilla > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
-.pos-grilla > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
-.pos-grilla > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
-.pos-grilla > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
-.pos-grilla > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
-.pos-grilla > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
-.pos-grilla > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
-.pos-grilla > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
-.pos-grilla > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(2) { animation-delay: 18ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(3) { animation-delay: 36ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(4) { animation-delay: 54ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(5) { animation-delay: 72ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(6) { animation-delay: 90ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(7) { animation-delay: 108ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(8) { animation-delay: 126ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(9) { animation-delay: 144ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(10) { animation-delay: 162ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(11) { animation-delay: 180ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(12) { animation-delay: 198ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(13) { animation-delay: 216ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(14) { animation-delay: 234ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(15) { animation-delay: 252ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(16) { animation-delay: 270ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(17) { animation-delay: 288ms; }
+.pos-grilla-grupo > .pos-producto-celda:nth-child(18) { animation-delay: 306ms; }
 .pos-chips-fila.abiertas .pos-chips { animation: pos-fundido var(--pos-t2) ease-out; }
 /* Contador y botones de la tarjeta: entran saltando; el contador vuelve a saltar
    con cada unidad (la clave lo remonta). */

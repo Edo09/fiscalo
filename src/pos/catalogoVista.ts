@@ -108,6 +108,40 @@ export function ordenar(productos: ProductoPos[], orden: Orden): ProductoPos[] {
   }
 }
 
+// --- Favoritos (la estrella de la tarjeta) -----------------------------------
+// De cada empleado en ESTE equipo, como sus ventas abiertas (favoritos.ts los
+// guarda). Van primero en la grilla, en cualquier orden, categoría o búsqueda.
+
+/** Favoritos primero; cada grupo conserva el orden que ya traía (estable). Antes del límite: nunca quedan fuera. */
+export function favoritosPrimero(lista: ProductoPos[], favoritos: ReadonlySet<number>): ProductoPos[] {
+  if (favoritos.size === 0) return lista
+  return [...lista.filter((p) => favoritos.has(p.id)), ...lista.filter((p) => !favoritos.has(p.id))]
+}
+
+/** Marca o desmarca un producto. */
+export function alternarFavorito(ids: readonly number[], id: number): number[] {
+  return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+}
+
+/** Lo guardado: { [empleadoId]: ids }. Lo que no se entiende se descarta (sin romper la caja). */
+export function leerFavoritos(texto: string | null): Record<string, number[]> {
+  let crudo: unknown
+  try {
+    crudo = texto === null ? null : JSON.parse(texto)
+  } catch {
+    return {}
+  }
+  if (crudo === null || typeof crudo !== 'object' || Array.isArray(crudo)) return {}
+  const out: Record<string, number[]> = {}
+  for (const [empleado, ids] of Object.entries(crudo as Record<string, unknown>)) {
+    // Solo ids de empleado: una clave como "__proto__" cambiaría el prototipo de out.
+    if (!/^\d+$/.test(empleado) || !Array.isArray(ids)) continue
+    const buenos = [...new Set(ids.filter((x): x is number => Number.isInteger(x) && (x as number) > 0))]
+    if (buenos.length > 0) out[empleado] = buenos
+  }
+  return out
+}
+
 /** Los que se pintan y cuántos quedan fuera por el límite. */
 export function limitar<T>(lista: T[], limite: Limite): { visibles: T[]; ocultos: number } {
   if (limite === 0 || lista.length <= limite) return { visibles: lista, ocultos: 0 }

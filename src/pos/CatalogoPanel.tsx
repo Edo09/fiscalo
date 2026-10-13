@@ -3,6 +3,8 @@
 // La foto (o las iniciales) va grande y centrada; con el producto en la venta,
 // sobre el borde de la tarjeta: arriba a la derecha el − y el contador, arriba a
 // la izquierda el botón que lo quita de la venta.
+// La estrella (arriba a la izquierda, junto a la foto) marca el producto como
+// favorito del empleado: los favoritos van primero (favoritos.ts).
 // La búsqueda es en memoria y, mientras hay texto, busca en todas las categorías.
 // Vista (tarjetas, compacta, lista), orden y cuántos se pintan son preferencia
 // del equipo (catalogoVista.ts). Con muchas categorías, "Todas" las despliega.
@@ -15,8 +17,9 @@ import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
 import {
-  cargarPreferencias, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS, type PreferenciasCatalogo,
+  cargarPreferencias, favoritosPrimero, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, VISTAS, type PreferenciasCatalogo,
 } from './catalogoVista'
+import { useFavoritos, useFavoritosStore } from './favoritos'
 import { SelectorCaja } from './SelectorCaja'
 
 interface Props {
@@ -44,6 +47,8 @@ interface Props {
   onQuitar: (p: ProductoPos) => void
   /** Cobro sin confirmar: la venta no se puede cambiar hasta reintentarlo. */
   bloqueado?: boolean
+  /** Dueño de los favoritos (la estrella): el empleado en sesión. */
+  empleadoId: number
 }
 
 const SIN_CATEGORIA = '#7a8699'
@@ -78,8 +83,10 @@ function Existencia({ p }: { p: ProductoPos }) {
 
 export function CatalogoPanel({
   catalogo, error, onReintentar, onRecargar, recargando, recargado, busqueda, onBusqueda, categoria, onCategoria,
-  buscadorRef, enCarrito, onAgregar, onQuitarUno, onQuitar, bloqueado = false,
+  buscadorRef, enCarrito, onAgregar, onQuitarUno, onQuitar, bloqueado = false, empleadoId,
 }: Props) {
+  const favoritos = useFavoritos(empleadoId)
+  const alternarFavorito = useFavoritosStore((s) => s.alternar)
   const colores = useMemo(() => {
     const m = new Map<number, string>()
     // El color elegido en app.* (Categorías) o, sin elegir, el calculado del nombre.
@@ -88,7 +95,9 @@ export function CatalogoPanel({
   }, [catalogo])
   const [prefs, setPrefs] = useState<PreferenciasCatalogo>(cargarPreferencias)
   useEffect(() => { guardarPreferencias(prefs) }, [prefs])
-  const productos = useMemo(() => ordenar(filtrar(catalogo, busqueda, categoria), prefs.orden), [catalogo, busqueda, categoria, prefs.orden])
+  // Favoritos primero, y antes del límite: nunca quedan fuera de la grilla.
+  const productos = useMemo(() => favoritosPrimero(ordenar(filtrar(catalogo, busqueda, categoria), prefs.orden), favoritos),
+    [catalogo, busqueda, categoria, prefs.orden, favoritos])
   const { visibles, ocultos } = limitar(productos, prefs.limite)
   const buscando = busqueda.trim() !== ''
 
@@ -227,44 +236,60 @@ export function CatalogoPanel({
             </p>
           </div>
         ) : (
-          visibles.map((p) => {
-            const cant = enCarrito.get(p.id) ?? 0
-            const agotado = p.stock !== null && p.stock <= 0
-            // Los botones van fuera de la tarjeta (un botón no puede ir dentro de
-            // otro), montados sobre su borde en las esquinas de arriba; la grilla
-            // deja aire alrededor para que no se monten sobre la vecina.
-            return (
-              <div key={p.id} className="pos-producto-celda">
-                <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
-                  onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
-                  <span className="pos-producto-top">
-                    <Marca key={p.imagen ?? ''} p={p} color={p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA} />
-                  </span>
-                  <span className="pos-producto-nombre">{p.nombre}</span>
-                  {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
-                  <span className="pos-producto-pie">
-                    <b className="pos-producto-precio"><span className="pos-moneda">RD$</span>{formatoCentavos(p.precio_centavos)}</b>
-                    <Existencia p={p} />
-                  </span>
-                </button>
-                {cant > 0 && (
-                  <>
-                    <button type="button" className="pos-producto-quitar" onClick={() => onQuitar(p)} disabled={bloqueado}
-                      aria-label={`Quitar ${p.nombre} de la venta`} title="Quitar de la venta">
-                      <Icon name="trash-2" size={16} />
+          // Favoritos y resto en dos grupos (display: contents: siguen en la misma
+          // grilla). Marcar una estrella pasa esa tarjeta de un grupo al otro y no
+          // mueve las demás en el DOM: moverlas repetía su animación de entrada.
+          [visibles.filter((p) => favoritos.has(p.id)), visibles.filter((p) => !favoritos.has(p.id))].map((grupo, g) => (
+            <div key={g === 0 ? 'favoritos' : 'resto'} className="pos-grilla-grupo">
+              {grupo.map((p) => {
+                const cant = enCarrito.get(p.id) ?? 0
+                const agotado = p.stock !== null && p.stock <= 0
+                const fav = favoritos.has(p.id)
+                // Los botones van fuera de la tarjeta (un botón no puede ir dentro de
+                // otro), montados sobre su borde en las esquinas de arriba; la grilla
+                // deja aire alrededor para que no se monten sobre la vecina.
+                return (
+                  <div key={p.id} className="pos-producto-celda">
+                    <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
+                      onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
+                      <span className="pos-producto-top">
+                        <Marca key={p.imagen ?? ''} p={p} color={p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA} />
+                      </span>
+                      <span className="pos-producto-nombre">{p.nombre}</span>
+                      {p.sku && <span className="pos-producto-sku">{p.sku}</span>}
+                      <span className="pos-producto-pie">
+                        <b className="pos-producto-precio"><span className="pos-moneda">RD$</span>{formatoCentavos(p.precio_centavos)}</b>
+                        <Existencia p={p} />
+                      </span>
                     </button>
-                    <span className="pos-producto-paso">
-                      <button type="button" className="pos-producto-menos" onClick={() => onQuitarUno(p)} disabled={bloqueado}
-                        aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
-                        <Icon name="minus" size={17} />
-                      </button>
-                      <span key={cant} className="pos-producto-cant">×{fmtCantidad(cant)}</span>
-                    </span>
-                  </>
-                )}
-              </div>
-            )
-          })
+                    {/* Fuera de la tarjeta (un botón no va dentro de otro), sobre ella junto a la foto.
+                        Marcarla no toca la venta: vale también con un cobro sin confirmar. */}
+                    <button type="button" className={'pos-producto-estrella' + (fav ? ' on' : '')} aria-pressed={fav}
+                      onClick={() => alternarFavorito(empleadoId, p.id)}
+                      aria-label={fav ? `Quitar ${p.nombre} de favoritos` : `Marcar ${p.nombre} como favorito`}
+                      title={fav ? 'Quitar de favoritos' : 'Marcar como favorito'}>
+                      <Icon key={String(fav)} name="star" size={18} />
+                    </button>
+                    {cant > 0 && (
+                      <>
+                        <button type="button" className="pos-producto-quitar" onClick={() => onQuitar(p)} disabled={bloqueado}
+                          aria-label={`Quitar ${p.nombre} de la venta`} title="Quitar de la venta">
+                          <Icon name="trash-2" size={16} />
+                        </button>
+                        <span className="pos-producto-paso">
+                          <button type="button" className="pos-producto-menos" onClick={() => onQuitarUno(p)} disabled={bloqueado}
+                            aria-label={cant > 1 ? `Quitar una unidad de ${p.nombre}` : `Quitar ${p.nombre} de la venta`}>
+                            <Icon name="minus" size={17} />
+                          </button>
+                          <span key={cant} className="pos-producto-cant">×{fmtCantidad(cant)}</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ))
         )}
         {ocultos > 0 && (
           <div className="pos-grilla-mas">
