@@ -55,5 +55,5 @@ igual('con varios rangos manda el Hasta más alto',
   'El número «Desde» tiene que ser mayor que 200, que es el último ya usado o autorizado para E32.')
 igual('sin rangos cargados: se acepta', problemaConExistentes([], 'E31', 1, 100), null)
 
-console.log(`\n${total - fallos} de ${total} pruebas OK`)
-process.exit(fallos === 0 ? 0 : 1)
+console.log(`\n${total - fallos}/${total} OK`)
+if (fallos > 0) process.exit(1)

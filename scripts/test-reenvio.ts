@@ -50,5 +50,5 @@ chk('la tarjeta de NO_ENCONTRADO no llama rechazo a lo que no lo es',
   !/rechaz/i.test(TITULO_NO_ENCONTRADO) && !/rechaz/i.test(TEXTO_NO_ENCONTRADO))
 chk('y su estado se ve "Pendiente" en el listado, como hasta ahora', dgiiLabel('NO_ENCONTRADO') === 'Pendiente')
 
-console.log(`\n${total - fallos} de ${total} pruebas OK`)
-process.exit(fallos === 0 ? 0 : 1)
+console.log(`\n${total - fallos}/${total} OK`)
+if (fallos > 0) process.exit(1)
