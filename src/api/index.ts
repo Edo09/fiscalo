@@ -63,7 +63,7 @@ export { listUbicaciones } from './ubicaciones'
 export { listAjustes, getAjuste, crearAjuste, anularAjuste, listMovimientos, getValorInventario } from './inventario'
 export { listUsers, getUser, createUser, updateUser, deleteUser } from './users'
 export { listRoles, getRole, createRole, updateRole, deleteRole, assignUserRole } from './roles'
-export { getStats } from './stats'
+export { getStats, getAvisosEcf } from './stats'
 export {
   getReporte606Preview, downloadReporte606,
   getReporte607Preview, downloadReporte607,

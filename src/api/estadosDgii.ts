@@ -60,3 +60,17 @@ export function isRechazo(raw?: string | null): boolean {
 export function isEnVuelo(raw?: string | null): boolean {
   return (ESTADOS_EN_VUELO as readonly string[]).includes(raw ?? '')
 }
+
+/**
+ * Estados desde los que la app deja usar "Reenviar a la DGII" (POST
+ * /api/facturas/{id}/reenviar): solo un comprobante que la DGII rechazó o no
+ * encontró. Uno sin confirmar (en vuelo, ENVIADO, EN_PROCESO) NUNCA se reenvía
+ * desde la app: lo resuelve soporte o, en el POS, el reenvío automático. Mismos
+ * estados que handleReenviar en la API.
+ */
+export const ESTADOS_REENVIABLES = ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO'] as const
+
+/** ¿Se puede ofrecer "Reenviar a la DGII" para este estado? */
+export function puedeReenviarEstado(raw?: string | null): boolean {
+  return (ESTADOS_REENVIABLES as readonly string[]).includes(raw ?? '')
+}

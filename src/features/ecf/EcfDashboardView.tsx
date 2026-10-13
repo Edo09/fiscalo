@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Icon, Btn, Money, Badge, Card, Progress, Spinner, ErrorState, PageHead, type IconName } from '@/components/ui'
-import { getStats, formatApiDate } from '@/api'
+import { getStats, getAvisosEcf, formatApiDate } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
 import { RangosNcfModal } from './RangosNcfModal'
 import { contarSinConfirmar } from '@/features/invoices/enVuelo'
+import { listarAvisos } from './avisosEcf'
 import type { Nav } from '@/config/navigation'
 
 /* FISCALO — Dashboard e-CF (GET /api/facturas/stats) */
@@ -12,6 +13,10 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const d = stats.data
   const [rangosOpen, setRangosOpen] = useState(false)
+  // Avisos para el administrador (certificado, secuencias, ventas sin rango). Si
+  // la consulta falla, simplemente no hay banner: no estorba al resto del panel.
+  const avisos = useApiQuery(['facturas', 'avisos'], () => getAvisosEcf())
+  const listaAvisos = listarAvisos(avisos.data)
 
   const totalAceptados = d?.por_estado.filter((e) => e.estado.includes('ACEPTADO')).reduce((a, e) => a + e.total, 0) ?? 0
   const totalEnProceso = d?.por_estado.filter((e) => e.estado === 'ENVIADO' || e.estado === 'EN_PROCESO').reduce((a, e) => a + e.total, 0) ?? 0
@@ -50,6 +55,26 @@ export function EcfDashboardView({ nav }: { nav: Nav }) {
         <ErrorState title="No se pudieron cargar las estadísticas" onRetry={stats.reload}>{stats.error}</ErrorState>
       ) : (
         <>
+          {listaAvisos.length > 0 && (
+            <div className="col gap-sm" style={{ marginBottom: 14 }}>
+              {listaAvisos.map((a) => (
+                <div key={a.clave} role="alert" className="card card-pad row gap-sm between"
+                  style={{ background: a.tono === 'danger' ? 'var(--danger-soft)' : 'var(--warning-soft)', borderColor: 'transparent' }}>
+                  <div className="row gap-sm" style={{ alignItems: 'flex-start' }}>
+                    <Icon name={a.icono} size={16}
+                      style={{ color: a.tono === 'danger' ? 'var(--danger)' : 'var(--warning)', flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <div className="fw6 text-sm">{a.titulo}</div>
+                      <div className="text-sm mt-sm">{a.detalle}</div>
+                    </div>
+                  </div>
+                  {a.accionRangos && (
+                    <Btn variant="secondary" size="sm" icon="hash" onClick={() => setRangosOpen(true)}>Rangos</Btn>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="dash-grid">
             <div className="col gap-md">
             {/* KPIs compactos al lado de Secuencias: el total ocupa la primera

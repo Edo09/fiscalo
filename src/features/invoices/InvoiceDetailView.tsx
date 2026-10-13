@@ -16,6 +16,7 @@ import { imprimirRecibo } from './imprimirRecibo'
 import { lineaQueCuadra, r2, type ItemFirmado } from './montosLinea'
 import { anuladaPor, filasRelacionadas } from './notasVinculadas'
 import { textoPieDocumento, textoTarjetaEnVuelo } from './enVuelo'
+import { puedeReenviarEstado } from '@/api/estadosDgii'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { staleTimeFor } from '@/config/cache'
 import type { Nav } from '@/config/navigation'
@@ -250,10 +251,10 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
   const rechazado = isRechazo(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
-  // Mismas condiciones que el backend (handleReenviar): rechazado sin archivar y
-  // con la secuencia sin consumir (o sin la bandera, que se trata igual).
-  const puedeReenviar = ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO'].includes(estadoRaw ?? '')
-    && estadoData?.secuencia_utilizada !== true
+  // Mismas condiciones que el backend (handleReenviar): solo un comprobante que
+  // la DGII rechazó, sin archivar y con la secuencia sin consumir (o sin la
+  // bandera, que se trata igual). Uno sin confirmar nunca se reenvía desde la app.
+  const puedeReenviar = puedeReenviarEstado(estadoRaw) && estadoData?.secuencia_utilizada !== true
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.

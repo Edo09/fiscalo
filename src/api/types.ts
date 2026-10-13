@@ -542,6 +542,28 @@ export interface StatsData {
 }
 
 // ---------------------------------------------------------------------------
+// Avisos del e-CF para quien administra — GET /api/facturas/avisos
+// ---------------------------------------------------------------------------
+
+export interface AvisoSecuencia {
+  /** 'E31'. */
+  tipo: string
+  ambiente: string
+  /** Números libres en los rangos vigentes; 0 si está agotada. */
+  restantes: number | null
+  /** pocos: 50 o menos libres. agotada: ya no hay. */
+  estado: 'pocos' | 'agotada'
+}
+
+export interface AvisosEcf {
+  /** Ventas del POS de hoy que salieron como factura simple porque el e-CF no se pudo generar. */
+  certificado_fallo: { ventas_hoy: number }
+  secuencias: AvisoSecuencia[]
+  /** Ventas del POS con el número siguiente al último de su rango, sin enviar: esperan un rango autorizado. */
+  sin_rango: { ventas: number }
+}
+
+// ---------------------------------------------------------------------------
 // Clientes — esquema gratexdb.clients
 // ---------------------------------------------------------------------------
 

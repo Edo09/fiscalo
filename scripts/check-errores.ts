@@ -4,7 +4,7 @@
 //
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/check-errores.ts
-import { dgiiLabel, isEnVuelo, isRechazo } from '../src/api/estadosDgii.ts'
+import { ESTADOS_EN_VUELO, dgiiLabel, isEnVuelo, isRechazo, puedeReenviarEstado } from '../src/api/estadosDgii.ts'
 import { clasificar, humanizar, networkError } from '../src/api/errores.ts'
 import type { EstadoDgii } from '../src/api/types.ts'
 import {
@@ -56,6 +56,19 @@ igual('isEnVuelo: solo PENDIENTE_ENVIO y ENVIO_INCIERTO',
 igual('isRechazo no cambia: RECHAZADO, RECHAZADO_ARCHIVADO y RFCE_RECHAZADO',
   ['RECHAZADO', 'RECHAZADO_ARCHIVADO', 'RFCE_RECHAZADO', 'ENVIO_INCIERTO', 'NO_ENCONTRADO_ARCHIVADO'].map(isRechazo),
   [true, true, true, false, false])
+
+// Reenviar a la DGII (decisión U7): solo un comprobante RECHAZADO o NO_ENCONTRADO,
+// sin archivar. Uno sin confirmar (en vuelo, ENVIADO, EN_PROCESO) NUNCA se
+// reenvía desde la app: lo resuelve soporte o, en el POS, el reenvío automático.
+igual('puedeReenviarEstado: solo RECHAZADO, RFCE_RECHAZADO y NO_ENCONTRADO',
+  [
+    'RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO',
+    'PENDIENTE_ENVIO', 'ENVIO_INCIERTO', 'ENVIADO', 'EN_PROCESO', 'RFCE_ENVIADO', 'RFCE_EN_PROCESO',
+    'ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO', 'ERROR', 'RECHAZADO_ARCHIVADO', 'NO_ENCONTRADO_ARCHIVADO',
+    null, undefined, '',
+  ].map(puedeReenviarEstado),
+  [true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false])
+chk('un comprobante en vuelo nunca se reenvía desde la app', ESTADOS_EN_VUELO.every((e) => !puedeReenviarEstado(e)))
 
 // --- Textos de la emisión (src/api/errores.ts) -------------------------------
 // Copias LITERALES de textos del servidor. Si uno cambia allá, se cambia aquí:

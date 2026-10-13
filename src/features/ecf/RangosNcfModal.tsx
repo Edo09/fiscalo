@@ -87,6 +87,7 @@ export function RangosNcfModal({ onClose }: { onClose: () => void }) {
       // El próximo e-NCF y los restantes cambian: invalidar rangos y stats.
       void queryClient.invalidateQueries({ queryKey: ['ncf'] })
       void queryClient.invalidateQueries({ queryKey: ['facturas', 'stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['facturas', 'avisos'] })
       void queryClient.invalidateQueries({ queryKey: ['gastos', 'stats'] })
       setFormOpen(false)
       setDesde(''); setHasta(''); setVenc(''); setSolicitud(''); setAutorizacion('')
