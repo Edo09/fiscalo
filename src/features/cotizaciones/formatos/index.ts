@@ -7,11 +7,12 @@
 // expuesto en GET /api/branding) y el de una cotización guardada, su columna
 // `formato`. Este registro solo dice qué formulario va con cada uno.
 //
-// Un formato nuevo: su carpeta aquí, una entrada en FormatoId y en FORMATOS, y
-// su clase en api-gratex src/Utils/Cotizacion/ (CotizacionFormatos). El editor
-// lo toma de este registro, pero el listado no: CotizacionesView elige las
-// columnas y las acciones de cada fila por formato, y una fila de un formato
-// que no esté allí sale con el Facturar de Gratex (precios con ITBIS incluido).
+// Un formato nuevo: su carpeta aquí, una entrada en FormatoId (formatoId.ts) y
+// en FORMATOS, y su clase en api-gratex src/Utils/Cotizacion/
+// (CotizacionFormatos). El editor lo toma de este registro, pero el listado
+// no: CotizacionesView elige las columnas, y AccionesCotizacion las acciones
+// de cada fila por formato; una fila de un formato que no esté allí sale con
+// el Facturar de Gratex (precios con ITBIS incluido).
 // Los pasos completos: api-gratex docs/modules/cotizaciones-formatos.md,
 // "Agregar un formato para un tenant nuevo".
 import type { ComponentType } from 'react'
@@ -20,8 +21,9 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import type { Nav } from '@/config/navigation'
 import { CotizacionFormView } from '../CotizacionFormView'
 import { FerreteriaCotizacionForm } from './ferreteria/FerreteriaCotizacionForm'
+import { esFormato, type FormatoId } from './formatoId'
 
-export type FormatoId = 'gratex' | 'ferreteria'
+export { esFormato, formatoDeFila, type FormatoId } from './formatoId'
 
 export interface CotizacionFormatoUI {
   id: FormatoId
@@ -33,21 +35,6 @@ export const FORMATOS: Record<FormatoId, CotizacionFormatoUI> = {
   // El formulario de siempre, sin tocar: Gratex no cambia con este registro.
   gratex: { id: 'gratex', Form: CotizacionFormView },
   ferreteria: { id: 'ferreteria', Form: FerreteriaCotizacionForm },
-}
-
-/** ¿Es un formato que esta versión del front sabe mostrar? */
-export function esFormato(x: unknown): x is FormatoId {
-  return typeof x === 'string' && Object.prototype.hasOwnProperty.call(FORMATOS, x)
-}
-
-/**
- * Formato de una cotización guardada. Las filas de antes de la migración 026
- * no traen `formato` (o lo traen en null): son de Gratex. Uno desconocido
- * (un backend más nuevo que este front) también cae en Gratex.
- */
-export function formatoDeFila(row: { formato?: string | null } | null | undefined): FormatoId {
-  const f = row?.formato
-  return esFormato(f) ? f : 'gratex'
 }
 
 /**

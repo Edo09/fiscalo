@@ -15,7 +15,7 @@
 // sesión main.tsx vacía la caché, y AppShell vuelve a montar este observador.
 import { getBranding } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { esFormato, type FormatoId } from './index'
+import { esFormato, type FormatoId } from './formatoId'
 
 export function useFormatoTenant(): { formato: FormatoId | null; error: boolean; reintentar: () => void } {
   const { data, error, errorStatus, reload } = useApiQuery(['branding'], getBranding, {

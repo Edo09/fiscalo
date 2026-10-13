@@ -7,11 +7,13 @@ export type Vista = 'tarjetas' | 'compacta' | 'lista'
 export type Orden = 'nombre' | 'precio_asc' | 'precio_desc' | 'codigo' | 'existencia'
 /** 0 = todos. */
 export type Limite = 200 | 300 | 500 | 0
+/** Lo que elige "Mostrar": cuántos se pintan, o solo los favoritos del empleado (sin límite). */
+export type Mostrar = Limite | 'favoritos'
 
 export interface PreferenciasCatalogo {
   vista: Vista
   orden: Orden
-  limite: Limite
+  limite: Mostrar
 }
 
 export const VISTAS: { valor: Vista; nombre: string; icono: 'layout-grid' | 'grid-3x3' | 'list' }[] = [
@@ -29,7 +31,7 @@ export interface OpcionSelector<T extends string | number> {
   corto: string
   detalle?: string
   glifo?: string
-  icono?: 'trending-up' | 'trending-down' | 'hash' | 'package' | 'layers'
+  icono?: 'trending-up' | 'trending-down' | 'hash' | 'package' | 'layers' | 'star'
 }
 
 export const ORDENES: OpcionSelector<Orden>[] = [
@@ -39,7 +41,8 @@ export const ORDENES: OpcionSelector<Orden>[] = [
   { valor: 'codigo', nombre: 'Código', corto: 'Código', detalle: 'Por SKU; los que no tienen, al final', icono: 'hash' },
   { valor: 'existencia', nombre: 'Existencia: menor primero', corto: 'Existencia', detalle: 'Lo que se está acabando arriba', icono: 'package' },
 ]
-export const LIMITES: OpcionSelector<Limite>[] = [
+export const LIMITES: OpcionSelector<Mostrar>[] = [
+  { valor: 'favoritos', nombre: 'Favoritos', corto: 'Favoritos', detalle: 'Solo los que marcaste con la estrella', icono: 'star' },
   { valor: 200, nombre: '200 productos', corto: '200', detalle: 'Por defecto: rápido en cualquier PC', glifo: '200' },
   { valor: 300, nombre: '300 productos', corto: '300', glifo: '300' },
   { valor: 500, nombre: '500 productos', corto: '500', glifo: '500' },
@@ -62,7 +65,7 @@ export function leerPreferencias(texto: string | null): PreferenciasCatalogo {
   return {
     vista: VISTAS.some((x) => x.valor === crudo.vista) ? crudo.vista as Vista : d.vista,
     orden: ORDENES.some((x) => x.valor === crudo.orden) ? crudo.orden as Orden : d.orden,
-    limite: LIMITES.some((x) => x.valor === crudo.limite) ? crudo.limite as Limite : d.limite,
+    limite: LIMITES.some((x) => x.valor === crudo.limite) ? crudo.limite as Mostrar : d.limite,
   }
 }
 
@@ -118,6 +121,11 @@ export function favoritosPrimero(lista: ProductoPos[], favoritos: ReadonlySet<nu
   return [...lista.filter((p) => favoritos.has(p.id)), ...lista.filter((p) => !favoritos.has(p.id))]
 }
 
+/** Mostrar → Favoritos: solo los marcados, en el orden que traen. */
+export function soloFavoritos(lista: ProductoPos[], favoritos: ReadonlySet<number>): ProductoPos[] {
+  return lista.filter((p) => favoritos.has(p.id))
+}
+
 /** Marca o desmarca un producto. */
 export function alternarFavorito(ids: readonly number[], id: number): number[] {
   return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
@@ -143,7 +151,7 @@ export function leerFavoritos(texto: string | null): Record<string, number[]> {
 }
 
 /** Los que se pintan y cuántos quedan fuera por el límite. */
-export function limitar<T>(lista: T[], limite: Limite): { visibles: T[]; ocultos: number } {
-  if (limite === 0 || lista.length <= limite) return { visibles: lista, ocultos: 0 }
+export function limitar<T>(lista: T[], limite: Mostrar): { visibles: T[]; ocultos: number } {
+  if (limite === 0 || limite === 'favoritos' || lista.length <= limite) return { visibles: lista, ocultos: 0 }
   return { visibles: lista.slice(0, limite), ocultos: lista.length - limite }
 }

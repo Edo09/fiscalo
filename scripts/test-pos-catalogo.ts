@@ -5,7 +5,8 @@
 //   node scripts/test-pos-catalogo.ts
 import type { ProductoPos } from '../src/pos/api.ts'
 import {
-  alternarFavorito, favoritosPrimero, leerFavoritos, leerPreferencias, limitar, ordenar, PREFERENCIAS_POR_DEFECTO,
+  alternarFavorito, favoritosPrimero, leerFavoritos, leerPreferencias, limitar, LIMITES, ordenar, PREFERENCIAS_POR_DEFECTO,
+  soloFavoritos,
 } from '../src/pos/catalogoVista.ts'
 
 let fallos = 0
@@ -75,6 +76,13 @@ chk('leer lo guardado: descarta ids que no son enteros positivos y repetidos',
 const raro = leerFavoritos('{"__proto__":[5],"x":[6],"9":[7]}')
 chk('claves que no son ids de empleado ("__proto__", "x") se ignoran', JSON.stringify(raro) === '{"9":[7]}'
   && Object.getPrototypeOf(raro) === Object.prototype, raro)
+
+console.log('Mostrar: solo favoritos')
+chk('"Favoritos" es la primera opción de Mostrar', LIMITES[0].valor === 'favoritos' && LIMITES.slice(1).map((o) => o.valor).join() === '200,300,500,0')
+chk('solo favoritos: deja los marcados, en el orden que traen', ids(soloFavoritos(porNombre, new Set([6, 1]))) === '1,6')
+chk('solo favoritos sin ninguno marcado: vacío', soloFavoritos(porNombre, new Set()).length === 0)
+chk('con "Favoritos" no hay límite (son pocos y se quieren todos)', limitar(mil, 'favoritos').ocultos === 0 && limitar(mil, 'favoritos').visibles.length === 1000)
+chk('"Favoritos" guardado en Mostrar se respeta', leerPreferencias('{"limite":"favoritos"}').limite === 'favoritos')
 
 console.log('Preferencias del equipo')
 chk('sin nada guardado: tarjetas, por nombre, 200', JSON.stringify(leerPreferencias(null)) === JSON.stringify(PREFERENCIAS_POR_DEFECTO)

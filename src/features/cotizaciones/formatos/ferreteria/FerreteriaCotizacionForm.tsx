@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Icon, Btn, Money, Spinner } from '@/components/ui'
 import {
   ApiError, createCotizacion, updateCotizacion, deleteCotizacion, previewCotizacion,
-  getCotizacion, getClient, getBranding, getEmisor, mapClientRow,
+  getCotizacion, getCotizacionPdf, getClient, getBranding, getEmisor, mapClientRow,
 } from '@/api'
 import type { CotizacionRow, IndicadorFacturacion } from '@/api'
 import { NewClientModal } from '@/features/clients/NewClientModal'
@@ -28,7 +28,12 @@ import {
 } from './schema'
 import { BloqueCliente } from './BloqueCliente'
 import { DescripcionLinea } from './DescripcionLinea'
-import { clienteDeFila, formatearRnc, lineaDesdeProducto, lineaLibre, lineasDeFila, siguienteId } from './lineas'
+import { clienteDeFila, formatearRnc, lineaDesdeProducto, lineaLibre, lineasDeFila } from './lineas'
+import { cambiosLineas, fotoLineas, idNuevo, idParaFilaEnBlanco } from './cambios'
+import { AccionesEdicion } from './AccionesEdicion'
+import { TEXTOS_COTIZACION, imprimirGuardado } from './imprimirGuardado'
+import { AccionesCotizacion } from '../../AccionesCotizacion'
+import { usePermisosCotizacion } from '../../permisosCotizacion'
 import '@/styles/factura-doc.css'
 
 /* FISCALO — Cotización con el formato de Ferretería (spec 8.1).
@@ -72,30 +77,33 @@ function ajustesDeFila(row: CotizacionRow): AjustesFerreteriaForm {
 }
 
 /**
- * Lo que cuenta como "cambio" al editar, en una sola cadena: se compara con la
- * foto que se toma al cargar. Si el usuario devuelve un campo a como estaba,
- * deja de contar.
+ * La cotización tal como se cargó. Contra ella se marca, campo por campo, lo
+ * que se tocó (como en la factura simple); si el usuario devuelve un campo a
+ * como estaba, deja de contar.
  */
-function huella(
-  clienteId: string | null, libre: string, fecha: string, lineas: LineaFerreteriaForm[], ajustes: AjustesFerreteriaForm,
-): string {
-  return JSON.stringify([
-    clienteId, libre.trim(), fecha, ajustes,
-    lineas.map((l) => [l.prodId, l.descripcion, l.cantidad, l.precio, l.indFact, l.unidadMedida, l.tipoItem]),
-  ])
+interface FotoCotizacion {
+  clienteId: string | null
+  fecha: string
+  ajustes: AjustesFerreteriaForm
+  /** Solo las líneas con contenido (ver fotoLineas). */
+  lineas: LineaFerreteriaForm[]
 }
+
+const CLAVES_AJUSTES = Object.keys(SIN_AJUSTES) as (keyof AjustesFerreteriaForm)[]
 
 /** 409: el formato del tenant ya no es este (pantalla vieja). Nada de lo que se haga aquí se puede guardar. */
 const esDesactualizada = (e: unknown): e is ApiError => e instanceof ApiError && e.status === 409
 
 /** Un monto del grupo "Cargos y abonos": etiqueta a la izquierda y el campo donde va la cifra. */
 function CampoAjuste({
-  id, label, value, error, onValue,
+  id, label, value, error, cambiado, onValue,
 }: {
   id: string
   label: string
   value: number
   error?: string
+  /** Difiere de lo guardado: se marca como los demás campos tocados. */
+  cambiado?: boolean
   onValue: (v: number) => void
 }) {
   return (
@@ -104,7 +112,7 @@ function CampoAjuste({
         <label htmlFor={id}>{label}</label>
         <input
           id={id}
-          className={'fx-field fx-num fx-ajuste-monto' + (error ? ' fx-field--err' : '')}
+          className={'fx-field fx-num fx-ajuste-monto' + (cambiado ? ' fx-mod' : '') + (error ? ' fx-field--err' : '')}
           type="number" min={0} step="0.01" inputMode="decimal"
           value={value}
           onChange={(e) => onValue(+e.target.value || 0)}
@@ -144,8 +152,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   const [desactualizada, setDesactualizada] = useState<string | null>(null)
   /** Al editar: ya se volcó la fila en el formulario. */
   const [listo, setListo] = useState(!editando)
-  /** Foto del documento tal como se cargó (ver huella); null = nueva o sin cargar. */
-  const [original, setOriginal] = useState<string | null>(null)
+  /** Foto del documento tal como se cargó (ver FotoCotizacion); null = nueva o sin cargar. */
+  const [original, setOriginal] = useState<FotoCotizacion | null>(null)
 
   // --- Emisor: el membrete del papel, igual que en la factura ---
   const { data: emisor } = useApiQuery(['emisor'], getEmisor)
@@ -154,6 +162,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   const contactoEmisor = [emisor?.telefono, emisor?.correo].filter(Boolean).join(' · ')
   // Qué unidades admiten fracciones (metro, kilo) y cuáles se cuentan enteras.
   const unidades = useUnidadesMedida()
+  // PDF, Conduce y Facturar de la cotización guardada (las mismas del listado).
+  const permisos = usePermisosCotizacion()
 
   // --- Carga al editar ---
   // Misma clave que CotizacionEditor: la fila ya está en la caché.
@@ -177,7 +187,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     setFechaGuardada(dia)
     setCliente(cli)
     setClienteCompleto(cli == null)
-    setOriginal(huella(cli?.id ?? null, '', dia || hoyLocal(), ls, aj))
+    setOriginal({ clienteId: cli?.id ?? null, fecha: dia || hoyLocal(), ajustes: aj, lineas: fotoLineas(ls, lineaEnBlanco) })
     setListo(true)
   }, [detalle.data])
 
@@ -209,9 +219,17 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   // esconder, porque cambian el TOTAL.
   const ajustesVisibles = ajustesAbiertos || hayAjustes
 
+  // --- Qué se tocó respecto a la cotización cargada (como la factura simple) ---
+  // Una nueva no tiene foto: nada sale marcado y hayCambios es false.
+  const cambios = cambiosLineas(original?.lineas ?? null, lineas, lineaEnBlanco)
+  const clienteCambiado = original != null && ((cliente?.id ?? null) !== original.clienteId || clienteLibre.trim() !== '')
+  const fechaCambiada = original != null && fecha !== original.fecha
+  const ajusteCambiado = (k: keyof AjustesFerreteriaForm) => original != null && ajustes[k] !== original.ajustes[k]
+  const hayCambios = clienteCambiado || fechaCambiada || CLAVES_AJUSTES.some(ajusteCambiado) || cambios.hayCambios
+  const marca = (cond: boolean) => (cond ? ' fx-mod' : '')
+
   // --- Salir sin guardar ---
   // Una nueva avisa en cuanto tiene algo escrito; una existente, cuando se tocó algo.
-  const hayCambios = original != null && huella(cliente?.id ?? null, clienteLibre, fecha, lineas, ajustes) !== original
   const hayAlgoEscrito = cliente != null || clienteLibre.trim() !== '' || enUso.length > 0 || hayAjustes
   const salida = useAvisoSalida(
     editando ? hayCambios : hayAlgoEscrito,
@@ -250,7 +268,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     quitarErrLinea(id)
   }
   const addLineaLibre = () => {
-    setLineas((ls) => [...ls, lineaLibre(siguienteId(ls))])
+    // idNuevo: nunca el id de una línea guardada, o la nueva pasaría por esa, editada.
+    setLineas((ls) => [...ls, lineaLibre(idNuevo(ls, original?.lineas ?? null))])
     quitarErrForm()
   }
   /**
@@ -262,8 +281,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
       return ultima && lineaEnBlanco(ultima)
-        ? [...ls.slice(0, -1), lineaDesdeProducto(p, ultima.id)]
-        : [...ls, lineaDesdeProducto(p, siguienteId(ls))]
+        ? [...ls.slice(0, -1), lineaDesdeProducto(p, idParaFilaEnBlanco(ultima, ls, original?.lineas ?? null))]
+        : [...ls, lineaDesdeProducto(p, idNuevo(ls, original?.lineas ?? null))]
     })
     quitarErrForm()
   }
@@ -304,21 +323,42 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     return cuerpoFerreteria({ clienteId: Number(cliente.id), lineas: enUso, ajustes, date })
   }
 
-  // Acción única: un doble clic crearía la misma cotización dos veces (y gastaría dos números).
-  const guardar = useAccionUnica(async () => {
+  // El guardado sigue aunque la pantalla se cierre a mitad (p. ej. la sesión
+  // venció): en ese caso no debe navegar ni imprimir desde una vista que ya no está.
+  const montado = useRef(false)
+  useEffect(() => {
+    montado.current = true
+    return () => { montado.current = false }
+  }, [])
+
+  /**
+   * Acción única: un doble clic crearía la misma cotización dos veces (y
+   * gastaría dos números). Guardar e imprimir comparten el candado porque
+   * imprimir también guarda.
+   *
+   * Como en la factura simple: guarda, vuelve al listado y, si se pidió,
+   * imprime la cotización ya guardada (nunca lo que hay en pantalla).
+   *
+   * @param imprimir true = mandar a imprimir (hoja carta) al terminar.
+   */
+  const guardar = useAccionUnica(async (imprimir: boolean) => {
     if (desactualizada) return
     const cuerpo = validar()
     if (!cuerpo) return
     setGuardando(true)
+    let id: number | undefined
     try {
       if (cotizacionId != null) {
         await updateCotizacion({ id: cotizacionId, ...cuerpo })
+        id = cotizacionId
         toast.success(`Cotización ${codigo} actualizada.`)
       } else {
         const res = await createCotizacion(cuerpo)
+        id = res?.id
         toast.success(`Cotización ${res.code} creada.`)
       }
       void queryClient.invalidateQueries({ queryKey: ['cotizaciones'] })
+      if (!montado.current) return
       salida.liberar()
       nav('cotizaciones', null, { replace: true })
     } catch (e) {
@@ -326,7 +366,23 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
       if (esDesactualizada(e)) setDesactualizada(e.message)
       else toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la cotización.')
       setGuardando(false)
+      return
     }
+    if (!imprimir) return
+
+    // Ya guardada: si la impresión falla, la cotización queda y se imprime
+    // desde el listado, que es donde ya está el usuario.
+    if (id == null) {
+      // Sin el id no hay de dónde pedir el PDF; la cotización sí quedó.
+      console.warn('[cotización] la respuesta del guardado no trae el id; no se imprime')
+      toast.error(TEXTOS_COTIZACION.guardadoSinImprimir)
+      return
+    }
+    const guardada = id
+    await imprimirGuardado(
+      { pdf: () => getCotizacionPdf(guardada), textos: TEXTOS_COTIZACION },
+      TEXTOS_COTIZACION.guardadoSinImprimir,
+    )
   })
 
   const vistaPrevia = async () => {
@@ -378,7 +434,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
   return (
     <div className="page fx-desk">
-      <div className="row between" style={{ marginBottom: 14 }}>
+      <div className="row between" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('cotizaciones')}>Cotizaciones</Btn>
         {editando && confirmDel ? (
           <span className="row gap-sm" style={{ alignItems: 'center' }}>
@@ -389,9 +445,26 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
             </Btn>
           </span>
         ) : editando ? (
-          <Btn variant="ghost" size="sm" icon="trash-2" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>
-            Eliminar
-          </Btn>
+          // marginLeft auto: si baja sola a otra línea, sigue a la derecha.
+          <span className="row gap-sm" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+            {/* Salen de la cotización GUARDADA: con cambios en pantalla, el PDF,
+                el conduce o la factura no serían lo que el usuario está viendo. */}
+            {listo && detalle.data && (
+              <AccionesCotizacion
+                cotizacion={detalle.data}
+                nav={nav}
+                permisos={permisos}
+                bloqueo={
+                  guardando ? 'Guardando la cotización…'
+                    : hayCambios ? 'Guarda los cambios primero: el PDF, el conduce y la factura salen de la cotización guardada.'
+                      : null
+                }
+              />
+            )}
+            <Btn variant="ghost" size="sm" icon="trash-2" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>
+              Eliminar
+            </Btn>
+          </span>
         ) : null}
       </div>
 
@@ -415,7 +488,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
             <label className="fx-eyebrow" htmlFor="fx-cot-fecha">Fecha</label>
             <input
               id="fx-cot-fecha"
-              className={'fx-field' + (errores.fecha ? ' fx-field--err' : '')}
+              className={'fx-field' + marca(fechaCambiada) + (errores.fecha ? ' fx-field--err' : '')}
               type="date"
               value={fecha}
               onChange={(e) => {
@@ -467,7 +540,12 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
               // fracciones; unidades o cajas se cuentan enteras.
               const enteras = !admiteDecimales(l.unidadMedida, unidades)
               return (
-                <div className={'fx-grid-ecf fx-grid-cot-fer fx-row' + (le ? ' fx-row-incompleta' : '')} key={l.id}>
+                // Agregada en esta edición: barra ámbar. Con error, manda la roja.
+                <div
+                  className={'fx-grid-ecf fx-grid-cot-fer fx-row'
+                    + (le ? ' fx-row-incompleta' : cambios.esNueva(l) ? ' fx-row-nueva' : '')}
+                  key={l.id}
+                >
                   <button
                     type="button"
                     className="fx-gutter"
@@ -480,7 +558,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
                   <div className="fx-cell" data-label="Cant.">
                     <input
-                      className={'fx-field fx-num' + (le?.cantidad ? ' fx-field--err' : '')}
+                      className={'fx-field fx-num' + marca(cambios.campoCambiado(l, 'cantidad')) + (le?.cantidad ? ' fx-field--err' : '')}
                       type="number" min={0}
                       step={enteras ? 1 : 'any'}
                       inputMode={enteras ? 'numeric' : 'decimal'}
@@ -494,7 +572,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
                   <div className="fx-cell" data-label="Unidad">
                     <UnidadMedidaSelect
-                      className={'fx-tasa' + (le?.unidadMedida ? ' fx-tasa--err' : '')}
+                      className={'fx-tasa' + marca(cambios.campoCambiado(l, 'unidadMedida')) + (le?.unidadMedida ? ' fx-tasa--err' : '')}
                       value={l.unidadMedida}
                       onChange={(v) => updLinea(l.id, { unidadMedida: v })}
                     />
@@ -503,7 +581,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
                   <div className="fx-desc">
                     <DescripcionLinea
-                      className={'fx-field fx-desc' + (le?.descripcion ? ' fx-field--err' : '')}
+                      className={'fx-field fx-desc' + marca(cambios.campoCambiado(l, 'descripcion')) + (le?.descripcion ? ' fx-field--err' : '')}
                       value={l.descripcion}
                       onValue={(v) => updLinea(l.id, { descripcion: v })}
                       placeholder="Artículo o trabajo (ej. Fundas de cemento gris)"
@@ -520,7 +598,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
                           <span className="fx-contador">Línea libre ·</span>
                           <button
                             type="button"
-                            className="fx-detalle-toggle fx-detalle-toggle--sec"
+                            className={'fx-detalle-toggle fx-detalle-toggle--sec' + marca(cambios.campoCambiado(l, 'tipoItem'))}
                             onClick={() => updLinea(l.id, { tipoItem: l.tipoItem === 'Bien' ? 'Servicio' : 'Bien' })}
                             title="Cambiar entre bien y servicio (cuenta al facturarla)"
                           >
@@ -538,7 +616,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
 
                   <div className="fx-cell" data-label="Precio">
                     <input
-                      className={'fx-field fx-num' + (le?.precio ? ' fx-field--err' : '')}
+                      className={'fx-field fx-num' + marca(cambios.campoCambiado(l, 'precio')) + (le?.precio ? ' fx-field--err' : '')}
                       type="number" min={0} step="any" inputMode="decimal"
                       value={l.precio}
                       onChange={(e) => updLinea(l.id, { precio: +e.target.value || 0 })}
@@ -549,7 +627,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
                   </div>
 
                   <select
-                    className="fx-tasa fx-cell" data-label="ITBIS"
+                    className={'fx-tasa fx-cell' + marca(cambios.campoCambiado(l, 'indFact'))} data-label="ITBIS"
                     value={l.indFact}
                     onChange={(e) => updLinea(l.id, { indFact: Number(e.target.value) as IndicadorFacturacion })}
                     aria-label={`ITBIS de la línea ${i + 1}`}
@@ -622,17 +700,17 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
                   </div>
                   <CampoAjuste
                     id="fx-aj-cargos" label="Cargos bancarios" value={ajustes.cargosBancarios}
-                    error={errores.ajustes.cargosBancarios} onValue={(v) => updAjuste('cargosBancarios', v)}
+                    error={errores.ajustes.cargosBancarios} cambiado={ajusteCambiado('cargosBancarios')} onValue={(v) => updAjuste('cargosBancarios', v)}
                   />
                   <CampoAjuste
                     id="fx-aj-manejo" label="Manejos de operaciones bancarias" value={ajustes.manejoBancario}
-                    error={errores.ajustes.manejoBancario} onValue={(v) => updAjuste('manejoBancario', v)}
+                    error={errores.ajustes.manejoBancario} cambiado={ajusteCambiado('manejoBancario')} onValue={(v) => updAjuste('manejoBancario', v)}
                   />
                   <CampoAjuste
                     id="fx-aj-mano" label="Costo mano de obra" value={ajustes.manoObra}
-                    error={errores.ajustes.manoObra} onValue={(v) => updAjuste('manoObra', v)}
+                    error={errores.ajustes.manoObra} cambiado={ajusteCambiado('manoObra')} onValue={(v) => updAjuste('manoObra', v)}
                   />
-                  <label className="fx-ajuste-check">
+                  <label className={'fx-ajuste-check' + marca(ajusteCambiado('retencion'))}>
                     <input
                       type="checkbox"
                       checked={ajustes.retencion}
@@ -642,7 +720,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
                   </label>
                   <CampoAjuste
                     id="fx-aj-abono" label="Abono realizado" value={ajustes.abono}
-                    error={errores.ajustes.abono} onValue={(v) => updAjuste('abono', v)}
+                    error={errores.ajustes.abono} cambiado={ajusteCambiado('abono')} onValue={(v) => updAjuste('abono', v)}
                   />
                 </>
               ) : (
@@ -706,15 +784,19 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
               <Btn variant="primary" icon="refresh-cw" onClick={recargar}>Recargar</Btn>
             </>
           ) : (
-            <>
-              <Btn variant="ghost" onClick={() => nav('cotizaciones')}>Cancelar</Btn>
-              <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previewing || !listo}>
-                {previewing ? 'Generando…' : 'Vista previa'}
-              </Btn>
-              <Btn variant="primary" icon="save" onClick={() => void guardar()} disabled={guardando || borrando || !listo}>
-                {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear cotización'}
-              </Btn>
-            </>
+            // El flujo de la factura simple: guardada y sin tocar, Ver e Imprimir
+            // lo guardado; nueva o con cambios, Vista previa y Guardar e imprimir.
+            <AccionesEdicion
+              guardado={cotizacionId != null && !hayCambios
+                ? { pdf: () => getCotizacionPdf(cotizacionId), textos: TEXTOS_COTIZACION }
+                : null}
+              editando={editando}
+              onCancelar={() => nav('cotizaciones')}
+              vistaPrevia={{ onClick: () => void vistaPrevia(), busy: previewing, disabled: !listo }}
+              onGuardar={(imprimir) => void guardar(imprimir)}
+              guardando={guardando}
+              bloqueado={borrando || !listo}
+            />
           )}
         </div>
       </div>
