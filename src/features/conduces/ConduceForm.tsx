@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn } from '@/components/ui'
-import { ApiError, createConduce, updateConduce, deleteConduce, previewConduce, getBranding, getEmisor } from '@/api'
+import {
+  ApiError, createConduce, updateConduce, deleteConduce, previewConduce, getConducePdf, getBranding, getEmisor,
+} from '@/api'
 import type { ConduceInput } from '@/api'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { ProductoCombobox } from '@/features/products/ProductoCombobox'
@@ -12,9 +14,10 @@ import {
 } from '@/components/unidadesMedida'
 import { BloqueCliente } from '@/features/cotizaciones/formatos/ferreteria/BloqueCliente'
 import { DescripcionLinea } from '@/features/cotizaciones/formatos/ferreteria/DescripcionLinea'
-import {
-  formatearRnc, lineaDesdeProducto, lineaLibre, siguienteId,
-} from '@/features/cotizaciones/formatos/ferreteria/lineas'
+import { formatearRnc, lineaDesdeProducto, lineaLibre } from '@/features/cotizaciones/formatos/ferreteria/lineas'
+import { cambiosLineas, fotoLineas, idNuevo, idParaFilaEnBlanco } from '@/features/cotizaciones/formatos/ferreteria/cambios'
+import { AccionesEdicion } from '@/features/cotizaciones/formatos/ferreteria/AccionesEdicion'
+import { TEXTOS_CONDUCE, imprimirGuardado } from '@/features/cotizaciones/formatos/ferreteria/imprimirGuardado'
 import { MAX_DESCRIPCION, type LineaFerreteriaForm } from '@/features/cotizaciones/formatos/ferreteria/schema'
 import { presentDocument } from '@/lib/file'
 import { ahoraLocal } from '@/lib/date'
@@ -75,15 +78,19 @@ export interface InicialConduce {
 }
 
 /**
- * Lo que cuenta como "cambio", en una sola cadena: se compara con la foto que
- * se toma al abrir. Si el usuario devuelve un campo a como estaba, deja de contar.
+ * El conduce tal como se abrió (o se guardó por última vez). Contra él se marca,
+ * campo por campo, lo que se tocó (como en la factura simple); si el usuario
+ * devuelve un campo a como estaba, deja de contar.
  */
-function huella(clienteId: string | null, libre: string, fecha: string, lineas: LineaFerreteriaForm[]): string {
-  return JSON.stringify([
-    clienteId, libre.trim(), fecha,
-    lineas.map((l) => [l.prodId, l.descripcion, l.cantidad, l.precio, l.indFact, l.unidadMedida, l.tipoItem]),
-  ])
+interface FotoConduce {
+  clienteId: string | null
+  fecha: string
+  /** Solo las líneas con contenido (ver fotoLineas). */
+  lineas: LineaFerreteriaForm[]
 }
+
+const fotoDe = (clienteId: string | null, fecha: string, lineas: LineaFerreteriaForm[]): FotoConduce =>
+  ({ clienteId, fecha, lineas: fotoLineas(lineas, lineaVacia) })
 
 export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduce }) {
   const queryClient = useQueryClient()
@@ -119,10 +126,10 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
    */
   const yaCreado = useRef(false)
   /**
-   * Foto del documento tal como se abrió (ver huella). Al editar y guardar pasa a
-   * ser la de lo guardado: el formulario sigue en pantalla ya sin cambios.
+   * Foto del documento tal como se abrió (ver FotoConduce). Al editar y guardar
+   * pasa a ser la de lo guardado: el formulario sigue en pantalla ya sin cambios.
    */
-  const [original, setOriginal] = useState(() => huella(inicial.cliente?.id ?? null, '', inicial.fecha, inicial.lineas))
+  const [original, setOriginal] = useState(() => fotoDe(inicial.cliente?.id ?? null, inicial.fecha, inicial.lineas))
   /**
    * Día guardado ('' al crear). Si la fecha del formulario sigue siendo ese, el
    * PUT no la manda y el backend conserva la hora. Al editar y guardar pasa a ser
@@ -143,7 +150,13 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   // Nuevo o guardado, se avisa al salir solo si se tocó algo: un conduce nuevo
   // abre con lo de su cotización (se recupera con volver a pulsar Conduce) o en
   // blanco, y sin tocar nada no hay qué perder.
-  const hayCambios = huella(cliente?.id ?? null, clienteLibre, fecha, lineas) !== original
+  const cambios = cambiosLineas(original.lineas, lineas, lineaVacia)
+  const clienteCambiado = (cliente?.id ?? null) !== original.clienteId || clienteLibre.trim() !== ''
+  const fechaCambiada = fecha !== original.fecha
+  const hayCambios = clienteCambiado || fechaCambiada || cambios.hayCambios
+  // Las marcas, solo en uno guardado (como la factura simple): en uno nuevo todo
+  // es nuevo, y marcarlo no diría nada.
+  const marca = (cond: boolean) => (editando && cond ? ' fx-mod' : '')
   const salida = useAvisoSalida(
     hayCambios,
     editando
@@ -186,7 +199,8 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
   }
   /** Línea libre: precio interno 0, 18%, Unidad y bien (lineaLibre). */
   const addLineaLibre = () => {
-    setLineas((ls) => [...ls, lineaLibre(siguienteId(ls))])
+    // idNuevo: nunca el id de una línea guardada, o la nueva pasaría por esa, editada.
+    setLineas((ls) => [...ls, lineaLibre(idNuevo(ls, original.lineas))])
     quitarErrForm()
   }
   /**
@@ -198,8 +212,8 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
       return ultima && lineaVacia(ultima)
-        ? [...ls.slice(0, -1), lineaDesdeProducto(p, ultima.id)]
-        : [...ls, lineaDesdeProducto(p, siguienteId(ls))]
+        ? [...ls.slice(0, -1), lineaDesdeProducto(p, idParaFilaEnBlanco(ultima, ls, original.lineas))]
+        : [...ls, lineaDesdeProducto(p, idNuevo(ls, original.lineas))]
     })
     quitarErrForm()
   }
@@ -232,15 +246,22 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     return cuerpoConduce({ clienteId: Number(cliente.id), lineas: enUso, cotizacionId: editando ? null : cotizacionId, date })
   }
 
-  // Acción única: un doble clic crearía el mismo conduce dos veces (y gastaría dos números).
-  const guardar = useAccionUnica(async () => {
+  /**
+   * Acción única: un doble clic crearía el mismo conduce dos veces (y gastaría
+   * dos números). Guardar e imprimir comparten el candado porque imprimir
+   * también guarda.
+   *
+   * @param imprimir true = mandar a imprimir (hoja carta) el conduce ya
+   *   guardado, nunca lo que hay en pantalla.
+   */
+  const guardar = useAccionUnica(async (imprimir: boolean) => {
     // Con el modal abierto, o ya creado, no hay nada más que guardar.
     if (guardado != null || yaCreado.current) return
     const cuerpo = validar()
     if (!cuerpo) return
     // Lo que se está guardando. Si se sigue escribiendo mientras el servidor
     // responde, eso queda como cambio sin guardar.
-    const foto = huella(cliente?.id ?? null, clienteLibre, fecha, lineas)
+    const foto = fotoDe(cliente?.id ?? null, fecha, lineas)
     const diaEnviado = fecha
     setGuardando(true)
     let resultado: ConduceGuardado
@@ -270,6 +291,14 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
     if (resultado.accion === 'creado') salida.liberar()
     setGuardado(resultado)
     setGuardando(false)
+    // El modal sale enseguida y la impresión va detrás: si falla, el conduce ya
+    // quedó y se imprime desde aquí (Seguir en el conduce) o desde el listado.
+    if (imprimir) {
+      void imprimirGuardado(
+        { pdf: () => getConducePdf(resultado.id), textos: TEXTOS_CONDUCE },
+        TEXTOS_CONDUCE.guardadoSinImprimir,
+      )
+    }
   })
 
   // --- Después de guardar (ConduceGuardadoModal) ---
@@ -370,7 +399,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
             <label className="fx-eyebrow" htmlFor="fx-con-fecha">Fecha</label>
             <input
               id="fx-con-fecha"
-              className={'fx-field' + (errores.fecha ? ' fx-field--err' : '')}
+              className={'fx-field' + marca(fechaCambiada) + (errores.fecha ? ' fx-field--err' : '')}
               type="date"
               value={fecha}
               onChange={(e) => {
@@ -416,7 +445,12 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
             // fracciones; unidades o cajas se cuentan enteras.
             const enteras = !admiteDecimales(l.unidadMedida, unidades)
             return (
-              <div className={'fx-grid-ecf fx-grid-conduce fx-row' + (le ? ' fx-row-incompleta' : '')} key={l.id}>
+              // Agregada en esta edición: barra ámbar. Con error, manda la roja.
+              <div
+                className={'fx-grid-ecf fx-grid-conduce fx-row'
+                  + (le ? ' fx-row-incompleta' : editando && cambios.esNueva(l) ? ' fx-row-nueva' : '')}
+                key={l.id}
+              >
                 <button
                   type="button"
                   className="fx-gutter"
@@ -429,7 +463,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
 
                 <div className="fx-cell" data-label="Cant.">
                   <input
-                    className={'fx-field fx-num' + (le?.cantidad ? ' fx-field--err' : '')}
+                    className={'fx-field fx-num' + marca(cambios.campoCambiado(l, 'cantidad')) + (le?.cantidad ? ' fx-field--err' : '')}
                     type="number" min={0}
                     step={enteras ? 1 : 'any'}
                     inputMode={enteras ? 'numeric' : 'decimal'}
@@ -443,7 +477,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
 
                 <div className="fx-cell" data-label="Unidad">
                   <UnidadMedidaSelect
-                    className={'fx-tasa' + (le?.unidadMedida ? ' fx-tasa--err' : '')}
+                    className={'fx-tasa' + marca(cambios.campoCambiado(l, 'unidadMedida')) + (le?.unidadMedida ? ' fx-tasa--err' : '')}
                     value={l.unidadMedida}
                     onChange={(v) => updLinea(l.id, { unidadMedida: v })}
                   />
@@ -452,7 +486,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
 
                 <div className="fx-desc">
                   <DescripcionLinea
-                    className={'fx-field fx-desc' + (le?.descripcion ? ' fx-field--err' : '')}
+                    className={'fx-field fx-desc' + marca(cambios.campoCambiado(l, 'descripcion')) + (le?.descripcion ? ' fx-field--err' : '')}
                     value={l.descripcion}
                     onValue={(v) => updLinea(l.id, { descripcion: v })}
                     placeholder="Lo que se entrega (ej. Fundas de cemento gris)"
@@ -469,7 +503,7 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
                         <span className="fx-contador">Línea libre ·</span>
                         <button
                           type="button"
-                          className="fx-detalle-toggle fx-detalle-toggle--sec"
+                          className={'fx-detalle-toggle fx-detalle-toggle--sec' + marca(cambios.campoCambiado(l, 'tipoItem'))}
                           onClick={() => updLinea(l.id, { tipoItem: l.tipoItem === 'Bien' ? 'Servicio' : 'Bien' })}
                           title="Cambiar entre bien y servicio (cuenta al facturarla)"
                         >
@@ -530,13 +564,20 @@ export function ConduceForm({ nav, inicial }: { nav: Nav; inicial: InicialConduc
           )}
         </div>
         <div className="row gap-sm fx-acciones">
-          <Btn variant="ghost" onClick={volver}>Cancelar</Btn>
-          <Btn variant="secondary" icon="eye" onClick={() => void vistaPrevia()} disabled={previewing}>
-            {previewing ? 'Generando…' : 'Vista previa'}
-          </Btn>
-          <Btn variant="primary" icon="save" onClick={() => void guardar()} disabled={guardando || borrando || guardado != null}>
-            {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear conduce'}
-          </Btn>
+          {/* El flujo de la factura simple: guardado y sin tocar, Ver e Imprimir
+              lo guardado; nuevo o con cambios, Vista previa y Guardar e imprimir. */}
+          <AccionesEdicion
+            guardado={conduceId != null && !hayCambios
+              ? { pdf: () => getConducePdf(conduceId), textos: TEXTOS_CONDUCE }
+              : null}
+            editando={editando}
+            onCancelar={volver}
+            vistaPrevia={{ onClick: () => void vistaPrevia(), busy: previewing }}
+            onGuardar={(imprimir) => void guardar(imprimir)}
+            guardando={guardando}
+            // Con el modal abierto (o ya creado) no hay nada más que guardar.
+            bloqueado={borrando || guardado != null}
+          />
         </div>
       </div>
 

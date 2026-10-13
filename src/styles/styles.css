@@ -66,45 +66,51 @@
   --density: 1;
 }
 
+/* Oscuro: gris frío, no casi negro (2026-10-13: el de antes, con fondo
+   #0c0d10, se veía demasiado negro). Es la misma paleta que el "gris oscuro"
+   del POS (pos.css): el texto secundario y los estados dan 4.5:1 o más sobre
+   las superficies, y los bordes y las tarjetas se separan mejor del fondo. */
 [data-theme="dark"] {
-  --accent: #4d8cf0;
-  --accent-hover: #5e98f2;
-  --accent-active: #6fa3f4;
-  --accent-soft: #18233a;
-  --accent-soft-2: #1d2c47;
-  --accent-text: #8fb8f6;
-  --on-accent: #0b1220;
+  --accent: #649cf3;
+  --accent-hover: #72a6f4;
+  --accent-active: #80aff5;
+  --accent-soft: #2e3b52;
+  --accent-soft-2: #34445f;
+  --accent-text: #a6c5f8;
+  --on-accent: #0d1626;
 
-  --bg: #0c0d10;
-  --surface: #15171c;
-  --surface-2: #121419;
-  --surface-hover: #1d2026;
-  --surface-active: #232730;
-  --sidebar-bg: #101216;
-  --border: #24272f;
-  --border-strong: #313641;
-  --ring: rgba(77, 140, 240, 0.4);
+  --bg: #24272d;
+  --surface: #2c3037;
+  --surface-2: #282b32;
+  --surface-hover: #343941;
+  --surface-active: #3b4049;
+  --sidebar-bg: #262a30;
+  --border: #3b4049;
+  --border-strong: #4b515c;
+  --ring: rgba(100, 156, 243, 0.45);
 
-  --text: #e9ebef;
-  --text-2: #a3aab6;
-  --text-3: #6c7380;
-  --text-inverse: #0c0d10;
+  --text: #eceef2;
+  --text-2: #bcc2cb;
+  --text-3: #979eaa;
+  --text-inverse: #24272d;
 
-  --success: #34b178;
-  --success-soft: #11251c;
-  --warning: #d99a2b;
-  --warning-soft: #2a2113;
-  --danger: #e26464;
-  --danger-soft: #2c1718;
-  --info: #4d8cf0;
-  --info-soft: #18233a;
-  --neutral-soft: #1d2026;
+  --success: #43c089;
+  --success-soft: #26392f;
+  --warning: #e4aa45;
+  --warning-soft: #3c3424;
+  --danger: #f17d7d;
+  --danger-soft: #45292c;
+  --info: #649cf3;
+  --info-soft: #2e3b52;
+  --neutral-soft: #353a42;
 
-  --sh-xs: 0 1px 2px rgba(0,0,0,0.3);
-  --sh-sm: 0 1px 3px rgba(0,0,0,0.4);
-  --sh-md: 0 4px 14px rgba(0,0,0,0.5);
-  --sh-lg: 0 14px 38px rgba(0,0,0,0.6);
-  --sh-pop: 0 18px 50px rgba(0,0,0,0.7);
+  /* Las de --sh-xs a --sh-lg las pisa el :root de bold.css (carga después);
+     el modo oscuro las vuelve a poner allí, en "DARK MODE — ajustes finos". */
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --sh-md: 0 4px 14px rgba(0, 0, 0, 0.32);
+  --sh-lg: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
 }
 
 * { box-sizing: border-box; }
@@ -663,7 +669,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
    MODAL / DRAWER
    ============================================================ */
 .overlay { position: fixed; inset: 0; background: rgba(16,20,28,0.45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); z-index: 100; display: grid; place-items: center; padding: 24px; animation: fade .15s ease; }
-[data-theme="dark"] .overlay { background: rgba(0,0,0,0.6); }
+[data-theme="dark"] .overlay { background: rgba(10, 12, 16, 0.55); }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--sh-pop); width: 100%; max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; animation: pop .18s cubic-bezier(.2,.8,.2,1); }
 .modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
 .modal-head h3 { font-size: 16px; }

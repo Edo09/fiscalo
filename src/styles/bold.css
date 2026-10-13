@@ -209,7 +209,15 @@ h1, h2, h3,
 /* ============================================================
    DARK MODE — ajustes finos
    ============================================================ */
-[data-theme="dark"] .sidebar { background: linear-gradient(180deg, #0e1018 0%, #0b0d14 100%); border-right-color: #000; }
+/* Las sombras del :root de arriba (pensadas para el claro) le ganaban a las del
+   modo oscuro de styles.css: sobre el gris no se veian. */
+[data-theme="dark"] {
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
+  --sh-md: 0 6px 16px rgba(0, 0, 0, 0.3), 0 2px 5px rgba(0, 0, 0, 0.18);
+  --sh-lg: 0 16px 40px rgba(0, 0, 0, 0.4), 0 5px 12px rgba(0, 0, 0, 0.2);
+}
+[data-theme="dark"] .sidebar { background: var(--sidebar-bg); border-right-color: var(--border); }
 [data-theme="dark"] .content { background:
   radial-gradient(120% 60% at 100% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%),
   var(--bg); }

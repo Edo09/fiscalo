@@ -351,6 +351,16 @@
 .fx-tasa.fx-mod { border-color: var(--warning); }
 .fx-tasa.fx-mod:focus-visible { border-color: var(--accent); }
 
+/* Cotización de Ferretería y conduce: piezas que la factura simple no tiene.
+   .fx-tasa, .fx-ajuste-monto y .fx-detalle-toggle traen su propio fondo o
+   subrayado, que taparía la marca; con más especificidad se ve igual que en
+   los demás campos. */
+.fx-grid-cot-fer .fx-tasa.fx-mod,
+.fx-grid-conduce .fx-tasa.fx-mod { background: var(--warning-soft); }
+.fx-ajuste-monto.fx-mod { border-bottom-color: var(--warning); }
+.fx-detalle-toggle.fx-mod { background: var(--warning-soft); border-radius: 3px; padding: 0 4px; }
+.fx-ajuste-check.fx-mod { border-radius: var(--r-sm); }
+
 /* Linea con datos que NO se guardaria (le falta descripcion, o la cantidad no
    es positiva). Se marca en rojo y bloquea el guardado: antes desaparecia sin
    avisar y, como el PUT reemplaza todas las lineas, se perdia para siempre. */
@@ -381,6 +391,9 @@
   padding-left: 6px;
   margin-left: -6px;
 }
+/* .fx-row (mas abajo, y en angosto) pone su padding y le quitaba el de la
+   izquierda: quedaba solo el margen negativo y la fila nueva se corria 6px. */
+.fx-row.fx-row-nueva { padding-left: 6px; }
 
 .fx-cambios {
   display: inline-flex;

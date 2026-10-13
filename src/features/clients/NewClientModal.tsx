@@ -29,7 +29,8 @@ type Campos = { client_name: string; company_name: string; email: string; phone_
 
 type CamposTexto = Exclude<keyof Campos, 'permitir_credito'>
 
-const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: false }
+// Crédito habilitado por defecto (migración 035 de api-gratex): se quita editando el cliente.
+const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: true }
 
 /**
  * Campos iniciales a partir de lo buscado. El buscador acepta nombre, RNC o

@@ -22,7 +22,10 @@ export function VistaPreviaRecibo({
   onGuardarEImprimir: () => void
   onClose: () => void
 }) {
-  const ancho = datos.papel.ancho_mm
+  // Los rótulos dicen la opción de la tirilla (80, 76, 72), como los botones de
+  // la factura; ancho_mm es el ancho de página que se imprime (72 en la de 80)
+  // y es el que mide el papel en pantalla.
+  const ancho = datos.papel.opcion
   return (
     <Modal
       title={`Vista previa · recibo ${ancho} mm`}
@@ -50,7 +53,7 @@ export function VistaPreviaRecibo({
           srcDoc={reciboHtml(datos, { vistaPrevia: true })}
           // Si el diálogo es más angosto (teléfono), max-width lo recorta y el
           // recibo se ve a tamaño real (ver anchoVistaPreviaPx).
-          style={{ width: anchoVistaPreviaPx(ancho) }}
+          style={{ width: anchoVistaPreviaPx(datos.papel.ancho_mm) }}
         />
       </div>
     </Modal>
