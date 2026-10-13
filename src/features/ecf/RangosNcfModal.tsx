@@ -5,9 +5,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal, Btn, Badge, Icon, Spinner, type BadgeTone } from '@/components/ui'
 import { ApiError, listNcfRangos, registerNcfRango, formatApiDate } from '@/api'
-import type { NcfRango } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ECF_TIPOS } from '@/config/ecf'
+import { problemaConExistentes } from './rangosNcf'
 
 const ESTADO_RANGO: Record<string, { label: string; tone: BadgeTone }> = {
   activo: { label: 'Activo', tone: 'success' },
@@ -15,37 +15,6 @@ const ESTADO_RANGO: Record<string, { label: string; tone: BadgeTone }> = {
   agotado: { label: 'Agotado', tone: 'danger' },
   vencido: { label: 'Vencido', tone: 'danger' },
   sin_limite: { label: 'Sin límite', tone: 'warning' },
-}
-
-/**
- * Por qué no se puede registrar este rango con los que ya hay, o null. Es la
- * misma regla del backend (ncfModel::registerRango), calculada con los rangos
- * ya cargados en la tabla para decirlo antes de enviar y con el número exacto.
- *
- * El "Desde" tiene que quedar después de todo lo ya usado o autorizado del
- * tipo. Excepción: la fila "sin límite" que el sistema siembra al crear la
- * empresa, cuando el rango nuevo empieza donde ella; esa fila se convierte en
- * el rango autorizado y su consumo no cuenta como tope.
- */
-function problemaConExistentes(rangos: NcfRango[], tipo: string, desde: number, hasta: number): string | null {
-  const delTipo = rangos.filter((r) => r.type === tipo)
-  const sinLimite = [...delTipo].reverse().find((r) => r.numero_hasta == null)
-  const convertir = sinLimite != null && Number(sinLimite.numero_desde) === desde
-  let tope = 0
-  for (const r of delTipo) {
-    if (convertir && r.id === sinLimite.id) continue
-    tope = Math.max(tope, Number(r.current_value) || 0, Number(r.numero_hasta ?? 0) || 0)
-  }
-  if (desde <= tope) {
-    return `El número «Desde» tiene que ser mayor que ${tope}, que es el último ya usado o autorizado para ${tipo}.`
-  }
-  if (convertir) {
-    const usado = Math.max(Number(sinLimite.current_value) || 0, desde - 1)
-    if (usado > hasta) {
-      return `Ya se usaron números de ${tipo} hasta el ${usado}: el número «Hasta» tiene que ser ${usado} o más.`
-    }
-  }
-  return null
 }
 
 export function RangosNcfModal({ onClose }: { onClose: () => void }) {
