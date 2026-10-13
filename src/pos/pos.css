@@ -171,6 +171,11 @@
 .pos-barra-espacio { flex: 1; }
 .pos-reloj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .pos-barra .btn { white-space: nowrap; flex-shrink: 0; }
+/* Tonos de la barra: Turno en amarillo y Bloquear en rojo, suaves para no gritar. */
+.pos-barra .btn.pos-btn-turno { background: var(--warning-soft); color: var(--warning); border-color: var(--warning); }
+.pos-barra .btn.pos-btn-bloquear { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+.pos-barra .btn.pos-btn-turno:hover:not(:disabled),
+.pos-barra .btn.pos-btn-bloquear:hover:not(:disabled) { filter: brightness(0.96); }
 .pos-cuerpo { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
 
 /* ---- Sin conexion ------------------------------------------------------- */
@@ -624,6 +629,10 @@
 }
 .pos-teclado-monto .pos-tecla-limpiar:active { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* Spinner dentro de un botón: toma el color del texto, para verse sobre el acento. */
+/* Ocupado no es deshabilitado: el botón que trabaja no se apaga a media opacidad. */
+.pos-root .btn[aria-busy="true"]:disabled { opacity: 1; cursor: progress; }
+.pos-spinner-boton { width: 16px; height: 16px; border-color: color-mix(in srgb, currentColor 35%, transparent); border-top-color: currentColor; flex-shrink: 0; }
 .pos-cobro-estado { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0 0; }
 .pos-cobro-estado > b { font-size: 20px; }
 .pos-cobro-estado .pos-sub { text-align: center; }

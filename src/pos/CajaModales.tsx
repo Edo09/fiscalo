@@ -321,7 +321,7 @@ export function TurnoModal({ equipo, sesion, turno, puedeCerrar, motivoNoCerrar,
       <div className="pos-modal-pie">
         <Btn className="pos-boton-grande" onClick={onCerrar}>Volver</Btn>
         {turno ? (
-          <Btn variant="primary" className="pos-boton-grande" icon="lock" disabled={!puedeCerrar} onClick={onCerrarTurno}>
+          <Btn variant="danger" className="pos-boton-grande" icon="lock" disabled={!puedeCerrar} onClick={onCerrarTurno}>
             {ajeno ? (sesion.empleado.rol === 'supervisor' ? 'Cerrar su turno' : 'Cerrar su turno (supervisor)') : 'Cerrar turno'}
           </Btn>
         ) : (

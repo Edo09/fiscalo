@@ -235,12 +235,13 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const turnoPropio = turno !== null && turno.empleado_id === sesion.empleado.id
   const turnoAjeno = turno !== null && !turnoPropio
   // Al entrar sin turno, se ofrece abrirlo una vez; después, al intentar cobrar.
+  // Nunca mientras se bloquea: la caja va de salida al PIN.
   useEffect(() => {
-    if (estado && turno === null && !aperturaOfrecida.current && modal === null) {
+    if (estado && turno === null && !aperturaOfrecida.current && modal === null && !bloqueando) {
       aperturaOfrecida.current = true
       setModal({ tipo: 'apertura' })
     }
-  }, [estado, turno, modal])
+  }, [estado, turno, modal, bloqueando])
 
   const motivoNoCobrar = !estado
     ? 'Cargando la caja…'
@@ -373,12 +374,12 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
         )}
         <span className="pos-reloj">{reloj}</span>
         <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
-        <Btn icon="clock" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
+        <Btn icon="clock" className="pos-btn-turno" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
         <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
         <Btn icon={tema === 'oscuro' ? 'sun' : 'moon'} onClick={alternarTema}
           aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'} />
-        <Btn icon="lock" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
+        <Btn icon="lock" className="pos-btn-bloquear" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
       </header>
 
       {rechazadas.length > 0 && (
@@ -565,10 +566,12 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           errorDeSesion={errorDeSesion}
           onCancelar={() => setModal(null)}
           onCerrado={() => { void cargarEstado() }}
+          bloqueando={bloqueando}
           onTerminar={() => {
             if (modal.propio) {
-              // Fin del turno propio: la caja queda lista para el siguiente.
-              setModal(null)
+              // Fin del turno propio: la caja queda lista para el siguiente. El
+              // diálogo sigue a la vista hasta llegar al PIN: cerrarlo antes
+              // dejaba ver la venta sin turno (y su "Abrir turno") un instante.
               void bloquear()
             } else {
               aperturaOfrecida.current = true

@@ -132,18 +132,24 @@ export function PosApp() {
     setPantalla({ tipo: 'pin' })
   }, [guardarEquipo])
 
+  // Al bloquear, cerrarSesion() (zustand) se pinta en un render ANTES que el
+  // setPantalla('pin') que la acompaña: React no los junta. Con la venta sin
+  // sesión se muestra ya el PIN, así ese render intermedio no deja ver un
+  // spinner entre el diálogo y el teclado (y el PIN no se monta dos veces).
+  const visible: Pantalla = pantalla.tipo === 'venta' && equipo && !sesion ? { tipo: 'pin' } : pantalla
+
   let contenido: JSX.Element
-  switch (pantalla.tipo) {
+  switch (visible.tipo) {
     case 'cargando':
       contenido = <div className="pos-centro"><div className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} /></div>
       break
     case 'habilitar':
       contenido = (
         <HabilitarEquipo
-          adminInicial={pantalla.admin}
-          aviso={pantalla.aviso}
+          adminInicial={visible.admin}
+          aviso={visible.aviso}
           onListo={listo}
-          onCancelar={pantalla.cancelable && equipo ? () => setPantalla({ tipo: 'pin' }) : undefined}
+          onCancelar={visible.cancelable && equipo ? () => setPantalla({ tipo: 'pin' }) : undefined}
         />
       )
       break
@@ -164,12 +170,12 @@ export function PosApp() {
       contenido = (
         <div className="pos-centro">
           <div className="pos-panel" style={{ textAlign: 'center' }}>
-            <Icon name={pantalla.tipo === 'sin-red' ? 'wifi-off' : 'alert-triangle'} size={32} style={{ color: 'var(--danger)' }} />
-            <h1 className="pos-titulo">{pantalla.tipo === 'sin-red' ? 'Sin conexión' : 'POS no disponible'}</h1>
+            <Icon name={visible.tipo === 'sin-red' ? 'wifi-off' : 'alert-triangle'} size={32} style={{ color: 'var(--danger)' }} />
+            <h1 className="pos-titulo">{visible.tipo === 'sin-red' ? 'Sin conexión' : 'POS no disponible'}</h1>
             <p className="pos-sub">
-              {pantalla.tipo === 'sin-red'
+              {visible.tipo === 'sin-red'
                 ? 'No hay conexión con el servidor. Revisa el internet de este equipo. Mientras tanto no se puede emitir: usa el procedimiento de contingencia.'
-                : pantalla.motivo}
+                : visible.motivo}
             </p>
             <Btn variant="primary" className="pos-boton-grande" icon="refresh-cw" onClick={() => void arrancar()}>Reintentar</Btn>
           </div>
@@ -179,7 +185,7 @@ export function PosApp() {
   }
 
   return (
-    <div className={'pos-root' + (pantalla.tipo === 'venta' ? ' en-venta' : '')}>
+    <div className={'pos-root' + (visible.tipo === 'venta' ? ' en-venta' : '')}>
       {!enLinea && (
         <div className="pos-sin-red" role="alert">
           <Icon name="wifi-off" size={16} />
@@ -188,7 +194,7 @@ export function PosApp() {
       )}
       {/* Envoltorio por pantalla: al cambiar (PIN, venta, habilitar...) entra con
           un fundido. Solo opacidad: un transform aquí movería los diálogos fijos. */}
-      <div key={pantalla.tipo} className="pos-pantalla">{contenido}</div>
+      <div key={visible.tipo} className="pos-pantalla">{contenido}</div>
     </div>
   )
 }

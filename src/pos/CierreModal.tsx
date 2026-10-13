@@ -37,10 +37,12 @@ interface Props {
   /** El turno quedó cerrado (aunque todavía se muestre el resultado). */
   onCerrado: () => void
   onTerminar: () => void
+  /** Terminar ya bloqueó la caja y se espera la salida: el diálogo queda quieto hasta el PIN. */
+  bloqueando?: boolean
   errorDeSesion: (e: unknown) => boolean
 }
 
-export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, onCancelar, onCerrado, onTerminar, errorDeSesion }: Props) {
+export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, onCancelar, onCerrado, onTerminar, bloqueando = false, errorDeSesion }: Props) {
   const ancho = useImpresoraStore((s) => s.anchoTirilla)
   const [valores, setValores] = useState<Record<string, string>>({})
   const [activa, setActiva] = useState(FILAS[0])
@@ -266,10 +268,10 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
               <div className="pos-info" style={{ margin: 0, width: '100%' }}><Icon name="check" size={16} /><span>Nota guardada: {r.nota}</span></div>
             ) : (
               <div style={{ width: '100%' }}>
-                <textarea className="pos-nota" value={nota} maxLength={255} rows={2} onChange={(e) => setNota(e.target.value)}
+                <textarea className="pos-nota" value={nota} maxLength={255} rows={2} disabled={bloqueando} onChange={(e) => setNota(e.target.value)}
                   placeholder={dif === 0 ? 'Nota (opcional)' : `Nota (opcional): por qué ${textoDiferencia(dif).toLowerCase()}`} />
                 {nota.trim() !== '' && (
-                  <Btn size="sm" icon="save" disabled={notaEstado === 'guardando'} onClick={() => void guardarNota(r)}>
+                  <Btn size="sm" icon="save" disabled={notaEstado === 'guardando' || bloqueando} onClick={() => void guardarNota(r)}>
                     {notaEstado === 'guardando' ? 'Guardando…' : 'Guardar nota'}
                   </Btn>
                 )}
@@ -280,11 +282,15 @@ export function CierreModal({ equipo, sesion, turno, permiso, cuenta, empresa, o
               <div className="pos-error" style={{ margin: 0 }}><Icon name="printer" size={16} /><span>No se pudo imprimir el reporte. Revisa la impresora y reimprime.</span></div>
             )}
             <div className="pos-modal-pie" style={{ width: '100%' }}>
-              <Btn className="pos-boton-grande" icon="printer" disabled={fase.impresion === 'imprimiendo'} onClick={() => void imprimir(r)}>
+              <Btn className="pos-boton-grande" icon="printer" disabled={fase.impresion === 'imprimiendo' || bloqueando} onClick={() => void imprimir(r)}>
                 {fase.impresion === 'imprimiendo' ? 'Imprimiendo…' : 'Reimprimir'}
               </Btn>
-              <button ref={terminarRef} type="button" className="btn btn-primary pos-boton-grande" onClick={onTerminar}>
-                <Icon name="check" />Terminar
+              {/* El propio deja la caja bloqueada para el siguiente: el botón lo dice antes de tocarlo. */}
+              <button ref={terminarRef} type="button" className="btn btn-primary pos-boton-grande" disabled={bloqueando} aria-busy={bloqueando}
+                onClick={onTerminar}>
+                {bloqueando
+                  ? <><span className="spinner pos-spinner-boton" aria-hidden="true" />Bloqueando…</>
+                  : <><Icon name={ajeno ? 'check' : 'lock'} />{ajeno ? 'Terminar' : 'Terminar y bloquear'}</>}
               </button>
             </div>
           </div>
