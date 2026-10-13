@@ -16,7 +16,7 @@ import { imprimirRecibo } from './imprimirRecibo'
 import { lineaQueCuadra, r2, type ItemFirmado } from './montosLinea'
 import { anuladaPor, filasRelacionadas } from './notasVinculadas'
 import { textoPieDocumento, textoTarjetaEnVuelo } from './enVuelo'
-import { puedeReenviarEstado } from '@/api/estadosDgii'
+import { TEXTO_NO_ENCONTRADO, TITULO_NO_ENCONTRADO, puedeReenviarFactura, tarjetaReenvio } from './reenvio'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { staleTimeFor } from '@/config/cache'
 import type { Nav } from '@/config/navigation'
@@ -249,12 +249,19 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
   const estadoData = estado.data
   const estadoRaw = estadoData?.estado_dgii ?? f.estadoDgiiRaw ?? null
   const mensajes = (estadoData?.consulta?.mensajes ?? []).filter((m) => m.valor)
-  const rechazado = isRechazo(estadoRaw)
+  const tarjeta = tarjetaReenvio(estadoRaw)
   const isRfce = (estadoRaw ?? '').startsWith('RFCE')
   // Mismas condiciones que el backend (handleReenviar): solo un comprobante que
-  // la DGII rechazó, sin archivar y con la secuencia sin consumir (o sin la
-  // bandera, que se trata igual). Uno sin confirmar nunca se reenvía desde la app.
-  const puedeReenviar = puedeReenviarEstado(estadoRaw) && estadoData?.secuencia_utilizada !== true
+  // la DGII rechazó o no encontró, sin archivar y con la secuencia sin consumir (o
+  // sin la bandera, que se trata igual). Uno sin confirmar nunca se reenvía desde la app.
+  const puedeReenviar = puedeReenviarFactura(estadoRaw, estadoData?.secuencia_utilizada)
+  const botonReenviar = puedeReenviar && (
+    <div className="row mt-sm">
+      <Btn variant="primary" size="sm" icon="send" onClick={() => void reenviar()} disabled={reenviando}>
+        {reenviando ? 'Reenviando…' : 'Reenviar a la DGII'}
+      </Btn>
+    </div>
+  )
 
   // Detalle real desde la API. El documento muestra al COMPRADOR (receptor del
   // e-CF); el emisor (la propia empresa del tenant) solo va en la tarjeta lateral.
@@ -339,7 +346,7 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
         <Btn variant="secondary" size="sm" icon="arrow-left" onClick={() => nav('facturas')}>Facturación</Btn>
       </div>
 
-      {rechazado && (
+      {tarjeta === 'rechazado' && (
         <div className="card card-pad" style={{ maxWidth: 1040, margin: '0 auto 14px', background: 'var(--danger-soft)', borderColor: 'transparent' }}>
           <div className="row gap-sm" style={{ color: 'var(--danger)' }}>
             <Icon name="x-circle" size={16} /><span className="fw6 text-sm">Rechazado por la DGII</span>
@@ -350,13 +357,25 @@ export function InvoiceDetailView({ factura, nav }: { factura: Factura | null; n
           {estadoData?.secuencia_utilizada === false && (
             <div className="text-xs muted mt-sm">La secuencia no se consumió: corrige la causa del rechazo y reenvíalo con el mismo e-NCF.</div>
           )}
-          {puedeReenviar && (
-            <div className="row mt-sm">
-              <Btn variant="primary" size="sm" icon="send" onClick={() => void reenviar()} disabled={reenviando}>
-                {reenviando ? 'Reenviando…' : 'Reenviar a la DGII'}
-              </Btn>
-            </div>
+          {botonReenviar}
+          {estadoData?.secuencia_utilizada === true && (
+            <div className="text-xs muted mt-sm">La secuencia se consumió: la reemisión tomará un nuevo e-NCF.</div>
           )}
+        </div>
+      )}
+
+      {/* NO_ENCONTRADO: la DGII no tiene el e-NCF. No es un rechazo (el estado se ve
+          "Pendiente"), pero el API lo reenvía igual con el mismo número: sin esta
+          tarjeta el botón no tenía dónde estar. */}
+      {tarjeta === 'no_encontrado' && (
+        <div className="card card-pad" style={{ maxWidth: 1040, margin: '0 auto 14px', background: 'var(--warning-soft)', borderColor: 'transparent' }}>
+          {/* El texto en el color normal: el ámbar sobre --warning-soft se lee mal. */}
+          <div className="row gap-sm">
+            <Icon name="alert-triangle" size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+            <span className="fw6 text-sm">{TITULO_NO_ENCONTRADO}</span>
+          </div>
+          <div className="text-sm mt-sm">{TEXTO_NO_ENCONTRADO}</div>
+          {botonReenviar}
           {estadoData?.secuencia_utilizada === true && (
             <div className="text-xs muted mt-sm">La secuencia se consumió: la reemisión tomará un nuevo e-NCF.</div>
           )}
