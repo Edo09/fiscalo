@@ -361,41 +361,46 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   return (
     <>
       <header className="pos-barra">
-        <Icon name="store" size={22} style={{ color: 'var(--accent)' }} />
-        <div className="pos-barra-dato ocultable"><small>Empresa</small><b>{empresa || '—'}</b></div>
-        <div className="pos-barra-dato"><small>Caja</small><b>{equipo.caja.nombre}</b></div>
-        <div className="pos-barra-dato">
-          <small>{sesion.empleado.rol === 'supervisor' ? 'Supervisor' : 'Cajero'}</small>
-          <b>{sesion.empleado.nombre}</b>
+        {/* Fila dentro del header: el header es el contenedor de las container
+            queries (pos.css) y un contenedor no puede consultarse a sí mismo. */}
+        <div className="pos-barra-fila">
+          <Icon name="store" size={22} className="pos-barra-logo" style={{ color: 'var(--accent)' }} />
+          <div className="pos-barra-dato ocultable"><small>Empresa</small><b>{empresa || '—'}</b></div>
+          <div className="pos-barra-dato pos-barra-caja"><small>Caja</small><b>{equipo.caja.nombre}</b></div>
+          <div className="pos-barra-dato">
+            <small>{sesion.empleado.rol === 'supervisor' ? 'Supervisor' : 'Cajero'}</small>
+            <b>{sesion.empleado.nombre}</b>
+          </div>
+          <div className="pos-barra-espacio" />
+          {pendientes > 0 && (
+            <span key={pendientes} className="pos-pendientes" title="Ventas que la DGII todavía no confirmó: se reenvían solas">
+              <Icon name="clock" size={15} />{pendientes} <span className="ocultable">sin confirmar DGII</span>
+            </span>
+          )}
+          <span className="pos-reloj">{reloj}</span>
+          <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
+          <Btn icon="clock" className="pos-btn-turno" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
+          <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
+          {/* Tamaño de la pantalla (preferencia del equipo): en pantallas de poca
+              resolución todo se veía grande. El % vuelve al 100. */}
+          <div className="pos-tamano" role="group" aria-label="Tamaño de la pantalla">
+            <button type="button" onClick={achicar} disabled={tamano === TAMANOS[0]} aria-label="Achicar textos" title="Achicar textos">
+              A<span aria-hidden="true">−</span>
+            </button>
+            <button type="button" className="pos-tamano-valor" onClick={tamanoNormal}
+              title="Volver al 100 %" aria-label={`Tamaño ${tamano} %. Volver al 100 %`}>
+              {tamano}%
+            </button>
+            <button type="button" onClick={agrandar} disabled={tamano === TAMANOS[TAMANOS.length - 1]} aria-label="Agrandar textos" title="Agrandar textos">
+              A<span aria-hidden="true">+</span>
+            </button>
+          </div>
+          <Btn icon={tema === 'oscuro' ? 'sun' : 'moon'} className="pos-barra-tema" onClick={alternarTema}
+            aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'} />
+          <Btn icon="lock" className="pos-btn-bloquear" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}
+            aria-label="Bloquear la caja"><span className="pos-barra-txt-bloquear">Bloquear</span></Btn>
         </div>
-        <div className="pos-barra-espacio" />
-        {pendientes > 0 && (
-          <span key={pendientes} className="pos-pendientes" title="Ventas que la DGII todavía no confirmó: se reenvían solas">
-            <Icon name="clock" size={15} />{pendientes} <span className="ocultable">sin confirmar DGII</span>
-          </span>
-        )}
-        <span className="pos-reloj">{reloj}</span>
-        <Btn icon="receipt" onClick={() => setModal({ tipo: 'ventasDia' })} aria-label="Ventas del día"><span className="ocultable">Ventas del día</span></Btn>
-        <Btn icon="clock" className="pos-btn-turno" onClick={() => setModal({ tipo: 'turno' })} disabled={!estado} aria-label="Turno y ventas del turno"><span className="ocultable">Turno</span></Btn>
-        <Btn icon="printer" onClick={() => setModal({ tipo: 'impresora' })} aria-label="Impresora de recibos"><span className="ocultable">Impresora</span></Btn>
-        {/* Tamaño de la pantalla (preferencia del equipo): en pantallas de poca
-            resolución todo se veía grande. El % vuelve al 100. */}
-        <div className="pos-tamano" role="group" aria-label="Tamaño de la pantalla">
-          <button type="button" onClick={achicar} disabled={tamano === TAMANOS[0]} aria-label="Achicar textos" title="Achicar textos">
-            A<span aria-hidden="true">−</span>
-          </button>
-          <button type="button" className="pos-tamano-valor" onClick={tamanoNormal}
-            title="Volver al 100 %" aria-label={`Tamaño ${tamano} %. Volver al 100 %`}>
-            {tamano}%
-          </button>
-          <button type="button" onClick={agrandar} disabled={tamano === TAMANOS[TAMANOS.length - 1]} aria-label="Agrandar textos" title="Agrandar textos">
-            A<span aria-hidden="true">+</span>
-          </button>
-        </div>
-        <Btn icon={tema === 'oscuro' ? 'sun' : 'moon'} onClick={alternarTema}
-          aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'} />
-        <Btn icon="lock" className="pos-btn-bloquear" onClick={() => void bloquear()} disabled={bloqueando || modal?.tipo === 'cobro'}>Bloquear</Btn>
       </header>
 
       {rechazadas.length > 0 && (

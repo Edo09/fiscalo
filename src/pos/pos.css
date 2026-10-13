@@ -169,12 +169,19 @@
 .pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
 
 /* ---- Barra de la caja (con sesion) -------------------------------------- */
+/* La barra es un contenedor (container query): lo que se oculta depende de SU
+   ancho, que ya viene dividido por el zoom de tamano.ts. Con @media, un 120 %
+   en 1024 px se salía por la derecha sin que ninguna regla se enterara. */
 .pos-barra {
-  height: 60px; display: flex; align-items: center; gap: 16px;
-  padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  container: barra / inline-size;
+  height: 60px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.pos-barra-dato { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.pos-barra-dato small { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.pos-barra-fila { height: 100%; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+.pos-barra-dato { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; overflow: hidden; }
+.pos-barra-dato small {
+  font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* Un nombre largo se corta con puntos suspensivos: nunca parte la barra en dos lineas. */
 .pos-barra-dato b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 .pos-barra-espacio { flex: 1; }
@@ -701,7 +708,6 @@
 
 @media (max-width: 720px) {
   .pos-efectivo { grid-template-columns: 1fr; }
-  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
 }
 
 /* ---- Cierre de turno (K6-K8) y panel del turno (K9) ---------------------- */
@@ -776,11 +782,37 @@
   .pos-cierre-cifras { grid-template-columns: 1fr; }
 }
 
-/* La empresa es lo primero que sobra: el cajero sabe donde trabaja. */
-@media (max-width: 720px) {
-  .pos-barra { gap: 10px; }
+/* La barra se va soltando cosas según su ancho, de lo que menos falta a lo que
+   más: la empresa (el cajero sabe dónde trabaja), los textos de los botones (el
+   ícono queda, con su aria-label), el texto de Bloquear y el % del tamaño, el
+   reloj y el logo, el nombre de la caja y, en un teléfono con el tamaño
+   agrandado, el botón del tema. Medido con la barra
+   completa en 1215 px; los cortes dejan margen para nombres largos. */
+@container barra (max-width: 1239px) {
   .pos-barra-dato.ocultable { display: none; }
+}
+@container barra (max-width: 1079px) {
+  .pos-barra .btn .ocultable, .pos-pendientes .ocultable { display: none; }
+}
+@container barra (max-width: 859px) {
+  .pos-barra-fila { gap: 10px; }
   .pos-barra-dato b { max-width: 140px; }
+  .pos-barra-txt-bloquear, .pos-tamano .pos-tamano-valor { display: none; }
+  .pos-tamano button + button { border-left: 1px solid var(--border); }
+}
+@container barra (max-width: 639px) {
+  .pos-barra-fila { gap: 8px; padding: 0 12px; }
+  .pos-barra-logo, .pos-reloj { display: none; }
+}
+@container barra (max-width: 479px) {
+  .pos-barra-fila { gap: 6px; }
+  .pos-barra-caja { display: none; }
+  .pos-barra .btn { padding-inline: 9px; }
+  .pos-tamano button { min-width: 34px; padding: 0 6px; }
+}
+/* Teléfono con el tamaño agrandado: el tema es lo único que no hace falta para vender. */
+@container barra (max-width: 379px) {
+  .pos-barra-tema { display: none; }
 }
 @media (max-width: 520px) {
   .pos-panel { padding: 22px 18px; }
