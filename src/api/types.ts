@@ -408,6 +408,12 @@ export interface ReciboDatos {
   /** Motivo de nota E33/E34 que no cupo en una línea; '' si no aplica. */
   motivo: string
   totales: { etiqueta: string; valor: string; total: boolean }[]
+  /**
+   * Cómo se pagó (recibos del POS): [{ etiqueta: 'Efectivo', valor: '3,558.00' }, { etiqueta: 'Devuelta', valor: '914.80' }],
+   * con el valor ya formateado como los renglones de `totales`. Se imprime tras los totales. Ausente, null o []
+   * (recibos de la app): no se imprime nada.
+   */
+  pago?: { etiqueta: string; valor: string }[] | null
   /** null en facturas no electrónicas. */
   timbre: { qr: string | null; aviso_preview: string; codigo_seguridad: string; fecha_firma: string } | null
   leyenda_qr: string

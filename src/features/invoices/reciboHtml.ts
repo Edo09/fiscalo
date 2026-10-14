@@ -101,6 +101,12 @@ export function reciboHtml(d: ReciboDatos, opts: OpcionesRecibo = {}): string {
   const totales = d.totales.map((t) => `
     <div class="${t.total ? 'tot total' : 'tot'}"><span>${esc(t.etiqueta)}:</span><span>${esc(t.valor)}</span></div>`).join('')
 
+  // Forma de pago (POS): renglones como los de los totales, pegados a ellos. Sin pago, nada.
+  const pago = d.pago?.length
+    ? d.pago.map((p) => `
+    <div class="tot"><span>${esc(p.etiqueta)}:</span><span>${esc(p.valor)}</span></div>`).join('')
+    : ''
+
   const timbre = d.timbre
     ? `${imagen(d.timbre.qr, 'qr', 'Código QR de la DGII')}
       ${d.timbre.aviso_preview ? `<div class="aviso centro">${esc(d.timbre.aviso_preview)}</div>` : ''}
@@ -172,7 +178,7 @@ export function reciboHtml(d: ReciboDatos, opts: OpcionesRecibo = {}): string {
   ${lineas}
   ${d.motivo ? `<div class="motivo">Motivo: ${esc(d.motivo)}</div>` : ''}
   ${SEPARADOR}
-  ${totales}
+  ${totales}${pago}
   ${SEPARADOR}
   ${timbre}
   ${d.leyenda_qr ? `<div class="pie">${esc(d.leyenda_qr)}</div>` : ''}
