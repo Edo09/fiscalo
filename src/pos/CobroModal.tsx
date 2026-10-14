@@ -20,6 +20,7 @@ import { BILLETES, centavosATexto, formatoCentavos, MONEDAS, montoACentavos, tot
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
 import { tituloVenta } from './estados'
+import { pagoVenta, resumenVenta, textoPago, type ResumenVenta } from './resumenVenta'
 
 /** Códigos con los que el servidor NO emitió nada: se puede corregir y cobrar con otra clave. */
 const SIN_VENTA = new Set([
@@ -56,9 +57,37 @@ const FORMAS: { forma: FormaPago; nombre: string; tecla: string; icono: 'banknot
 type Fase =
   | { tipo: 'eligiendo' }
   | { tipo: 'enviando' }
-  | { tipo: 'hecha'; r: VentaRespuesta; impresion: 'imprimiendo' | 'ok' | 'error' }
+  /** `resumen`: foto del carrito al cobrar; sigue igual aunque el carrito se vacíe después. */
+  | { tipo: 'hecha'; r: VentaRespuesta; resumen: ResumenVenta; impresion: 'imprimiendo' | 'ok' | 'error' }
   | { tipo: 'error'; mensaje: string; soloVolver: boolean }
   | { tipo: 'duda'; mensaje: string }
+
+/** Qué se llevó el cliente y cómo pagó, con los números del carrito (resumenVenta.ts). */
+function ResumenCompra({ resumen, cobro }: { resumen: ResumenVenta; cobro: VentaRespuesta['cobro'] }) {
+  return (
+    <div className="pos-resumen" role="group" aria-label="Resumen de la compra">
+      <ul className="pos-resumen-lineas">
+        {resumen.lineas.map((l, i) => (
+          <li key={i}>
+            <span>{l.cantidad} × {l.nombre}</span>
+            <span>RD$ {formatoCentavos(l.importeCentavos)}</span>
+          </li>
+        ))}
+      </ul>
+      {/* Las filas muestran el importe sin descuento (como el carrito): esta fila explica por qué el total es menor. */}
+      {resumen.descuentoCentavos > 0 && (
+        <div className="pos-total-fila"><span>Descuento {resumen.descuentoPct}%</span><span>−RD$ {formatoCentavos(resumen.descuentoCentavos)}</span></div>
+      )}
+      <div className="pos-resumen-totales">
+        {/* Como el carrito y el recibo: subtotal sin ITBIS + ITBIS = total. */}
+        <div className="pos-total-fila"><span>Subtotal</span><span>RD$ {formatoCentavos(resumen.subtotalCentavos)}</span></div>
+        <div className="pos-total-fila"><span>ITBIS</span><span>RD$ {formatoCentavos(resumen.itbisCentavos)}</span></div>
+        <div className="pos-total-fila pos-total"><span>Total</span><span>RD$ {formatoCentavos(resumen.totalCentavos)}</span></div>
+      </div>
+      <div className="pos-resumen-pago">{textoPago(pagoVenta(cobro))}</div>
+    </div>
+  )
+}
 
 interface Props {
   equipo: EquipoGuardado
@@ -143,14 +172,14 @@ export function CobroModal({
   const alcanza = forma !== 1 || (recibidoCentavos !== null && recibidoCentavos >= total)
   const devuelta = forma === 1 && recibidoCentavos !== null ? recibidoCentavos - total : null
 
-  const imprimir = useCallback(async (r: VentaRespuesta) => {
-    setFase({ tipo: 'hecha', r, impresion: 'imprimiendo' })
+  const imprimir = useCallback(async (r: VentaRespuesta, resumen: ResumenVenta) => {
+    setFase({ tipo: 'hecha', r, resumen, impresion: 'imprimiendo' })
     try {
       const recibo = r.recibo ?? (await posApi.recibo(equipo.token, sesion.token, r.venta.factura_id, ancho)).recibo
       await printHtml(reciboHtml(recibo), { anchoMm: recibo.papel.ancho_mm, selector: SELECTOR_RECIBO })
-      setFase({ tipo: 'hecha', r, impresion: 'ok' })
+      setFase({ tipo: 'hecha', r, resumen, impresion: 'ok' })
     } catch {
-      setFase({ tipo: 'hecha', r, impresion: 'error' })
+      setFase({ tipo: 'hecha', r, resumen, impresion: 'error' })
     }
   }, [equipo.token, sesion.token, ancho])
 
@@ -180,13 +209,16 @@ export function CobroModal({
     }
     if (!estado.cobroEnDuda && (cuerpo.lineas.length === 0 || !alcanza || faltaComprador)) return
     enviandoRef.current = true
+    // Foto del carrito al cobrar para la pantalla "Venta cobrada": en un reintento
+    // el carrito sigue congelado, es el mismo que se mandó.
+    const resumen = resumenVenta(estado.lineas, estado.cliente?.descuento ?? 0)
     // Antes de mandar: si la respuesta no llega, el carrito ya está congelado.
     marcarCobroEnDuda(cuerpo)
     setFase({ tipo: 'enviando' })
     try {
       const r = await posApi.vender(equipo.token, sesion.token, cuerpo)
       marcarCobroEnDuda(null)
-      void imprimir(r)
+      void imprimir(r, resumen)
     } catch (e) {
       const codigo = e instanceof PosApiError ? e.codigo : 'ERROR'
       const mensaje = e instanceof Error ? e.message : 'No se pudo cobrar.'
@@ -320,13 +352,13 @@ export function CobroModal({
             {tituloVenta(fase.r.venta.tipo_ecf)} {fase.r.venta.e_ncf ?? ''}
             {fase.r.venta.cliente && <><br />{fase.r.venta.cliente.nombre}</>}
           </p>
-          {fase.r.cobro.devuelta_centavos !== null ? (
+          <ResumenCompra resumen={fase.resumen} cobro={fase.r.cobro} />
+          {/* Efectivo: la devuelta (o "Pago exacto") en grande. Tarjeta y transferencia: la forma de pago ya va en el resumen. */}
+          {fase.r.cobro.devuelta_centavos !== null && (
             <div className={'pos-devuelta grande' + (fase.r.cobro.devuelta_centavos > 0 ? ' cambio' : '')}>
               <small>{fase.r.cobro.devuelta_centavos > 0 ? 'Devuelta' : 'Pago exacto'}</small>
               <b>RD$ {formatoCentavos(fase.r.cobro.devuelta_centavos)}</b>
             </div>
-          ) : (
-            <div className="pos-devuelta grande"><small>{fase.r.cobro.forma_pago_nombre}</small><b>RD$ {formatoCentavos(fase.r.cobro.total_centavos)}</b></div>
           )}
           {fase.r.repetida && (
             <div className="pos-info" style={{ margin: 0 }}><Icon name="info" size={16} /><span>Esta venta ya se había emitido: es la misma, no se emitió otra.</span></div>
@@ -335,7 +367,7 @@ export function CobroModal({
             <div className="pos-error" style={{ margin: 0 }}><Icon name="printer" size={16} /><span>No se pudo imprimir el recibo. Revisa la impresora y reimprime.</span></div>
           )}
           <div className="pos-modal-pie" style={{ width: '100%' }}>
-            <Btn className="pos-boton-grande" icon="printer" disabled={fase.impresion === 'imprimiendo'} onClick={() => void imprimir(fase.r)}>
+            <Btn className="pos-boton-grande" icon="printer" disabled={fase.impresion === 'imprimiendo'} onClick={() => void imprimir(fase.r, fase.resumen)}>
               {fase.impresion === 'imprimiendo' ? 'Imprimiendo…' : 'Reimprimir'}
             </Btn>
             {/* Botón nativo (Btn no reenvía ref): recibe el foco al terminar de imprimir. */}
