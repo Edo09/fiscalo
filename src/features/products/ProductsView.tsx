@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, PageHead, LoadingState, ErrorState, EmptyState } from '@/components/ui'
-import { listCategories, listProducts, mapProductRow } from '@/api'
+import { listCategories, listProducts, mapProductRowConRegla } from '@/api'
+import type { Nav } from '@/config/navigation'
+import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { fmtCantidad } from '@/lib/format'
 import { API_BASE_URL } from '@/api/config'
@@ -22,7 +24,7 @@ function FotoMini({ p }: { p: Producto }) {
 }
 
 /* FISCALO — Productos y servicios (GET /api/products) */
-export function ProductsView() {
+export function ProductsView({ nav }: { nav: Nav }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('Todas')
   const [modal, setModal] = useState<{ product: Producto | null } | null>(null)
@@ -56,7 +58,10 @@ export function ProductsView() {
   const categorias = useApiQuery(['categories', 'list'], () => listCategories({ pageSize: 100 }))
 
   // Texto y categoria los filtra el servidor: estas son ya las filas a pintar.
-  const rows = (data?.items ?? []).map(mapProductRow)
+  // Con "Bloquear ventas sin existencia" activo, un Bien con la existencia en blanco
+  // se ve como 0 y Agotado: es lo que hace el bloqueo, y la lista tiene que decir lo mismo.
+  const estricto = useInventarioEstricto() === true
+  const rows = (data?.items ?? []).map((r) => mapProductRowConRegla(r, estricto))
   const cats = [
     { id: 'Todas', nombre: 'Todas' },
     ...(categorias.data?.items ?? []).map((c) => ({ id: String(c.id), nombre: c.nombre || '—' })),
@@ -128,7 +133,7 @@ export function ProductsView() {
         )}
       </Card>
 
-      {modal && <ProductFormModal product={modal.product} onClose={() => setModal(null)} onSaved={reload} />}
+      {modal && <ProductFormModal product={modal.product} nav={nav} onClose={() => setModal(null)} onSaved={reload} />}
     </div>
   )
 }

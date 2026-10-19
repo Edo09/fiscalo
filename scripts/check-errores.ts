@@ -5,7 +5,7 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/check-errores.ts
 import { ESTADOS_EN_VUELO, dgiiLabel, isEnVuelo, isRechazo, puedeReenviarEstado } from '../src/api/estadosDgii.ts'
-import { clasificar, humanizar, networkError } from '../src/api/errores.ts'
+import { ApiError, clasificar, codigoDe, errorDeRespuesta, humanizar, networkError } from '../src/api/errores.ts'
 import type { EstadoDgii } from '../src/api/types.ts'
 import {
   PIE_DOCUMENTO_EN_VUELO, textoChipSinConfirmar, textoTarjetaEnVuelo,
@@ -201,6 +201,64 @@ try {
   console.warn = warn
 }
 igual('504 de POST /reenviar -> MSG_TARDO_EMISION', humanizar('', 504, REENVIO).mensaje, MSG_TARDO_EMISION)
+
+// --- Control de existencias (spec 2026-10-19-control-existencias-ventas 4.4) -----
+// Copia LITERAL de la frase del API (inventoryModel::mensajeFaltantes). Si cambia
+// allá, se cambia aquí. El API omite el nombre cuando parece una constante
+// (CABLE_THHN_12): el humanizador lo tomaría por una variable interna.
+const STOCK_FRASE = 'No hay existencia suficiente de «Cemento gris»: pides 5 y hay 2.'
+const STOCK_FRASE_SIN_NOMBRE = 'No hay existencia suficiente: pides 5 y hay 2.'
+const STOCK_FALTANTES = [
+  { product_id: 12, nombre: 'Cemento gris', sku: 'CEM-01', unidad_medida: 'Unidad', solicitado: 5, disponible: 2, faltante: 3 },
+]
+const STOCK_CUERPO = {
+  status: false, error: STOCK_FRASE, codigo: 'STOCK_INSUFICIENTE', data: { faltantes: STOCK_FALTANTES },
+}
+
+console.log('existencia: el código del cuerpo llega al ApiError')
+igual('codigoDe lee el código del sobre', codigoDe(STOCK_CUERPO), 'STOCK_INSUFICIENTE')
+igual('codigoDe: sin código -> null', codigoDe({ status: false, error: 'x' }), null)
+igual('codigoDe: código vacío o que no es texto -> null', [codigoDe({ codigo: '  ' }), codigoDe({ codigo: 5 })], [null, null])
+igual('codigoDe: cuerpo nulo o que no es objeto -> null', [codigoDe(null), codigoDe(undefined), codigoDe('x')], [null, null, null])
+{
+  const e = errorDeRespuesta(STOCK_FRASE, 422, { metodo: 'POST', path: '/api/facturas' }, STOCK_CUERPO.data, codigoDe(STOCK_CUERPO))
+  igual('errorDeRespuesta con código -> ApiError.codigo', e.codigo, 'STOCK_INSUFICIENTE')
+  chk('es un ApiError 422 con los datos', e instanceof ApiError && e.status === 422 && json(e.datos) === json(STOCK_CUERPO.data))
+}
+igual('sin código en el sobre, ApiError.codigo sigue siendo null (nada cambia para los demás errores)',
+  errorDeRespuesta('No se pudo guardar.', 422, { metodo: 'POST', path: '/api/clients' }, undefined, codigoDe({ status: false })).codigo, null)
+igual('quien no pasa código (auth, descargas) tampoco lo tiene',
+  errorDeRespuesta('No se pudo guardar.', 422, { metodo: 'POST', path: '/api/clients' }).codigo, null)
+
+console.log('existencia: la frase del API pasa por el humanizador sin cambios')
+for (const [desc, ctx] of [
+  ['POST /api/facturas', EMISION],
+  ['POST /api/facturas-simples', { metodo: 'POST', path: '/api/facturas-simples' }],
+  ['PUT /api/facturas-simples/9', { metodo: 'PUT', path: '/api/facturas-simples/9' }],
+] as const) {
+  igual(`${desc}: con nombre`, humanizar(STOCK_FRASE, 422, ctx), { mensaje: STOCK_FRASE, reemplazado: false })
+  igual(`${desc}: sin nombre (nombre que parece constante)`,
+    humanizar(STOCK_FRASE_SIN_NOMBRE, 422, ctx), { mensaje: STOCK_FRASE_SIN_NOMBRE, reemplazado: false })
+}
+igual('dos productos: una frase por producto, unidas',
+  humanizar(`${STOCK_FRASE} No hay existencia suficiente de «Varilla»: pides 1 y hay 0.`, 422, EMISION).reemplazado, false)
+
+console.log('existencia: con un nombre que parece constante, datos.faltantes sobrevive al reemplazo')
+{
+  const nombreConstante = [{ ...STOCK_FALTANTES[0], nombre: 'CABLE_THHN_12' }]
+  const texto = 'No hay existencia suficiente de «CABLE_THHN_12»: pides 5 y hay 2.'
+  chk('el texto con esa constante sí se reemplaza (es lo que obliga a armar el texto desde datos)',
+    humanizar(texto, 422, EMISION).reemplazado)
+  console.warn = () => {}
+  try {
+    const e = errorDeRespuesta(texto, 422, EMISION, { faltantes: nombreConstante }, 'STOCK_INSUFICIENTE')
+    chk('el mensaje del ApiError es el genérico, no el original', e.reemplazado && e.message !== texto && e.original === texto)
+    igual('datos.faltantes llega intacto', e.datos, { faltantes: nombreConstante })
+    igual('y el código también', e.codigo, 'STOCK_INSUFICIENTE')
+  } finally {
+    console.warn = warn
+  }
+}
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

@@ -5,7 +5,7 @@
 // las pantallas pueden seguir haciendo `e instanceof ApiError ? e.message : …`.
 import { API_BASE_URL, API_KEY } from './config'
 import { getToken, clearSession } from '@/stores/auth'
-import { errorDeRespuesta, networkError, referenciaDe, sesionExpirada, textoError, type ContextoError } from './errores'
+import { codigoDe, errorDeRespuesta, networkError, referenciaDe, sesionExpirada, textoError, type ContextoError } from './errores'
 import type { ListResult } from './types'
 
 // ApiError y networkError viven en errores.ts; se re-exportan aquí porque
@@ -89,7 +89,15 @@ async function fetchBody(path: string, init: RequestInit = {}): Promise<unknown>
   }
   if (body && typeof body === 'object' && 'status' in body && (body as { status: unknown }).status === false) {
     const texto = textoError(body)
-    throw errorDeRespuesta(texto, res.status, { ...ctx, referencia: referenciaDe(body, texto) }, (body as { data?: unknown }).data)
+    // `data` y `codigo` del sobre viajan en el ApiError aunque el texto se reemplace:
+    // el control de existencias arma su mensaje desde ellos (existencia.ts).
+    throw errorDeRespuesta(
+      texto,
+      res.status,
+      { ...ctx, referencia: referenciaDe(body, texto) },
+      (body as { data?: unknown }).data,
+      codigoDe(body),
+    )
   }
   if (!res.ok) {
     throw errorDeRespuesta(null, res.status, ctx)

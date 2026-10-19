@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState } from '@/components/ui'
-import { ApiError, crearAjuste, listProducts, mapProductRow } from '@/api'
+import { ApiError, crearAjuste, getProduct, listProducts, mapProductRow } from '@/api'
 import type { CrearAjusteLinea, MotivoAjuste } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
@@ -10,7 +10,7 @@ import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/componen
 import { r2, redondear } from '@/features/invoices/montosLinea'
 import { decimalesDe, fmtCantidad } from '@/lib/format'
 import type { Producto } from '@/types/domain'
-import type { Nav } from '@/config/navigation'
+import type { AjustePrefill, Nav } from '@/config/navigation'
 import { MOTIVOS } from './motivos'
 
 interface Linea {
@@ -27,12 +27,38 @@ interface Linea {
   costo: number
 }
 
+/** Id de línea único en la vista: Date.now() se repetiría en las líneas que se arman juntas (el prefill). */
+let ultimaLinea = 0
+const nuevoIdLinea = () => ++ultimaLinea
+
+/** La línea de un producto: un incremento, con la existencia y el costo que el producto tiene ahora. */
+const lineaDeProducto = (p: Producto, cantidad = 0): Linea => ({
+  id: nuevoIdLinea(),
+  productId: Number(p.id),
+  nombre: p.nombre,
+  sku: p.sku ?? '',
+  unidadMedida: p.unidadMedida,
+  cantidadActual: p.stock ?? 0,
+  tipo: 'INCREMENTO',
+  cantidad,
+  costo: Number(p.costo ?? 0),
+})
+
 /* FISCALO — Crear ajuste de inventario (POST /api/inventario/ajustes).
    Cada línea se convierte en un movimiento del libro: queda el saldo antes, el
-   ajuste y el saldo después. No se puede editar luego; se anula con el inverso. */
-export function AdjustmentFormView({ nav }: { nav: Nav }) {
+   ajuste y el saldo después. No se puede editar luego; se anula con el inverso.
+
+   Con `prefill` (el botón del aviso "no hay existencia suficiente" de las
+   facturas, spec control de existencias 4.6) se abre con las líneas de lo que le
+   falta a la venta, como INCREMENTO y con el motivo «Entrada de mercancía». Cada
+   producto se pide al API (existencia y costo de ahora, no los de la lista en
+   caché) y la cantidad llega puesta, pero todo sigue editable: es un punto de
+   partida, no un ajuste hecho. El prefill solo se lee al montar (App monta el
+   formulario con una key por prefill, ver claveFormularioAjuste). Termina donde
+   siempre, en el listado de Ajustes: no vuelve a la venta (C16). */
+export function AdjustmentFormView({ nav, prefill = null }: { nav: Nav; prefill?: AjustePrefill | null }) {
   const queryClient = useQueryClient()
-  const [motivo, setMotivo] = useState<MotivoAjuste>('CONTEO_FISICO')
+  const [motivo, setMotivo] = useState<MotivoAjuste>(prefill ? 'ENTRADA' : 'CONTEO_FISICO')
   const [nota, setNota] = useState('')
   /**
    * Líneas cuya cantidad ya se dejó (el campo perdió el foco). Un producto recién
@@ -68,20 +94,39 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       toast.error(`${p.nombre} ya está en el ajuste.`)
       return
     }
-    setLineas((ls) => [...ls, {
-      id: Date.now(),
-      productId: Number(p.id),
-      nombre: p.nombre,
-      sku: p.sku ?? '',
-      unidadMedida: p.unidadMedida,
-      cantidadActual: p.stock ?? 0,
-      tipo: 'INCREMENTO',
-      cantidad: 0,
-      costo: Number(p.costo ?? 0),
-    }])
+    setLineas((ls) => [...ls, lineaDeProducto(p)])
     setPicker(false)
     setBusca('')
   }
+
+  // Las líneas del prefill: se piden todas juntas y las que no se pudieron traer
+  // (el producto se borró, red caída) se avisan para agregarlas a mano. Si el
+  // usuario ya agregó alguna mientras cargaba, no se repite (un producto por ajuste).
+  const [cargandoPrefill, setCargandoPrefill] = useState(() => (prefill?.lineas.length ?? 0) > 0)
+  useEffect(() => {
+    if (!prefill || prefill.lineas.length === 0) return
+    let cancelado = false
+    void (async () => {
+      const resultados = await Promise.allSettled(prefill.lineas.map((l) => getProduct(l.productId)))
+      if (cancelado) return
+      const nuevas: Linea[] = []
+      let sinCargar = 0
+      resultados.forEach((r, i) => {
+        if (r.status === 'fulfilled') nuevas.push(lineaDeProducto(mapProductRow(r.value), prefill.lineas[i].cantidad))
+        else sinCargar++
+      })
+      setLineas((ls) => [...ls, ...nuevas.filter((n) => !ls.some((l) => l.productId === n.productId))])
+      setCargandoPrefill(false)
+      if (sinCargar > 0) {
+        toast.error(
+          sinCargar === 1
+            ? 'No se pudo cargar uno de los productos de la venta. Agrégalo con «Agregar producto».'
+            : `No se pudieron cargar ${sinCargar} productos de la venta. Agrégalos con «Agregar producto».`,
+        )
+      }
+    })()
+    return () => { cancelado = true }
+  }, [prefill])
 
   const updLinea = (id: number, cambios: Partial<Linea>) =>
     setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, ...cambios } : l)))
@@ -130,16 +175,20 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
         })
       : null
   const lineasConFraccionMala = lineas.filter((l) => problemaFraccion(l) != null)
-  // Dejar el almacén en negativo casi siempre es un error de captura, pero no lo
-  // bloqueamos: el sistema permite saldo negativo y a veces refleja la realidad.
+  // Dejar el almacén en negativo casi siempre es un error de captura, pero este
+  // formulario no lo bloquea: el Ajuste nunca bloquea y a veces refleja la realidad.
+  // El saldo negativo solo se tolera mientras la empresa no active «Bloquear ventas
+  // sin existencia»; con ese bloqueo activo, las facturas lo impiden.
   const negativos = lineas.filter((l) => l.cantidad > 0 && finalDe(l) < 0)
-  const motivoBloqueo = lineas.length === 0
-    ? 'Agrega al menos un producto para ajustar.'
-    : lineasEnCero.length > 0
-      ? 'Falta la cantidad en algún producto.'
-      : lineasConFraccionMala.length > 0
-        ? 'Revisa la cantidad marcada en rojo.'
-        : null
+  const motivoBloqueo = cargandoPrefill
+    ? 'Cargando los productos de la venta…'
+    : lineas.length === 0
+      ? 'Agrega al menos un producto para ajustar.'
+      : lineasEnCero.length > 0
+        ? 'Falta la cantidad en algún producto.'
+        : lineasConFraccionMala.length > 0
+          ? 'Revisa la cantidad marcada en rojo.'
+          : null
   const puedeGuardar = motivoBloqueo == null && !guardando
 
   // Acción única: un doble clic crearia dos ajustes y moveria el stock el doble.
@@ -201,9 +250,14 @@ export function AdjustmentFormView({ nav }: { nav: Nav }) {
       <div style={{ marginTop: 16 }}>
       <Card>
         <p className="text-sm muted" style={{ marginTop: 0 }}>Selecciona los productos que vas a ajustar</p>
+        {prefill && prefill.lineas.length > 0 && (
+          <p className="text-xs muted-3" style={{ marginTop: 0 }}>
+            Las cantidades son lo que le falta a la venta para poder facturarla. Revísalas antes de guardar el ajuste.
+          </p>
+        )}
 
         {lineas.length === 0 ? (
-          <p className="text-sm muted-3">Sin productos todavía.</p>
+          <p className="text-sm muted-3">{cargandoPrefill ? 'Cargando los productos de la venta…' : 'Sin productos todavía.'}</p>
         ) : (
           <div className="tbl-wrap">
             <table className="tbl">

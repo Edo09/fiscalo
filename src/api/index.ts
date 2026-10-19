@@ -60,7 +60,11 @@ export { listEcfRecibidos, aprobarEcfRecibido } from './recepcion'
 export { listUnidadesMedida } from './unidadesMedida'
 export { listTiposBienesServicios } from './tiposBienesServicios'
 export { listUbicaciones } from './ubicaciones'
-export { listAjustes, getAjuste, crearAjuste, anularAjuste, listMovimientos, getValorInventario } from './inventario'
+export {
+  listAjustes, getAjuste, crearAjuste, anularAjuste, listMovimientos, getValorInventario,
+  getConfiguracionInventario, updateConfiguracionInventario,
+} from './inventario'
+export type { ConfiguracionInventario } from './inventario'
 export { listUsers, getUser, createUser, updateUser, deleteUser } from './users'
 export { listRoles, getRole, createRole, updateRole, deleteRole, assignUserRole } from './roles'
 export { getStats, getAvisosEcf } from './stats'
@@ -88,4 +92,4 @@ export {
   getGastoXml,
   createGasto,
 } from './gastos'
-export { formatApiDate, dgiiLabel, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProveedorRow, mapUserRow } from './mappers'
+export { formatApiDate, dgiiLabel, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProductRowConRegla, mapProveedorRow, mapUserRow } from './mappers'

@@ -1263,6 +1263,13 @@ export interface BrandingData {
    * se muestra el botón POS del navbar. Ausente si el backend no lo expone: sin POS.
    */
   pos_enabled?: boolean
+  /**
+   * La empresa bloquea las ventas sin existencia (master tenants.inventario_estricto,
+   * que un admin cambia en Configuración > Inventario). Con esto las facturas
+   * muestran la existencia y avisan antes de enviar. Ausente si el backend no lo
+   * expone: sin bloqueo (todo como siempre).
+   */
+  inventario_estricto?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -1479,7 +1486,7 @@ export interface FacturaSimple extends FacturaSimpleRow {
 
 /** Motivos de un ajuste. ANULACION la pone el sistema, no el usuario. */
 export type MotivoAjuste =
-  | 'CONTEO_FISICO' | 'MERMA' | 'DANO' | 'ROBO'
+  | 'CONTEO_FISICO' | 'ENTRADA' | 'INVENTARIO_INICIAL' | 'MERMA' | 'DANO' | 'ROBO'
   | 'DEVOLUCION' | 'ERROR_CAPTURA' | 'ANULACION' | 'OTRO'
 
 export interface AjusteRow {

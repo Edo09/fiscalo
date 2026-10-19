@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Modal, Spinner, Switch } from '@/components/ui'
+import { Icon, Btn, Badge, Money, Modal, Spinner, Switch } from '@/components/ui'
 import {
   ApiError, DEFAULT_USER_ID, createFactura, previewFactura, getStats, getClient,
   getBranding, getEmisor, listProducts, mapClientRow, mapProductRow, formatApiDate, dgiiLabel, updateClient,
@@ -12,6 +12,11 @@ import type {
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { MSG_SIN_PRECIO } from '@/features/conduces/conversion'
+import { AvisoExistencia } from '@/features/inventory/AvisoExistencia'
+import {
+  datosStockInsuficiente, ecfRevisaExistencia, faltantesLocalesEcf, type ExistenciaConocida, type FaltanteStock,
+} from '@/features/inventory/existencia'
+import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { ProductFormModal } from '@/features/products/ProductFormModal'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import {
@@ -19,8 +24,10 @@ import {
 } from '@/components/unidadesMedida'
 import { presentDocument } from '@/lib/file'
 import { isoLocal } from '@/lib/date'
+import { fmtCantidad } from '@/lib/format'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
+import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { useSession } from '@/stores/auth'
 import type { Nav } from '@/config/navigation'
 import type { Cliente, Producto, Factura, FacturaPrefill } from '@/types/domain'
@@ -176,6 +183,13 @@ function nextENcf(tipo: TipoEcf, secuencias?: StatsSecuencia[]): string | null {
   return `E${tipo}${String(next).padStart(10, '0')}`
 }
 
+/** Lo que el catálogo dice de la existencia de un producto (ver faltantesLocalesEcf). */
+function existenciaDe(p: Producto): ExistenciaConocida {
+  return {
+    stock: p.stock, nombre: p.nombre, esServicio: p.tipo === 'Servicio', sku: p.sku || null, unidadMedida: String(p.unidadMedida),
+  }
+}
+
 /* FISCALO — Crear factura (emite contra POST /api/facturas).
    `prefill` permite llegar con cliente y líneas precargados (ej. al convertir
    una cotización); todo sigue siendo editable antes de emitir. */
@@ -233,6 +247,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // sabe si la DGII la recibió. El formulario se queda bloqueado (emitirla otra
   // vez gastaría otro número para la misma venta) y ofrece abrirla.
   const [facturaEnVuelo, setFacturaEnVuelo] = useState<Factura | null>(null)
+  // Control de existencias (spec control-existencias-ventas): todo lo que sigue
+  // existe solo con "Bloquear ventas sin existencia" activo en la empresa. Sin la
+  // regla (o mientras no se sabe, null) la factura se comporta como siempre.
+  const estricto = useInventarioEstricto() === true
+  // Lo que el API rechazó con STOCK_INSUFICIENTE y con qué líneas. El aviso vale
+  // para ESA venta: en cuanto cambian productos, cantidades o tipo, se retira.
+  const [rechazoExistencia, setRechazoExistencia] = useState<{ faltantes: FaltanteStock[]; firma: string } | null>(null)
+  // Existencia de los productos elegidos o que el API nombró. El catálogo en
+  // pantalla cambia con cada búsqueda y no siempre trae los de las líneas.
+  const [existenciasVistas, setExistenciasVistas] = useState<Map<number, ExistenciaConocida>>(() => new Map())
+  const avisoExistenciaRef = useRef<HTMLDivElement | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [errors, setErrors] = useState<FacturaFormErrors>(emptyFormErrors)
   // Líneas con el campo de detalle (descripcion) desplegado. Se colapsa por
@@ -378,6 +403,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       unidadMedida: p.unidadMedida || 43,
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
+    // La existencia que tenía el catálogo al elegirlo: la línea la usa aunque la búsqueda cambie.
+    setExistenciasVistas((m) => new Map(m).set(Number(p.id), existenciaDe(p)))
     setProdPicker(false)
     setProdQuery('')
   }
@@ -430,6 +457,39 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const {
     subtotal, itbis: itbisTotal, descuentos: descTotal, total,
   } = totalesDocumento(lineas.map(calc))
+
+  // --- Existencia (solo con la regla activa) ---
+  // Aviso ANTES de emitir: lo que el navegador sabe puede tener hasta 3 minutos,
+  // así que solo avisa y nunca bloquea Emitir (C10): el API tiene la última
+  // palabra. El catálogo vigente pisa lo guardado al elegir cada producto.
+  const existencias = new Map(existenciasVistas)
+  for (const p of catalogo) existencias.set(Number(p.id), existenciaDe(p))
+  // La cantidad que viaja al API (a 2 decimales), no la escrita.
+  const lineasConsumo = lineas.map((l) => ({
+    productId: l.prodId ? Number(l.prodId) : null, cantidad: calc(l).cantidad, esServicio: l.tipoItem === 'Servicio',
+  }))
+  const faltanteDe = new Map((estricto ? faltantesLocalesEcf(tipo, lineasConsumo, existencias) : []).map((f) => [f.productId, f]))
+  // Identifica la venta que el API rechazó: otro producto, cantidad o tipo la retira.
+  const firmaVenta = `${tipo}|${lineasConsumo.map((l) => `${l.productId}:${l.cantidad}:${l.esServicio}`).join(',')}`
+  const rechazo = rechazoExistencia?.firma === firmaVenta ? rechazoExistencia : null
+  // El aviso suele quedar fuera de pantalla (Emitir está en la barra de abajo): se lleva a la vista.
+  useEffect(() => {
+    if (rechazo) avisoExistenciaRef.current?.scrollIntoView({ block: 'center' })
+  }, [rechazo])
+
+  // La e-CF no guarda borrador: con la regla activa el aviso lleva a Ajuste de
+  // inventario, y las líneas escritas aquí se perderían (C9). Solo con la regla
+  // activa y con líneas (C14); sin ella la pantalla sale como siempre. Se libera
+  // en cuanto la factura existe (ver emitir): lo emitido no se pierde al salir.
+  // Mientras la emisión está en vuelo (`emitting`) no se pregunta ni se sale: el
+  // diálogo diría «no se ha emitido» de una factura que ya reservó su e-NCF. El
+  // `estricto &&` es obligatorio: guardandoAhora() ignora `activo`, y sin la regla
+  // la pantalla tiene que navegar como siempre.
+  const salida = useAvisoSalida(
+    estricto && lineas.length > 0,
+    'Esta factura no se ha emitido: no tiene e-NCF, no descontó inventario y no aparecerá en las ventas. Si sales ahora, se pierden sus líneas.',
+    estricto && emitting,
+  )
 
   // Las notas piden además el comprobante que modifican (bloque NotaReferencia).
   // E41, E43 y E47 no van aquí: la empresa los emite como comprador, desde Gastos.
@@ -589,12 +649,20 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     const payload = buildPayload()
     if (!payload) return
     setEmitting(true)
+    // Cada intento empieza sin el aviso de existencia del anterior.
+    setRechazoExistencia(null)
     // La emisión hace un viaje síncrono a la DGII: toast de progreso hasta resolver.
     const tid = toast.loading('Emitiendo e-CF a la DGII…')
     try {
       const res = await createFactura(payload)
+      // La factura ya existe: no quedan líneas sin emitir que perder al salir (C14).
+      // Va antes del nav de abajo, que corre tras una pausa: el estado de React llegaría tarde.
+      salida.liberar()
       // Invalida listados y stats de facturas (la secuencia e-NCF avanzó).
       void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+      // La venta mueve existencia: el catálogo y el inventario en caché ya no son los de antes.
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['inventario'] })
       toast.success(`e-CF ${res.e_ncf} emitido (${dgiiLabel(res.estado_dgii)}).`, { id: tid })
       const created: Factura = {
         id: String(res.factura_id),
@@ -626,6 +694,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       if (incierta) {
         // La factura existe (en vuelo): el listado y la secuencia cambiaron.
         void queryClient.invalidateQueries({ queryKey: ['facturas'] })
+        // También existe para el aviso de salida: «Ver factura» no debe preguntar si se descartan las líneas.
+        salida.liberar()
         const f = facturaEmisionIncierta(incierta, {
           cliente: cliente?.nombre ?? 'Consumidor final',
           clienteId: cliente?.id ?? '',
@@ -644,6 +714,25 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           action: { label: 'Ver factura', onClick: () => nav('factura-ver', f, { replace: true }) },
         })
         // Sin setEmitting(false): el formulario queda bloqueado.
+        return
+      }
+      const faltantes = datosStockInsuficiente(e)
+      if (faltantes) {
+        // El API la rechazó ANTES de gastar el e-NCF: no se emitió nada y la factura
+        // sigue editable. El aviso trae lo que falta y la salida a Ajuste de inventario.
+        void queryClient.invalidateQueries({ queryKey: ['products'] })
+        void queryClient.invalidateQueries({ queryKey: ['inventario'] })
+        // Lo que el API dice que hay es lo más reciente que se sabe de esos productos.
+        setExistenciasVistas((m) => {
+          const n = new Map(m)
+          for (const f of faltantes) {
+            n.set(f.productId, { stock: f.disponible, nombre: f.nombre, esServicio: false, sku: f.sku, unidadMedida: f.unidadMedida })
+          }
+          return n
+        })
+        setRechazoExistencia({ faltantes, firma: firmaVenta })
+        toast.error('No se emitió la factura: no hay existencia suficiente. Mira el aviso sobre los totales.', { id: tid })
+        setEmitting(false)
         return
       }
       toast.error(e instanceof ApiError ? e.message : 'No se pudo emitir la factura.', { id: tid })
@@ -882,6 +971,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           {lineas.map((l, i) => {
             const le = errors.lineas[l.id]
             const c = calc(l)
+            // Aviso de existencia de esta línea (solo con la regla activa; ya trae las
+            // líneas repetidas del producto sumadas y salta servicios y notas de crédito).
+            const falta = estricto && l.prodId && l.tipoItem !== 'Servicio' && l.cant > 0 ? faltanteDe.get(Number(l.prodId)) : undefined
             return (
               <div className="fx-grid-ecf fx-row" key={l.id}>
                 <button
@@ -927,6 +1019,13 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                       {l.nombre.length}/80
                     </span>
                   </div>
+                  {/* Solo un aviso (ámbar, no rojo): Emitir sigue disponible y el API decide. */}
+                  {falta && (
+                    <span className="fx-err" style={{ color: 'var(--warning)' }}>
+                      <Icon name="alert-triangle" size={12} />
+                      Pides {fmtCantidad(falta.solicitado)} y hay {fmtCantidad(falta.disponible)} en existencia.
+                    </span>
+                  )}
 
                   {showDesc(l) && (
                     <>
@@ -1025,6 +1124,13 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             </button>
           </div>
         </section>
+
+        {/* --- Rechazo por existencia: lo que falta y la salida a Ajuste de inventario --- */}
+        {rechazo && (
+          <div ref={avisoExistenciaRef} style={{ marginTop: 24 }}>
+            <AvisoExistencia faltantes={rechazo.faltantes} nav={nav} />
+          </div>
+        )}
 
         {/* --- Observaciones + totales, como en una factura impresa --- */}
         <section className="fx-cierre">
@@ -1165,13 +1271,26 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             </div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
-              {catalogo.map((p) => (
-                <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
-                  <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
-                  <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div></div>
-                  <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
-                </div>
-              ))}
+              {catalogo.map((p) => {
+                const precio = <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
+                return (
+                  <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
+                    <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
+                    <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div></div>
+                    {estricto && p.tipo !== 'Servicio' ? (
+                      // Con la regla activa un Bien sin existencia anotada vale 0, igual que en el API (C18).
+                      // Agotado no impide elegirlo. En una nota de crédito (E34) o una entrada (E41) el
+                      // API no revisa la existencia: ahí solo se muestra el número, sin «Agotado».
+                      <div className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
+                        {precio}
+                        {ecfRevisaExistencia(tipo) && (p.stock == null || p.stock <= 0)
+                          ? <Badge tone="danger">Agotado</Badge>
+                          : <span className="text-xs muted">Existencia {fmtCantidad(p.stock ?? 0)}</span>}
+                      </div>
+                    ) : precio}
+                  </div>
+                )
+              })}
             </div>
           )}
         </Modal>

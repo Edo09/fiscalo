@@ -54,6 +54,7 @@ const ACCIONES: Record<string, string> = {
   NCF_SEQUENCE_UPDATE: 'Cambio de secuencia NCF',
   AJUSTE_CREAR: 'Ajuste de inventario',
   AJUSTE_ANULAR: 'Anulación de ajuste',
+  INVENTARIO_CONFIG: 'Regla de existencias',
   ASSIGN: 'Asignación de rol',
   LOGO_UPLOAD: 'Logo subido',
   LOGO_DELETE: 'Logo eliminado',

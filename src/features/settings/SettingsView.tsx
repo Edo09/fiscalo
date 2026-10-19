@@ -4,10 +4,11 @@ import { toast } from 'sonner'
 import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead, type IconName } from '@/components/ui'
 import { getEmisor, getStats, getBranding, uploadBrandingLogo, deleteBrandingLogo, listUbicaciones, formatApiDate, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { hasModule } from '@/config/permissions'
+import { esRolAdmin, hasModule } from '@/config/permissions'
 import { useSession } from '@/stores/auth'
 import { BrandingSection } from './BrandingSection'
 import { ImpresoraSection } from './ImpresoraSection'
+import { InventarioSection } from './InventarioSection'
 import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
 
 /* FISCALO — Configuración */
@@ -30,6 +31,9 @@ export function SettingsView() {
   // pero subir/quitar el logo y cambiar la plantilla exigen el módulo: sin él
   // el backend responde 403, así que ni se ofrecen.
   const puedeEditarBranding = !user?.permissions || hasModule(user.permissions, 'branding')
+  // Bloquear ventas sin existencia lo cambia solo el administrador (por nombre de rol,
+  // como la bitácora): el API responde 403 a cualquier otro rol.
+  const esAdmin = esRolAdmin(user?.role)
   const fileRef = useRef<HTMLInputElement>(null)
   const [sec, setSec] = useState('empresa')
   const [logoBusy, setLogoBusy] = useState(false)
@@ -83,9 +87,10 @@ export function SettingsView() {
     { id: 'fiscal', label: 'Configuración DGII', ic: 'landmark' },
     { id: 'numeracion', label: 'Numeraciones e-CF', ic: 'hash' },
     { id: 'plantillas', label: 'Plantillas PDF', ic: 'file-text' },
+    { id: 'inventario', label: 'Inventario', ic: 'package' },
     { id: 'impresora', label: 'Impresora de recibos', ic: 'printer' },
   ]
-  const secs = todasSecs.filter((s) => s.id !== 'plantillas' || puedeEditarBranding)
+  const secs = todasSecs.filter((s) => (s.id !== 'plantillas' || puedeEditarBranding) && (s.id !== 'inventario' || esAdmin))
   return (
     <div className="page page-wide">
       <PageHead title="Configuración" sub="Ajustes generales y fiscales del sistema" />
@@ -201,6 +206,8 @@ export function SettingsView() {
           )}
           {/* Guarda también aquí: /auth/me puede quitar el módulo con la sección abierta. */}
           {sec === 'plantillas' && puedeEditarBranding && <BrandingSection />}
+          {/* Guarda también aquí: /auth/me puede cambiar el rol con la sección abierta. */}
+          {sec === 'inventario' && esAdmin && <InventarioSection />}
           {sec === 'impresora' && <ImpresoraSection />}
         </div>
       </div>

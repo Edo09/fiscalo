@@ -14,8 +14,11 @@ import { API_BASE_URL } from '@/api/config'
 import { reducirFoto, TIPOS_FOTO, urlFoto } from '@/lib/fotoProducto'
 import type { UnidadMedida } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
+import { puedeVerVista, type Nav } from '@/config/navigation'
+import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { redondear } from '@/features/invoices/montosLinea'
-import { decimalesDe } from '@/lib/format'
+import { decimalesDe, fmtCantidad } from '@/lib/format'
+import { useSession } from '@/stores/auth'
 import type { Producto } from '@/types/domain'
 
 /** Largo máximo del nombre (columna products.nombre). */
@@ -30,8 +33,11 @@ const MAX_EXISTENCIA = 1e12
 /**
  * Qué está mal en la existencia o el stock mínimo, o null si está bien. Mismo
  * criterio que problemaCantidad (la unidad decide si hay fracciones, hasta 3
- * decimales), pero aquí el 0 vale y la existencia puede venir negativa: el
- * libro deja vender sin existencia, y bloquearla impediría editar el producto.
+ * decimales), pero aquí el 0 vale y la existencia puede venir negativa: con la
+ * empresa sin "Bloquear ventas sin existencia" (lo normal) el libro deja vender
+ * sin existencia, y bloquearla impediría editar el producto. Con el bloqueo
+ * activo la existencia no se escribe al editar (solo la cantidad inicial al
+ * crear): se mueve con Ajuste de inventario, así que ahí ni se juzga.
  *
  * `sinCambio`: al editar, el valor y la unidad son los que ya tenía el
  * producto. Entonces no se juzgan los decimales ni la unidad, igual que el
@@ -88,6 +94,12 @@ interface ProductFormModalProps {
   initial?: ProductoInicial
   onClose: () => void
   /**
+   * Para el enlace a Ajuste de inventario que sale cuando la empresa bloquea las
+   * ventas sin existencia y la existencia no se puede escribir aquí. Sin `nav`
+   * (el alta desde una factura) el aviso sale sin enlace.
+   */
+  nav?: Nav
+  /**
    * Tras guardar o eliminar. Al CREAR recibe el producto recién creado, para que
    * quien abrió el modal pueda enlazarlo en el acto (la factura necesita el id:
    * sin él la venta no descuenta inventario). En editar/eliminar llega null.
@@ -95,9 +107,16 @@ interface ProductFormModalProps {
   onSaved: (creado?: Producto | null) => void
 }
 
-export function ProductFormModal({ product, initial, onClose, onSaved }: ProductFormModalProps) {
+export function ProductFormModal({ product, initial, nav, onClose, onSaved }: ProductFormModalProps) {
   const queryClient = useQueryClient()
+  const { user } = useSession()
   const editing = product !== null
+  // Con "Bloquear ventas sin existencia" activo la existencia solo la mueve el libro
+  // (spec control de existencias, C7): al editar es de solo lectura (el API ignora el
+  // `stock` que llegue); al crear se escribe la cantidad inicial, que el API registra
+  // como inventario inicial.
+  const estricto = useInventarioEstricto() === true
+  const stockSoloLectura = estricto && editing
   const [nombre, setNombre] = useState(
     product && product.nombre !== '—' ? product.nombre : (initial?.nombre ?? ''),
   )
@@ -161,8 +180,13 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
   const sinCambio = (valor: string, original: number | null | undefined) =>
     editing && product != null && unidadMedida === product.unidadMedida && original != null &&
     valor.trim() !== '' && Number.isFinite(Number(valor)) && Math.abs(Number(valor) - original) < 0.0005
-  const problemaStock = tipo === 'Bien'
-    ? problemaExistencia(stock, 'la existencia', unidadMedida, unidades, sinCambio(stock, product?.stock))
+  // Con el bloqueo activo, la cantidad inicial del alta pasa por el libro como una
+  // entrada: un negativo lo rechazaría el API, así que se avisa aquí, bajo el campo.
+  const inicialNegativa = estricto && !editing && stock.trim() !== '' && Number(stock) < 0
+  const problemaStock = tipo === 'Bien' && !stockSoloLectura
+    ? inicialNegativa
+      ? 'La existencia inicial no puede ser negativa.'
+      : problemaExistencia(stock, 'la existencia', unidadMedida, unidades, sinCambio(stock, product?.stock))
     : null
   const problemaMin = tipo === 'Bien'
     ? problemaExistencia(stockMin, 'el stock mínimo', unidadMedida, unidades, sinCambio(stockMin, product?.min))
@@ -199,6 +223,9 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
       unidad_medida: String(unidadMedida),
       precio: Number(precio) || 0,
       costo: Number(costo) || 0,
+      // `stock` viaja siempre, también al editar con el bloqueo activo: el API lo ignora en
+      // ese caso y el libro es quien lo mueve. La bandera del navegador puede estar vieja (el
+      // admin apagó el bloqueo en otra sesión) y sin la clave el API borraría la existencia.
       stock: tipo === 'Servicio' || stock === '' ? null : Number(stock),
       stock_minimo: stockMin === '' ? null : Number(stockMin),
       activo,
@@ -248,6 +275,11 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
       }
       // Invalida la caché de productos en TODAS las vistas (lista y picker de factura).
       void queryClient.invalidateQueries({ queryKey: ['products'] })
+      // Con el bloqueo activo, una existencia inicial al crear la registra el API como
+      // ajuste INVENTARIO_INICIAL: «Ajuste de inventario» y «Valor de inventario» en caché no
+      // lo tienen. No se mira `estricto`: la bandera del navegador puede estar vieja y
+      // invalidar de más es barato.
+      if (!editing && payload.stock !== null) void queryClient.invalidateQueries({ queryKey: ['inventario'] })
       if (errorAlSubir) {
         toast.error(`El producto "${payload.nombre}" se guardó, pero la foto no: ${errorAlSubir}`)
       } else {
@@ -389,12 +421,20 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
           <>
             <div className={'field' + (problemaStock ? ' field-error' : '')}>
               <label className="label">Existencia</label>
-              <input
-                className="input num" type="number" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
-                value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—"
-                aria-invalid={problemaStock != null || undefined}
-              />
+              {stockSoloLectura ? (
+                // Un Bien sin existencia anotada vale 0 para el bloqueo: se ve igual que en la lista.
+                <input className="input num" readOnly value={fmtCantidad(Number(stock) || 0)} />
+              ) : (
+                <input
+                  className="input num" type="number" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
+                  value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—"
+                  aria-invalid={problemaStock != null || undefined}
+                />
+              )}
               {problemaStock && <div className="err-msg">{problemaStock}</div>}
+              {estricto && !editing && (
+                <div className="hint">Cantidad con la que abre el inventario; después solo cambia con un ajuste.</div>
+              )}
             </div>
             <div className={'field' + (problemaMin ? ' field-error' : '')}>
               <label className="label">Stock mínimo</label>
@@ -405,6 +445,21 @@ export function ProductFormModal({ product, initial, onClose, onSaved }: Product
               />
               {problemaMin && <div className="err-msg">{problemaMin}</div>}
             </div>
+            {stockSoloLectura && (
+              <div className="field full">
+                <div className="row gap-sm hint" style={{ marginTop: 0, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <span>
+                    Tu empresa bloquea las ventas sin existencia: aquí la existencia no se escribe. Cambia con un
+                    ajuste de inventario o al registrar una compra.
+                  </span>
+                  {nav && puedeVerVista(user, 'ajuste-nuevo') && (
+                    <Btn variant="secondary" size="sm" icon="git-compare" onClick={() => nav('ajuste-nuevo')}>
+                      Ir a Ajuste de inventario
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
         <div className="field full">

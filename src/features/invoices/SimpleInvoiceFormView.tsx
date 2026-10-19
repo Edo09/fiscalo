@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Icon, Btn, Money, Card, Modal, PageHead, LoadingState, ErrorState, Dropdown, MenuItem } from '@/components/ui'
+import { Icon, Btn, Badge, Money, Card, Modal, PageHead, LoadingState, ErrorState, Dropdown, MenuItem } from '@/components/ui'
 import {
-  ApiError, createFacturaSimple, getBranding, getClient, getEmisor, getFacturaSimple, getFacturaSimplePdf,
+  ApiError, createFacturaSimple, getBranding, getClient, getEmisor, getFacturaSimple, getFacturaSimplePdf, getProduct,
   listProducts, mapClientRow, mapProductRow, previewFacturaSimple, previewReciboFacturaSimple, updateFacturaSimple,
 } from '@/api'
 import type { DocBase64, FacturaSimpleInput, FacturaSimpleItemInput, FormatoImpresion, ReciboDatos } from '@/api'
@@ -11,12 +11,17 @@ import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { NewClientModal } from '@/features/clients/NewClientModal'
 import { NombreClienteLibre } from '@/features/clients/NombreClienteLibre'
 import { MSG_SIN_PRECIO } from '@/features/conduces/conversion'
+import { AvisoExistencia } from '@/features/inventory/AvisoExistencia'
+import {
+  consumoPorProducto, datosStockInsuficiente, faltantesLocales, type ExistenciaConocida, type FaltanteStock,
+} from '@/features/inventory/existencia'
+import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument, printDocument } from '@/lib/file'
 import { hoyLocal } from '@/lib/date'
-import { aNumero } from '@/lib/format'
+import { aNumero, fmtCantidad } from '@/lib/format'
 import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/components/unidadesMedida'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
@@ -84,6 +89,13 @@ interface Linea {
 const lineaVacia = (id: number, desc = 0): Linea => ({
   id, prodId: '', descripcion: '', cantidad: 1, precio: 0, desc, unidadMedida: null,
 })
+
+/** Lo que el catálogo dice de la existencia de un producto (ver faltantesLocales). */
+function existenciaDe(p: Producto): ExistenciaConocida {
+  return {
+    stock: p.stock, nombre: p.nombre, esServicio: p.tipo === 'Servicio', sku: p.sku || null, unidadMedida: String(p.unidadMedida),
+  }
+}
 
 /**
  * % de descuento que reproduce el monto guardado. Con 2 decimales a veces no
@@ -196,6 +208,20 @@ export function SimpleInvoiceFormView({
   const anchoTirilla = useAnchoTirilla()
   /** Foto del documento tal como se cargó: sirve para marcar qué se tocó. */
   const [original, setOriginal] = useState<{ fecha: string; metodo: string; lineas: Linea[] } | null>(null)
+
+  // Control de existencias (spec control-existencias-ventas): todo lo que sigue
+  // existe solo con "Bloquear ventas sin existencia" activo en la empresa. Sin la
+  // regla (o mientras no se sabe, null) la factura se comporta como siempre.
+  const estricto = useInventarioEstricto() === true
+  // Lo que el API rechazó con STOCK_INSUFICIENTE y con qué productos y cantidades.
+  // El aviso vale para ESA venta: en cuanto cambian, se retira.
+  const [rechazoExistencia, setRechazoExistencia] = useState<{ faltantes: FaltanteStock[]; firma: string } | null>(null)
+  // Existencia de los productos de las líneas. El catálogo en pantalla cambia con
+  // cada búsqueda y no siempre trae los de las líneas (sobre todo al editar).
+  const [existenciasVistas, setExistenciasVistas] = useState<Map<number, ExistenciaConocida>>(() => new Map())
+  /** Productos de los que ya se sabe la existencia o ya se pidió: no se piden dos veces. */
+  const existenciaPedida = useRef<Set<number>>(new Set())
+  const avisoExistenciaRef = useRef<HTMLDivElement | null>(null)
 
   // Identidad del emisor: el papel muestra los mismos datos que se van a
   // imprimir. Misma clave de caché que Configuración, así no se repite la
@@ -362,6 +388,9 @@ export function SimpleInvoiceFormView({
         ? [...ls.slice(0, -1), desde(ultima.id)]
         : [...ls, desde(Math.max(0, ...ls.map((l) => l.id)) + 1)]
     })
+    // La existencia que tenía el catálogo al elegirlo: la línea la usa aunque la búsqueda cambie.
+    existenciaPedida.current.add(Number(p.id))
+    setExistenciasVistas((m) => new Map(m).set(Number(p.id), existenciaDe(p)))
     setCatalogoAbierto(false)
     setBuscaProd('')
   }
@@ -512,6 +541,50 @@ export function SimpleInvoiceFormView({
   const puedeGuardar = motivoBloqueo == null && !guardando
   const marcarCliente = intentoFallido && problemaCliente != null
 
+  // --- Existencia (solo con la regla activa) ---
+  // Aviso ANTES de guardar: lo que el navegador sabe puede tener hasta 3 minutos,
+  // así que solo avisa y nunca bloquea Guardar (C10): el API tiene la última
+  // palabra. El catálogo vigente pisa lo guardado al elegir cada producto.
+  const existencias = new Map(existenciasVistas)
+  for (const p of catalogo) existencias.set(Number(p.id), existenciaDe(p))
+  // Lo que viaja al API: solo las líneas válidas, con la cantidad a 3 decimales.
+  const consumo = consumoPorProducto(
+    lineasValidas.map((l) => ({ productId: l.prodId ? Number(l.prodId) : null, cantidad: cantDe(l) })),
+  )
+  // Al editar, lo que la factura ya tiene descontado cuenta como existencia: el API
+  // revierte sus líneas guardadas antes de revisar las nuevas (C13), así que subir de
+  // 3 a 5 con existencia 1 falta 1, no 4. Las líneas son las de la carga (`original`).
+  const credito = consumoPorProducto(
+    (original?.lineas ?? []).map((l) => ({ productId: l.prodId ? Number(l.prodId) : null, cantidad: redondear(l.cantidad, 3) })),
+  )
+  const faltanteDe = new Map((estricto ? faltantesLocales(consumo, existencias, credito) : []).map((f) => [f.productId, f]))
+  // Identifica la venta que el API rechazó: otro producto o cantidad la retira (una
+  // línea libre o un servicio no cambian lo que se pide de existencia).
+  const firmaVenta = [...consumo].sort((a, b) => a[0] - b[0]).map(([id, cant]) => `${id}:${cant}`).join(',')
+  const rechazo = rechazoExistencia?.firma === firmaVenta ? rechazoExistencia : null
+  // El aviso suele quedar fuera de pantalla (Guardar está en la barra de abajo): se lleva a la vista.
+  useEffect(() => {
+    if (rechazo) avisoExistenciaRef.current?.scrollIntoView({ block: 'center' })
+  }, [rechazo])
+
+  // Al editar una factura o convertir una cotización las líneas ya traen su producto
+  // y el catálogo en pantalla (una página de la búsqueda) no siempre lo incluye: se
+  // pide su existencia, una vez por producto. Sin la regla activa no se pide nada.
+  const idsProductos = [...new Set(lineas.filter((l) => l.prodId).map((l) => l.prodId))].join(',')
+  useEffect(() => {
+    if (!estricto || !idsProductos) return
+    for (const id of idsProductos.split(',').map(Number)) {
+      if (existenciaPedida.current.has(id)) continue
+      existenciaPedida.current.add(id)
+      getProduct(id)
+        .then((fila) => {
+          // Lo que llegó del rechazo del API o del catálogo es más reciente: no se pisa.
+          setExistenciasVistas((m) => (m.has(id) ? m : new Map(m).set(id, existenciaDe(mapProductRow(fila)))))
+        })
+        .catch(() => { /* Solo un aviso: sin el dato, esa línea simplemente no se marca. */ })
+    }
+  }, [estricto, idsProductos])
+
   const items = (): FacturaSimpleItemInput[] =>
     lineasValidas.map((l) => ({
       ...(l.prodId ? { product_id: Number(l.prodId) } : {}),
@@ -633,6 +706,8 @@ export function SimpleInvoiceFormView({
   const guardar = useAccionUnica(async (imprimir: FormatoImpresion | null) => {
     if (!puedeGuardar) return
     setGuardando(true)
+    // Cada intento empieza sin el aviso de existencia del anterior.
+    setRechazoExistencia(null)
     let id: number | undefined
     try {
       if (editando && facturaId != null) {
@@ -644,11 +719,38 @@ export function SimpleInvoiceFormView({
         id = creada?.id
         toast.success(`Factura simple ${creada?.no_factura ?? ''} creada.`)
       }
+      // La venta mueve existencia (al editar, devuelve la de antes y descuenta la nueva):
+      // el catálogo y el inventario en caché ya no son los de antes.
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['inventario'] })
       await queryClient.invalidateQueries({ queryKey: ['facturas-simples'] })
       if (!montado.current) return
       salida.liberar()
       nav('facturas-simples', null, { replace: true })
     } catch (e) {
+      const faltantes = datosStockInsuficiente(e)
+      if (faltantes) {
+        // El API la rechazó y no guardó nada: la factura sigue editable. El aviso trae
+        // lo que falta y la salida a Ajuste de inventario.
+        void queryClient.invalidateQueries({ queryKey: ['products'] })
+        void queryClient.invalidateQueries({ queryKey: ['inventario'] })
+        // Lo que el API dice que hay es lo más reciente que se sabe de esos productos.
+        // Su `disponible` ya suma lo que esta factura tiene guardada (C13) y `faltante`
+        // es solicitado - (existencia + crédito): la existencia propia es lo que sobra.
+        setExistenciasVistas((m) => {
+          const n = new Map(m)
+          for (const f of faltantes) {
+            n.set(f.productId, {
+              stock: redondear(f.solicitado - f.faltante - (credito.get(f.productId) ?? 0), 3),
+              nombre: f.nombre, esServicio: false, sku: f.sku, unidadMedida: f.unidadMedida,
+            })
+          }
+          return n
+        })
+        setRechazoExistencia({ faltantes, firma: firmaVenta })
+        toast.error('No se guardó la factura: no hay existencia suficiente. Mira el aviso sobre los totales.')
+        return
+      }
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la factura.')
       return
     } finally {
@@ -847,7 +949,12 @@ export function SimpleInvoiceFormView({
             <span style={{ textAlign: 'right' }}>Importe</span>
           </div>
 
-          {lineas.map((l, i) => (
+          {lineas.map((l, i) => {
+            // Aviso de existencia de esta línea (solo con la regla activa; ya trae las
+            // líneas repetidas del producto sumadas y salta servicios y líneas libres).
+            const falta = estricto && l.prodId && esValida(l) ? faltanteDe.get(Number(l.prodId)) : undefined
+            const conCredito = falta != null && (credito.get(falta.productId) ?? 0) > 0
+            return (
             <div
               className={'fx-grid fx-row' + (esLineaNueva(l.id) ? ' fx-row-nueva' : '')
                 + ((!esValida(l) && !estaEnBlanco(l)) || cantidadMal(l) || sinPrecio(l) ? ' fx-row-incompleta' : '')}
@@ -918,8 +1025,19 @@ export function SimpleInvoiceFormView({
                   <Icon name="alert-circle" size={12} />{MSG_SIN_PRECIO}
                 </span>
               )}
+
+              {/* Solo un aviso (ámbar, no rojo): Guardar sigue disponible y el API decide.
+                  Al editar, lo que hay incluye lo que esta factura ya tiene descontado. */}
+              {falta && (
+                <span className="fx-err" style={{ gridColumn: '1 / -1', color: 'var(--warning)' }}>
+                  <Icon name="alert-triangle" size={12} />
+                  Pides {fmtCantidad(falta.solicitado)} y hay {fmtCantidad(falta.disponible)}
+                  {conCredito ? ' disponibles, contando lo que esta factura ya tiene.' : ' en existencia.'}
+                </span>
+              )}
             </div>
-          ))}
+            )
+          })}
 
           <div className="fx-add-row">
             <button type="button" className="fx-add" onClick={() => setCatalogoAbierto(true)}>
@@ -952,6 +1070,13 @@ export function SimpleInvoiceFormView({
             </div>
           )}
         </section>
+
+        {/* --- Rechazo por existencia: lo que falta y la salida a Ajuste de inventario --- */}
+        {rechazo && (
+          <div ref={avisoExistenciaRef} style={{ marginTop: 24 }}>
+            <AvisoExistencia faltantes={rechazo.faltantes} nav={nav} />
+          </div>
+        )}
 
         {/* --- Totales --- */}
         <section className="fx-totales">
@@ -1095,16 +1220,28 @@ export function SimpleInvoiceFormView({
             </div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -10px' }}>
-              {catalogo.map((p) => (
-                <button type="button" key={p.id} className="fx-prod" onClick={() => addProducto(p)}>
-                  <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} style={{ color: 'var(--text-3)' }} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="fx-prod-nombre" style={{ display: 'block' }}>{p.nombre}</span>
-                    <span className="fx-prod-meta">{p.sku || 'sin SKU'} · {p.cat || 'sin categoría'}</span>
-                  </span>
-                  <span className="fx-prod-precio"><Money value={p.precio} cur={false} /></span>
-                </button>
-              ))}
+              {catalogo.map((p) => {
+                const precio = <span className="fx-prod-precio"><Money value={p.precio} cur={false} /></span>
+                return (
+                  <button type="button" key={p.id} className="fx-prod" onClick={() => addProducto(p)}>
+                    <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} style={{ color: 'var(--text-3)' }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span className="fx-prod-nombre" style={{ display: 'block' }}>{p.nombre}</span>
+                      <span className="fx-prod-meta">{p.sku || 'sin SKU'} · {p.cat || 'sin categoría'}</span>
+                    </span>
+                    {estricto && p.tipo !== 'Servicio' ? (
+                      // Con la regla activa un Bien sin existencia anotada vale 0, igual que en el API (C18).
+                      // Agotado no impide elegirlo: el aviso de la línea lo dice y el API decide (C10).
+                      <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
+                        {precio}
+                        {p.stock == null || p.stock <= 0
+                          ? <Badge tone="danger">Agotado</Badge>
+                          : <span className="text-xs muted">Existencia {fmtCantidad(p.stock)}</span>}
+                      </span>
+                    ) : precio}
+                  </button>
+                )
+              })}
             </div>
           )}
         </Modal>

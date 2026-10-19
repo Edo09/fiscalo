@@ -95,6 +95,40 @@ export function anularAjuste(id: number | string, nota?: string): Promise<Ajuste
   })
 }
 
+/** Configuración de existencias de la empresa (GET/PUT /api/inventario/configuracion). */
+export interface ConfiguracionInventario {
+  /** La empresa rechaza las facturas que piden más de lo que hay (master tenants.inventario_estricto). */
+  bloquear_sin_existencia: boolean
+  /** Bienes activos con existencia vacía o en 0 o menos: lo que dejaría de poder venderse al activarlo. */
+  productos_sin_existencia: number
+}
+
+/** Lo que manda la API: el contador puede venir como texto y la bandera como 0/1. */
+type ConfiguracionInventarioApi = {
+  bloquear_sin_existencia: boolean | number | string
+  productos_sin_existencia: number | string
+}
+
+const aConfiguracionInventario = (c: ConfiguracionInventarioApi): ConfiguracionInventario => ({
+  bloquear_sin_existencia: c.bloquear_sin_existencia === true || c.bloquear_sin_existencia === 1 || c.bloquear_sin_existencia === '1',
+  productos_sin_existencia: aNumero(c.productos_sin_existencia),
+})
+
+/** Cualquier usuario con sesión la puede leer; cambiarla es solo del administrador. */
+export async function getConfiguracionInventario(): Promise<ConfiguracionInventario> {
+  return aConfiguracionInventario(await getJson<ConfiguracionInventarioApi>('/api/inventario/configuracion'))
+}
+
+/** Activa o desactiva el bloqueo de ventas sin existencia (solo administrador; 403 para otro rol). */
+export async function updateConfiguracionInventario(bloquear: boolean): Promise<ConfiguracionInventario> {
+  const res = await request<ConfiguracionInventarioApi>('/api/inventario/configuracion', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bloquear_sin_existencia: bloquear }),
+  })
+  return aConfiguracionInventario(res)
+}
+
 /** Kardex: todos los movimientos de un producto, del más reciente al más viejo. */
 export function listMovimientos(
   productId: number | string,

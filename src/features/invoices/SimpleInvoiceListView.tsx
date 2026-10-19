@@ -85,6 +85,9 @@ export function SimpleInvoiceListView({ nav }: { nav: Nav }) {
       await deleteFacturaSimple(confirmDel.id)
       toast.success(`Factura ${confirmDel.no_factura} eliminada.`)
       setConfirmDel(null)
+      // Eliminarla devuelve la existencia: el catálogo y el inventario en caché ya no son los de antes.
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['inventario'] })
       await queryClient.invalidateQueries({ queryKey: ['facturas-simples'] })
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo eliminar la factura.')

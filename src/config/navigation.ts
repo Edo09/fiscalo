@@ -67,9 +67,22 @@ export interface ConduceRef { kind: 'conduce'; id: number }
 /** Conduce nuevo a partir de una cotización de Ferretería (botón "Conduce"). */
 export interface ConduceDesdeCotizacion { kind: 'conduce-desde-cotizacion'; cotizacionId: number }
 
+/**
+ * Ajuste de inventario con las líneas ya puestas: lo que el aviso de existencia
+ * de una factura manda a `ajuste-nuevo` (botón "Ir a Ajuste de inventario"). Cada
+ * línea trae el producto y la cantidad que le falta a la venta; el formulario
+ * trae el resto (nombre, existencia, costo) del producto mismo. Solo las líneas:
+ * al guardar o cancelar el ajuste se va al listado de Ajustes, no de vuelta a la
+ * venta (spec control de existencias, C16).
+ */
+export interface AjustePrefill {
+  kind: 'ajuste-prefill'
+  lineas: { productId: number; cantidad: number }[]
+}
+
 export type NavPayload =
   | Factura | EcfTipo | FacturaPrefill | FacturaSimplePrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef
-  | ConduceRef | ConduceDesdeCotizacion | null
+  | ConduceRef | ConduceDesdeCotizacion | AjustePrefill | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
@@ -116,6 +129,34 @@ export function isConduceDesdeCotizacion(p: unknown): p is ConduceDesdeCotizacio
   return p != null && (p as ConduceDesdeCotizacion).kind === 'conduce-desde-cotizacion'
 }
 
+/**
+ * ¿El payload es un ajuste con líneas ya puestas? Se valida la forma entera
+ * (productos enteros positivos y cantidades mayores que 0): el formulario de
+ * Ajuste las usa tal cual para pedir cada producto al API, y un ajuste de 0 no
+ * es válido. Lo que no cumpla se trata como un ajuste en blanco.
+ */
+export function isAjustePrefill(p: unknown): p is AjustePrefill {
+  if (p === null || typeof p !== 'object' || (p as AjustePrefill).kind !== 'ajuste-prefill') return false
+  const lineas: unknown = (p as AjustePrefill).lineas
+  return Array.isArray(lineas) && lineas.every((l: unknown) => {
+    if (l === null || typeof l !== 'object') return false
+    const { productId, cantidad } = l as { productId?: unknown; cantidad?: unknown }
+    return typeof productId === 'number' && Number.isInteger(productId) && productId > 0
+      && typeof cantidad === 'number' && Number.isFinite(cantidad) && cantidad > 0
+  })
+}
+
+/**
+ * La `key` con que App monta el formulario de Ajuste: una por borrador, porque el
+ * formulario toma las líneas del prefill solo al montarse (después son estado
+ * propio). Dos prefills con las mismas líneas son el mismo borrador (misma key,
+ * como en mismoDestino); un ajuste en blanco es siempre 'nuevo', así que abrir
+ * "Crear ajuste" de nuevo no borra lo que ya se escribió.
+ */
+export function claveFormularioAjuste(prefill: AjustePrefill | null): string {
+  return prefill ? `prefill-${prefill.lineas.map((l) => `${l.productId}x${l.cantidad}`).join(',')}` : 'nuevo'
+}
+
 /** ¿El payload pide abrir el formulario de "nuevo" (desde el botón Nueva)? */
 export function isNuevoSignal(p: NavPayload): p is NuevoSignal {
   return p != null && (p as NuevoSignal).kind === 'nuevo'
@@ -155,6 +196,11 @@ export function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayl
   if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
   if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
   if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
+  // Dos ajustes con las mismas líneas (mismo producto y cantidad, en el mismo orden) abren lo mismo.
+  if (isAjustePrefill(p1) && isAjustePrefill(p2)) {
+    return p1.lineas.length === p2.lineas.length
+      && p1.lineas.every((l, i) => l.productId === p2.lineas[i].productId && l.cantidad === p2.lineas[i].cantidad)
+  }
   if (v1 === 'conduce-editar' && isNuevoSignal(p1) && isNuevoSignal(p2)) return true
   return false
 }

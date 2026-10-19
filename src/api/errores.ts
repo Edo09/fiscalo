@@ -27,7 +27,10 @@ export interface OpcionesApiError {
   reemplazado?: boolean
   /** error_id del ErrorHandler del backend: el código que soporte busca en el log. */
   referencia?: string | null
-  /** Código propio del front para casos que una pantalla trata distinto (ver CODIGO_*). */
+  /**
+   * Código para casos que una pantalla trata distinto: uno propio del front (ver
+   * CODIGO_*) o el `codigo` que el servidor manda en el sobre de error (codigoDe).
+   */
   codigo?: string | null
   /** `data` que acompañaba al error (p. ej. el e-NCF guardado de un rechazo DGII). */
   datos?: unknown
@@ -420,14 +423,27 @@ export function textoError(body: unknown): string | null {
 }
 
 /**
+ * El `codigo` del sobre ({status:false, error, codigo:'STOCK_INSUFICIENTE', data}),
+ * solo si es un texto con contenido. Es el código que el SERVIDOR manda para que
+ * la pantalla trate un error distinto (ver features/inventory/existencia.ts).
+ */
+export function codigoDe(body: unknown): string | null {
+  const c = (body as { codigo?: unknown } | null)?.codigo
+  return typeof c === 'string' && c.trim() ? c.trim() : null
+}
+
+/**
  * ApiError para una respuesta de error del servidor. `raw` = texto del sobre
  * (null si no vino). Si el texto se reemplaza, el original va a la consola.
+ * `datos` = el `data` del sobre y `codigo` = su `codigo` (codigoDe): ninguno de
+ * los dos se pierde aunque el texto se reemplace.
  */
 export function errorDeRespuesta(
   raw: string | null,
   status: number,
   ctx: ContextoError = {},
   datos?: unknown,
+  codigo?: string | null,
 ): ApiError {
   const referencia = ctx.referencia ?? referenciaDe(null, raw)
   const c = { ...ctx, referencia }
@@ -437,7 +453,7 @@ export function errorDeRespuesta(
   if (reemplazado && !ctx.ilegible) {
     avisarReemplazo(raw ? 'mensaje técnico reemplazado' : 'error sin texto del servidor', c, status, original)
   }
-  return new ApiError(mensaje, status, { original, delServidor: raw !== null, reemplazado, referencia, datos })
+  return new ApiError(mensaje, status, { original, delServidor: raw !== null, reemplazado, referencia, codigo, datos })
 }
 
 /**

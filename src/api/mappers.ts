@@ -3,6 +3,7 @@ import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserR
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { aNumero, colorFor } from '@/lib/format'
 import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
+import { estadoExistencia } from '@/features/inventory/existencia'
 import { dgiiLabel } from './estadosDgii'
 
 // Etiquetas y preguntas sobre el estado DGII: viven en estadosDgii.ts (sin
@@ -75,22 +76,40 @@ export function mapUserRow(r: UserRow): UsuarioRow {
 
 /** Mapea una fila de `products` al tipo Producto de la UI. */
 export function mapProductRow(r: ProductRow): Producto {
+  return armarProducto(r, false)
+}
+
+/**
+ * Lo mismo que mapProductRow, pero con la existencia que ve Productos cuando la
+ * empresa bloquea las ventas sin existencia (C18): un Bien con la existencia en
+ * blanco se ve como 0 y «Agotado». `estricto` es el valor de useInventarioEstricto().
+ *
+ * Es una función aparte y no un segundo parámetro de mapProductRow porque las
+ * pantallas la usan como `.map(mapProductRow)`, y `map` pasaría el índice de la
+ * fila como esa bandera.
+ */
+export function mapProductRowConRegla(r: ProductRow, estricto: boolean): Producto {
+  return armarProducto(r, estricto)
+}
+
+function armarProducto(r: ProductRow, estricto: boolean): Producto {
   const ind = Number(r.indicador_facturacion ?? 1)
   // Tasa de ITBIS derivada del indicador: 1=18%, 2=16%, lo demás (3/4/0)=exento.
   const itbis = ind === 1 ? 18 : ind === 2 ? 16 : 0
-  const tipo = Number(r.indicador_bien_servicio ?? 1) === 2 ? 'Servicio' : 'Producto'
+  const esServicio = Number(r.indicador_bien_servicio ?? 1) === 2
+  const tipo = esServicio ? 'Servicio' : 'Producto'
   // Desde la migración 025 stock y stock_minimo son DECIMAL y llegan como texto
   // ("10.000"). Sin convertirlos, `stock <= min` comparaba dos textos letra por
   // letra ("10.000" <= "9.000" da true) y el producto salía como Bajo sin estarlo.
-  const stock = r.stock == null || r.stock === '' ? null : aNumero(r.stock)
+  // Con la regla de bloqueo activa, un Bien en blanco vale 0 (estadoExistencia).
+  const { stock, agotado } = estadoExistencia(r.stock == null || r.stock === '' ? null : aNumero(r.stock), esServicio, estricto)
   const min = r.stock_minimo == null || r.stock_minimo === '' ? null : aNumero(r.stock_minimo)
   const activo = r.activo === undefined || r.activo === null ? true : Boolean(Number(r.activo))
 
   let estado: string
   if (!activo) estado = 'Inactivo'
-  else if (stock === null) estado = 'Disponible'
-  else if (stock <= 0) estado = 'Agotado'
-  else if (min != null && stock <= min) estado = 'Bajo'
+  else if (agotado) estado = 'Agotado'
+  else if (stock !== null && min != null && stock <= min) estado = 'Bajo'
   else estado = 'Disponible'
 
   return {

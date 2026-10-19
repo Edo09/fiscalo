@@ -47,8 +47,9 @@ import { useSession, getToken, setSession } from '@/stores/auth'
 import { me } from '@/api/auth'
 import { useHistoryNav } from '@/hooks/useHistoryNav'
 import {
-  claveEditorConduce, claveFormularioFactura, debeSalirDeVista, isCotizacionRef, isFacturaPrefill,
-  isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, payloadConduce, type Nav, type ViewId,
+  claveEditorConduce, claveFormularioAjuste, claveFormularioFactura, debeSalirDeVista, isAjustePrefill, isCotizacionRef,
+  isFacturaPrefill, isFacturaSimplePrefill, isFacturaSimpleRef, isNuevoSignal, navTopFor, payloadConduce, type Nav,
+  type ViewId,
 } from '@/config/navigation'
 import type { EcfTipo, Factura } from '@/types/domain'
 
@@ -229,12 +230,18 @@ function AppShell() {
         return <ConduceEditor key={claveEditorConduce(p)} nav={nav} payload={p} />
       }
       case 'clientes': return <ClientsView nav={nav} />
-      case 'productos': return <ProductsView />
+      case 'productos': return <ProductsView nav={nav} />
       case 'categorias': return <CategoriesView />
       case 'almacenes': return <WarehousesView />
       case 'ajustes': return <AdjustmentsView nav={nav} />
       case 'inventario-valor': return <InventoryValueView />
-      case 'ajuste-nuevo': return <AdjustmentFormView nav={nav} />
+      // Con prefill (el aviso de existencia de una factura): las líneas de lo que falta, ya
+      // puestas. Con key por prefill, como los borradores de factura: el formulario las toma
+      // solo al montarse. Sin prefill, la key fija 'nuevo': "Crear ajuste" no borra lo escrito.
+      case 'ajuste-nuevo': {
+        const prefill = isAjustePrefill(payload) ? payload : null
+        return <AdjustmentFormView key={claveFormularioAjuste(prefill)} nav={nav} prefill={prefill} />
+      }
       case 'ecf': return <EcfDashboardView nav={nav} />
       case 'ecf-tipo': return <EcfTypeView tipo={payload as EcfTipo | null} nav={nav} />
       case 'aprobar-ecf': return <ApproveEcfView />
