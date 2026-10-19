@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://gratex.net/api/:path*"
+      "destination": "https://smh.ynz.temporary.site/api/:path*"
     },
     {
       "source": "/(.*)",
