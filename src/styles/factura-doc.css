@@ -888,6 +888,51 @@
   .fx-doc-datos { grid-template-columns: 1fr; gap: 18px; }
 }
 
+/* Factura simple: cliente y pago sobre la misma línea. Sin tipo de comprobante
+   ni ITBIS que poner al lado (ver .fx-doc-datos), el cliente toma todo el ancho
+   que sobra y el pago, una columna a su derecha. Las bases son lo mínimo que
+   cada uno necesita para no cortarse: el buscador ("Buscar cliente por nombre,
+   RNC o código…") y el método más largo ("Crédito 30 días"). Si no caben
+   juntos (teléfono), el pago baja y cada uno ocupa su renglón. */
+.fx-receptor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 20px;
+}
+
+.fx-receptor-cliente { flex: 4 1 400px; min-width: 0; }
+.fx-receptor-pago { flex: 1 1 190px; min-width: 0; }
+
+.fx-receptor .fx-eyebrow { display: block; }
+
+/* El pago mide lo que el buscador (40px). El cliente ya elegido —de la lista o el
+   de una factura guardada— lo iguala, para que los subrayados de los dos campos
+   queden a la misma altura en cualquier estado. */
+.fx-receptor .fx-cliente .input.row.between { min-height: 40px; }
+.fx-receptor .fx-cliente-actual { min-height: 40px; padding-block: 8px; }
+
+/* El pago se anuncia igual que el campo de cliente (fondo tenue + subrayado
+   permanente) y con su misma altura: Cliente y Pago se leen como hermanos, no
+   como un campo y un texto suelto. Va después de .fx-cond-sel para pisarlo. */
+.fx-cond-sel--campo {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-top: 4px;
+  padding: 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border-bottom-width: 1.5px;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+/* Con la marca de "cambiado" (.fx-mod) manda el ámbar, también al pasar el ratón. */
+.fx-cond-sel--campo:not(.fx-mod):hover { background: var(--surface-hover); }
+.fx-cond-sel--campo:not(.fx-mod):focus-visible { background: var(--accent-soft); }
+
 /* Rejilla de lineas del e-CF (8 columnas). */
 .fx-grid-ecf {
   display: grid;

@@ -845,7 +845,7 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         {/* --- Receptor --- */}
         <section className="fx-a-quien">
           <span className="fx-eyebrow">
-            Facturar a {requiereCliente ? <span className="req">*</span> : <span className="opt">(opcional)</span>}
+            Cliente {requiereCliente ? <span className="req">*</span> : <span className="opt">(opcional)</span>}
           </span>
           <div className="fx-cliente-row">
             <div className="fx-cliente">

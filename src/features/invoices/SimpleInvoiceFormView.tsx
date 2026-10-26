@@ -871,53 +871,57 @@ export function SimpleInvoiceFormView({
 
         <div className="fx-rule" />
 
-        {/* --- Receptor --- */}
-        <section className="fx-a-quien">
-          <span className="fx-eyebrow">Facturar a <span className="req">*</span></span>
+        {/* --- Cliente y pago: sobre la misma línea (ver .fx-receptor) --- */}
+        <section className="fx-receptor">
+          <div className="fx-receptor-cliente">
+            <span className="fx-eyebrow">Cliente <span className="req">*</span></span>
 
-          {clienteActual && !cliente && !cambiandoCliente ? (
-            <div className="fx-cliente-actual">
-              <span className="fx-cliente-nombre">{clienteActual}</span>
-              <button type="button" className="fx-link" onClick={() => setCambiandoCliente(true)}>
-                Cambiar
-              </button>
-            </div>
-          ) : (
-          <>
-          <div className="fx-cliente-row">
-            <div className="fx-cliente" ref={clienteCajaRef}>
-              <ClientCombobox
-                value={cliente}
-                onChange={seleccionarCliente}
-                onBusquedaChange={setBusquedaCliente}
-                invalido={marcarCliente}
-              />
-            </div>
-            <button
-              type="button"
-              className="fx-cliente-add"
-              onClick={() => setNuevoCliente(true)}
-              title="Nuevo cliente"
-              aria-label="Crear un cliente nuevo"
-            >
-              <Icon name="plus" size={16} />
-            </button>
+            {clienteActual && !cliente && !cambiandoCliente ? (
+              <div className="fx-cliente-actual">
+                <span className="fx-cliente-nombre">{clienteActual}</span>
+                <button type="button" className="fx-link" onClick={() => setCambiandoCliente(true)}>
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="fx-cliente-row">
+                  <div className="fx-cliente" ref={clienteCajaRef}>
+                    <ClientCombobox
+                      value={cliente}
+                      onChange={seleccionarCliente}
+                      onBusquedaChange={setBusquedaCliente}
+                      invalido={marcarCliente}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="fx-cliente-add"
+                    onClick={() => setNuevoCliente(true)}
+                    title="Nuevo cliente"
+                    aria-label="Crear un cliente nuevo"
+                  >
+                    <Icon name="plus" size={16} />
+                  </button>
+                </div>
+                {!cliente && (
+                  <NombreClienteLibre
+                    value={clienteLibre}
+                    onChange={setClienteLibre}
+                    onGuardado={(c) => { seleccionarCliente(c); setClienteLibre('') }}
+                    className={marca(clienteCambiado && clienteLibre.trim() !== '')}
+                  />
+                )}
+              </>
+            )}
+            {marcarCliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaCliente}</span>}
           </div>
-          {!cliente && (
-            <NombreClienteLibre
-              value={clienteLibre}
-              onChange={setClienteLibre}
-              onGuardado={(c) => { seleccionarCliente(c); setClienteLibre('') }}
-              className={marca(clienteCambiado && clienteLibre.trim() !== '')}
-            />
-          )}
-          </>
-          )}
-          {marcarCliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaCliente}</span>}
-          <div style={{ marginTop: 12 }}>
-            <span className="fx-eyebrow">Pago</span>
+
+          <div className="fx-receptor-pago">
+            <label className="fx-eyebrow" htmlFor="fx-metodo">Pago</label>
             <select
-              className={'fx-cond-sel' + marca(metodoCambiado)}
+              id="fx-metodo"
+              className={'fx-cond-sel fx-cond-sel--campo' + marca(metodoCambiado)}
               value={metodo}
               onChange={(e) => setMetodo(e.target.value)}
               aria-label="Método de pago"
