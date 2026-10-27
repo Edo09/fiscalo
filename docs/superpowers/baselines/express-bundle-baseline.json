@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "git_sha": "4f490cd0900435aee94e63d9ebea2f73a33e753c",
+  "node": "v25.2.1",
+  "paginas": {
+    "app": {
+      "entrada": [
+        {
+          "nombre": "main-CuOd2Hu1.js",
+          "bytes": 631140,
+          "gzip": 166432
+        },
+        {
+          "nombre": "bold-Do0_jC5o.js",
+          "bytes": 244634,
+          "gzip": 73283
+        },
+        {
+          "nombre": "bold-DEr2LVwp.css",
+          "bytes": 49359,
+          "gzip": 10527
+        },
+        {
+          "nombre": "main-CSSBcok7.css",
+          "bytes": 26157,
+          "gzip": 5432
+        }
+      ],
+      "totalBytes": 951290,
+      "totalGzip": 255674
+    },
+    "pos": {
+      "entrada": [
+        {
+          "nombre": "pos-Dt2nOOt4.js",
+          "bytes": 97989,
+          "gzip": 28651
+        },
+        {
+          "nombre": "bold-Do0_jC5o.js",
+          "bytes": 244634,
+          "gzip": 73283
+        },
+        {
+          "nombre": "bold-DEr2LVwp.css",
+          "bytes": 49359,
+          "gzip": 10527
+        },
+        {
+          "nombre": "pos-CyFRQ3dw.css",
+          "bytes": 47795,
+          "gzip": 8588
+        }
+      ],
+      "totalBytes": 439777,
+      "totalGzip": 121049
+    }
+  },
+  "perezosos": []
+}
