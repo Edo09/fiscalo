@@ -110,3 +110,122 @@ Pasos que entiende la sonda (`?paso=`): `info`, `dormir&seg=N` (GET o POST, de 1
    ```
 
    Es la línea base host a DGII; la emisión completa se mide en R6. Esta es la primera vez que esa rama corre de verdad contra la DGII (las pruebas del repo no salen a internet): si un intento trae `curl_errno` distinto de 0, el `curl_error` dice por qué (resolución de nombres, conexión o tiempo agotado) y también es un dato del spike; pégalo tal cual.
+
+## R4. S1: el e-NCF devuelve el trackId de la fila (owner-run)
+
+Qué mide: si `ConsultaTrackIds` con el e-NCF devuelve el `trackId` que la app guardó en su fila. Es lo que permitiría reconciliar un comprobante que quedó sin respuesta (el POS ya lo hace con `ECFEmissionService::consultarTrackIds`, ver `PosVenta::revisarECF`).
+
+**Solo existe en `testecf` y `ecf`.** Los servicios de consulta por e-NCF no existen en `certecf` (`ECFEmissionService.php` líneas 1160 y 1161; cabecera de `tools/consultar_ecf_dgii.php`): allí responden 404 y una lista vacía, y eso hace la prueba **INVÁLIDA, nunca FALLA**. Por eso la fila que se consulta tiene que ser de `testecf` o `ecf`, y la consulta se hace en ese mismo ambiente. En `ecf` es una consulta de solo lectura: no se emite nada.
+
+1. **Busca una fila de la app (cero emisiones).** En phpMyAdmin, sobre la base del tenant, esta consulta solo lee:
+
+   ```sql
+   SELECT id, e_ncf, track_id, estado_dgii, ambiente_dgii FROM facturas WHERE tipo_ecf IN ('31','45') AND estado_dgii = 'ACEPTADO' AND ambiente_dgii IN ('testecf','ecf') ORDER BY id DESC LIMIT 3
+   ```
+
+   Si no sale ninguna fila, emite una E31 en `testecf` primero, con R6 (con el tenant en `testecf`), y vuelve a correr la consulta. Las cinco emisiones de R6 sirven.
+
+2. **Pregunta a la DGII por esa fila.** El token del servidor (`CERT_RUN_TOKEN`, está en el `.env` del servidor) va en el cuerpo del POST, no en la URL, y se guarda solo en una variable de tu terminal:
+
+   ```bash
+   CERT_RUN_TOKEN=<valor de CERT_RUN_TOKEN en el .env del servidor>
+   curl -s -X POST "https://<API host>/api/public/consultar_ecf_dgii.php" --data-urlencode "token=$CERT_RUN_TOKEN" --data-urlencode "tenant_id=<id>" --data-urlencode "ambiente=<ambiente_dgii de la fila>" --data-urlencode "encf=<e-NCF>" --data-urlencode "formato=json"
+   ```
+
+   El wrapper usa el ambiente del propio tenant salvo que le pases `ambiente=`; pásalo siempre, con el `ambiente_dgii` de la fila. El POST funciona porque el wrapper lee `$_REQUEST`. Del JSON que devuelve miras dos sitios: `resumen.<e-NCF>.track_ids` y `crudo.<e-NCF>.trackids` (con su `status_code`).
+
+3. **PASA** si la lista trae al menos un `trackId` y uno de ellos es igual al `track_id` de la fila. **FALLA** si la consulta se hizo en el ambiente de la fila (`testecf` o `ecf`) y la lista viene vacía o ningún `trackId` coincide. **INVÁLIDA** si el ambiente consultado fue `certecf` o no era el de la fila. Un `FALLO` de la consulta (token, red, DGII caída) no es veredicto: repítela.
+
+4. **Un número que nunca se usó.** Repite el `curl` con un e-NCF que ese tenant no haya emitido, por ejemplo uno muy por encima de su rango autorizado como `E319999999999`, con el mismo `ambiente=`. Se espera una lista vacía (`track_ids` vacío y `status_code` 404 en `crudo`): es la forma de distinguir "la DGII no lo tiene" de "la consulta falló". Si trae algún `trackId`, es FALLA.
+
+Pega las dos salidas tal cual en el archivo de resultados (no llevan el token). Las E32 de menos de RD$250,000 van por RFCE y no tienen `trackId` (el POS las consulta por código de seguridad, `PosVenta::revisarRFCE`): quedan fuera de este spike.
+
+## R5. S3: notas de crédito E34 contra la DGII, comprador distinto y rechazo (owner-run)
+
+Necesita un tenant en `certecf` con rangos E31 y E34 registrados; gasta unos ocho números en total (S3a: dos E31 y dos E34; S3b: una E31 y una o dos E34). Todo se hace con `tools/express_p0/spike_e34_certecf.php`, desde el checkout del API en la rama `feat/express-backend`. El script lee el ambiente activo del tenant (`GET /api/facturas/stats`, `data.ambiente_activo`) antes de emitir y se niega, con código de salida 2, si no es `certecf` o `testecf`. El token se toma solo de la variable de entorno `EXPRESS_P0_TOKEN`: nunca se pasa como argumento y nunca se imprime. Cada comando acepta `--seco`, que imprime los payloads y no envía nada (ni pide token); úsalo antes de la primera emisión.
+
+Preparación:
+
+1. En la app completa, crea **dos clientes de prueba** (cliente 1 y cliente 2), cada uno con un RNC válido, la `Razón social` llena y el mismo texto en `Nombre`.
+2. En tu terminal (el token es el de la app de ese tenant, el mismo que la app manda en `X-API-KEY`; no lo pegues en el chat, en commits ni en el archivo de resultados):
+
+   ```bash
+   export EXPRESS_P0_TOKEN=<token de la app de ese tenant>
+   S="php -d extension=curl tools/express_p0/spike_e34_certecf.php --api=https://<API host>/api"
+   ```
+
+Cada línea que imprime el script es JSON: `ambiente`, `saldo`, `emision`, `consulta_estado` y `resultado`. Llevan el `estado_dgii` y los mensajes de rechazo del servidor tal cual (`error` y `dgii_response` en la emisión, `consulta` en la consulta de estado). Pégalas todas en el archivo de resultados.
+
+**S3a: comprador distinto en la nota.** El nombre del comprador que se manda a la DGII es el primero que no esté vacío entre `razon_social`, `company_name` y `client_name` (`facturaController.php` líneas 358 a 370); `Nombre` solo alimenta el Contacto. Por eso la variante 1 cambia solo la `Razón social` y la variante 2 solo el RNC.
+
+1. Variante 1 (solo la `Razón social`), con el cliente 1:
+
+   ```bash
+   $S --client-id=<id del cliente 1> --fase=original
+   ```
+
+   Espera a que la línea final diga que la original está lista (la DGII la acepta; el script consulta su estado cada 15 s hasta 10 min) y anota el e-NCF que imprime. En la app cambia **solo** la `Razón social` del cliente 1 (otro texto), sin tocar nada más. Luego:
+
+   ```bash
+   $S --client-id=<id del cliente 1> --fase=nota --original=<e-NCF de la original del cliente 1>
+   ```
+
+2. Variante 2 (solo el RNC), con el cliente 2:
+
+   ```bash
+   $S --client-id=<id del cliente 2> --fase=original
+   ```
+
+   En la app cambia **solo** el RNC del cliente 2 (a otro RNC válido). Luego el mismo comando de nota con su e-NCF:
+
+   ```bash
+   $S --client-id=<id del cliente 2> --fase=nota --original=<e-NCF de la original del cliente 2>
+   ```
+
+3. **Antes de juzgar cada variante**, comprueba en phpMyAdmin que el cambio sí llegó al XML. La E34 tiene que llevar el comprador nuevo y la original el viejo; la consulta solo lee (el e-NCF de la E34 sale en la línea `emision` de la fase `nota`):
+
+   ```sql
+   SELECT id, e_ncf, SUBSTRING(xml_firmado, LOCATE('<RazonSocialComprador>', xml_firmado), 120) AS razon_social_comprador, SUBSTRING(xml_firmado, LOCATE('<RNCComprador>', xml_firmado), 40) AS rnc_comprador FROM facturas WHERE e_ncf IN ('<e-NCF de la original>', '<e-NCF de la E34>')
+   ```
+
+   Variante 1: cambia `RazonSocialComprador`. Variante 2: cambia `RNCComprador`. Si los dos XML dicen lo mismo, la corrida es **inválida** (el cambio no llegó al XML) y no se juzga: repítela.
+
+4. Anota por variante el `estado_dgii` final, los mensajes de rechazo y las lecturas de saldo (`antes` y `despues`). ACEPTADO y RECHAZADO son los dos resultados válidos de S3a: el spike mide lo que hace la DGII, no tiene un lado correcto. Al terminar, restaura o borra los dos clientes de prueba.
+
+**S3b: nota rechazada y saldo de la original.** Usa un cliente de prueba con sus datos sin tocar (el cliente 1, ya restaurado, sirve): el comprador de la original y el de las notas tiene que ser el mismo.
+
+```bash
+$S --client-id=<id del cliente> --fase=original
+$S --client-id=<id del cliente> --fase=reintento --original=<e-NCF de la original>
+```
+
+`reintento` manda primero una E34 con la fecha de vencimiento de la secuencia en `31-12-2000` para que la DGII la rechace y, **solo si la DGII la RECHAZA**, manda una segunda E34 normal por el monto completo. Imprime tres lecturas del saldo de la original, `GET /api/facturas/modificables?client_id=<id>&query=<e-NCF>&limit=1`: `antes`, `entre` (con el rechazo ya resuelto) y `despues`.
+
+- **PASA** si el saldo `entre` es igual al de `antes` (la nota rechazada no resta nada) y la segunda E34 queda ACEPTADA (el saldo `despues` baja a 0).
+- Si el script sale con código 3 e imprime `INCONCLUSO: la DGII acepto la secuencia de 2000`, la DGII aceptó la nota de la secuencia vencida: la original ya quedó acreditada por completo y una segunda E34 la habría rechazado el propio API (`validarFacturaModificada`, `facturaController.php` línea 881). Se anota como **NO EJECUTADA (motivo)**, nunca como PASA. Para volver a intentarlo hace falta una original nueva (otra `--fase=original`).
+
+Anota por corrida el `estado_dgii`, los mensajes de rechazo y las tres lecturas de saldo.
+
+## R6. S2c: latencia de una emisión completa (owner-run)
+
+Mide cuánto tarda `POST /api/facturas` de punta a punta (tu terminal, el API, la DGII y la respuesta). Va con un tenant en `testecf` o `certecf`. Corre desde el checkout del API en la rama `feat/express-backend` (usa `tools/express_p0/e31_minimo.json`).
+
+1. Define las variables y mira el ambiente activo. **Si `ambiente_activo` dice `ecf`, detente:** estas emisiones serían facturas fiscales reales.
+
+   ```bash
+   TOKEN=<token de la app del tenant>
+   CLIENT_ID=<id de un cliente con RNC válido; el cliente de prueba de R5 sirve>
+   curl -s -H "X-API-KEY: $TOKEN" https://<API host>/api/facturas/stats
+   ```
+
+2. Cinco emisiones, una tras otra (cada una usa un número del rango E31 del ambiente):
+
+   ```bash
+   for i in 1 2 3 4 5; do
+     curl -s -o /dev/null -w '%{http_code} %{time_total}\n' -X POST https://<API host>/api/facturas -H "X-API-KEY: $TOKEN" -H 'Content-Type: application/json' --data "$(sed "s/__CLIENT_ID__/$CLIENT_ID/" tools/express_p0/e31_minimo.json)"
+   done
+   ```
+
+   Cada línea es `<código HTTP> <segundos>`. Pega las cinco y anota el **mínimo, la mediana y el máximo** de los segundos. Si alguna no responde 200, anótalo y repite esa para tener cinco emisiones completas (con `-o /dev/null` no se ve el cuerpo; quítalo para ver el error).
+
+Esta medición incluye tu red hasta el API; la latencia del host a la DGII sola es la de R2, paso 4.
