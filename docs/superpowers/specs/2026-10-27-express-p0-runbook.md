@@ -111,6 +111,90 @@ Pasos que entiende la sonda (`?paso=`): `info`, `dormir&seg=N` (GET o POST, de 1
 
    Es la línea base host a DGII; la emisión completa se mide en R6. Esta es la primera vez que esa rama corre de verdad contra la DGII (las pruebas del repo no salen a internet): si un intento trae `curl_errno` distinto de 0, el `curl_error` dice por qué (resolución de nombres, conexión o tiempo agotado) y también es un dato del spike; pégalo tal cual.
 
+## R3. S0: un proyecto Vercel de `express/` con las opciones previstas (owner-run)
+
+Qué mide: si Vercel construye y sirve `express/` como un proyecto aparte del mismo repo con las opciones de despliegue previstas (diseño 13.1) y si los rewrites de `express/vercel.json` hacen lo que Express necesita: dar 404 a `/api/public/*`, entregar el shell de la SPA en cualquier otra ruta, llevar `/sonda` (con su cadena de consulta) a un origen externo y sostener ahí un POST de hasta 60 s. **Va después de R1 y R2**: el origen lento es la sonda (`paso=dormir`), así que tiene que seguir subida y sin vencer; si venció, repite R1 (copia nueva y token nuevo) y usa ese token aquí (`T`).
+
+El stub vive en `docs/superpowers/spikes/express-p0-s0/` de la rama `feat/express-frontend`: la carpeta `express/` (cinco archivos: `index.html`, `package.json`, `vite.config.ts`, `vercel.json` y `src/main.ts`) y `probar.mjs`. `main.ts` importa `redondear` de `src/features/invoices/montosLinea.ts` por ruta relativa (`../../src/...`): eso prueba que Vercel trae los archivos de fuera del Root Directory. El stub no se fusiona nunca: va a una rama desechable que sale de `main`, nunca de `feat/express-frontend`.
+
+1. **Rama desechable.** Corre esto en tu checkout del front. `S0` es la carpeta del stub en el checkout que tenga `feat/express-frontend` (hoy `.claude/worktrees/express-frontend/docs/superpowers/spikes/express-p0-s0`). `API_HOST` es solo el dominio del API, sin `https://` y sin ruta (el de `destination` en `vercel.json` línea 5, el mismo de R1): el stub ya trae el `https://` delante. Hazlo antes de que `main` tenga su propia carpeta `express/` (plan 06); después, la copia la pisaría.
+
+   ```bash
+   S0=<carpeta del stub>
+   API_HOST=<dominio del API>
+   git switch -c spike/express-s0 main
+   cp -r "$S0/express" express
+   sed -i "s#<API host>#$API_HOST#g" express/vercel.json
+   grep -c '<API host>' express/vercel.json
+   git add express
+   git commit -m "spike(express): stub S0 de Vercel"
+   git push -u origin spike/express-s0
+   ```
+
+   El `grep -c` tiene que imprimir `0`: si imprime otro número, quedó un `<API host>` sin reemplazar y el rewrite de `/sonda` o el de `/api/` apuntaría a un dominio inventado. Si prefieres no mover la rama de tu checkout, crea un worktree (`git worktree add ../express-s0 -b spike/express-s0 main`), entra a esa carpeta y corre ahí los comandos sin el `git switch`.
+
+2. **Proyecto desechable en Vercel.** Add New → Project, importa el mismo repositorio de GitHub y ponle un nombre distinto al del proyecto real (por ejemplo `fiscalpoint-express-s0`). Fija estos ajustes **antes de desplegar** y anota cada uno que hayas tenido que cambiar respecto a lo que Vercel proponía:
+
+   | Ajuste | Valor |
+   |---|---|
+   | Root Directory | `express/`, con "Include source files outside of the Root Directory in the Build Step" activado |
+   | Framework Preset | el que detecte Vercel (Vite) u Other; anota cuál quedó |
+   | Install Command (Override) | `cd .. && npm ci` |
+   | Build Command (Override) | `cd .. && npx vite build --config express/vite.config.ts` |
+   | Output Directory (Override) | `dist` |
+   | Node.js Version | 22.x |
+   | Environment Variables | ninguna |
+
+   - Para que `https://<proyecto>.vercel.app` sirva la rama del spike, pon `spike/express-s0` como Production Branch (Settings → Git) y despliega esa rama.
+   - El asistente de importación lee la rama por defecto (`main`), que no tiene `express/`. Si no te deja elegir `express/` como Root Directory, termina la importación con lo que proponga, escribe `express` en Settings → General → Root Directory y anótalo. El primer despliegue (el de `main`) fallará o construirá otra cosa: no cuenta.
+   - Si al abrir la URL ves un inicio de sesión de Vercel (401), la protección de despliegues está tapando la prueba: desactiva Vercel Authentication solo en este proyecto desechable y anótalo.
+
+3. **Revisa el registro del build.** Tiene que mostrar que `npm ci` corrió en la raíz del repo (no en `express/`), que `vite build` terminó con `built in` y que el despliegue quedó `Ready`. Anota cualquier aviso (por ejemplo, sobre el rango abierto de `engines.node` o sobre la versión de Node elegida).
+
+4. **Corre las comprobaciones.** `T` es el token de R1 (`T=<token impreso>`) y la sonda sigue subida:
+
+   ```bash
+   node "$S0/probar.mjs" --base=https://<proyecto>.vercel.app --token=$T
+   ```
+
+   Tarda unos 150 s: las cuatro esperas son reales (15, 30, 45 y 60 s). El token solo viaja en la cabecera `X-Probe-Token` y no se imprime. Cada comprobación sale en una línea `OK` o `FALLA` con el estado HTTP, los segundos y un extracto del cuerpo (en un `FALLA`, el motivo va en la misma línea); termina con código 0 si todo pasó y 1 si algo falló. Pega la salida tal cual en el archivo de resultados.
+
+   | Línea | Qué prueba |
+   |---|---|
+   | `GET /` | 200 y trae `<title>Express S0</title>`: el build salió y se sirve el stub |
+   | `cabecera x-express-s0 en /` | el bloque `headers` de `express/vercel.json` se aplica |
+   | `GET /api/public/x` | 404 y no el shell: el rewrite a `/__no_existe__` bloquea. Trae también `server` y `x-vercel-error`: dicen si el 404 lo dio Vercel o el origen del API |
+   | `GET /facturas` | 200 con el shell: el comodín de la SPA |
+   | `GET /sonda?paso=info` | el JSON de la sonda: el rewrite externo y la cadena de consulta llegan al origen |
+   | `POST /sonda?paso=dormir&seg=N` (N = 15, 30, 45 y 60) | 200 y unos N segundos (entre N − 1 y N + 10): un POST largo sobrevive al rewrite externo. Se detiene en la primera que falla y dice cuál fue |
+
+   Si una espera falla, anota N: la fila S0 del archivo de resultados dice qué se acorta (`DGII_TIMEOUT_SEG` del plan 03 y el tiempo límite del cliente del plan 07).
+
+5. **`server.fs.allow` en desarrollo (local, no necesita Vercel).** Desde la raíz del checkout que tiene `feat/express-frontend`, antes del plan 06 (después, `express/` tiene archivos con esos mismos nombres y la copia los pisaría):
+
+   ```bash
+   mkdir -p express && cp -r "$S0/express/." express/
+   npx vite --config express/vite.config.ts --port 5191 --strictPort
+   ```
+
+   En otra terminal, **justo después de arrancar y antes de abrir nada en el navegador**, pide un archivo de `src/` por la ruta `@fs` (en Git Bash de Windows, `pwd -W` da la ruta con letra de unidad):
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:5191/@fs/$(pwd -W)/src/features/invoices/montosLinea.ts"
+   ```
+
+   Sin `S0_FS_ALLOW` tiene que dar `403`. Detén el servidor (Ctrl+C), arráncalo de nuevo con `S0_FS_ALLOW=1 npx vite --config express/vite.config.ts --port 5191 --strictPort` y repite el `curl` justo después de arrancar: tiene que dar `200`. Usa `localhost`, no `127.0.0.1`: Vite escucha en `localhost`, que en algunos equipos es solo `::1`, y `127.0.0.1` no responde (así pasó al preparar el stub). Esta prueba no usa el `.env` de la raíz ni llega a ninguna API: la config del stub tiene `root` y `envDir` en `express/` y no define proxy.
+
+   El orden importa: Vite da por seguro cualquier módulo que otro módulo ya servido importa (`config.safeModulePaths`), así que en cuanto el navegador, o una petición, carga `/src/main.ts`, el mismo `@fs` responde `200` aunque no haya `S0_FS_ALLOW`. Medido al preparar el stub (2026-10-27, Vite 6.4.3, Windows, servidor recién arrancado en cada caso): sin `S0_FS_ALLOW`, `403` en la primera petición y también después de pedir solo `/`, pero `200` después de pedir `/src/main.ts`; con `S0_FS_ALLOW=1`, `200` siempre. Anota el estado de tu primera petición con y sin la variable.
+
+   Al terminar, quita lo copiado (Vite también deja `express/node_modules/.vite`):
+
+   ```bash
+   rm -rf express/index.html express/package.json express/vite.config.ts express/vercel.json express/src express/node_modules express/dist
+   ```
+
+6. **Anota y limpia.** En la fila S0 del archivo de resultados: cada ajuste que hubo que cambiar (valor propuesto y valor final), la salida completa de `probar.mjs`, los dos estados de `@fs` y la fecha. **PASA** si el build sale con los ajustes de la tabla y encuentra los archivos de fuera de `express/`, las nueve líneas de `probar.mjs` dicen `OK` y el `@fs` en frío da 403 sin `S0_FS_ALLOW` y 200 con `S0_FS_ALLOW=1`. Después borra el proyecto Vercel desechable (Settings → General → Delete Project) y la rama (`git switch main`, `git branch -D spike/express-s0`, `git push origin --delete spike/express-s0`); R7 lo repite al cerrar el spike.
+
 ## R4. S1: el e-NCF devuelve el trackId de la fila (owner-run)
 
 Qué mide: si `ConsultaTrackIds` con el e-NCF devuelve el `trackId` que la app guardó en su fila. Es lo que permitiría reconciliar un comprobante que quedó sin respuesta (el POS ya lo hace con `ECFEmissionService::consultarTrackIds`, ver `PosVenta::revisarECF`).
