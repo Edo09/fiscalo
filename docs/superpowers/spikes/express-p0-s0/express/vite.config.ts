@@ -8,8 +8,12 @@
  * que en desarrollo apunta a PRODUCCION, nunca se lee.
  *
  * `server.fs.allow` mide el desarrollo local, no Vercel: con `root` = express/,
- * Vite solo sirve archivos de esa carpeta, y main.ts importa de ../../src.
- * Sin S0_FS_ALLOW=1 esa ruta debe dar 403; con S0_FS_ALLOW=1 debe dar 200.
+ * Vite solo sirve por su cuenta archivos de esa carpeta, y main.ts importa de ../../src.
+ * Se mide pidiendo montosLinea.ts por la ruta /@fs/ EN FRIO (primera peticion de un
+ * servidor recien arrancado): sin S0_FS_ALLOW=1 da 403; con S0_FS_ALLOW=1 da 200.
+ * El orden importa: Vite da por seguro el modulo que otro modulo ya servido importa
+ * (config.safeModulePaths), asi que despues de servir /src/main.ts ese mismo /@fs/
+ * da 200 aun sin S0_FS_ALLOW=1. Lo que mide el spike es la peticion directa en frio.
  */
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'

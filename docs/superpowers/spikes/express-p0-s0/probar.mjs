@@ -9,7 +9,7 @@
  *   2. cabecera x-express-s0       la del bloque `headers` de express/vercel.json
  *   3. GET /api/public/x           404 y NO el shell (el rewrite bloqueado a /__no_existe__)
  *   4. GET /facturas               200 con el shell (el comodin de la SPA)
- *   5. GET /sonda?paso=info        el JSON de la sonda (el rewrite externo y la cadena de consulta llegan al origen)
+ *   5. GET /sonda?paso=info        el JSON de la sonda (el rewrite externo, la cadena de consulta y la cabecera X-Probe-Token llegan al origen)
  *   6. POST /sonda?paso=dormir&seg=N, N = 15, 30, 45 y 60: 200 y unos N segundos. Se detiene en la primera que falla.
  *
  * Uso:
@@ -115,7 +115,8 @@ function informar(nombre, r, motivo, detalle) {
 /** Motivo de fallo de una respuesta que debia ser el JSON de la sonda; null si lo es. */
 function motivoDeSonda(r, paso) {
   if (r.error) return 'la peticion no obtuvo respuesta'
-  if (r.estado === 403) return 'la sonda dijo 403: token incorrecto o sonda vencida (repite R1)'
+  // Un 403 no distingue token malo de cabecera perdida en el rewrite: la sonda contesta lo mismo.
+  if (r.estado === 403) return 'la sonda dijo 403: token incorrecto, sonda vencida (repite R1) o la cabecera X-Probe-Token no llego al origen'
   if (esShell(r.cuerpo)) return 'devolvio el shell: el rewrite de /sonda no salio hacia el origen'
   const json = jsonDe(r.cuerpo)
   if (json === null) return 'el cuerpo no es JSON de la sonda'

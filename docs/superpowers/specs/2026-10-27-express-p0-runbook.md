@@ -165,7 +165,7 @@ El stub vive en `docs/superpowers/spikes/express-p0-s0/` de la rama `feat/expres
    | `cabecera x-express-s0 en /` | el bloque `headers` de `express/vercel.json` se aplica |
    | `GET /api/public/x` | 404 y no el shell: el rewrite a `/__no_existe__` bloquea. Trae también `server` y `x-vercel-error`: dicen si el 404 lo dio Vercel o el origen del API |
    | `GET /facturas` | 200 con el shell: el comodín de la SPA |
-   | `GET /sonda?paso=info` | el JSON de la sonda: el rewrite externo y la cadena de consulta llegan al origen |
+   | `GET /sonda?paso=info` | el JSON de la sonda: el rewrite externo, la cadena de consulta y la cabecera `X-Probe-Token` llegan al origen (un `403` aquí puede ser token malo, sonda vencida o cabecera perdida: la sonda no los distingue) |
    | `POST /sonda?paso=dormir&seg=N` (N = 15, 30, 45 y 60) | 200 y unos N segundos (entre N − 1 y N + 10): un POST largo sobrevive al rewrite externo. Se detiene en la primera que falla y dice cuál fue |
 
    Si una espera falla, anota N: la fila S0 del archivo de resultados dice qué se acorta (`DGII_TIMEOUT_SEG` del plan 03 y el tiempo límite del cliente del plan 07).
@@ -193,7 +193,7 @@ El stub vive en `docs/superpowers/spikes/express-p0-s0/` de la rama `feat/expres
    rm -rf express/index.html express/package.json express/vite.config.ts express/vercel.json express/src express/node_modules express/dist
    ```
 
-6. **Anota y limpia.** En la fila S0 del archivo de resultados: cada ajuste que hubo que cambiar (valor propuesto y valor final), la salida completa de `probar.mjs`, los dos estados de `@fs` y la fecha. **PASA** si el build sale con los ajustes de la tabla y encuentra los archivos de fuera de `express/`, las nueve líneas de `probar.mjs` dicen `OK` y el `@fs` en frío da 403 sin `S0_FS_ALLOW` y 200 con `S0_FS_ALLOW=1`. Después borra el proyecto Vercel desechable (Settings → General → Delete Project) y la rama (`git switch main`, `git branch -D spike/express-s0`, `git push origin --delete spike/express-s0`); R7 lo repite al cerrar el spike.
+6. **Anota y limpia.** En la fila S0 del archivo de resultados: cada ajuste que hubo que cambiar (valor propuesto y valor final), la salida completa de `probar.mjs`, los dos estados de `@fs` y la fecha. **PASA** si el build sale con los ajustes de la tabla y encuentra los archivos de fuera de `express/`, las nueve líneas de `probar.mjs` dicen `OK` y el `@fs` en frío da 403 sin `S0_FS_ALLOW` y 200 con `S0_FS_ALLOW=1`. Quien cite este criterio (la fila S0 del archivo de resultados, el plan 06) lo lee igual: es la petición directa y en frío; los imports estáticos de `src/` hechos desde un módulo ya servido funcionan en desarrollo aun sin `fs.allow` (Vite 6.4.3), así que el `fs.allow` queda como salvaguarda de las peticiones directas y no como condición para que `main.ts` cargue. Después borra el proyecto Vercel desechable (Settings → General → Delete Project) y la rama (`git switch main`, `git branch -D spike/express-s0`, `git push origin --delete spike/express-s0`); R7 lo repite al cerrar el spike.
 
 ## R4. S1: el e-NCF devuelve el trackId de la fila (owner-run)
 
