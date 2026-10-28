@@ -44,7 +44,7 @@ Estado de `@fs` en la primera petición en frío (servidor recién arrancado, an
 - Sin `S0_FS_ALLOW`:
 - Con `S0_FS_ALLOW=1`:
 
-Nota sobre `@fs`: un import estático de `src/` hecho desde un módulo que el servidor ya sirvió funciona en desarrollo aun sin `fs.allow`, así que esta parte de S0 no prueba que el ajuste haga falta. El plan 06 conserva `fs.allow: ['..']` sea cual sea el resultado.
+Nota sobre `@fs`: un import estático de `src/` hecho desde un módulo que el servidor ya sirvió funciona en desarrollo aun sin `fs.allow` (Vite lo da por seguro en `config.safeModulePaths`; comprobado con Vite 6.4.3: después de servir `/src/main.ts` del stub, el mismo `/@fs/` pasa de 403 a 200 sin `S0_FS_ALLOW`), así que esta parte de S0 no prueba que el ajuste haga falta. El plan 06 conserva `fs.allow: ['..']` sea cual sea el resultado.
 
 ### S1: `ConsultaTrackIds` por e-NCF (R4)
 
