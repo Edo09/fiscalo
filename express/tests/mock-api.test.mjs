@@ -24,8 +24,10 @@ test('loopback', () => {
   for (const h of ['127.0.0.1', 'localhost', '::1']) asegurarLoopback(h)
   for (const h of ['0.0.0.0', '192.168.1.5', 'express.fiscalpoint.com.do']) assert.throws(() => asegurarLoopback(h))
 })
-test('servidor: login de las diez personas, me, signout y allowlist', async () => {
+test('servidor: login de las diez personas, me, signout y allowlist', async (t) => {
   const srv = crearServidor(); await new Promise((r) => srv.listen(0, '127.0.0.1', r))
+  // Se cierra siempre, también si una aserción falla: con el servidor abierto el proceso no termina y el CI esperaría hasta su tiempo límite.
+  t.after(() => { srv.closeAllConnections(); srv.close() })
   const base = `http://127.0.0.1:${srv.address().port}`
   const post = (ruta, cuerpo, token) => fetch(base + ruta, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(cuerpo ?? {}) })
   for (const n of Object.keys(PERSONAS)) {
@@ -38,7 +40,10 @@ test('servidor: login de las diez personas, me, signout y allowlist', async () =
   const { data } = await (await post('/api/auth/login', { emailOrUsername: 'admin.e45@express.test', password: 'mock-admin.e45' })).json()
   const h = { Authorization: `Bearer ${data.token}` }
   assert.equal((await fetch(base + '/api/auth/me', { headers: h })).status, 200)
-  const gastos = await fetch(base + '/api/gastos', { headers: h }); assert.equal((await gastos.json()).codigo, 'EDICION_NO_INCLUYE')
+  const gastos = await fetch(base + '/api/gastos', { headers: h }); const denegado = await gastos.json()
+  assert.equal(gastos.status, 403); assert.equal(denegado.codigo, 'EDICION_NO_INCLUYE')
+  // el texto del contrato 4.3(b), sin punto final y en NFC: la constante del API del plan 02 tiene que ser idéntica, byte a byte
+  assert.equal(denegado.error, 'Tu plan Express no incluye esta función'); assert.equal(denegado.error, denegado.error.normalize('NFC'))
   // allowed by the allowlist but owned by no plan, so no later plan has to flip this assertion
   const xml = await fetch(base + '/api/facturas/1/xml', { headers: h }); assert.equal(xml.status, 404); assert.equal((await xml.json()).error, 'El mock todavía no implementa esta ruta.')
   // the seam writes binary answers (plan 06's PDF): push a temporary handler, read it back, remove it.
@@ -50,5 +55,4 @@ test('servidor: login de las diez personas, me, signout y allowlist', async () =
   MANEJADORES.splice(MANEJADORES.indexOf(tmp), 1)
   await post('/api/auth/signout', {}, data.token)
   assert.equal((await fetch(base + '/api/auth/me', { headers: h })).status, 401)
-  srv.close()
 })

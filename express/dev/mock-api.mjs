@@ -242,7 +242,10 @@ export function asegurarLoopback(host) {
 export const MANEJADORES = []
 
 const PAGINA_500 = '<!DOCTYPE html>\n<html><head><title>500 Internal Server Error</title></head>\n<body><h1>Internal Server Error</h1></body></html>\n'
-const MSG_EDICION = 'Tu plan Express no incluye esta función.'
+// Texto de EDICION_NO_INCLUYE: el del contrato 4.3(b) y el anexo 10.2, SIN punto final. Tiene que ser, byte a byte, el de la
+// constante del API que crea el plan 02 (quien compare los dos importa una sola constante, no retipea el texto). El front decide
+// por `codigo === 'EDICION_NO_INCLUYE'`, nunca por este texto.
+const MSG_EDICION = 'Tu plan Express no incluye esta función'
 const MSG_ADMIN = 'No tienes permiso para hacer esto. Pídeselo a un administrador.'
 const MSG_LOGIN = 'El usuario o la contraseña no son correctos. Revísalos e inténtalo de nuevo.'
 const MSG_SIN_CREDENCIALES = 'Credenciales requeridas. Integracion: X-API-KEY + X-API-SECRET. App: Authorization: Bearer <token>.'
