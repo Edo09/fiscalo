@@ -1,0 +1,40 @@
+name: express-front
+# CI minimo de FRONT (2026-10-27): antes no habia ninguno. Los ganchos HOOK se encienden solos cuando existen sus archivos.
+on:
+  pull_request:
+  push:
+    branches: [main, 'feat/express-**']
+permissions:
+  contents: read
+jobs:
+  front:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22.18.0', cache: npm }
+      - run: npm ci
+      - name: Typecheck raiz
+        run: npm run typecheck
+      - name: Lint raiz
+        run: npm run lint
+        # linea base 2026-10-27: 0 errores, 0 avisos. Con errores > 0 agregar "continue-on-error: true" y avisar al dueno.
+      - name: Scripts de prueba existentes
+        run: |
+          fallos=0
+          for f in scripts/test-*.ts scripts/check-errores.ts scripts/parity-cotizacion-ferreteria.ts; do
+            echo "== $f"; node "$f" || fallos=$((fallos+1))
+          done
+          [ "$fallos" -eq 0 ]
+      - name: Build raiz (app y pos)
+        run: npx vite build
+      - name: HOOK express-node-tests
+        if: ${{ hashFiles('express/tests/mock-api.test.mjs') != '' }}
+        run: node --test express/tests/mock-api.test.mjs
+      - name: HOOK express-typecheck
+        if: ${{ hashFiles('express/tsconfig.json') != '' }}
+        run: npx tsc -p express/tsconfig.json --noEmit
+      - name: HOOK express-graph-guard
+        if: ${{ hashFiles('express/dev/check-graph.mjs') != '' }}
+        run: node express/dev/check-graph.mjs
