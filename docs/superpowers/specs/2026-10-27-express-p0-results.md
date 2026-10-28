@@ -10,7 +10,7 @@ Fecha de la plantilla: 2026-10-28. Es el único sitio donde se anotan los result
 - S1 tiene que decir `PASA` o `FALLA`, nunca `PENDIENTE`, antes de que el plan 08 pueda empezar.
 - `Fecha y quien`: `AAAA-MM-DD, nombre`.
 - Pega cada salida tal cual en el `Detalle` de su spike y nunca un token (ni el de la sonda, ni `CERT_RUN_TOKEN`, ni `EXPRESS_P0_TOKEN`, ni el de la app).
-- Las respuestas D1 a D8 van en su sección y tu firma va al final. Con la tabla sin `PENDIENTE` y la firma puesta se cumple lo que el chequeo de salida de P0 pide de este archivo; los planes 02 y 06 no empiezan antes de que ese chequeo pase.
+- Las respuestas D1 a D8 van en su sección y tu firma va al final. Con la tabla sin `PENDIENTE` y la firma puesta se cumple lo que el chequeo de salida de P0 pide de este archivo; el resto de ese chequeo, incluidas las dos corridas de CI en verde, está en la sección R8 del runbook. Los planes 02 y 06 no empiezan antes de que ese chequeo pase.
 
 ## Tabla de spikes
 
@@ -171,6 +171,6 @@ Para D6 (cambia los planes 03 y 07, así que hace falta antes de que arranque el
 
 ## Cierre de P0
 
-Esta línea cierra el archivo: nombre y fecha al firmar, una vez que R1 a R7 estén hechos, la tabla no tenga ninguna fila en `PENDIENTE` y las respuestas D1 a D8 estén anotadas.
+Esta línea cierra el archivo: nombre y fecha al firmar, una vez que R1 a R7 estén hechos, la tabla no tenga ninguna fila en `PENDIENTE`, las respuestas D1 a D8 estén anotadas y el chequeo de salida del runbook (R8) haya pasado, con las dos corridas de CI (API y front) en verde para el último commit de cada rama. `scripts/test-p0-results.ts` y un CI en verde no prueban nada de esto: aceptan `PENDIENTE` y una firma en blanco a propósito. R8 trae los comandos que sí lo comprueban.
 
 Firma del dueño:

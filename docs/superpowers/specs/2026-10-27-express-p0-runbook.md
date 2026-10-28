@@ -2,6 +2,10 @@
 
 Fecha: 2026-10-27. Complementa el plan `2026-10-27-express-01-p0-baselines-ci-spikes.md`. Cada sección marcada **(owner-run)** necesita tus cuentas o credenciales (hosting, Vercel, DGII); nadie más las ejecuta. Cada salida que dé un comando se pega tal cual en el archivo de resultados (`docs/superpowers/specs/2026-10-27-express-p0-results.md`), nunca el token.
 
+## `<API host>`
+
+En todo este runbook `<API host>` es **solo el dominio** del API: sin `https://` y sin ruta. Es el que está en el `destination` del rewrite de `/api/` de `vercel.json` (línea 5), entre `https://` y `/api/:path*`. Los comandos lo escriben siempre con su esquema (`https://<API host>/api/...`), y en R3 la variable `API_HOST` es ese mismo valor: el stub ya trae el `https://` delante, así que un `API_HOST` con esquema o con ruta dejaría un rewrite roto en `express/vercel.json` (R3 lo comprueba).
+
 ## Ids de los spikes
 
 El brief de diseño numera los spikes S0 a S6; este plan los reparte con otros ids. Esta tabla es el puente:
@@ -16,7 +20,7 @@ El brief de diseño numera los spikes S0 a S6; este plan los reparte con otros i
 | S5 | `S3b` | E34 rechazada y el saldo de la factura original | R5 |
 | S6 | `S2c` | Latencia hacia la DGII: `latencia` desde el host (R2) y emisión completa (R6) | R2 y R6 |
 
-Orden de las secciones: **R1, R2, R3, R4, R5, R6, R7**. R3 necesita R1 y R2 hechos primero (usa el token de la sonda). Las tareas siguientes de P0 agregan R3 a R7 en ese orden, no en el orden de las tareas.
+Orden de las secciones: **R1, R2, R3, R4, R5, R6, R7, R8**. R3 necesita R1 y R2 hechos primero (usa el token de la sonda). Las tareas siguientes de P0 agregan R3 a R7 en ese orden, no en el orden de las tareas. R8 no es un spike: es el chequeo de salida de P0 y va al final, cuando R1 a R7 y el archivo de resultados están completos.
 
 ## R1. Preparar y subir la sonda del host (owner-run)
 
@@ -39,7 +43,7 @@ La sonda `express_probe.php` es temporal. La plantilla vive en `api-gratex/tools
    curl -s -w '\n%{http_code}\n' "$P?paso=info"
    ```
 
-   `<API host>` es el origen (esquema y dominio, sin ruta) que aparece en `vercel.json` línea 5, el `destination` del rewrite de `/api/`.
+   `<API host>` es solo el dominio del API, como se define al principio de este runbook: sin `https://`, que ya va en el comando.
 
 4. Comprueba que la cabecera llega a PHP. Con el token (`T=<token impreso>`), la misma llamada debe responder 200 con el JSON de `info`:
 
@@ -117,21 +121,22 @@ Qué mide: si Vercel construye y sirve `express/` como un proyecto aparte del mi
 
 El stub vive en `docs/superpowers/spikes/express-p0-s0/` de la rama `feat/express-frontend`: la carpeta `express/` (cinco archivos: `index.html`, `package.json`, `vite.config.ts`, `vercel.json` y `src/main.ts`) y `probar.mjs`. `main.ts` importa `redondear` de `src/features/invoices/montosLinea.ts` por ruta relativa (`../../src/...`): eso prueba que Vercel trae los archivos de fuera del Root Directory. El stub no se fusiona nunca: va a una rama desechable que sale de `main`, nunca de `feat/express-frontend`.
 
-1. **Rama desechable.** Corre esto en tu checkout del front. `S0` es la carpeta del stub en el checkout que tenga `feat/express-frontend` (hoy `.claude/worktrees/express-frontend/docs/superpowers/spikes/express-p0-s0`). `API_HOST` es solo el dominio del API, sin `https://` y sin ruta (el de `destination` en `vercel.json` línea 5, el mismo de R1): el stub ya trae el `https://` delante. Hazlo antes de que `main` tenga su propia carpeta `express/` (plan 06); después, la copia la pisaría.
+1. **Rama desechable.** Corre esto en tu checkout del front. `S0` es la carpeta del stub en el checkout que tenga `feat/express-frontend` (hoy `.claude/worktrees/express-frontend/docs/superpowers/spikes/express-p0-s0`). `API_HOST` es el `<API host>` de este runbook (solo el dominio del API, sin `https://` y sin ruta): el stub ya trae el `https://` delante. La rama sale de `main` y `main` puede traer ya una carpeta `express/`: la rama del plan 01 agrega `express/dev/` y `express/tests/`, y el plan 06 agrega `package.json`, `vite.config.ts` y el resto de verdad. Por eso la copia es `cp -r "$S0/express/." express/` (mezcla el stub con lo que haya); un `cp -r "$S0/express" express` con la carpeta ya creada lo dejaría anidado en `express/express/`, y el Root Directory `express/` de Vercel no encontraría ni `index.html` ni `vercel.json`. Hazlo antes del plan 06, que agrega `package.json` y `vite.config.ts` de verdad: después, la copia los pisaría.
 
    ```bash
    S0=<carpeta del stub>
    API_HOST=<dominio del API>
    git switch -c spike/express-s0 main
-   cp -r "$S0/express" express
+   mkdir -p express && cp -r "$S0/express/." express/
    sed -i "s#<API host>#$API_HOST#g" express/vercel.json
    grep -c '<API host>' express/vercel.json
+   grep -cE '"https://[A-Za-z0-9.-]+/api/(public/express_probe\.php|:path\*)"' express/vercel.json
    git add express
    git commit -m "spike(express): stub S0 de Vercel"
    git push -u origin spike/express-s0
    ```
 
-   El `grep -c` tiene que imprimir `0`: si imprime otro número, quedó un `<API host>` sin reemplazar y el rewrite de `/sonda` o el de `/api/` apuntaría a un dominio inventado. Si prefieres no mover la rama de tu checkout, crea un worktree (`git worktree add ../express-s0 -b spike/express-s0 main`), entra a esa carpeta y corre ahí los comandos sin el `git switch`.
+   El primer `grep -c` tiene que imprimir `0` y el segundo `2`. El primero cuenta los `<API host>` que quedaron sin reemplazar: con otro número el rewrite de `/sonda` o el de `/api/` apuntaría a un dominio inventado. El segundo cuenta los dos rewrites externos con la forma `https://<dominio>/api/...` y nada más; si `API_HOST` trajo el esquema (`https://https://...`) o una ruta, el `sed` no falla y el primer `grep` también da `0`, pero este da menos de 2 y el S0 fallaría por algo que no es de Vercel: corrige `API_HOST` y repite desde el `cp` (la carpeta `express/` se vuelve a mezclar sin problema). Si prefieres no mover la rama de tu checkout, crea un worktree (`git worktree add ../express-s0 -b spike/express-s0 main`), entra a esa carpeta y corre ahí los comandos sin el `git switch`.
 
 2. **Proyecto desechable en Vercel.** Add New → Project, importa el mismo repositorio de GitHub y ponle un nombre distinto al del proyecto real (por ejemplo `fiscalpoint-express-s0`). Fija estos ajustes **antes de desplegar** y anota cada uno que hayas tenido que cambiar respecto a lo que Vercel proponía:
 
@@ -342,3 +347,77 @@ Va al final, cuando R1 a R6 ya están hechos y sus salidas pegadas en el archivo
    ```
 
    Si en R3 usaste un worktree (`git worktree add ../express-s0 -b spike/express-s0 main`), quítalo antes de borrar la rama con `git worktree remove ../express-s0`.
+
+## R8. Chequeo de salida de P0 (owner-run)
+
+Es lo que tiene que cumplirse antes de que arranquen los planes 02 y 06 (contratos, sección 2, fila 01). Ningún script lo prueba por sí solo: `node scripts/test-p0-results.ts` acepta `PENDIENTE` y una firma en blanco a propósito (la plantilla recién creada también tiene que pasar) y un CI en verde no sabe nada de los spikes. Por eso el cierre es tuyo, y este es el guion. Va después de R1 a R7 y de llenar el archivo de resultados.
+
+1. **Sube las dos ramas.** Los dos checkouts son los de `feat/express-backend` (el API, hoy `api-gratex/.claude/worktrees/express-backend`) y `feat/express-frontend` (el front, hoy `fiscalo/.claude/worktrees/express-frontend`). Los dos workflows corren con el push a esas ramas:
+
+   ```bash
+   git -C <checkout del API> push -u origin feat/express-backend
+   git -C <checkout del front> push -u origin feat/express-frontend
+   ```
+
+2. **Lee las dos corridas.** Tienen que quedar en `completed success` y ser las del **último commit de cada rama**: una corrida verde de un commit anterior no cuenta. `gh` no está instalado en la máquina de desarrollo; las mismas corridas están en las páginas de Actions, con el commit al lado de cada una:
+
+   - API: `https://github.com/Edo09/api-gratex/actions/workflows/express-api.yml`
+   - Front: `https://github.com/Edo09/fiscalo/actions/workflows/express-front.yml`
+
+   Con `gh` instalado y con sesión iniciada:
+
+   ```bash
+   gh run list --workflow express-api.yml --branch feat/express-backend --limit 1
+   gh run list --workflow express-front.yml --branch feat/express-frontend --limit 1
+   gh run watch <id de la corrida> --exit-status
+   ```
+
+   **Cómo leer la del API.** Es la primera vez que esas pruebas corren en PHP 8.3, el de producción, donde `round()` no da lo mismo que en el 8.5 con el que se capturó la base.
+   - `Setup PHP`: PHP 8.3.x, con mbstring, dom, simplexml, xml, curl, openssl, pdo_sqlite, pdo_mysql, gd y fileinfo entre las extensiones activadas.
+   - `php -l`: verde y sin salida.
+   - Línea base de suites (`--comparar`): la primera línea es `PHP 8.3.x`; después sale `AVISO PHP 8.5 en la base, 8.3 ahora` (es lo esperado y nunca es una diferencia); la fila de `test_grupo_multiempresa.php` dice `total 28` y `saltadas 0`; la última línea es `Sin diferencias con la linea base.` Un `DIFERENCIA` es un hallazgo real y se informa antes de seguir: no se arregla editando la base ni quitando un archivo del `php -l`, y en una suite que cuenta dinero puede ser justo el `round()` de 8.3 contra el de 8.5. Si esa fila dice `total 10` o `saltadas 2`, `pdo_sqlite` no cargó (la lista de extensiones del workflow no se respetó).
+   - Suites puras de Express: cada una termina en `N de N pruebas OK`.
+
+   **Cómo leer la del front.** Todos los pasos hasta `Build raiz (app y pos)` en verde; `HOOK express-node-tests` corre y los otros dos ganchos (`HOOK express-typecheck`, `HOOK express-graph-guard`) aparecen omitidos hasta el plan 06. Node 22.18 escribe en stderr un aviso experimental sobre quitar los tipos de los `.ts`: no es un fallo. Si `npm ci` falla con un error de descarga de `registry.npmmirror.com` (dos entradas de `package-lock.json`, `sonner` y `zod`, resuelven a ese espejo desde antes de esta rama), cambia el espejo por el registro oficial, comprueba y vuelve a empujar:
+
+   ```bash
+   sed -i 's#https://registry.npmmirror.com/#https://registry.npmjs.org/#' package-lock.json
+   npm ci --dry-run
+   ```
+
+   Un paso rojo que no era ya un fallo de `main` se arregla en la rama con un commit nuevo y se vuelve a leer la corrida; uno que ya fallaba en `main` se informa antes de seguir.
+
+3. **Corre los chequeos locales.** Del checkout del API (rama `feat/express-backend`):
+
+   ```bash
+   php tools/test_express_baseline_puro.php
+   php tools/test_express_reservas.php
+   php tools/test_express_golden_puro.php
+   php tools/test_express_p0_spikes_puro.php
+   php tools/test_express_p0_guardas.php
+   php tools/express_baseline.php --comparar
+   php -d extension=curl -d extension=openssl -d extension=pdo_mysql tools/express_golden.php --comparar
+   grep -c "036_facturas_idempotency.sql" db/migrations/README.md
+   ```
+
+   Las cinco suites puras terminan en `N de N pruebas OK` y salen con 0. `express_baseline.php --comparar` sale con 0 y termina en `Sin diferencias con la linea base.`. El golden sale con 0 y `Sin diferencias` sobre el árbol sin tocar: usa solo las bases scratch, con las credenciales `WA_DB_*` del entorno o de `tools/.env` (que nunca se imprimen), y tarda unos cuatro minutos; con 1 hay diferencias (o un `[FALLO]` de la preparación de la base, que dice su causa en su propia línea) y con 2 la corrida fue rechazada o se detuvo por un error y no comparó nada. El `grep -c` imprime 1 o más. Del checkout del front (rama `feat/express-frontend`):
+
+   ```bash
+   node --test express/tests/mock-api.test.mjs
+   node scripts/medir-build.ts --comparar
+   node scripts/test-p0-results.ts
+   ```
+
+   La primera pasa; la segunda sale con 0 y dice `sin diferencias` (solo se corre en este equipo: el CI no la corre, porque los finales de línea de un checkout de Windows cambian los bytes); la tercera termina en `31/31 OK`.
+
+4. **Comprueba que los spikes y la firma están.** Estos dos comandos son lo que `test-p0-results.ts` no prueba. Desde el checkout del front:
+
+   ```bash
+   R=docs/superpowers/specs/2026-10-27-express-p0-results.md
+   grep -E '^\| (S0|S1|S2a|S2b|S2c|S3a|S3b) \|' $R | awk -F'|' '{print $5}' | grep -c PENDIENTE
+   grep -nE '^Firma del dueño:[[:space:]]*[^[:space:]]' $R
+   ```
+
+   El primero tiene que imprimir `0` (ninguna de las siete filas queda en `PENDIENTE`; `S1` dice `PASA` o `FALLA`) y el segundo tiene que imprimir tu línea firmada; si no imprime nada, la firma está en blanco.
+
+5. **Cierra.** Solo si los cuatro pasos dan lo esperado, firma en `Cierre de P0` del archivo de resultados. Una corrida roja o de un commit anterior, una fila en `PENDIENTE` o la firma en blanco quieren decir que P0 no cerró, y los planes 02 y 06 no empiezan.
