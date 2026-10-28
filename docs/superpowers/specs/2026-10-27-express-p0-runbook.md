@@ -318,3 +318,27 @@ Mide cuánto tarda `POST /api/facturas` de punta a punta (tu terminal, el API, l
    Cada línea es `<código HTTP> <segundos>`. Pega las cinco y anota el **mínimo, la mediana y el máximo** de los segundos. Si alguna no responde 200, anótalo y repite esa para tener cinco emisiones completas (con `-o /dev/null` no se ve el cuerpo; quítalo para ver el error).
 
 Esta medición incluye tu red hasta el API; la latencia del host a la DGII sola es la de R2, paso 4.
+
+## R7. Cerrar los spikes: retirar la sonda y el proyecto desechable (owner-run)
+
+Va al final, cuando R1 a R6 ya están hechos y sus salidas pegadas en el archivo de resultados. La sonda es una página de diagnóstico del hosting (versión de PHP, límites, hora de MySQL) y el hosting sirve directo cualquier archivo de `public/`: aunque caduca sola y solo responde con el token, no debe quedar puesta. Usa el `P` de R1 (si cerraste la terminal, vuelve a definirlo).
+
+1. **Borra la sonda del hosting.** En cPanel (File Manager) borra `/home1/smhynzte/public_html/api/public/express_probe.php`. Los archivos de latido que dejó R2 (`express_probe_aaaa0001.log`, `express_probe_aaaa0002.log` y `express_probe_aaaa0003.log`) están en el `temp_dir` que dijo `info` y solo traen horas y números: bórralos también si el File Manager llega a esa carpeta.
+
+2. **Comprueba que ya no responde.** Sin token:
+
+   ```bash
+   curl -s -w '\n%{http_code}\n' "$P?paso=info"
+   ```
+
+   No debe salir nada de la sonda: ni el JSON de `info` ni el `{"error":"no autorizado"}` que daba en R1 sin token. Lo esperado es un 404 o un error del propio API (la ruta ya no existe). Si sale lo de la sonda, el archivo sigue puesto (o quedó en otra carpeta): bórralo y repite. Pega la salida (no lleva el token) en el `Detalle` de S2a del archivo de resultados.
+
+3. **Borra el proyecto Vercel desechable y la rama del spike.** Solo el proyecto que creaste en R3 (por ejemplo `fiscalpoint-express-s0`), nunca el proyecto real del front: Settings → General → Delete Project. Luego, en tu checkout del front:
+
+   ```bash
+   git switch main
+   git branch -D spike/express-s0
+   git push origin --delete spike/express-s0
+   ```
+
+   Si en R3 usaste un worktree (`git worktree add ../express-s0 -b spike/express-s0 main`), quítalo antes de borrar la rama con `git worktree remove ../express-s0`.
