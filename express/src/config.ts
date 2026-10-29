@@ -3,6 +3,8 @@
 /**
  * Número de WhatsApp de soporte. Vacío hasta que el dueño lo defina: mientras lo esté se ocultan la
  * fila «Ayuda y soporte» y «Avisar a soporte».
+ * La anotación `string` parece sobrar y no sobra: sin ella el tipo sería el literal `''` y, al poner
+ * el número, cada comparación con `''` dejaría de compilar (TS2367).
  */
 export const SOPORTE_WHATSAPP: string = ''
 
@@ -14,7 +16,7 @@ export const CLAVE_PREVIEW = 'express.dev.allowPreviewLogin'
 
 /**
  * Identificador de la compilación. Vite sustituye `__BUILD_ID__` con `define`; bajo Node (las
- * pruebas) no existe y `typeof` evita el ReferenceError.
+ * pruebas, que importan `~/config` a través del cargador) no existe y `typeof` evita el ReferenceError.
  */
 export const BUILD_ID: string = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'
 

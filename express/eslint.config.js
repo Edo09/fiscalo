@@ -12,6 +12,8 @@ import tseslint from 'typescript-eslint'
 // Piso de navegadores: Chrome y WebView 90, Safari e iOS 14.5. Con lib ES2020 el tipado ya rechaza
 // `findLast`, `findLastIndex` y `Object.hasOwn`, pero no `at` (lo declara @types/node) ni
 // `structuredClone` y `crypto.randomUUID` (los declara lib.dom): para esos tres solo frenan estos selectores.
+// `structuredClone` y `randomUUID` se detectan también como método (`window.structuredClone(x)`,
+// `window.crypto.randomUUID()`): `window`, `self` y `globalThis` llegan a la misma API.
 const llamadaA = (metodo, alternativa) => ({
   selector: `CallExpression[callee.computed=false][callee.property.name='${metodo}']`,
   message: `.${metodo}() no existe en Chrome 90 ni en Safari 14: ${alternativa}`,
