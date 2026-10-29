@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/api/public/:path*", "destination": "/__no_existe__" },
+    { "source": "/sonda", "destination": "https://smh.ynz.temporary.site/api/public/express_probe.php" },
+    { "source": "/api/:path*", "destination": "https://smh.ynz.temporary.site/api/:path*" },
+    { "source": "/((?!assets/|icons/|fonts/|theme-init.js|version.json).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/(.*)", "headers": [{ "key": "X-Express-S0", "value": "1" }] }
+  ]
+}
