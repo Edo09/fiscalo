@@ -237,6 +237,9 @@ export type AccionHistorial = 'push' | 'replace' | 'back'
  * al inicio se vuelve con atrás si hay historial de la app debajo, y si no (un enlace directo) se reemplaza, para no sacar al usuario de la app.
  * Tocar la pestaña en que ya se está reemplaza (no agrega entradas). El asistente (`facturar`) no es una pestaña: se entra siempre empujando,
  * para que atrás vuelva a la pestaña de donde se vino.
+ *
+ * Solo sabe SI hay historial debajo, no QUÉ hay. Por eso `irATab` (`crearNavegador`) cambia el `'back'` a Facturas por `'replace'` cuando la
+ * entrada de abajo no es Facturas (la lista de Clientes bajo un detalle, un enlace directo bajo Más): un atrás mostraría esa otra pantalla.
  */
 export function accionTab(actual: Ruta, destino: Ruta, hayHistorial: boolean): AccionHistorial {
   if (destino.id === 'facturar') return 'push'
@@ -279,49 +282,64 @@ export interface Navegador {
   navegar(r: Ruta, opts?: { reemplazar?: boolean }): void
   /** Retrocede una entrada si hay historial de la app; si no, reemplaza la actual por `fallback`. Nunca saca al usuario de la app. */
   atras(fallback: Ruta): void
-  /** Cambia de pestaña según `accionTab`. */
+  /** Cambia de pestaña según `accionTab`. Hacia Facturas solo retrocede si la entrada de abajo es Facturas; si no, reemplaza la actual. */
   irATab(destino: Ruta): void
 }
 
 /**
- * Un navegador de rutas sobre `win`. La profundidad (cuántas entradas creadas por la app hay debajo de la actual) se guarda en `history.state`
- * como `{ fx: n }` y se lee de ahí: así sobrevive a una recarga y a un atrás del sistema (el botón de Android), que un contador en memoria no
- * vería. Una entrada sin marca (el enlace con que se abrió la página, o una a la que el navegador no dejó marcar) vale 0: atrás reemplaza en
- * vez de retroceder, que es lo seguro.
+ * Un navegador de rutas sobre `win`. Cada entrada que crea lleva en `history.state` una marca `{ fx, bajo }`: `fx` es cuántas entradas creadas por
+ * la app hay debajo de ella y `bajo` el hash de la que está justo debajo. Se lee de ahí y no de una variable para que sobreviva a una recarga y a un
+ * atrás del sistema (el botón de Android), que un contador en memoria no vería. `fx` dice si atrás se queda dentro de la app; `bajo`, a dónde
+ * llevaría: tocar la pestaña Facturas solo retrocede si esa entrada es Facturas (un detalle apilado sobre Clientes, o Más sobre un enlace
+ * directo, tienen otra pantalla debajo). Una entrada sin marca (el enlace con que se abrió la página, o una a la que el navegador no dejó marcar)
+ * vale 0, y una marca sin `bajo` (la de una versión anterior) no dice a dónde lleva: atrás reemplaza en vez de retroceder, que es lo seguro.
+ *
+ * Quien empuje entradas por su cuenta (la hoja que guarda `{ sheet }`) debe marcarlas como lo hace `navegar`: `fx` una más que la actual y `bajo`
+ * el `location.hash` de ahora, con sus propias claves aparte. Sin eso, mientras esa entrada esté arriba, `atras` reemplazaría en vez de retroceder.
  */
 export function crearNavegador(win: VentanaDeRutas): Navegador {
-  const profundidad = (): number => {
+  /** La marca de la entrada actual; `bajo` es null si la marca no lo trae o no es un texto, y `fx` 0 si no hay marca válida. */
+  const leerMarca = (): { fx: number; bajo: string | null } => {
     const estado: unknown = win.history.state
-    const fx = typeof estado === 'object' && estado !== null ? (estado as { fx?: unknown }).fx : undefined
-    return typeof fx === 'number' && Number.isInteger(fx) && fx > 0 ? fx : 0
+    const marca: { fx?: unknown; bajo?: unknown } = typeof estado === 'object' && estado !== null ? estado : {}
+    const fx = typeof marca.fx === 'number' && Number.isInteger(marca.fx) && marca.fx > 0 ? marca.fx : 0
+    return { fx, bajo: typeof marca.bajo === 'string' ? marca.bajo : null }
   }
 
-  const marcar = (fx: number): void => {
+  const marcar = (fx: number, bajo: string | null): void => {
     try {
-      win.history.replaceState({ fx }, '')
+      win.history.replaceState(bajo === null ? { fx } : { fx, bajo }, '')
     } catch {
       // Safari corta la API de historial pasadas 100 llamadas en 30 segundos. Sin marca la entrada vale 0 y atrás reemplaza: nunca sale de la app.
     }
   }
 
-  const hayAtras = (): boolean => profundidad() > 0
+  const hayAtras = (): boolean => leerMarca().fx > 0
+
+  /** ¿La entrada de justo debajo es Facturas? Solo se sabe si la marca lo dice (`bajo` puede ser '': la raíz sin hash es Facturas). */
+  const abajoEsFacturas = (): boolean => {
+    const { bajo } = leerMarca()
+    return bajo !== null && parseHash(bajo).id === 'facturas'
+  }
 
   // Asignar `location.hash` y llamar a `location.replace` con un hash son navegaciones al fragmento, que el navegador resuelve en el acto: al volver
   // la entrada ya es la nueva (sin estado) y se la puede marcar enseguida. El `hashchange` llega después, y para entonces ya está marcada.
+  // Salvedad medida en Chromium: antes del evento `load` un empujón por `location.hash` se convierte en reemplazo (no nace una entrada) y la marca diría
+  // que hay una de la app debajo cuando no la hay. `history.length` no sirve para notarlo: también baja al empujar teniendo entradas de adelante.
   const ir = (r: Ruta, opts?: { reemplazar?: boolean }): void => {
     const destino = formatHash(r)
     const actual = win.location.hash
     if (opts?.reemplazar === true) {
       if (destino === actual) return
-      const fx = profundidad()
+      const { fx, bajo } = leerMarca()
       win.location.replace(destino)
-      if (fx > 0) marcar(fx) // la entrada nueva nace sin estado: a profundidad 0 ya vale 0 y se ahorra una llamada
+      if (fx > 0) marcar(fx, bajo) // nace sin estado y lo de abajo no cambió: se le copia la marca. A profundidad 0 ya vale 0 y se ahorra una llamada
     } else {
       // Empujar la ruta en que ya se está dejaría dos entradas iguales ('' y #/facturas son la misma ruta).
       if (destino === formatHash(parseHash(actual))) return
-      const fx = profundidad() + 1
+      const fx = leerMarca().fx + 1
       win.location.hash = destino
-      marcar(fx)
+      marcar(fx, actual) // la entrada de abajo es la que se deja, con el hash que tenía
     }
   }
 
@@ -331,7 +349,9 @@ export function crearNavegador(win: VentanaDeRutas): Navegador {
   }
 
   const aTab = (destino: Ruta): void => {
-    const accion = accionTab(parseHash(win.location.hash), destino, hayAtras())
+    let accion = accionTab(parseHash(win.location.hash), destino, hayAtras())
+    // `accionTab` solo sabe que hay historial debajo: un atrás a Facturas solo es cierto si lo de abajo es Facturas.
+    if (accion === 'back' && !abajoEsFacturas()) accion = 'replace'
     if (accion === 'back') win.history.back()
     else ir(destino, { reemplazar: accion === 'replace' })
   }

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { accionHoja, accionTab, crearNavegador, formatHash, moduloDeRuta, parseHash } from '~/router'
-import type { Ruta, VentanaDeRutas } from '~/router'
+import type { Navegador, Ruta, VentanaDeRutas } from '~/router'
 import { esperar } from './ayudas'
 
 const CASOS: [string, Ruta][] = [
@@ -304,6 +304,8 @@ function ventanaFalsa(entradas: Entrada[], opciones: { replaceStateLanza?: boole
     pila: (): string[] => entradas.map((e) => e.hash),
     /** El hash de la entrada actual. */
     actual: hashActual,
+    /** El estado (la marca del router) de cada entrada, también las de adelante. */
+    estados: (): unknown[] => entradas.map((e) => e.state),
     /** Cuántas entradas hay por debajo de la actual. */
     indice: (): number => indice,
     operaciones: (): string[] => operaciones,
@@ -490,6 +492,228 @@ test('irATab desde un detalle: otra pestaña lo reemplaza y la de Facturas vuelv
   nav.irATab({ id: 'facturas' })
   await esperar()
   assert.deepEqual([w.actual(), w.indice()], ['#/facturas', 0])
+})
+
+// --- Tocar la pestaña Facturas con otra pantalla debajo: un atrás solo sirve si lo de abajo es Facturas ----------------------------------
+
+test('la marca de cada entrada lleva la profundidad y el hash de la de abajo, y reemplazar la conserva', async () => {
+  const w = abrirEn('#/facturas')
+  const nav = crearNavegador(w.ventana)
+  nav.irATab({ id: 'clientes' })
+  nav.navegar({ id: 'cliente', clienteId: 7 })
+  await esperar()
+  assert.deepEqual(w.estados(), [null, { fx: 1, bajo: '#/facturas' }, { fx: 2, bajo: '#/clientes' }])
+
+  // Reemplazar la de arriba no cambia lo que hay debajo: la marca nueva copia la de la entrada que sale.
+  nav.navegar({ id: 'cliente', clienteId: 9 }, { reemplazar: true })
+  await esperar()
+  assert.deepEqual(w.pila(), ['#/facturas', '#/clientes', '#/clientes/9'])
+  assert.deepEqual(w.estados()[2], { fx: 2, bajo: '#/clientes' })
+})
+
+test('irATab a Facturas desde un detalle puesto sobre otra pestaña muestra Facturas: un atrás caería en la lista de Clientes', async () => {
+  // Facturas -> Clientes -> #/clientes/7 -> pestaña Facturas. La entrada de abajo es Clientes, no Facturas.
+  const w = abrirEn('#/facturas')
+  const nav = crearNavegador(w.ventana)
+  nav.irATab({ id: 'clientes' })
+  nav.navegar({ id: 'cliente', clienteId: 7 })
+  nav.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(w.actual(), '#/facturas')
+  assert.equal(w.operaciones().includes('atras'), false)
+  assert.equal(w.salio(), false)
+  assert.deepEqual(w.pila(), ['#/facturas', '#/clientes', '#/facturas']) // reemplazó el detalle, sin agregar ni quitar entradas
+  assert.equal(nav.hayHistorial(), true)
+})
+
+test('irATab a Facturas decide igual tras una recarga: la entrada de abajo se lee del historial', async () => {
+  const w = abrirEn('#/facturas')
+  const antes = crearNavegador(w.ventana)
+  antes.irATab({ id: 'clientes' })
+  antes.navegar({ id: 'cliente', clienteId: 7 })
+  await esperar()
+
+  const tras = crearNavegador(w.ventana) // el módulo empieza de cero sobre el mismo historial
+  tras.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(w.actual(), '#/facturas')
+  assert.equal(w.operaciones().includes('atras'), false)
+})
+
+test('un atrás del sistema deja la marca de la entrada a la que se vuelve: desde ella, Facturas sí está debajo', async () => {
+  const w = abrirEn('#/facturas')
+  const nav = crearNavegador(w.ventana)
+  nav.irATab({ id: 'clientes' })
+  nav.navegar({ id: 'cliente', clienteId: 7 })
+  await esperar()
+
+  w.ventana.history.back() // el botón atrás de Android, sin pasar por el router
+  await esperar()
+  assert.equal(w.actual(), '#/clientes')
+  nav.irATab({ id: 'facturas' })
+  await esperar()
+  assert.deepEqual([w.actual(), w.indice()], ['#/facturas', 0]) // retrocedió: reemplazar habría dejado dos entradas
+  assert.equal(w.salio(), false)
+})
+
+test('tras reemplazar por Facturas la marca sigue bien: otra pestaña y volver a Facturas retrocede una entrada', async () => {
+  const w = abrirEn('#/facturas')
+  const nav = crearNavegador(w.ventana)
+  nav.irATab({ id: 'clientes' })
+  nav.navegar({ id: 'cliente', clienteId: 7 })
+  nav.irATab({ id: 'facturas' }) // reemplaza el detalle: Facturas, Clientes, Facturas
+  await esperar()
+  assert.deepEqual(w.estados()[2], { fx: 2, bajo: '#/clientes' })
+
+  nav.irATab({ id: 'productos' }) // desde Facturas se empuja
+  await esperar()
+  assert.deepEqual(w.pila(), ['#/facturas', '#/clientes', '#/facturas', '#/productos'])
+  assert.deepEqual(w.estados()[3], { fx: 3, bajo: '#/facturas' })
+
+  nav.irATab({ id: 'facturas' }) // ahora lo de abajo sí es Facturas
+  await esperar()
+  assert.deepEqual([w.actual(), w.indice()], ['#/facturas', 2])
+  assert.equal(w.salio(), false)
+})
+
+test('irATab a Facturas desde Mas abierta sobre un enlace directo a otra pestaña: Mas se reemplaza por Facturas', async () => {
+  const w = abrirEn('#/clientes') // un enlace directo: debajo de Más no hay inicio
+  const nav = crearNavegador(w.ventana)
+  nav.navegar({ id: 'mas' })
+  assert.deepEqual(w.pila(), ['#/clientes', '#/mas'])
+  nav.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(w.actual(), '#/facturas')
+  assert.deepEqual(w.pila(), ['#/clientes', '#/facturas'])
+  assert.equal(w.operaciones().includes('atras'), false)
+  assert.equal(w.salio(), false)
+})
+
+test('irATab a Facturas con Mas abierta sobre Clientes o sobre el detalle de una factura muestra la lista de Facturas', async () => {
+  // Facturas -> Clientes -> Más -> pestaña Facturas.
+  const sobreClientes = abrirEn('#/facturas')
+  const a = crearNavegador(sobreClientes.ventana)
+  a.irATab({ id: 'clientes' })
+  a.navegar({ id: 'mas' })
+  a.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(sobreClientes.actual(), '#/facturas')
+  assert.equal(sobreClientes.operaciones().includes('atras'), false)
+
+  // Facturas -> detalle de la factura 12 -> Más -> pestaña Facturas. Debajo hay '#/facturas/12': empieza igual, pero es otra pantalla.
+  const sobreDetalle = abrirEn('#/facturas')
+  const b = crearNavegador(sobreDetalle.ventana)
+  b.navegar({ id: 'factura', facturaId: 12 })
+  b.navegar({ id: 'mas' })
+  b.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(sobreDetalle.actual(), '#/facturas')
+  assert.equal(sobreDetalle.operaciones().includes('atras'), false)
+
+  // Lo mismo con una fila de Más ya tocada (reemplaza la entrada de Más, y lo de abajo sigue siendo Clientes).
+  const conFila = abrirEn('#/facturas')
+  const c = crearNavegador(conFila.ventana)
+  c.irATab({ id: 'clientes' })
+  c.navegar({ id: 'mas' })
+  c.navegar({ id: 'mas-empresa' }, { reemplazar: true })
+  c.irATab({ id: 'facturas' })
+  await esperar()
+  assert.equal(conFila.actual(), '#/facturas')
+  assert.equal(conFila.operaciones().includes('atras'), false)
+})
+
+test('irATab a Facturas con Facturas debajo sigue retrocediendo una entrada, también con filtros y desde la raíz sin hash', async () => {
+  // Más abierta sobre Facturas.
+  const mas = abrirEn('#/facturas')
+  const a = crearNavegador(mas.ventana)
+  a.navegar({ id: 'mas' })
+  a.irATab({ id: 'facturas' })
+  await esperar()
+  assert.deepEqual([mas.actual(), mas.indice()], ['#/facturas', 0])
+  assert.equal(mas.operaciones().includes('atras'), true)
+
+  // La entrada de abajo es la lista con su búsqueda: retroceder la deja como estaba.
+  const filtrada = abrirEn('#/facturas?q=abc&estado=accion')
+  const b = crearNavegador(filtrada.ventana)
+  b.irATab({ id: 'clientes' })
+  b.irATab({ id: 'facturas' })
+  await esperar()
+  assert.deepEqual([filtrada.actual(), filtrada.indice()], ['#/facturas?q=abc&estado=accion', 0])
+
+  // La raíz sin hash también es Facturas: `bajo` vale '' (un texto vacío, no una marca ausente).
+  const raiz = abrirEn('')
+  const c = crearNavegador(raiz.ventana)
+  c.irATab({ id: 'clientes' })
+  assert.deepEqual(raiz.estados()[1], { fx: 1, bajo: '' })
+  c.irATab({ id: 'facturas' })
+  await esperar()
+  assert.deepEqual([raiz.actual(), raiz.indice()], ['', 0])
+})
+
+test('una marca sin la entrada de abajo, o con una que no es un hash (la de una versión anterior), no autoriza a retroceder: se reemplaza por Facturas', async () => {
+  for (const bajo of [undefined, null, 42, {}, ['#/facturas']]) {
+    const etiqueta = `bajo = ${JSON.stringify(bajo) ?? 'ausente'}`
+    const w = ventanaFalsa([
+      { hash: '#/facturas', state: null },
+      { hash: '#/clientes', state: bajo === undefined ? { fx: 1 } : { fx: 1, bajo } },
+    ])
+    const nav = crearNavegador(w.ventana)
+    assert.equal(nav.hayHistorial(), true, etiqueta) // la profundidad se sigue leyendo
+    assert.doesNotThrow(() => nav.irATab({ id: 'facturas' }), etiqueta)
+    await esperar()
+    assert.equal(w.actual(), '#/facturas', etiqueta)
+    assert.equal(w.operaciones().includes('atras'), false, etiqueta)
+    assert.equal(w.salio(), false, etiqueta)
+  }
+})
+
+test('toda secuencia corta de navegación cumple lo mismo: la marca no miente, la pestaña tocada se ve y nunca se sale de la app', async () => {
+  type Ventana = ReturnType<typeof ventanaFalsa>
+  const ACCIONES: [string, (nav: Navegador, w: Ventana) => void, string?][] = [
+    ['pestaña Facturas', (nav) => nav.irATab({ id: 'facturas' }), 'facturas'],
+    ['pestaña Clientes', (nav) => nav.irATab({ id: 'clientes' }), 'clientes'],
+    ['pestaña Productos', (nav) => nav.irATab({ id: 'productos' }), 'productos'],
+    ['asistente', (nav) => nav.irATab({ id: 'facturar' }), 'facturar'],
+    ['detalle de cliente', (nav) => nav.navegar({ id: 'cliente', clienteId: 7 })],
+    ['detalle de factura', (nav) => nav.navegar({ id: 'factura', facturaId: 12 })],
+    ['abrir Más', (nav) => nav.navegar({ id: 'mas' })],
+    ['fila de Más', (nav) => nav.navegar({ id: 'mas-empresa' }, { reemplazar: true })],
+    ['atrás de la app', (nav) => nav.atras({ id: 'facturas' })],
+    [
+      'atrás del sistema',
+      (_nav, w) => {
+        if (w.indice() > 0) w.ventana.history.back() // desde la primera entrada sacaría de la app: eso no lo decide el router
+      },
+    ],
+  ]
+  const LARGO = 4
+  // Un microtask por vuelta basta para que corran los atrás pendientes de la ventana falsa (esperar() de verdad haría lenta la prueba).
+  const vaciar = async (): Promise<void> => {
+    for (let i = 0; i < 3; i++) await Promise.resolve()
+  }
+  let probadas = 0
+  for (const inicio of ['#/facturas', '#/clientes/7']) {
+    for (let n = 0; n < ACCIONES.length ** LARGO; n++) {
+      const w = abrirEn(inicio)
+      const nav = crearNavegador(w.ventana)
+      const traza: string[] = [inicio]
+      for (let k = 0, resto = n; k < LARGO; k++, resto = Math.floor(resto / ACCIONES.length)) {
+        const [nombre, hacer, destino] = ACCIONES[resto % ACCIONES.length]
+        traza.push(nombre)
+        const donde = traza.join(' > ')
+        hacer(nav, w)
+        await vaciar()
+        assert.equal(w.salio(), false, donde)
+        if (destino !== undefined) assert.equal(parseHash(w.actual()).id, destino, donde) // la pestaña tocada es la que se ve
+        // La marca no miente: la profundidad es el índice y `bajo` el hash de la entrada de abajo (la primera no lleva marca).
+        assert.equal(nav.hayHistorial(), w.indice() > 0, donde)
+        if (w.indice() === 0) assert.equal(w.estados()[0], null, donde)
+        else assert.deepEqual(w.estados()[w.indice()], { fx: w.indice(), bajo: w.pila()[w.indice() - 1] }, donde)
+      }
+      probadas++
+    }
+  }
+  assert.equal(probadas, 2 * ACCIONES.length ** LARGO)
 })
 
 test('el asistente se entra empujando desde cualquier pestaña, y atrás vuelve a esa pestaña', async () => {
