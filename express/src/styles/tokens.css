@@ -6,7 +6,7 @@
    [data-theme="dark"]). tests/tokens.test.ts vigila que sigan siendo
    los mismos. Lo del escritorio (--sidebar-*, --navbar-h, --density)
    no viene. Lo táctil, las capas, el movimiento, el texto sobre
-   fondos suaves y la pila de fuentes son nuevos.
+   fondos suaves, el anillo de foco y la pila de fuentes son nuevos.
 
    Tema: manda el atributo data-theme ("light" o "dark"; lo pone
    theme-init.js con la preferencia guardada). Sin atributo, manda el
@@ -34,6 +34,11 @@
   --border: #e7e9ee;
   --border-strong: #d6dae1;
   --ring: rgba(42, 111, 219, 0.32);
+
+  /* Anillo de foco del teclado (lo usa base.css). No es --ring: ese es un halo translúcido que sobre los fondos da 1.5:1 en el claro y de 2.1 a
+     2.2:1 en el oscuro, y WCAG 1.4.11 pide 3:1 al indicador de foco. El acento sólido pasa en los dos temas; --accent cambia en el bloque
+     oscuro y --focus lo sigue. */
+  --focus: var(--accent);
 
   /* Texto. --text-3 queda en 3:1 sobre --bg en el claro: solo para marcadores de posición y detalles que no hace falta leer. */
   --text: #1a1d23;

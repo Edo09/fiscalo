@@ -1,7 +1,8 @@
-// Tokens de diseño de Express (express/src/styles/tokens.css). Cuatro garantías: los colores, radios y sombras que Express toma de la app
+// Tokens de diseño de Express (express/src/styles/tokens.css). Cinco garantías: los colores, radios y sombras que Express toma de la app
 // completa valen lo mismo que allá (el valor efectivo tras bold.css) en los dos temas; la paleta oscura, que tiene que estar dos veces (por
-// el sistema y por el atributo), es idéntica en las dos; los tokens nuevos del móvil tienen los valores del contrato; y las parejas de texto
-// y fondo dan 4.5:1 en el claro y en el oscuro. Los CSS se leen desde la ubicación de esta prueba, no desde el directorio de trabajo.
+// el sistema y por el atributo), es idéntica en las dos; los tokens nuevos del móvil tienen los valores del contrato; las parejas de texto
+// y fondo dan 4.5:1 en el claro y en el oscuro; y el anillo de foco del teclado (base.css, con --focus) da 3:1 sobre los fondos en los dos
+// temas. Los CSS se leen desde la ubicación de esta prueba, no desde el directorio de trabajo.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -89,6 +90,13 @@ function ratio(a: string, b: string): number {
   return (mayor + 0.05) / (menor + 0.05)
 }
 
+/** El valor de `token` en `tema` con sus `var(--otro)` ya sustituidos, como los calcula el navegador (solo la forma simple, sin respaldo). */
+function resolver(tema: Mapa, token: string, visitados: string[] = []): string {
+  assert.ok(!visitados.includes(token), `referencia circular: ${[...visitados, token].join(' -> ')}`)
+  assert.ok(token in tema, `${token} no esta definido`)
+  return tema[token].replace(/var\((--[a-z0-9-]+)\)/g, (_, otro: string) => resolver(tema, otro, [...visitados, token]))
+}
+
 // --- Los mapas: la app completa y Express -----------------------------------------------------------------------------------------
 
 const styles = analizar(leer('src/styles/styles.css'))
@@ -168,6 +176,7 @@ test('tokens nuevos', () => {
     ['--z-bar', '10'], ['--z-accion', '20'], ['--z-banner', '30'], ['--z-fondo', '40'], ['--z-sheet', '50'], ['--z-toast', '60'],
     ['--mov-rapido', '150ms'], ['--mov', '200ms'],
     ['--warning-text', '#8a5608'], ['--success-text', '#17694a'], ['--danger-text', '#a82a2a'],
+    ['--focus', 'var(--accent)'], // sin repetirlo en los bloques oscuros: --accent ya cambia allí y --focus lo sigue
   ]
   for (const [token, valor] of nuevos) assert.equal(claro[token], valor, token)
 })
@@ -182,6 +191,28 @@ test('contraste 4.5:1 en los dos temas', () => {
     for (const [nombre, tema] of [['claro', claro], ['oscuro', oscuro]] as const) {
       const relacion = ratio(tema[texto], tema[fondo])
       assert.ok(relacion >= 4.5, `${nombre}: ${texto} ${tema[texto]} sobre ${fondo} ${tema[fondo]} da ${relacion.toFixed(2)}:1`)
+    }
+  }
+})
+
+// WCAG 1.4.11 (contraste de lo que no es texto) pide 3:1 al indicador de foco. --ring, el halo translúcido de la app completa, mezclado con
+// el fondo da 1.5:1 en el claro y de 2.1 a 2.2:1 en el oscuro, y la app completa nunca lo usa solo: va junto a un borde --accent (.input).
+// El anillo de base.css usa --focus, el acento sólido, que es lo que la app completa pinta como foco de teclado (bold.css, .btn:focus-visible).
+test('el anillo de foco: base.css usa --focus y --focus da 3:1 sobre los fondos en los dos temas', () => {
+  const base = analizar(leer('express/src/styles/base.css'))
+  assert.equal(mapa(unico(bloquesDe(base, ':focus'), 'base.css :focus')).outline, '3px solid var(--focus)')
+  assert.equal(mapa(unico(bloquesDe(base, ':focus:not(:focus-visible)'), 'base.css :focus:not(:focus-visible)')).outline, 'none')
+  // Los fondos donde puede caer un control con foco: la pantalla, las tarjetas y las franjas de estado.
+  const fondos = [
+    '--bg', '--surface', '--surface-2', '--surface-hover', '--surface-active', '--neutral-soft',
+    '--accent-soft', '--success-soft', '--warning-soft', '--danger-soft',
+  ]
+  for (const [nombre, tema] of [['claro', claro], ['oscuro', oscuro]] as const) {
+    // Un color sin transparencia: con rgba() `ratio` falla, porque sin conocer el fondo no hay contraste que medir.
+    const anillo = resolver(tema, '--focus')
+    for (const fondo of fondos) {
+      const relacion = ratio(anillo, tema[fondo])
+      assert.ok(relacion >= 3, `${nombre}: --focus ${anillo} sobre ${fondo} ${tema[fondo]} da ${relacion.toFixed(2)}:1`)
     }
   }
 })

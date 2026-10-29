@@ -48,10 +48,11 @@ summary,
   touch-action: manipulation;
 }
 
-/* Foco: anillo de 3px con --ring. `:focus` solo es la red de los navegadores sin :focus-visible (Safari antes de 15.4): ahí el anillo sale
-   siempre. Donde :focus-visible existe, la segunda regla lo quita al tocar o hacer clic y deja el del teclado. */
+/* Foco: anillo de 3px con --focus, el acento sólido (con --ring, translúcido, no llegaba a los 3:1 que WCAG 1.4.11 pide al indicador de
+   foco). `:focus` solo es la red de los navegadores sin :focus-visible (Safari antes de 15.4): ahí el anillo sale siempre. Donde
+   :focus-visible existe, la segunda regla lo quita al tocar o hacer clic y deja el del teclado. */
 :focus {
-  outline: 3px solid var(--ring);
+  outline: 3px solid var(--focus);
 }
 
 :focus:not(:focus-visible) {
