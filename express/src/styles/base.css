@@ -1,0 +1,90 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Estilos base
+   Reinicio, tipografía, la pantalla, el foco y utilidades.
+   Los tokens (--bg, --text, --font-sans, --bar-h...) están en
+   tokens.css.
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Sin el margen de 8px del navegador: con él, una pantalla de alto completo desbordaría y habría scroll de más. */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Una pantalla de la app: al menos el alto visible (dvh sigue a la barra de direcciones del móvil; vh, donde dvh no existe) y, al pie, el
+   espacio de la barra inferior más el área segura, para que la barra no tape el final. */
+.pantalla {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: calc(var(--bar-h) + var(--safe-b));
+  overscroll-behavior-y: contain;
+}
+
+/* Controles: sin el destello gris del toque y sin la espera del doble toque (zoom). */
+a,
+button,
+input,
+select,
+textarea,
+label,
+summary,
+[role="button"],
+[role="tab"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Foco: anillo de 3px con --ring. `:focus` solo es la red de los navegadores sin :focus-visible (Safari antes de 15.4): ahí el anillo sale
+   siempre. Donde :focus-visible existe, la segunda regla lo quita al tocar o hacer clic y deja el del teclado. */
+:focus {
+  outline: 3px solid var(--ring);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Solo para lectores de pantalla: ocupa 1px y no se ve. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Cifras de ancho fijo: los montos se alinean y no bailan al cambiar. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Movimiento reducido: sin transiciones ni animaciones. La duración queda en 0.01ms y no en 0 porque con 0 una transición ni empieza y su
+   transitionend nunca llega (algo que lo espere se quedaría colgado); y las animaciones sin fin pasan a una sola vuelta, que a esa duración
+   parpadearía. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

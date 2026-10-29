@@ -1,0 +1,192 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Tokens de diseño
+
+   Colores, radios y sombras: los de la app completa, con el valor
+   efectivo tras bold.css (src/styles/styles.css y bold.css, :root y
+   [data-theme="dark"]). tests/tokens.test.ts vigila que sigan siendo
+   los mismos. Lo del escritorio (--sidebar-*, --navbar-h, --density)
+   no viene. Lo táctil, las capas, el movimiento, el texto sobre
+   fondos suaves y la pila de fuentes son nuevos.
+
+   Tema: manda el atributo data-theme ("light" o "dark"; lo pone
+   theme-init.js con la preferencia guardada). Sin atributo, manda el
+   sistema. Por eso la paleta oscura está dos veces, idéntica: en el
+   @media (el sistema) y en el atributo (lo guardado). Al cambiar una,
+   se cambia la otra: la prueba lo comprueba.
+   ============================================================ */
+
+:root {
+  /* ---- Acento (azul) ---- */
+  --accent: #2a6fdb;
+  --accent-hover: #2462c2;
+  --accent-active: #1f56ac;
+  --accent-soft: #eaf1fc;
+  --accent-soft-2: #dbe8fa;
+  --accent-text: #1f56ac;
+  --on-accent: #ffffff;
+
+  /* ---- Neutros ---- */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #fbfcfd;
+  --surface-hover: #f3f5f8;
+  --surface-active: #eef1f5;
+  --border: #e7e9ee;
+  --border-strong: #d6dae1;
+  --ring: rgba(42, 111, 219, 0.32);
+
+  /* Texto. --text-3 queda en 3:1 sobre --bg en el claro: solo para marcadores de posición y detalles que no hace falta leer. */
+  --text: #1a1d23;
+  --text-2: #5a626e;
+  --text-3: #899099;
+
+  /* ---- Estados ----
+     El texto sobre un fondo -soft usa el -text de su color: en el claro, el color base no llega a 4.5:1 sobre su fondo suave. */
+  --success: #1f8a5b;
+  --success-soft: #e6f4ec;
+  --success-text: #17694a;
+  --warning: #c47f12;
+  --warning-soft: #fbf1dd;
+  --warning-text: #8a5608;
+  --danger: #d14343;
+  --danger-soft: #fce8e8;
+  --danger-text: #a82a2a;
+  --info: #2a6fdb;
+  --info-soft: #eaf1fc;
+  --neutral-soft: #eef0f3;
+
+  /* ---- Radios (--r-lg y --r-xl, los de bold.css) ---- */
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* ---- Sombras (las de bold.css; --sh-pop, la de styles.css) ---- */
+  --sh-xs: 0 1px 2px rgba(15, 20, 40, 0.05);
+  --sh-sm: 0 1px 3px rgba(15, 20, 40, 0.07), 0 1px 2px rgba(15, 20, 40, 0.05);
+  --sh-md: 0 6px 16px rgba(15, 20, 40, 0.09), 0 2px 5px rgba(15, 20, 40, 0.05);
+  --sh-lg: 0 16px 40px rgba(15, 20, 40, 0.14), 0 5px 12px rgba(15, 20, 40, 0.06);
+  --sh-pop: 0 16px 48px rgba(16, 24, 40, 0.18);
+
+  /* ---- Táctil y medidas (nuevos) ---- */
+  --tap: 48px; /* objetivo táctil mínimo */
+  --tap-lg: 52px; /* botón primario */
+  --bar-h: 56px; /* barra inferior, sin el área segura */
+  --top-h: 48px; /* barra superior */
+  --kb-inset: 0px; /* alto del teclado en pantalla: 0 sin teclado; la app lo actualiza con visualViewport */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --gutter: 16px;
+
+  /* ---- Capas ---- */
+  --z-bar: 10;
+  --z-accion: 20;
+  --z-banner: 30;
+  --z-fondo: 40;
+  --z-sheet: 50;
+  --z-toast: 60;
+
+  /* ---- Movimiento ---- */
+  --mov-rapido: 150ms;
+  --mov: 200ms;
+
+  /* ---- Tipografía: el cuerpo usa la pila del sistema; los títulos, Space Grotesk si carga y, si no, el cuerpo ---- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Space Grotesk", var(--font-sans);
+}
+
+/* ---- Oscuro por el sistema: sin data-theme, o con uno que no sea "light". ----
+   Gris frío, como el de la app completa. Los -text oscuros son los colores base, que sobre su fondo suave oscuro dan más de 4.5:1. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accent: #649cf3;
+    --accent-hover: #72a6f4;
+    --accent-active: #80aff5;
+    --accent-soft: #2e3b52;
+    --accent-soft-2: #34445f;
+    --accent-text: #a6c5f8;
+    --on-accent: #0d1626;
+
+    --bg: #24272d;
+    --surface: #2c3037;
+    --surface-2: #282b32;
+    --surface-hover: #343941;
+    --surface-active: #3b4049;
+    --border: #3b4049;
+    --border-strong: #4b515c;
+    --ring: rgba(100, 156, 243, 0.45);
+
+    --text: #eceef2;
+    --text-2: #bcc2cb;
+    --text-3: #979eaa;
+
+    --success: #43c089;
+    --success-soft: #26392f;
+    --success-text: #43c089;
+    --warning: #e4aa45;
+    --warning-soft: #3c3424;
+    --warning-text: #e4aa45;
+    --danger: #f17d7d;
+    --danger-soft: #45292c;
+    --danger-text: #f17d7d;
+    --info: #649cf3;
+    --info-soft: #2e3b52;
+    --neutral-soft: #353a42;
+
+    --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+    --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
+    --sh-md: 0 6px 16px rgba(0, 0, 0, 0.3), 0 2px 5px rgba(0, 0, 0, 0.18);
+    --sh-lg: 0 16px 40px rgba(0, 0, 0, 0.4), 0 5px 12px rgba(0, 0, 0, 0.2);
+    --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
+  }
+}
+
+/* ---- Oscuro por la preferencia guardada (data-theme="dark"): lo mismo que el bloque de arriba. ---- */
+:root[data-theme="dark"] {
+  --accent: #649cf3;
+  --accent-hover: #72a6f4;
+  --accent-active: #80aff5;
+  --accent-soft: #2e3b52;
+  --accent-soft-2: #34445f;
+  --accent-text: #a6c5f8;
+  --on-accent: #0d1626;
+
+  --bg: #24272d;
+  --surface: #2c3037;
+  --surface-2: #282b32;
+  --surface-hover: #343941;
+  --surface-active: #3b4049;
+  --border: #3b4049;
+  --border-strong: #4b515c;
+  --ring: rgba(100, 156, 243, 0.45);
+
+  --text: #eceef2;
+  --text-2: #bcc2cb;
+  --text-3: #979eaa;
+
+  --success: #43c089;
+  --success-soft: #26392f;
+  --success-text: #43c089;
+  --warning: #e4aa45;
+  --warning-soft: #3c3424;
+  --warning-text: #e4aa45;
+  --danger: #f17d7d;
+  --danger-soft: #45292c;
+  --danger-text: #f17d7d;
+  --info: #649cf3;
+  --info-soft: #2e3b52;
+  --neutral-soft: #353a42;
+
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
+  --sh-md: 0 6px 16px rgba(0, 0, 0, 0.3), 0 2px 5px rgba(0, 0, 0, 0.18);
+  --sh-lg: 0 16px 40px rgba(0, 0, 0, 0.4), 0 5px 12px rgba(0, 0, 0, 0.2);
+  --sh-pop: 0 18px 48px rgba(0, 0, 0, 0.48);
+}
