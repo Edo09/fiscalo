@@ -22,6 +22,14 @@ const cuerpo = (r: { cuerpo?: unknown }): any => r.cuerpo
 const q = (consulta = ''): URLSearchParams => new URLSearchParams(consulta)
 const DOS_DECIMALES = /^-?\d+\.\d{2}$/
 const MENSAJE_RECIBO = 'No se pudo preparar el recibo. Revisa el ancho de papel en Configuración → Impresora de recibos o imprime en hoja carta.'
+// Textos del controlador del API (facturaController.php), letra por letra: FACTURA_NOTA_EN_VUELO y FACTURA_NOTA_ENVIADO_SIN_TRACK, que el
+// plan del write-ahead (release 1, tarea 18) trae completas y scripts/check-errores.ts copia; `%s` es el e-NCF (sprintf). El 404 es el de
+// handleConsultarEstado (mismo plan).
+const NOTA_EN_VUELO = 'La DGII todavía no ha confirmado este comprobante. No lo emitas de nuevo; si sigue así en unos minutos, avisa a soporte con el número %s.'
+const NOTA_ENVIADO_SIN_TRACK =
+  'La DGII recibió este comprobante, pero no devolvió su número de seguimiento y por eso no se puede consultar su estado desde aquí. Si necesitas confirmarlo, avisa a soporte con el número %s.'
+const MENSAJE_NO_EXISTE = 'No encontramos esta factura. Puede que ya no exista.'
+const conNcf = (texto: string, eNcf: string): string => texto.replace('%s', () => eNcf)
 
 test('lista: tipo, paginas, filtros', () => {
   const r = listarFacturas(t, new URLSearchParams('tipo_ecf=45&pageSize=15&page=1')).cuerpo as any
@@ -41,10 +49,11 @@ test('lista: estados, orden, lean, tipo, busqueda y paginas', () => {
   // el 422 de un estado desconocido lleva el texto del API y el sobre de error
   const malo = listarFacturas(t, q('estado=zzz'))
   assert.deepEqual([malo.http, cuerpo(malo).status, cuerpo(malo).error], [422, false, 'Ese filtro de estado no es válido. Elige otro en la lista.'])
-  assert.equal(listarFacturas(t, q('estado=PENDIENTE')).http, 422, 'los estados van en minúsculas')
 
   assert.deepEqual(estados('estado=aprobado&pageSize=100'), ['ACEPTADO'])
-  assert.deepEqual(estados('estado=rechazado&pageSize=100'), ['RECHAZADO'])
+  // `rechazado` del API es LIKE '%RECHAZADO%' (plan 05): también trae lo archivado, que `archivadas=0` y `accion` sí dejan fuera
+  assert.deepEqual(estados('estado=rechazado&pageSize=100'), ['RECHAZADO', 'RECHAZADO_ARCHIVADO'])
+  assert.deepEqual(estados('estado=rechazado&archivadas=0&pageSize=100'), ['RECHAZADO'])
   assert.deepEqual(estados('estado=accion&pageSize=100'), ['ERROR', 'NO_ENCONTRADO', 'RECHAZADO'])
   assert.equal(listarFacturas(t, q('estado=accion'), { sinAccion: false }).http, 200)
   assert.equal(listarFacturas(t, q('estado=rechazado'), { sinAccion: true }).http, 200, 'sin `accion` el resto de filtros sigue igual')
@@ -54,12 +63,12 @@ test('lista: estados, orden, lean, tipo, busqueda y paginas', () => {
   assert.deepEqual(ids, [...ids].sort((a, b) => b - a))
   assert.equal(new Set(ids).size, ids.length)
 
-  // lean quita lo pesado y deja las notas
+  // lean quita lo pesado (también la consulta de la descripción de cada fila) y deja las notas
   const completa = filas('pageSize=5')[0]
   const lean = filas('pageSize=5&lean=1')[0]
-  assert.ok('items' in completa && 'respuesta_dgii' in completa)
-  assert.ok(!('items' in lean) && !('respuesta_dgii' in lean) && !('xml_firmado' in lean))
-  assert.ok(Array.isArray(lean.notas) && 'modifica' in lean)
+  assert.ok('items' in completa && 'respuesta_dgii' in completa && 'description' in completa)
+  assert.ok(!('items' in lean) && !('respuesta_dgii' in lean) && !('xml_firmado' in lean) && !('description' in lean))
+  assert.ok(Array.isArray(lean.notas) && 'modifica' in lean && 'company_name' in lean)
 
   // tipo_ecf se guarda sin la E, y la lista lo acepta con o sin ella
   assert.ok(filas('pageSize=100').every((f) => /^\d+$/.test(f.tipo_ecf)))
@@ -99,6 +108,44 @@ test('lista: estados, orden, lean, tipo, busqueda y paginas', () => {
   const reemplazo = t.facturas.filter((f) => f.e_ncf === archivada.no_factura)
   assert.deepEqual(reemplazo.map((f) => f.estado_dgii), ['ACEPTADO'])
   assert.ok(reemplazo[0].id > archivada.id)
+})
+
+test('lista: pageSize vale 10 por omisión y no tiene tope, como los demás listados del API', () => {
+  const sin = cuerpo(listarFacturas(t, q()))
+  assert.deepEqual([sin.data.length, sin.pagination.page, sin.pagination.pageSize], [10, 1, 10])
+  assert.equal(sin.pagination.totalPages, Math.ceil(sin.pagination.total / 10))
+  // el tope de 100 que traía el mock era una regla inventada: un pedido mayor se atiende tal cual
+  const enorme = cuerpo(listarFacturas(t, q('pageSize=500')))
+  assert.deepEqual([enorme.data.length, enorme.pagination.pageSize, enorme.pagination.totalPages], [t.facturas.length, 500, 1])
+  // lo que no es un entero de 1 o más cae en el valor por omisión
+  for (const malo of ['0', '-3', 'abc', '']) assert.equal(cuerpo(listarFacturas(t, q(`pageSize=${malo}`))).pagination.pageSize, 10, `pageSize=${malo}`)
+  assert.deepEqual([cuerpo(listarFacturas(t, q('page=0&pageSize=15'))).pagination.page, cuerpo(listarFacturas(t, q('page=x&pageSize=15'))).pagination.page], [1, 1])
+})
+
+test('lista: el filtro de estado se normaliza como en el API (capitalización, espacios, todos y aprovado)', () => {
+  const ids = (consulta: string): number[] => {
+    const r = listarFacturas(t, q(consulta))
+    assert.equal(r.http, 200, consulta)
+    return cuerpo(r).data.map((f: any) => f.id as number)
+  }
+  const pendientes = ids('estado=pendiente&pageSize=100')
+  assert.ok(pendientes.length > 0)
+  for (const variante of ['PENDIENTE', 'Pendiente', '%20pendiente%20']) assert.deepEqual(ids(`estado=${variante}&pageSize=100`), pendientes, variante)
+  assert.deepEqual(ids('estado=%20Accion%20&pageSize=100'), ids('estado=accion&pageSize=100'))
+  assert.deepEqual(ids('estado=RECHAZADO&pageSize=100'), ids('estado=rechazado&pageSize=100'))
+  assert.ok(ids('estado=aprobado&pageSize=100').length > 0)
+  assert.deepEqual(ids('estado=aprovado&pageSize=100'), ids('estado=aprobado&pageSize=100'))
+  // 'todos' y vacío no filtran
+  const todas = ids('pageSize=100')
+  for (const sinFiltro of ['todos', 'TODOS', '']) assert.deepEqual(ids(`estado=${sinFiltro}&pageSize=100`), todas, `estado=${sinFiltro}`)
+  // lo demás es un filtro desconocido: el 422 con su texto
+  for (const malo of ['zzz', 'aceptado', 'pendientes', 'todo']) {
+    const r = listarFacturas(t, q(`estado=${malo}`))
+    assert.deepEqual([r.http, cuerpo(r).error], [422, 'Ese filtro de estado no es válido. Elige otro en la lista.'], malo)
+  }
+  // un API anterior al plan 05 no conoce `accion`, con la capitalización que sea, y el resto sigue igual
+  assert.equal(listarFacturas(t, q('estado=ACCION'), { sinAccion: true }).http, 422)
+  assert.deepEqual([listarFacturas(t, q('estado=TODOS'), { sinAccion: true }).http, listarFacturas(t, q('estado=Rechazado'), { sinAccion: true }).http], [200, 200])
 })
 
 test('detalle, estado, stats, pdf, fallos', () => {
@@ -286,6 +333,53 @@ test('detalle, estado, stats, pdf, fallos', () => {
   assert.equal(falloDeLectura('PRUEBA [HTML502]')!.http, 502, 'sin distinguir mayúsculas')
 })
 
+test('/estado de una fila en vuelo: 200 con la forma y la nota del API, con el e-NCF de la fila', () => {
+  for (const estado of ['PENDIENTE_ENVIO', 'ENVIO_INCIERTO']) {
+    const fila = t.facturas.find((f) => f.estado_dgii === estado)!
+    const r = estadoFactura(t, fila.id)
+    assert.deepEqual([r.http, cuerpo(r).status], [200, true], estado)
+    const d = cuerpo(r).data
+    assert.equal(d.nota, conNcf(NOTA_EN_VUELO, fila.e_ncf!), estado)
+    assert.deepEqual(Object.keys(d).sort(), ['e_ncf', 'en_vuelo', 'estado_dgii', 'factura_id', 'nota', 'secuencia_utilizada', 'tipo_ecf', 'track_id'], estado)
+    assert.deepEqual([d.factura_id, d.e_ncf, d.tipo_ecf, d.track_id, d.estado_dgii, d.secuencia_utilizada, d.en_vuelo], [fila.id, fila.e_ncf, '45', null, estado, null, true], estado)
+    assert.equal(fila.estado_dgii, estado, 'no consulta ni mueve nada')
+  }
+})
+
+test('/estado de un ENVIADO sin número de seguimiento: 200 con la nota de soporte, sin 422 y sin avanzar', () => {
+  const u = sembrarTenant('admin.e45', AHORA)
+  const i = u.facturas.findIndex((f) => f.estado_dgii === 'ENVIADO')
+  u.facturas[i] = { ...u.facturas[i], track_id: null }
+  const fila = u.facturas[i]
+  for (let veces = 0; veces < 3; veces++) {
+    const r = estadoFactura(u, fila.id)
+    assert.equal(r.http, 200, `consulta ${veces + 1}`)
+    const d = cuerpo(r).data
+    assert.deepEqual([d.en_vuelo, d.estado_dgii, d.track_id, d.secuencia_utilizada, d.e_ncf, d.tipo_ecf], [false, 'ENVIADO', null, null, fila.e_ncf, '45'])
+    assert.equal(d.nota, conNcf(NOTA_ENVIADO_SIN_TRACK, fila.e_ncf!))
+    assert.ok(!('consulta' in d))
+    assert.equal(u.facturas[i].estado_dgii, 'ENVIADO', 'no hay nada que consultar, así que no avanza')
+  }
+  // la rama pide el e-NCF: sin él vale el 422 de las filas sin número de seguimiento
+  u.facturas[i] = { ...fila, e_ncf: null }
+  assert.equal(estadoFactura(u, fila.id).http, 422)
+  // y lo que no es ENVIADO sigue su camino: el resumen de consumo (RFCE_) se consulta por e-NCF y un ERROR sin seguimiento da el 422
+  const consumo = sembrarTenant('admin.e32', AHORA)
+  const rfce = consumo.facturas.find((f) => f.estado_dgii === 'RFCE_ENVIADO')!
+  assert.equal(cuerpo(estadoFactura(consumo, rfce.id)).data.estado_dgii, 'RFCE_EN_PROCESO')
+  assert.equal(estadoFactura(u, u.facturas.find((f) => f.estado_dgii === 'ERROR')!.id).http, 422)
+})
+
+test('una factura que no existe: el 404 del API en /estado y /pdf, y data [] en el detalle', () => {
+  const lecturas = {
+    estado: estadoFactura(t, 99999),
+    pdf: pdfFactura(t, 99999, q()),
+    recibo: pdfFactura(t, 99999, q('format=datos&formato=pos')),
+  }
+  for (const [cual, r] of Object.entries(lecturas)) assert.deepEqual([r.http, cuerpo(r)], [404, { status: false, error: MENSAJE_NO_EXISTE }], cual)
+  assert.deepEqual([detalleFactura(t, 99999).http, cuerpo(detalleFactura(t, 99999)).data], [200, []])
+})
+
 test('falloDeLectura: MOCK_SLOW_MS manda sobre los 15 s y una ficha de error gana a la lenta', () => {
   const previo = process.env.MOCK_SLOW_MS
   try {
@@ -333,6 +427,26 @@ test('fichas de falla en las lecturas de una fila: el detalle, /estado y /pdf la
   assert.equal(detalleFactura(t, id('Min. de Obras Públicas')).demoraMs, undefined)
 })
 
+test('los motivos de rechazo sembrados son los que cita el plan, con la forma {valor, codigo} de la DGII', () => {
+  // La DGII es quien redacta estos textos y el API los guarda tal cual en respuesta_dgii: no hay nada contra qué compararlos, así que
+  // el mock no inventa ninguno. Los dos de aquí salen del plan: el de la tarea 7 (el código 145 es un rechazo real de la DGII, lo citan
+  // los planes del POS) y el de la maqueta de una factura rechazada del anexo, que es también el `rechazo` del plan 07.
+  const DEL_PLAN = [
+    { valor: 'Fecha de vencimiento de la secuencia vencida', codigo: 145 },
+    { valor: 'El RNC del comprador no coincide con su nombre.', codigo: 1 },
+  ]
+  let rechazadas = 0
+  for (const persona of ['admin.e45', 'admin.multi', 'admin.e32']) {
+    for (const f of sembrarTenant(persona, AHORA).facturas.filter((x) => x.estado_dgii.includes('RECHAZADO'))) {
+      rechazadas += 1
+      const mensajes: Array<{ valor: string; codigo: number }> = JSON.parse(f.respuesta_dgii!).mensajes
+      assert.ok(mensajes.length >= 1, `${persona} ${f.id} trae su motivo`)
+      for (const m of mensajes) assert.ok(DEL_PLAN.some((d) => d.valor === m.valor && d.codigo === m.codigo), `${persona} ${f.id}: ${JSON.stringify(m)}`)
+    }
+  }
+  assert.equal(rechazadas, 5, 'tres en la semilla E45 (con la archivada), una en admin.multi y una en admin.e32')
+})
+
 test('personas', () => {
   const sembrar = (persona: string) => sembrarTenant(persona, AHORA)
 
@@ -346,6 +460,10 @@ test('personas', () => {
   assert.deepEqual(e32.secuencias.map((s) => s.type), ['E32', 'E34'])
   assert.deepEqual(cuerpo(listarFacturas(e32, q('estado=pendiente&pageSize=100'))).data.map((f: any) => f.estado_dgii).sort(), ['RFCE_ENVIADO', 'RFCE_EN_PROCESO'])
   assert.deepEqual(cuerpo(listarFacturas(e32, q('estado=accion&pageSize=100'))).data.map((f: any) => f.estado_dgii), ['RFCE_RECHAZADO'])
+  // `aprobado` y `rechazado` son un LIKE '%ACEPTADO%' y un LIKE '%RECHAZADO%': traen también las variantes RFCE_
+  const estadosDe = (consulta: string): string[] => [...new Set<string>(cuerpo(listarFacturas(e32, q(consulta))).data.map((f: any) => f.estado_dgii))]
+  assert.deepEqual(estadosDe('estado=aprobado&pageSize=100'), ['RFCE_ACEPTADO'])
+  assert.deepEqual(estadosDe('estado=rechazado&pageSize=100'), ['RFCE_RECHAZADO'])
   // el estado RFCE avanza igual que el normal
   const rfceEnviada = e32.facturas.find((f) => f.estado_dgii === 'RFCE_ENVIADO')!
   assert.equal(cuerpo(estadoFactura(e32, rfceEnviada.id)).data.estado_dgii, 'RFCE_EN_PROCESO')
@@ -497,7 +615,8 @@ test('cableado: las seis rutas leen un tenant por empresa, con la identidad de l
   assert.deepEqual([recibo422.http, recibo422.cuerpo.error], [422, MENSAJE_RECIBO])
   const recibo = await json(admin.token, `/api/facturas/${idAceptada}/pdf?format=datos&formato=pos`)
   assert.ok(recibo.http === 200 && recibo.cuerpo.data.timbre.qr.startsWith('data:image/'))
-  assert.equal((await json(admin.token, '/api/facturas/99999/estado')).http, 404)
+  const sinFactura = await json(admin.token, '/api/facturas/99999/estado')
+  assert.deepEqual([sinFactura.http, sinFactura.cuerpo], [404, { status: false, error: MENSAJE_NO_EXISTE }])
 
   // la lista blanca sigue mandando: el módulo `facturacion` abre estas rutas, y lo que no existe sigue siendo 404 del mock
   assert.equal((await json(admin.token, '/api/gastos')).cuerpo.codigo, 'EDICION_NO_INCLUYE')

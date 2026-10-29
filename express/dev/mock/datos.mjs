@@ -156,6 +156,8 @@ export function respuestaDgii(estado, { trackId = null, rnc, encf, fecha, mensaj
   const base = estado.replace(/^RFCE_/, '').replace(/_ARCHIVADO$/, '')
   if (base === 'PENDIENTE_ENVIO' || base === 'ENVIO_INCIERTO') return null
   if (base === 'ENVIADO') return JSON.stringify({ trackId, error: '', mensaje: '' })
+  // Texto de ejemplo: lo que guarda el API en un ERROR depende de la falla. Trae `mensaje` (sin `mensajes`) porque es lo que lee el front
+  // cuando no hay lista de motivos (anexo, facturaModel.php:1728).
   if (base === 'ERROR') return JSON.stringify({ trackId, error: 'No se pudo comunicar con la DGII', mensaje: 'Tiempo de espera agotado' })
   const veredicto = VEREDICTOS.get(base)
   if (veredicto === undefined) throw new Error(`respuestaDgii: falta el veredicto del estado ${estado}`)
@@ -353,7 +355,12 @@ function construir(hoy, { rnc }, { clientes: clientesBase, filas: especificacion
 // Las semillas
 // ---------------------------------------------------------------------------
 
+// Los motivos de rechazo los redacta la DGII y el API los guarda tal cual en `respuesta_dgii.mensajes` (`{ valor, codigo }`): no hay en el
+// API nada contra qué compararlos, así que el mock no inventa ninguno y usa solo los dos que cita el plan. El primero es el de la tarea 7
+// (el código 145 es un rechazo real de la DGII, lo citan los planes del POS); el segundo sale de la maqueta de una factura rechazada del
+// anexo y es también el `rechazo` del plan 07.
 const MOTIVO_145 = { valor: 'Fecha de vencimiento de la secuencia vencida', codigo: 145 }
+const MOTIVO_RNC = { valor: 'El RNC del comprador no coincide con su nombre.', codigo: 1 }
 const FICHAS_DE_FALLA = ['[500]', '[html502]', '[403]', '[401]', '[slow]']
 
 /**
@@ -385,7 +392,7 @@ function semillaE45(hoy) {
     fila(-4, '10:20', '34', 'RECHAZADO', 5, [linea('Ajuste de precio', 1, 2500)], {
       modifica: 'conNotaRechazada',
       codigo: '3',
-      mensajes: [{ valor: 'La fecha del comprobante modificado no coincide con la registrada', codigo: 102 }],
+      mensajes: [MOTIVO_RNC],
     }),
     fila(-3, '16:45', '45', 'NO_ENCONTRADO', 2, [linea('Suministro de materiales', 3, 2000)]),
     fila(-3, '17:10', '45', 'ERROR', 1, [linea('Asesoría técnica', 1, 3000)]),
@@ -465,7 +472,7 @@ function semillaE32(hoy) {
     fila(0, '09:50', '32', 'RFCE_ACEPTADO', null, [linea('Venta de mostrador', 2, 450)]),
     fila(0, '10:20', '32', 'RFCE_EN_PROCESO', 1, [linea('Venta de mostrador', 1, 1250)]),
     fila(-1, '15:10', '32', 'RFCE_ENVIADO', null, [linea('Venta de mostrador', 3, 300)]),
-    fila(-2, '12:30', '32', 'RFCE_RECHAZADO', 3, [linea('Venta al por mayor', 1, 8000)], { mensajes: [{ valor: 'El RNC del comprador no coincide con su nombre', codigo: 1 }] }),
+    fila(-2, '12:30', '32', 'RFCE_RECHAZADO', 3, [linea('Venta al por mayor', 1, 8000)], { mensajes: [MOTIVO_RNC] }),
   ]
   return {
     tiposVenta: ['32'],

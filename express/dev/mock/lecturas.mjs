@@ -1,8 +1,10 @@
 // Lecturas del mock de Express (plan 06): los manejadores PUROS de las seis rutas de lectura. Reciben el tenant que siembra datos.mjs
 // y devuelven la `Respuesta` del esqueleto (mock-api.mjs); el cableado a las rutas (y a la persona de la petición) está allí.
 //
-// Copian lo que hace el API real: `tipo_ecf` sin la E, el dinero como texto con dos decimales, `data: [fila]` en el detalle, el 422
-// de un estado desconocido, `lean` y `archivadas=0` (los trae solo Express), y el 422 del recibo sin ancho de papel. Las fichas de
+// Copian lo que hace el API real: `tipo_ecf` sin la E, el dinero como texto con dos decimales, `data: [fila]` en el detalle, el filtro
+// de `estado` con su 422, la paginación (10 por omisión y sin tope, como los demás listados), `lean` y `archivadas=0` (los trae solo Express), los textos y la
+// forma de /estado (la nota de una fila en vuelo, la de un ENVIADO sin seguimiento y el 404) y el 422 del recibo sin ancho de papel.
+// Cada una dice en su comentario de dónde sale la regla; lo que no se pudo ver en el API (la cola del 422 de /estado) también. Las fichas de
 // falla de la lectura (`Prueba [500]`, ...) se buscan en el nombre del cliente de la fila que se lee: honran las tres lecturas de
 // una fila (detalle, /estado y /pdf) y nunca la lista, porque buscar «Prueba» tiene que devolver esas cinco filas y no fallar.
 
@@ -17,10 +19,17 @@ import { avanzarEstado, diaDe, respuestaDgii, sumarDias } from './datos.mjs'
 
 const MSG_ESTADO = 'Ese filtro de estado no es válido. Elige otro en la lista.'
 const MSG_RECIBO = 'No se pudo preparar el recibo. Revisa el ancho de papel en Configuración → Impresora de recibos o imprime en hoja carta.'
-const MSG_NO_EXISTE = 'Factura no encontrada.'
-// El texto exacto lo fija el API real; aquí solo importa que empiece como el que cita el plan y que la pantalla lo muestre tal cual.
+// Los textos de /estado que siguen son los del controlador del API (facturaController.php), tal como los trae el plan del write-ahead
+// (release 1, tarea 18) y los copia scripts/check-errores.ts. El 404 es el de handleConsultarEstado; /pdf usa el mismo porque no hay
+// otro a la vista.
+const MSG_NO_EXISTE = 'No encontramos esta factura. Puede que ya no exista.'
+// Del 422 de una fila sin número de seguimiento solo se conoce el comienzo (el plan y los specs lo citan con puntos suspensivos: «Esta
+// factura no se envió a la DGII...»): el resto es del mock, y la pantalla muestra el texto del servidor tal cual.
 const MSG_SIN_SEGUIMIENTO = 'Esta factura no se envió a la DGII (no tiene número de seguimiento), así que no hay nada que consultar.'
-const NOTA_EN_VUELO = 'La factura quedó guardada, pero la DGII todavía no confirma que la recibió. No la vuelvas a emitir.'
+// FACTURA_NOTA_EN_VUELO y FACTURA_NOTA_ENVIADO_SIN_TRACK, letra por letra; `%s` es el e-NCF (el API los pasa por sprintf).
+const NOTA_EN_VUELO = 'La DGII todavía no ha confirmado este comprobante. No lo emitas de nuevo; si sigue así en unos minutos, avisa a soporte con el número %s.'
+const NOTA_ENVIADO_SIN_TRACK =
+  'La DGII recibió este comprobante, pero no devolvió su número de seguimiento y por eso no se puede consultar su estado desde aquí. Si necesitas confirmarlo, avisa a soporte con el número %s.'
 // Mismo texto, byte a byte, que MSG_EDICION de mock-api.mjs (contrato 4.3(b)), sin punto final. mock-api.test.mjs fija aquel y
 // mock-lecturas.test.ts fija este: si uno cambia sin el otro, falla una de las dos pruebas.
 const MSG_EDICION = 'Tu plan Express no incluye esta función'
@@ -85,7 +94,7 @@ const clienteDe = (/** @type {Tenant} */ t, /** @type {FacturaMock} */ f) => (f.
 /** Minúsculas y sin acentos: el LIKE de MySQL con su cotejo por omisión no distingue ni una cosa ni la otra. */
 const plano = (/** @type {string} */ texto) => texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
-/** Entero de 1 o más que viene de la URL, o `porOmision` si falta o no lo es. */
+/** Entero de 1 o más que viene de la URL, o `porOmision` si falta o no lo es (0, negativos y texto caen al valor por omisión, como en los demás listados del API). */
 function entero(/** @type {string | null} */ valor, /** @type {number} */ porOmision) {
   const n = Number.parseInt(valor ?? '', 10)
   return Number.isFinite(n) && n >= 1 ? n : porOmision
@@ -93,6 +102,9 @@ function entero(/** @type {string | null} */ valor, /** @type {number} */ porOmi
 
 const esRechazada = (/** @type {string} */ estado) => estado.includes('RECHAZADO')
 const EN_VUELO = new Set(['PENDIENTE_ENVIO', 'ENVIO_INCIERTO'])
+
+/** El sprintf del API: el e-NCF en el lugar del `%s` (con una función, para que un `$&` en el número no se interprete). */
+const conNcf = (/** @type {string} */ texto, /** @type {string} */ eNcf) => texto.replace('%s', () => eNcf)
 
 /**
  * Las notas (E33 y E34, no rechazadas: una en proceso o en vuelo ya cuenta para el saldo) que modifican esta fila, por id ascendente.
@@ -115,15 +127,15 @@ function modificaDe(/** @type {Tenant} */ t, /** @type {FacturaMock} */ f) {
 
 /**
  * La fila tal como sale en la lista: las columnas más el resumen plano (`company_name`, `description`) y las notas vinculadas. `lean`
- * quita lo pesado (`items`, `respuesta_dgii`, `xml_firmado`); `cliente` y `emisor` solo van en el detalle.
+ * quita lo pesado: `items`, `respuesta_dgii`, `xml_firmado` y también `description`, que en el API es una consulta por fila (plan 05,
+ * COLUMNAS_LISTA_LEAN); deja `company_name`, `notas` y `modifica`. `cliente` y `emisor` solo van en el detalle.
  */
 function filaDeLista(/** @type {Tenant} */ t, /** @type {FacturaMock & { xml_firmado?: string | null }} */ f, /** @type {boolean} */ lean) {
   const { items = [], respuesta_dgii: respuesta = null, xml_firmado: xml, ...plana } = f
   return {
     ...plana,
     company_name: f.client_name,
-    description: items.length > 0 ? items[0].description : null,
-    ...(lean ? {} : { items, respuesta_dgii: respuesta, ...(xml === undefined ? {} : { xml_firmado: xml }) }),
+    ...(lean ? {} : { description: items.length > 0 ? items[0].description : null, items, respuesta_dgii: respuesta, ...(xml === undefined ? {} : { xml_firmado: xml }) }),
     notas: notasDe(t, f),
     modifica: modificaDe(t, f),
   }
@@ -133,13 +145,32 @@ function filaDeLista(/** @type {Tenant} */ t, /** @type {FacturaMock & { xml_fir
 // GET /api/facturas: lista y detalle
 // ---------------------------------------------------------------------------
 
-// Los filtros de `estado` (en minúsculas). `accion` solo existe desde el plan 05: sin él el API contesta 422 como con cualquier otro.
+// Los filtros de `estado`, como los arma applyEstadoTipoFilters del API: `aprobado` y `rechazado` son un LIKE '%ACEPTADO%' y un
+// LIKE '%RECHAZADO%' (así que `rechazado` trae también lo archivado, que `archivadas=0` y `accion` dejan fuera); `pendiente` es la lista
+// SIN_VEREDICTO y `accion` la de POR_REVISAR (plan 05). `accion` solo existe desde el plan 05: antes el API contesta 422 como con
+// cualquier otro valor.
+const PENDIENTES = ['PENDIENTE_ENVIO', 'ENVIO_INCIERTO', 'ENVIADO', 'EN_PROCESO', 'RFCE_ENVIADO', 'RFCE_EN_PROCESO']
+const POR_REVISAR = ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO', 'RFCE_NO_ENCONTRADO', 'ERROR', 'RFCE_ERROR']
+/** @type {Map<string, (estado: string) => boolean>} */
 const GRUPOS_ESTADO = new Map([
-  ['aprobado', ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO', 'RFCE_ACEPTADO_CONDICIONAL']],
-  ['rechazado', ['RECHAZADO', 'RFCE_RECHAZADO']],
-  ['pendiente', ['PENDIENTE_ENVIO', 'ENVIO_INCIERTO', 'ENVIADO', 'EN_PROCESO', 'RFCE_ENVIADO', 'RFCE_EN_PROCESO']],
-  ['accion', ['RECHAZADO', 'RFCE_RECHAZADO', 'NO_ENCONTRADO', 'RFCE_NO_ENCONTRADO', 'ERROR', 'RFCE_ERROR']],
+  ['aprobado', (estado) => estado.includes('ACEPTADO')],
+  ['rechazado', (estado) => estado.includes('RECHAZADO')],
+  ['pendiente', (estado) => PENDIENTES.includes(estado)],
+  ['accion', (estado) => POR_REVISAR.includes(estado)],
 ])
+
+/**
+ * normalizeEstadoFilter del API: recorta y pasa a minúsculas, y entonces `todos` o vacío es sin filtro (null), `aprovado` (la variante)
+ * es `aprobado`, un filtro conocido es él mismo y todo lo demás es inválido (false: el 422).
+ * @param {string | null} valor
+ * @returns {string | null | false}
+ */
+function normalizarEstado(valor) {
+  const estado = (valor ?? '').trim().toLowerCase()
+  if (estado === '' || estado === 'todos') return null
+  if (estado === 'aprovado') return 'aprobado'
+  return GRUPOS_ESTADO.has(estado) ? estado : false
+}
 
 /** Lo que busca `query` en una fila: e-NCF, cliente (con RNC, teléfono y correo, que la fila de lista no trae) y descripciones de líneas. */
 function textoDeBusqueda(/** @type {Tenant} */ t, /** @type {FacturaMock} */ f) {
@@ -148,27 +179,29 @@ function textoDeBusqueda(/** @type {Tenant} */ t, /** @type {FacturaMock} */ f) 
 }
 
 /**
- * GET /api/facturas sin `id`: página (`page`, `pageSize` hasta 100) de lo más nuevo a lo más viejo, con `estado`, `tipo_ecf`
- * (con o sin la E), `archivadas=0`, `lean=1` y `query`. La lista por omisión incluye las filas `*_ARCHIVADO`.
- * `opciones.sinAccion` finge el API anterior al plan 05, que no conoce `estado=accion` (la variable MOCK_SIN_ACCION=1 la enciende).
+ * GET /api/facturas sin `id`: página (`page`, `pageSize`) de lo más nuevo a lo más viejo, con `estado` (ver `normalizarEstado`),
+ * `tipo_ecf` (con o sin la E), `archivadas=0`, `lean=1` y `query`. `pageSize` vale 10 por omisión y no tiene tope: es lo que hacen los
+ * demás listados del API (cotizaciones, conduces y gastos) y el front de siempre pide 10; el código del listado de facturas en sí no
+ * se comparó. La lista por omisión incluye las filas `*_ARCHIVADO`. `opciones.sinAccion` finge el API anterior al plan 05, que no
+ * conoce `estado=accion` (la variable MOCK_SIN_ACCION=1 la enciende).
  * @param {Tenant} t
  * @param {URLSearchParams} params
  * @param {{ sinAccion?: boolean }} [opciones]
  * @returns {Respuesta}
  */
 export function listarFacturas(t, params, { sinAccion = false } = {}) {
-  const estado = params.get('estado') ?? ''
-  const estados = GRUPOS_ESTADO.get(estado)
-  if (estado !== '' && (estados === undefined || (estado === 'accion' && sinAccion))) return { http: 422, cuerpo: { status: false, error: MSG_ESTADO } }
+  const estado = normalizarEstado(params.get('estado'))
+  if (estado === false || (estado === 'accion' && sinAccion)) return { http: 422, cuerpo: { status: false, error: MSG_ESTADO } }
+  const coincideEstado = (estado === null ? undefined : GRUPOS_ESTADO.get(estado)) ?? (() => true)
   const tipo = (params.get('tipo_ecf') ?? '').replace(/^E/i, '')
   const sinArchivadas = params.get('archivadas') === '0'
   const lean = params.get('lean') === '1'
   const buscado = plano(params.get('query') ?? '').trim()
-  const pageSize = Math.min(100, entero(params.get('pageSize'), 20))
+  const pageSize = entero(params.get('pageSize'), 10)
   const page = entero(params.get('page'), 1)
 
   const coinciden = t.facturas
-    .filter((f) => estados === undefined || estados.includes(f.estado_dgii))
+    .filter((f) => coincideEstado(f.estado_dgii))
     .filter((f) => tipo === '' || f.tipo_ecf === tipo)
     .filter((f) => !(sinArchivadas && f.estado_dgii.endsWith('ARCHIVADO')))
     .filter((f) => buscado === '' || textoDeBusqueda(t, f).includes(buscado))
@@ -215,10 +248,11 @@ function mensajesDe(/** @type {FacturaMock} */ f) {
 }
 
 /**
- * GET /api/facturas/{id}/estado. Una fila en vuelo (PENDIENTE_ENVIO, ENVIO_INCIERTO) responde con lo guardado: `en_vuelo` y una
- * `nota`, sin consultar nada. Una sin número de seguimiento (salvo el resumen de consumo, que se consulta por e-NCF) da el 422 de
- * «no se envió». El resto consulta a la DGII: ENVIADO pasa a EN_PROCESO y este a ACEPTADO, un paso por llamada (ver
- * `avanzarEstado`), y el veredicto queda guardado en la fila.
+ * GET /api/facturas/{id}/estado, en el orden de handleConsultarEstado. Una fila en vuelo (PENDIENTE_ENVIO, ENVIO_INCIERTO) o un
+ * ENVIADO sin número de seguimiento y con e-NCF (handleEstadoEnVuelo) responde con lo guardado, sin consultar nada ni mover la fila:
+ * `en_vuelo` (verdadero solo en la primera) y la `nota` del API con el e-NCF; nunca es un 422. Una fila sin número de seguimiento (salvo
+ * el resumen de consumo, que se consulta por e-NCF) da el 422 de «no se envió». El resto consulta a la DGII: ENVIADO pasa a EN_PROCESO y
+ * este a ACEPTADO, un paso por llamada (ver `avanzarEstado`), y el veredicto queda guardado en la fila.
  * @param {Tenant} t
  * @param {number} id
  * @returns {Respuesta}
@@ -229,8 +263,18 @@ export function estadoFactura(t, id) {
   const f = t.facturas[i]
   return conFalloDeFila(f, () => {
     const encf = f.e_ncf ?? f.no_factura
-    if (EN_VUELO.has(f.estado_dgii)) {
-      return ok({ factura_id: f.id, e_ncf: encf, track_id: f.track_id, estado_dgii: f.estado_dgii, secuencia_utilizada: null, tipo_ecf: f.tipo_ecf, en_vuelo: true, nota: NOTA_EN_VUELO })
+    const enVuelo = EN_VUELO.has(f.estado_dgii)
+    if (enVuelo || (f.estado_dgii === 'ENVIADO' && !f.track_id && Boolean(f.e_ncf))) {
+      return ok({
+        factura_id: f.id,
+        e_ncf: encf,
+        tipo_ecf: f.tipo_ecf,
+        track_id: f.track_id || null,
+        estado_dgii: f.estado_dgii,
+        secuencia_utilizada: null,
+        en_vuelo: enVuelo,
+        nota: conNcf(enVuelo ? NOTA_EN_VUELO : NOTA_ENVIADO_SIN_TRACK, String(encf)),
+      })
     }
     if (!f.track_id && !f.estado_dgii.startsWith('RFCE_')) return { http: 422, cuerpo: { status: false, error: MSG_SIN_SEGUIMIENTO } }
     const g = avanzarEstado(f)
@@ -247,7 +291,9 @@ export function estadoFactura(t, id) {
 const ENVIADOS = new Set(['ENVIADO', 'EN_PROCESO', 'RFCE_ENVIADO', 'RFCE_EN_PROCESO'])
 const centavos = (/** @type {FacturaMock} */ f) => Math.round(Number(f.total) * 100)
 const conSigno = (/** @type {FacturaMock} */ f) => (f.tipo_ecf === '34' ? -centavos(f) : centavos(f))
-// Lo que cuenta como venta (por día y por mes): sin lo rechazado ni lo que todavía no salió hacia la DGII; la nota de crédito resta.
+// Lo que cuenta como venta (por día y por mes), como en getECFStats del API: todo lo que no es rechazado ni está en vuelo (así que
+// NO_ENCONTRADO y ERROR sí cuentan) y la nota de crédito resta. Es la regla que cita el anexo (facturaModel.php:1875-1876 y 1956-1963:
+// «neto de E34, sin lo rechazado ni lo no enviado») con el `$notRechazado` que el write-ahead extiende a lo que está en vuelo (spec 8).
 const esVenta = (/** @type {FacturaMock} */ f) => !esRechazada(f.estado_dgii) && !EN_VUELO.has(f.estado_dgii)
 
 /** Agrupa por `clave` y devuelve [clave, { total, centavos }] ordenado por clave. */
