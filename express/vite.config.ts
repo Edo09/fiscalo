@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { forbiddenModuleGuard } from './dev/plugins.mjs'
 
 /**
  * Express es una app aparte: la raíz de Vite es esta carpeta (`express/`), no `fiscalo/`.
@@ -14,7 +15,7 @@ const aqui = (ruta: string) => fileURLToPath(new URL(ruta, import.meta.url))
 export default defineConfig({
   root: aqui('.'),
   envDir: aqui('.'),
-  plugins: [react()],
+  plugins: [react(), forbiddenModuleGuard()], // la guardia falla el build si entra a un módulo prohibido de fiscalo/src (anexo 3.3)
   resolve: {
     alias: {
       '@': aqui('../src'), // fiscalo/src, solo por las rutas exactas permitidas
