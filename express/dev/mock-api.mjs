@@ -7,7 +7,9 @@
 //   - la lista blanca de rutas del contrato 4.3(f), con los mismos textos y códigos de error;
 //   - el analizador de tokens de falla (`[drop]`, `rechazo`, ...) y el extractor de su texto libre;
 //   - las personas `flaky`, `slow` y `offline`, que rompen la red a propósito;
-//   - la costura `MANEJADORES`, donde los planes 06, 07 y 09 empujan sus rutas.
+//   - la costura `MANEJADORES`, donde los planes 06, 07 y 09 empujan sus rutas;
+//   - las lecturas del plan 06 sobre esa costura: la lista y el detalle de facturas, stats, avisos, /estado, /pdf y /api/emisor
+//     (datos sembrados en mock/datos.mjs, manejadores puros en mock/lecturas.mjs).
 //
 // Solo escucha en loopback: el mock no valida nada real y sus datos son falsos. El proxy de
 // desarrollo del .env de la raíz apunta a PRODUCCIÓN, por eso Express habla únicamente con este mock.
@@ -18,6 +20,8 @@ import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sembrarTenant } from './mock/datos.mjs'
+import { avisos, detalleFactura, emisor, estadisticas, estadoFactura, listarFacturas, pdfFactura } from './mock/lecturas.mjs'
 
 // ---------------------------------------------------------------------------
 // Personas (contratos 4.4). Clave `<persona>`, contraseña `mock-<persona>`,
@@ -240,6 +244,49 @@ export function asegurarLoopback(host) {
  * @type {Array<{metodo: string, patron: RegExp, atender: (ctx: {metodo: string, ruta: string, query: URLSearchParams, cuerpo: any, persona: Persona, token: string, estado: any}) => Respuesta | Promise<Respuesta>}>}
  */
 export const MANEJADORES = []
+
+// ---------------------------------------------------------------------------
+// Lecturas de facturas, stats, avisos y emisor (plan 06). Aquí solo se elige el tenant de la petición y se despacha al manejador puro de
+// mock/lecturas.mjs: la lista blanca y las personas `flaky`, `slow` y `offline` ya corrieron antes de llegar a un manejador.
+// ---------------------------------------------------------------------------
+
+/**
+ * El tenant de la persona de la petición: se siembra la primera vez que se pide y se guarda en `estado.tenants` (cada servidor tiene los
+ * suyos). Se comparte por empresa, así que admin.e45 y user.e45, que son la empresa 1, ven y mueven los mismos datos. Una persona sin
+ * bloque (`completa`, `sinbloque`) no tiene `entitlements.tenant`: tiene el suyo, por nombre, con la identidad de la semilla. Con bloque,
+ * la identidad es la del bloque, para que `me`, /api/emisor y la cabecera de Más muestren un solo nombre y un solo RNC.
+ * Las fechas de la semilla son las del día de esa primera petición: un mock que sigue corriendo después de medianoche conserva su
+ * "hoy" de ayer hasta que se reinicia.
+ */
+function tenantDe(ctx) {
+  const empresa = ctx.persona.entitlements?.tenant
+  const clave = empresa ? `empresa:${empresa.id}` : `persona:${ctx.persona.nombre}`
+  const tenants = (ctx.estado.tenants ??= new Map())
+  if (!tenants.has(clave)) {
+    const identidad = empresa ? { nombre: empresa.nombre, rnc: empresa.rnc, ambiente: empresa.ambiente } : undefined
+    tenants.set(clave, sembrarTenant(ctx.persona.nombre, new Date(), identidad))
+  }
+  return tenants.get(clave)
+}
+
+const idDeRuta = (ruta) => Number(/^\/api\/facturas\/(\d+)\//.exec(ruta)?.[1])
+
+MANEJADORES.push(
+  {
+    // la lista y, con `id`, el detalle (MOCK_SIN_ACCION=1 finge el API que todavía no conoce `estado=accion`)
+    metodo: 'GET',
+    patron: /^\/api\/facturas$/,
+    atender: (ctx) =>
+      ctx.query.has('id')
+        ? detalleFactura(tenantDe(ctx), Number(ctx.query.get('id')))
+        : listarFacturas(tenantDe(ctx), ctx.query, { sinAccion: process.env.MOCK_SIN_ACCION === '1' }),
+  },
+  { metodo: 'GET', patron: /^\/api\/facturas\/stats$/, atender: (ctx) => estadisticas(tenantDe(ctx), ctx.query, new Date()) },
+  { metodo: 'GET', patron: /^\/api\/facturas\/avisos$/, atender: (ctx) => avisos(tenantDe(ctx)) },
+  { metodo: 'GET', patron: /^\/api\/facturas\/\d+\/estado$/, atender: (ctx) => estadoFactura(tenantDe(ctx), idDeRuta(ctx.ruta)) },
+  { metodo: 'GET', patron: /^\/api\/facturas\/\d+\/pdf$/, atender: (ctx) => pdfFactura(tenantDe(ctx), idDeRuta(ctx.ruta), ctx.query) },
+  { metodo: 'GET', patron: /^\/api\/emisor$/, atender: (ctx) => emisor(tenantDe(ctx)) },
+)
 
 const PAGINA_500 = '<!DOCTYPE html>\n<html><head><title>500 Internal Server Error</title></head>\n<body><h1>Internal Server Error</h1></body></html>\n'
 // Texto de EDICION_NO_INCLUYE: el del contrato 4.3(b) y el anexo 10.2, SIN punto final. Tiene que ser, byte a byte, el de la
