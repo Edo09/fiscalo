@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* El JS de dev/ y tests/ (mock, scripts) entra al programa pero no se revisa */
+    "allowJs": true,
+    "checkJs": false,
+
+    /* Type safety */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* Path aliases (resueltos relativo a este tsconfig.json): @ es fiscalo/src, ~ es express/src */
+    "paths": {
+      "@/*": ["../src/*"],
+      "~/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "tests", "dev", "vite.config.ts", "../src/vite-env.d.ts"],
+  "exclude": ["tests/fixtures", "dist"]
+}

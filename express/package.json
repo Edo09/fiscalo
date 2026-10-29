@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "node dev/run.mjs",
+    "test": "cd .. && node --import ./express/tests/_loader.mjs --test \"express/tests/**/*.test.ts\"",
+    "typecheck": "cd .. && tsc -p express/tsconfig.json --noEmit",
+    "build": "cd .. && node express/dev/check-api-origin.mjs && tsc -p express/tsconfig.json --noEmit && vite build --config express/vite.config.ts",
+    "lint": "cd .. && eslint -c express/eslint.config.js express",
+    "check-graph": "node dev/check-graph.mjs"
+  }
+}
