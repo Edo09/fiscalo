@@ -9,6 +9,12 @@
 //    401 el token murió de verdad: se vacía y se avisa con `onExpirada` (la hoja de sesión sobre la pantalla), con el snapshot retenido para saber
 //    de quién era la sesión. Una falla de red de ese me() no es un vencimiento: el token se queda. Un segundo null dentro de los 30 s no
 //    reintenta: avisa, porque un 401 que se repite ya no es un tropiezo.
+//    Hay una excepción, a propósito, a la letra del plan 06 (tarea 11, paso 3: «si no puede reintentar, avisa de inmediato»): el 401 que llega
+//    mientras ese me() sigue en vuelo. Una caída de la base de datos hace fallar a la vez todas las peticiones de la pantalla (lista, estadísticas,
+//    avisos), y avisar con el segundo abriría la hoja antes de que me() conteste, justo lo que el reintento evita. Ese 401 es del mismo incidente:
+//    el token vuelve al store y decide el me() que ya va (anexo 6.14 y F10: la hoja aparece si ese me() vuelve a dar 401). La excepción acaba con
+//    ese me(), sea cual sea su resultado, y no mueve la ventana de los 30 s. Para volver a la letra: quitar el `if (reintentoEnVuelo)` de
+//    `alPerderElToken`, la variable y las pruebas 2b, 2c y 2g de sesion.test.ts.
 // Los datos de pantalla solo se vacían en un cierre explícito o ante otro usuario (queryClient.ts), nunca con un null inesperado.
 import { useSyncExternalStore } from 'react'
 import { me as meDelApi } from '@/api/auth'
@@ -47,7 +53,10 @@ let instantanea: { token: string; user: UsuarioExpress } | null = null
 let cierreExplicito = false
 /** El instante del último reintento de me() ante un null inesperado (no cuenta lo que pide `refrescarMe`). */
 let ultimoReintentoMe: number | null = null
-/** Hay un me() de reintento en vuelo: los demás 401 de ese mismo incidente esperan su respuesta. */
+/**
+ * Hay un me() de reintento en vuelo: los demás 401 de ese mismo incidente no avisan ni reintentan, esperan su respuesta (la excepción del
+ * encabezado). Lo apaga ese me() al terminar, sea cual sea su resultado.
+ */
 let reintentoEnVuelo = false
 /** Lo que dice `useSesionExpirada`: la hoja de sesión tiene que estar abierta. */
 let expirada = false
@@ -182,7 +191,10 @@ async function reintentarMe(token: string): Promise<void> {
   if (instantanea?.token === token) avisarExpirada()
 }
 
-/** El token se fue del store sin que nadie lo pidiera (un 401): reintento único con me(), o aviso si ya se reintentó hace menos de 30 s. */
+/**
+ * El token se fue del store sin que nadie lo pidiera (un 401): reintento único con me(), o aviso si ya se reintentó hace menos de 30 s. Si el me()
+ * de un reintento sigue en vuelo, el 401 es del mismo incidente: el token vuelve y se espera a ese me() (la excepción del encabezado).
+ */
 function alPerderElToken(): void {
   if (reintentoEnVuelo) {
     reinstalarSnapshot() // otra petición del mismo incidente: el me() que ya va decide por todas

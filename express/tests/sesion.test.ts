@@ -168,6 +168,10 @@ test('2 401 transitorio: reinstala el token y llama me() una vez sin avisar', as
   assert.deepEqual(snapshot(), { token: 't1', user: U1 })
 })
 
+// 2b, 2c, 2g, 5b y 5c fijan una excepción, a propósito, a la letra del plan (tarea 11, paso 3: «si no puede reintentar, avisa de inmediato»): el
+// 401 que llega mientras el me() del reintento sigue en vuelo es del mismo incidente y no avisa; lo decide ese me() (anexo 6.14 y F10). 2b y 2c
+// son la excepción; 2g, que no mueve la ventana de los 30 s; 5b y 5c, que termina con el me() sea cual sea su resultado (si no, una sola falla de
+// red dejaría sin hoja a todos los 401 siguientes). Volver a la letra: quitar la rama de lib/sesion.ts y borrar 2b, 2c y 2g (5b y 5c valen igual).
 test('2b otro 401 del mismo incidente mientras el me() va en vuelo no abre la hoja: lo decide ese me()', async () => {
   // Una caída de la base de datos hace fallar a la vez todas las peticiones en vuelo (la lista, las estadísticas, los avisos).
   let responder!: (u: UsuarioExpress) => void
@@ -190,6 +194,7 @@ test('2c ...y si ese me() da 401, la hoja se abre una sola vez', async () => {
   setSession('t1', U1)
   clearSession()
   clearSession()
+  assert.deepEqual([getToken(), expiradas], ['t1', 0], 'mientras ese me() no conteste, la hoja sigue cerrada y el token puesto')
   rechazar(new ApiError('Tu sesión venció', 401))
   await esperar()
   assert.deepEqual([getToken(), llamadasMe, expiradas], [null, 1, 1])
@@ -230,6 +235,22 @@ test('2f si entra otra sesión mientras va el me(), el 401 tardío del viejo ni 
   rechazar(new ApiError('Tu sesión venció', 401))
   await esperar()
   assert.deepEqual([getToken(), expiradas, eventos], ['t2', 0, ['usuarioCambio']])
+})
+
+test('2g los 401 absorbidos no mueven la ventana: los 30 s cuentan desde que salió el me(), no desde el último 401', async () => {
+  let responder!: (u: UsuarioExpress) => void
+  respuestaMe = () => new Promise<UsuarioExpress>((resolve) => void (responder = resolve))
+  reloj.t = 0
+  setSession('t1', U1)
+  clearSession() // el me() sale en t = 0
+  reloj.t = 20_000
+  clearSession() // otro 401 del incidente, absorbido: no es un me() nuevo
+  responder(U1)
+  await esperar()
+  assert.equal(puedeReintentarMe(30_000), true, 'a los 30 s del me() ya se puede preguntar otra vez, aunque el último 401 sea de t = 20 s')
+  reloj.t = 31_000
+  clearSession()
+  assert.deepEqual([getToken(), llamadasMe, expiradas], ['t1', 2, 0])
 })
 
 test('3 segundo null en 30 s: avisa sin me()', async () => {
@@ -337,6 +358,39 @@ for (const [nombre, error] of [
     assert.deepEqual(snapshot(), { token: 't1', user: U1 })
   })
 }
+
+for (const [nombre, error] of [
+  ['ApiError status 0 (sin red)', new ApiError('Sin conexión', 0)],
+  ['un error que no es ApiError', new TypeError('boom')],
+] as const) {
+  test(`5b con un me() que falla con ${nombre} la espera termina: un 401 dentro de los 30 s ya avisa, no se absorbe`, async () => {
+    respuestaMe = async () => {
+      throw error
+    }
+    reloj.t = 0
+    setSession('t1', U1)
+    clearSession()
+    await esperar() // el reintento terminó sin vencer la sesión: el token sigue
+    assert.deepEqual([getToken(), llamadasMe, expiradas], ['t1', 1, 0])
+    reloj.t = 5_000
+    clearSession() // otro 401, ya sin me() en vuelo y dentro de los 30 s
+    await esperar()
+    assert.deepEqual([getToken(), llamadasMe, expiradas], [null, 1, 1])
+  })
+}
+
+test('5c ...y pasados los 30 s un 401 vuelve a reintentar: la falla del me() no deja puesta la espera', async () => {
+  respuestaMe = async () => {
+    throw new ApiError('Sin conexión', 0)
+  }
+  setSession('t1', U1)
+  clearSession()
+  await esperar()
+  reloj.t = 31_000
+  clearSession()
+  await esperar()
+  assert.deepEqual([getToken(), llamadasMe, expiradas], ['t1', 2, 0])
+})
 
 // --- Cierre explícito y cambio de usuario -------------------------------------------------------------------------------------------
 
