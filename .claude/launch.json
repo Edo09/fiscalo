@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "5174", "--strictPort", "--no-open"],
       "port": 5174
+    },
+    {
+      "name": "express-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["express/dev/run.mjs"],
+      "port": 5175
     }
   ]
 }
