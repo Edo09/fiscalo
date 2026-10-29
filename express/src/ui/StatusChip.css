@@ -1,0 +1,45 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — StatusChip
+   28px de alto, letra de 13px. Cada tono usa su -text sobre su -soft (4.5:1 en los dos temas, lo vigila tokens.test.ts); el neutro, --text-2 sobre
+   --neutral-soft.
+   ============================================================ */
+
+/* `min-height` y no `height`: si el texto crece por la letra del sistema, el chip crece con él y no lo corta. Una sola línea: el texto no se parte. */
+.chip-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 28px;
+  padding: 2px var(--sp-3) 2px var(--sp-2);
+  border-radius: var(--r-full);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.chip-estado--ok {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.chip-estado--warn {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.chip-estado--danger {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+/* --info-soft es el mismo color que --accent-soft, y --accent-text sobre él es una de las parejas que vigila tokens.test.ts. */
+.chip-estado--info {
+  background: var(--info-soft);
+  color: var(--accent-text);
+}
+
+.chip-estado--neutral {
+  background: var(--neutral-soft);
+  color: var(--text-2);
+}

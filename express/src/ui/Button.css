@@ -1,0 +1,165 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Button
+   Primario 52px (--tap-lg), los demás 48px (--tap). Rótulo 16/600, radio 14.
+   ============================================================ */
+
+/* `min-height` y no `height`: con la letra del sistema al 200% el rótulo crece y el botón con él. El borde existe en todas las variantes (transparente
+   donde no se ve) para que midan lo mismo. Sin transición de color: el movimiento de Express es de 150 a 200 ms en transform y opacity, y el color del
+   botón cambia al instante. */
+.boton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform var(--mov-rapido);
+}
+
+/* El anillo de foco es el de base.css; aquí solo se separa del relleno para que no se funda con él (sobre el botón de acento, el anillo de acento
+   no se distinguiría). */
+.boton:focus {
+  outline-offset: 2px;
+}
+
+.boton--bloque {
+  display: flex;
+  width: 100%;
+}
+
+.boton__contenido {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+/* ---- Variantes ---- */
+.boton--primario {
+  min-height: var(--tap-lg);
+  padding-right: var(--sp-5);
+  padding-left: var(--sp-5);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--sh-xs);
+}
+
+.boton--secundario {
+  padding-right: var(--sp-5);
+  padding-left: var(--sp-5);
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--sh-xs);
+}
+
+/* --on-accent sobre --danger: 4.57:1 en el claro y 6.87:1 en el oscuro. */
+.boton--peligro {
+  padding-right: var(--sp-5);
+  padding-left: var(--sp-5);
+  background: var(--danger);
+  color: var(--on-accent);
+}
+
+.boton--texto {
+  background: transparent;
+  color: var(--accent-text);
+}
+
+/* ---- Sobre el puntero fino (ratón): en un teléfono el :hover se queda pegado tras el toque ---- */
+@media (hover: hover) and (pointer: fine) {
+  .boton--primario:hover:not(:disabled):not([aria-busy="true"]) {
+    background: var(--accent-hover);
+  }
+
+  .boton--secundario:hover:not(:disabled):not([aria-busy="true"]) {
+    border-color: var(--text-3);
+    background: var(--surface-hover);
+  }
+
+  .boton--peligro:hover:not(:disabled):not([aria-busy="true"]) {
+    filter: brightness(0.94);
+  }
+
+  .boton--texto:hover:not(:disabled):not([aria-busy="true"]) {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---- Pulsado: después del :hover, para que gane cuando el puntero está encima ---- */
+.boton:active:not(:disabled):not([aria-busy="true"]) {
+  transform: scale(0.98);
+}
+
+.boton--primario:active:not(:disabled):not([aria-busy="true"]) {
+  background: var(--accent-active);
+}
+
+.boton--secundario:active:not(:disabled):not([aria-busy="true"]),
+.boton--texto:active:not(:disabled):not([aria-busy="true"]) {
+  background: var(--surface-active);
+}
+
+.boton--peligro:active:not(:disabled):not([aria-busy="true"]) {
+  filter: brightness(0.88);
+}
+
+/* ---- Deshabilitado y cargando ---- */
+.boton:disabled {
+  box-shadow: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cargando: el rótulo sigue en su sitio (da el ancho y los lectores de pantalla lo siguen leyendo) pero invisible, y el aro se pone encima. */
+.boton--cargando {
+  cursor: progress;
+}
+
+.boton--cargando .boton__contenido {
+  opacity: 0;
+}
+
+.boton__espera {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  margin: auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--r-full);
+  animation: boton-giro 0.8s linear infinite;
+}
+
+@keyframes boton-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* La razón de un botón deshabilitado: debajo de él, en texto secundario. */
+.boton__razon {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}

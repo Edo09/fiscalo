@@ -1,0 +1,130 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — TextField, NumericField y DateField
+   Caja de 52px (--tap-lg), letra de 16px, etiqueta arriba, mensaje abajo, botón de borrar de 48px.
+   ============================================================ */
+
+.campo {
+  display: block;
+  margin: 0;
+}
+
+.campo__etiqueta {
+  display: block;
+  margin: 0 0 var(--sp-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.campo__caja {
+  position: relative;
+}
+
+/* La letra de 16px no es negociable: con menos, Safari de iOS acerca la página al enfocar el campo. El borde es --text-3 y no --border-strong: el del
+   campo es lo que lo distingue del fondo y pide 3:1 (WCAG 1.4.11), que --text-3 da en los dos temas y --border-strong no. El anillo de foco es el de
+   base.css. */
+.campo__entrada {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-lg);
+  margin: 0;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--text-3);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.campo__entrada::placeholder {
+  color: var(--text-2);
+  opacity: 1; /* Firefox baja el marcador de posición por su cuenta */
+}
+
+.campo__entrada:focus {
+  border-color: var(--accent);
+}
+
+.campo__entrada:disabled {
+  background: var(--neutral-soft);
+  color: var(--text-2);
+}
+
+/* Con borrar, la caja reserva el sitio del botón: el texto no pasa por debajo de él ni salta cuando el botón aparece al escribir el primer carácter. */
+.campo__entrada--borrable {
+  padding-right: calc(var(--tap) + var(--sp-2));
+}
+
+/* El de búsqueda sin los adornos de WebKit: ya tiene su propio botón de borrar, y el de Safari sería uno doble. */
+.campo__entrada::-webkit-search-decoration,
+.campo__entrada::-webkit-search-cancel-button {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Fecha: iOS centra el valor y, con el campo vacío, deja el valor sin alto y el campo se encoge. */
+.campo__entrada--fecha {
+  min-width: 0;
+  text-align: start;
+}
+
+.campo__entrada--fecha::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: start;
+}
+
+/* ---- Error: borde rojo, y un segundo píxel por dentro (el borde no cambia de ancho: el campo no se mueve) ---- */
+.campo--error .campo__entrada,
+.campo--error .campo__entrada:focus {
+  border-color: var(--danger);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+
+/* ---- Borrar: 48px, dentro de la caja, a la derecha ---- */
+.campo__borrar {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.campo__borrar:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .campo__borrar:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---- Mensaje de abajo: ayuda, o el error en lugar de ella ---- */
+.campo__mensaje {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.campo__mensaje--error {
+  color: var(--danger-text);
+}

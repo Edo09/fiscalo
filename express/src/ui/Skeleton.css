@@ -1,0 +1,37 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Skeleton
+   El brillo es un `transform` (translateX) sobre un hijo: mover una capa no repinta. Con movimiento reducido, base.css deja la animación en una sola
+   vuelta de 0.01ms y el brillo termina fuera del bloque: queda el gris quieto.
+   ============================================================ */
+
+.esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.esqueleto__fila {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--neutral-soft);
+}
+
+/* El brillo es --surface: más claro que el gris en el tema claro, más oscuro en el oscuro; en los dos se nota la franja que pasa. */
+.esqueleto__fila::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, transparent, var(--surface), transparent);
+  transform: translateX(-100%);
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-brillo {
+  to {
+    transform: translateX(100%);
+  }
+}

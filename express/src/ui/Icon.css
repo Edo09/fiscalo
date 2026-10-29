@@ -1,0 +1,10 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Icon
+   ============================================================ */
+
+/* En línea y centrado con el texto que lo acompaña. `flex: none` para que una fila flex no lo encoja: un icono aplastado se deforma. */
+.icono {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}

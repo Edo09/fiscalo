@@ -1,0 +1,71 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Cabecera
+   48px (--top-h) más el área segura de arriba, que es 0 salvo en un teléfono con muesca donde la página llega hasta el borde (viewport-fit=cover).
+   Pegada arriba al desplazar (sticky): el presupuesto de alto de la pantalla cuenta con ella. Los dos lados dejan 8px: un botón de 48px del borde
+   (el «Volver» de la izquierda, el de actualizar de la derecha) deja su icono casi a la altura del margen de 16px.
+   ============================================================ */
+
+/* La línea de abajo es una sombra interior y no un borde: los botones de 48px ya llenan el alto, y con un borde de 1px la cabecera mediría 49. */
+.cabecera {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-bar);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: calc(var(--top-h) + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) var(--sp-2) 0 var(--gutter);
+  background: var(--bg);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+/* Con «Volver», su caja de 48px arranca a 8px del borde: se le quita al margen izquierdo la diferencia con el margen de 16px. */
+.cabecera__atras {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0 0 0 calc(var(--sp-2) - var(--gutter));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cabecera__atras:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cabecera__atras:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Una línea: si el título no cabe se corta con puntos suspensivos y no empuja ni baja lo de la derecha. */
+.cabecera__titulo {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cabecera__derecha {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+}

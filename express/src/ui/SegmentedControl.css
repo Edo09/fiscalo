@@ -1,0 +1,77 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — SegmentedControl
+   Segmentos de 48px que se reparten el ancho. La opción elegida se ve por el fondo, el texto, un aro de 2px y el peso de la letra: no solo por el color.
+   ============================================================ */
+
+/* `overflow: hidden` redondea las esquinas de los segmentos; por eso el anillo de foco va por dentro (más abajo), donde no se recorta. */
+.segmentos {
+  display: flex;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* `position: relative`: el radio es `.sr-only` (absoluto, de 1px) y debe quedar dentro del segmento; si no, al enfocarlo el navegador desplazaría la
+   página hasta donde lo ponga. */
+.segmento {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.segmento + .segmento {
+  border-left: 1px solid var(--border-strong);
+}
+
+.segmento__etiqueta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: break-word;
+  cursor: pointer;
+}
+
+/* --accent-text sobre --accent-soft: 6.19:1 en el claro y 6.42:1 en el oscuro. */
+.segmento__radio:checked + .segmento__etiqueta {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  font-weight: 700;
+}
+
+/* El foco se dibuja en el rótulo, que es lo que se ve; el radio (invisible) no lleva anillo propio. Es el mismo patrón de base.css: `:focus` siempre
+   (Safari antes de 15.4 no tiene :focus-visible) y se quita al tocar o hacer clic donde sí lo hay. */
+.segmento__radio:focus {
+  outline: none;
+}
+
+.segmento__radio:focus + .segmento__etiqueta {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.segmento__radio:focus:not(:focus-visible) + .segmento__etiqueta {
+  outline: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .segmento__radio:not(:checked) + .segmento__etiqueta:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.segmento__radio:not(:checked) + .segmento__etiqueta:active {
+  background: var(--surface-active);
+}
