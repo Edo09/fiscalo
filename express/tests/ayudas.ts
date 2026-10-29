@@ -4,6 +4,20 @@
 export const esperar = (ms = 0): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
+ * Corre `fn` con la zona horaria del proceso puesta en `zona` y la devuelve a la de antes pase lo que pase. Se restaura con el nombre de
+ * la zona y no con `delete process.env.TZ`: en Windows, Node se queda con la última zona puesta aunque se borre la variable.
+ */
+export function conZona(zona: string, fn: () => void): void {
+  const antes = Intl.DateTimeFormat().resolvedOptions().timeZone
+  process.env.TZ = zona
+  try {
+    fn()
+  } finally {
+    process.env.TZ = antes
+  }
+}
+
+/**
  * Reemplaza `globalThis.localStorage` hasta llamar a `restaurar()`, que devuelve el que había antes.
  * - `'memoria'`: un storage vacío en memoria; `datos` es su contenido, para inspeccionarlo.
  * - `'lanza'`: un storage bloqueado, como el de un navegador con las cookies bloqueadas: leer `localStorage` lanza un

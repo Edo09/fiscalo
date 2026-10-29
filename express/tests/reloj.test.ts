@@ -2,6 +2,8 @@
 // en globalThis.__VITE_ENV__ (ver _loader.mjs) y estas pruebas lo mutan.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { conZona } from './ayudas'
+import { diasHasta, etiquetaDia } from '~/lib/fechas'
 import { ahora, hoy, setRelojSimulado } from '~/lib/reloj'
 
 const env = (globalThis as any).__VITE_ENV__ as { DEV: boolean }
@@ -15,20 +17,6 @@ function enDev(fn: () => void): void {
   } finally {
     setRelojSimulado(null)
     env.DEV = false
-  }
-}
-
-/**
- * Corre `fn` con la zona horaria del proceso puesta en `zona` y la devuelve a la de antes pase lo que pase. Se restaura con el nombre de
- * la zona y no con `delete process.env.TZ`: en Windows, Node se queda con la última zona puesta aunque se borre la variable.
- */
-function conZona(zona: string, fn: () => void): void {
-  const antes = Intl.DateTimeFormat().resolvedOptions().timeZone
-  process.env.TZ = zona
-  try {
-    fn()
-  } finally {
-    process.env.TZ = antes
   }
 }
 
@@ -132,4 +120,46 @@ test('un texto que no es una fecha (el campo vacío de la barra) deja el reloj r
       assert.ok(real(), JSON.stringify(texto))
     }
   })
+})
+
+// --- Quien lee este reloj: lib/fechas (su «hoy» por defecto es el de aquí) -----------------------------------------------------------
+
+test('reloj simulado a las 23:30: hoy es el día local, y etiquetaDia y diasHasta lo siguen', () => {
+  // Review Focus 5. En RD (UTC-4) las 23:30 del 27 son las 03:30 UTC del 28: con la fecha UTC (`toISOString`) la fila de las 09:00 del 27
+  // diría «ayer». En UTC+14 es al revés a las 00:30 (son las 10:30 UTC del día anterior), y en UTC los dos días coinciden.
+  enDev(() => {
+    for (const zona of ['America/Santo_Domingo', 'Pacific/Kiritimati', 'UTC']) {
+      conZona(zona, () => {
+        setRelojSimulado('2026-10-27T23:30:00')
+        assert.equal(etiquetaDia('2026-10-27 09:00:00'), 'hoy 09:00', zona) // empieza con «hoy»
+        assert.equal(etiquetaDia('2026-10-28 09:00:00'), '28 oct 09:00', zona) // y la del 28, que aún no llegó, no
+        assert.equal(etiquetaDia('2026-10-26 09:00:00'), 'ayer 09:00', zona)
+        assert.equal(diasHasta('2026-10-28'), 1, zona)
+        assert.equal(diasHasta('2026-10-27'), 0, zona)
+
+        setRelojSimulado('2026-10-28T00:30:00')
+        assert.equal(etiquetaDia('2026-10-28 00:10:00'), 'hoy 00:10', zona)
+        assert.equal(etiquetaDia('2026-10-27 23:30:00'), 'ayer 23:30', zona)
+        assert.equal(diasHasta('2026-10-28'), 0, zona)
+      })
+    }
+  })
+})
+
+test('el reloj simulado corre: pasada la medianoche la fila de hoy pasa a ser de ayer', () => {
+  const ahoraReal = Date.now
+  let t = ahoraReal()
+  Date.now = () => t
+  try {
+    enDev(() => {
+      setRelojSimulado('2026-10-27T23:30:00')
+      assert.equal(etiquetaDia('2026-10-27 09:00:00'), 'hoy 09:00')
+      assert.equal(diasHasta('2026-10-28'), 1)
+      t += 31 * 60_000 // 00:01 del 28
+      assert.equal(etiquetaDia('2026-10-27 09:00:00'), 'ayer 09:00')
+      assert.equal(diasHasta('2026-10-28'), 0)
+    })
+  } finally {
+    Date.now = ahoraReal
+  }
 })
