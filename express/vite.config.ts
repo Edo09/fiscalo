@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { forbiddenModuleGuard } from './dev/plugins.mjs'
+import { budget, compilacionActual, forbiddenModuleGuard, versionJson } from './dev/plugins.mjs'
 
 /**
  * Express es una app aparte: la raíz de Vite es esta carpeta (`express/`), no `fiscalo/`.
@@ -12,10 +12,15 @@ import { forbiddenModuleGuard } from './dev/plugins.mjs'
  */
 const aqui = (ruta: string) => fileURLToPath(new URL(ruta, import.meta.url))
 
+// Una sola vez: `define.__BUILD_ID__` (el BUILD_ID de la app) y version.json llevan el mismo valor, y la app los compara.
+const compilacion = compilacionActual()
+
 export default defineConfig({
   root: aqui('.'),
   envDir: aqui('.'),
-  plugins: [react(), forbiddenModuleGuard()], // la guardia falla el build si entra a un módulo prohibido de fiscalo/src (anexo 3.3)
+  // La guardia falla el build si entra un módulo prohibido de fiscalo/src (anexo 3.3); budget mide el peso del build (avisa, y rompe el
+  // build si zod cae en el arranque); versionJson escribe version.json.
+  plugins: [react(), forbiddenModuleGuard(), budget(), versionJson(compilacion)],
   resolve: {
     alias: {
       '@': aqui('../src'), // fiscalo/src, solo por las rutas exactas permitidas
@@ -23,7 +28,7 @@ export default defineConfig({
     },
   },
   define: {
-    __BUILD_ID__: JSON.stringify('dev'),
+    __BUILD_ID__: JSON.stringify(compilacion.version),
   },
   build: {
     // Piso de navegadores: Chrome y WebView 90, Safari e iOS 14.5.
