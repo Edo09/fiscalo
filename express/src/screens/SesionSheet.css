@@ -1,0 +1,38 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Hoja de sesión vencida
+   El cuerpo de una hoja (ui/BottomSheet): una columna con 16px entre cada cosa. El botón va en el pie de la hoja, no aquí.
+   ============================================================ */
+
+.sesion__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+}
+
+.sesion__texto {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Contraseña: el campo y, a su lado, el botón de mostrarla (la misma fila de Login). `align-items: flex-end` los alinea por abajo: el campo no lleva mensaje debajo,
+   así que su caja de 52px y el botón de 48 acaban a la misma altura, y los 2px de margen centran el botón en la caja. */
+.sesion__clave {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.sesion__clave-campo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Ancho fijo: «Mostrar» y «Ocultar» no miden lo mismo y el campo no tiene que moverse al cambiar de uno a otro. */
+.sesion__ver {
+  flex: none;
+  min-width: 96px;
+  margin-bottom: 2px;
+}

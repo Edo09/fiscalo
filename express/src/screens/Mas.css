@@ -1,0 +1,190 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Menú Más
+   El cuerpo de una hoja (ui/BottomSheet), que ya pone el título (la empresa), el asa y el relleno de los lados. Filas de 56px, una debajo de otra.
+   ============================================================ */
+
+/* ---- La cuenta: RNC y ambiente en una línea, y debajo quién entró ---- */
+.mas__cuenta {
+  margin: 0 0 var(--sp-3);
+}
+
+.mas__rnc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mas__usuario {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* La etiqueta del ambiente: color, texto y borde (el color nunca va solo). --X-text sobre --X-soft: 4.5:1 en los dos temas, lo vigila tokens.test.ts. */
+.mas__ambiente {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.mas__ambiente--warn {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.mas__ambiente--ok {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+/* ---- La lista: una raya arriba y una debajo de cada fila ---- */
+.mas__lista {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.mas__lista > li {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- «Hay una versión nueva»: el texto y, debajo, «Actualizar» a lo ancho (con su razón debajo si está deshabilitado) ---- */
+.mas__version {
+  padding: var(--sp-3) 0;
+}
+
+.mas__version-texto {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-3);
+  color: var(--accent-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ---- Una fila: icono, rótulo y, a la derecha, la flecha o una nota. Es un botón o un enlace: el mismo aspecto ---- */
+.mas__fila {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.mas__fila:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mas__fila:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.mas__fila:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Cerrar sesión: en el color de peligro (--danger-text sobre --surface: más de 4.5:1 en los dos temas), con su icono. */
+.mas__fila--peligro {
+  color: var(--danger-text);
+}
+
+.mas__etiqueta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mas__nota {
+  flex: none;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ---- Tema: el rótulo y, debajo, el control de tres opciones a lo ancho ---- */
+.mas__tema {
+  padding: var(--sp-3) 0;
+}
+
+.mas__tema-etiqueta {
+  margin: 0 0 var(--sp-2);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* ---- La versión: texto pequeño y seleccionable ---- */
+.mas__build {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* De un toque se selecciona el identificador entero: es lo que se le da a soporte. */
+.mas__build-id {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+/* ---- La hoja de «Hay una factura sin confirmar» ---- */
+.mas__consecuencia {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Los dos botones de la hoja reparten el ancho y miden 48px (el primario mediría 52 y aquí no debe pesar más que el otro). Ninguno se deshabilita con razón, así que una
+   fila vale. El selector lleva dos clases para ganarle al `.boton--peligro`, que se carga antes. */
+.mas__botones {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.mas__botones .boton {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--tap);
+  padding-right: var(--sp-3);
+  padding-left: var(--sp-3);
+}

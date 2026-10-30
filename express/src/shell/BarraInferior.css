@@ -1,0 +1,190 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Barra inferior
+   56px (--bar-h) más el área segura, fija abajo, en la capa 10 (bajo la acción anclada, los avisos en banda, las hojas y el aviso emergente). Dos mitades de
+   igual ancho alrededor del botón central, que sobresale 12px.
+   ============================================================ */
+
+/* Los márgenes laterales respetan el área segura (la muesca, con el teléfono de lado); abajo, la barra de inicio de iOS. `box-sizing: border-box` (base.css): el
+   alto ya incluye el relleno de abajo, y las pestañas ocupan los 56px que quedan. Aparece con un fundido de 150ms: con movimiento reducido, base.css lo quita. */
+.barra {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-bar);
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--bar-h) + var(--safe-b));
+  padding: 0 env(safe-area-inset-right, 0px) var(--safe-b) env(safe-area-inset-left, 0px);
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--border);
+  animation: barra-entra var(--mov-rapido) ease-out;
+}
+
+@keyframes barra-entra {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Las dos mitades miden lo mismo (`flex: 1 1 0`), con una pestaña o con dos: por eso el botón central queda en el medio aunque falte Clientes o Productos. */
+.barra__mitad {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ---- Una pestaña: icono y etiqueta, el alto entero de la barra ---- */
+.barra__tab {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: var(--tap);
+  height: var(--bar-h);
+  margin: 0;
+  padding: 0 var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* El anillo de foco del teclado se dibuja por dentro: la pestaña llena la barra y por fuera se recortaría. */
+.barra__tab:focus {
+  outline-offset: -3px;
+}
+
+/* El contenedor del icono: ancla de las insignias y los puntos que se le ponen encima (la cuenta de Facturas, el punto de Más). */
+.barra__icono {
+  position: relative;
+  display: flex;
+}
+
+/* Una línea, con puntos suspensivos si no cabe (el nombre completo va en el `aria-label` del botón). */
+.barra__etiqueta {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --accent-text sobre --surface: más de 4.5:1 en los dos temas. La negrita y el indicador acompañan al color: nunca va solo. */
+.barra__tab--activa {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.barra__tab--activa::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 24px;
+  height: 3px;
+  margin-left: -12px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+}
+
+.barra__tab:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .barra__tab:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---- El botón central: un círculo de acento de 56px que sobresale 12px de la barra ---- */
+/* La columna del centro mide 72px: el círculo y 8px a cada lado, para que ninguna pestaña quede a menos de 8px de él. */
+.barra__centro {
+  position: relative;
+  flex: none;
+  width: 72px;
+}
+
+.barra__central {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 0 0 -28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  box-shadow: var(--sh-md);
+  color: var(--on-accent);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform var(--mov-rapido);
+}
+
+.barra__central:focus {
+  outline-offset: 3px;
+}
+
+.barra__central:active {
+  background: var(--accent-active);
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .barra__central:hover {
+    background: var(--accent-hover);
+  }
+}
+
+/* El punto del borrador (--warning), arriba a la derecha del círculo, con un borde del color de la barra que lo separa del acento. */
+.barra__punto {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--surface);
+  border-radius: var(--r-full);
+  background: var(--warning);
+}
+
+/* El aro de una emisión en vuelo: rodea el círculo y gira (solo CSS, con `transform`; con movimiento reducido, base.css lo deja quieto). Va fuera del círculo
+   y no sobre él: el icono no se tapa. */
+.barra__central[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  bottom: -6px;
+  left: -6px;
+  border: 3px solid transparent;
+  border-top-color: var(--accent);
+  border-radius: var(--r-full);
+  animation: barra-giro 0.9s linear infinite;
+}
+
+@keyframes barra-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}

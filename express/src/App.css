@@ -1,0 +1,10 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Shell
+   Lo que el shell pone y ninguna pantalla trae: el relleno mientras baja el trozo de una pantalla perezosa. Las franjas, la barra y las hojas tienen su CSS junto a su
+   componente.
+   ============================================================ */
+
+/* El esqueleto de una pantalla que todavía no llegó: con los márgenes de una pantalla y el espacio de la barra de abajo, para que al llegar nada salte. */
+.shell__espera {
+  padding: var(--sp-4) var(--gutter) calc(var(--bar-h) + var(--safe-b) + var(--sp-4));
+}

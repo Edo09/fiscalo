@@ -1,0 +1,86 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Franjas de la factura en curso
+   Ancho completo, en el flujo, con el tono del aviso (--X-text sobre --X-soft: 4.5:1 en los dos temas, lo vigila tokens.test.ts). Como `.sin-conexion`, no son
+   pegajosas: las cabeceras de las pantallas sí lo son.
+   ============================================================ */
+
+/* La raya de abajo es una sombra interior y no un borde, para no sumar un píxel. `min-height: 40px` en «Enviando» y 48px en «sin confirmar», que lleva un
+   botón de 48px. */
+.franja {
+  position: relative;
+  z-index: var(--z-banner);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: var(--sp-2) var(--gutter);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.franja--enviando {
+  background: var(--info-soft);
+  box-shadow: inset 0 -1px 0 var(--info);
+  color: var(--accent-text);
+}
+
+.franja--aviso {
+  min-height: var(--tap);
+  padding-top: 0;
+  padding-bottom: 0;
+  background: var(--warning-soft);
+  box-shadow: inset 0 -1px 0 var(--warning);
+  color: var(--warning-text);
+}
+
+/* `min-width: 0` y `overflow-wrap`: un e-NCF largo se parte en vez de empujar el botón fuera de la franja. */
+.franja__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* El aro de espera de «Enviando»: solo CSS, gira con `transform` (con movimiento reducido, base.css lo deja quieto). */
+.franja__giro {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--r-full);
+  animation: franja-giro 0.8s linear infinite;
+}
+
+@keyframes franja-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* «Ver»: 48x48 como mínimo, con el color de la franja y subrayado (el color nunca va solo). */
+.franja__ver {
+  flex: none;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  margin: 0 calc(var(--sp-2) - var(--gutter)) 0 0;
+  padding: 0 var(--sp-2);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.franja__ver:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .franja__ver:hover {
+    background: var(--surface-hover);
+  }
+}

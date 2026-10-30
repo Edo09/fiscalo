@@ -8,7 +8,7 @@
 //
 // `historialDeRuta`: la ruta es la dueña de la entrada del historial (Más, `#/mas`): la hoja no empuja nada ni escucha `popstate`, y `onCerrar` es el `atras`
 // de la ruta. Quien abre una hoja desde una acción que navega tiene que cerrarla primero y navegar cuando el atrás aterrice: con la hoja abierta `navegar`
-// dejaría su entrada enterrada bajo la nueva pantalla y un atrás mostraría la pantalla de antes una vez más.
+// dejaría su entrada enterrada bajo la nueva pantalla y un atrás mostraría la pantalla de antes una vez más. `cuandoAterriceElAtras` (ui/capas.ts) espera ese atrás.
 //
 // El cuerpo de la hoja no debe pedir el foco con `autoFocus` (ver `useCapa`): un campo que deba recibirlo al abrir lleva `data-foco-inicial`.
 import { useId, useRef } from 'react'

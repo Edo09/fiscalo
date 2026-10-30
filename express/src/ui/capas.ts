@@ -1,4 +1,5 @@
-// Lo que comparten las capas modales de Express: las hojas (`BottomSheet`) y el selector a pantalla completa (`FullScreenPicker`). Dos mitades.
+// Lo que comparten las capas modales de Express: las hojas (`BottomSheet`) y el selector a pantalla completa (`FullScreenPicker`). Dos mitades, y una ayuda para la
+// acción de una capa que navega (`cuandoAterriceElAtras`, más abajo).
 //
 //  1. El historial (`crearGestorDeCapas`, sin DOM, probado en Node). Cada capa empuja UNA entrada del historial al abrirse, para que el atrás del sistema (el
 //     botón de Android, el gesto de iOS) la cierre en vez de sacar la pantalla de debajo. Es lo que el router (router.ts, `crearNavegador`) pide a quien empuje
@@ -191,6 +192,33 @@ let gestorDeLaVentana: GestorDeCapas | undefined
 function gestorGlobal(): GestorDeCapas {
   if (!gestorDeLaVentana) gestorDeLaVentana = crearGestorDeCapas(window)
   return gestorDeLaVentana
+}
+
+// --- Navegar tras cerrar una capa ---------------------------------------------------------------------------------------------
+
+/** Lo que `cuandoAterriceElAtras` usa de la ventana: el `popstate` y los temporizadores del gestor, así una prueba puede pasarle la misma ventana falsa. */
+type VentanaDelAtras = Pick<VentanaDeCapas, 'addEventListener' | 'removeEventListener' | 'setTimeout' | 'clearTimeout'>
+
+/**
+ * Corre `luego` cuando aterriza el próximo atrás del historial, y no antes. Es lo que espera la acción de una capa que navega (la hoja de cerrar sesión que lleva a
+ * la factura sin confirmar; la hoja de sesión vencida cuando entra otro usuario): la capa empujó su propia entrada, y navegar mientras esa entrada es la actual
+ * la deja enterrada bajo la pantalla nueva (un atrás de más mostraría la pantalla de antes) y hace que `reemplazar` copie una marca `bajo` de un nivel de menos.
+ * Se cierra la capa primero y se navega cuando el atrás de su cierre ya aterrizó.
+ *
+ * Se llama ANTES de cerrar la capa (poner `abierto` en false, o lo que la desmonte): el atrás que pide el cierre aterriza en un turno posterior, y ponerla después
+ * es una carrera que no se gana. Si ese atrás no llega (la capa no pudo empujar su entrada, o el navegador no lo cumple) `luego` corre igual pasado `esperaMs`,
+ * el mismo respaldo del gestor. Corre una sola vez y quita su oyente antes de correr, así el `popstate` que lance lo que `luego` navegue (`navegar` lo lanza en
+ * el acto) no la dispara otra vez. Su oyente se pone después del del gestor: cuando corre, el gestor ya procesó el aterrizaje.
+ */
+export function cuandoAterriceElAtras(luego: () => void, win: VentanaDelAtras = window, esperaMs: number = ESPERA_ATRAS_MS): void {
+  const correr = (): void => {
+    // Lo primero que hace es quitar sus dos disparadores (el oyente y el respaldo): así corre una sola vez, llegue lo que llegue después.
+    win.removeEventListener('popstate', correr)
+    win.clearTimeout(espera)
+    luego()
+  }
+  win.addEventListener('popstate', correr)
+  const espera = win.setTimeout(correr, esperaMs) // `correr` solo se llama después, desde el evento o desde este temporizador: `espera` ya existe
 }
 
 // --- El arrastre del asa ------------------------------------------------------------------------------------------------------

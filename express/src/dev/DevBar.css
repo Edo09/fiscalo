@@ -1,0 +1,61 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Barra de desarrollo (solo DEV)
+   Una franja delgada en el flujo, arriba de todo, que se abre con «DEV». En el flujo y no flotante para no tapar nada de lo que se prueba.
+   ============================================================ */
+
+.devbar {
+  position: relative;
+  z-index: var(--z-banner);
+  background: var(--neutral-soft);
+  box-shadow: inset 0 -1px 0 var(--border-strong);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Cerrada mide 28px. El triángulo del navegador queda: dice que se abre. */
+.devbar__resumen {
+  min-height: 28px;
+  padding: var(--sp-1) var(--gutter);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.devbar__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--gutter) var(--sp-4);
+}
+
+.devbar__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.devbar__campo > label {
+  font-weight: 600;
+}
+
+/* Un campo y, a su lado, «Real». El botón nunca se deshabilita (no lleva razón), así que una fila vale. */
+.devbar__fila {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.devbar__entrada {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+}

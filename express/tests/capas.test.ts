@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { crearNavegador } from '~/router'
-import { cierraPorArrastre, crearGestorDeCapas, UMBRAL_ARRASTRE_PX } from '~/ui/capas'
+import { cierraPorArrastre, crearGestorDeCapas, cuandoAterriceElAtras, UMBRAL_ARRASTRE_PX } from '~/ui/capas'
 import { esperar } from './ayudas'
 
 interface Entrada {
@@ -434,4 +434,100 @@ test('cierraPorArrastre: un arrastre de 80 px hacia abajo cierra y uno menor no'
   assert.equal(cierraPorArrastre(300), true)
   assert.equal(cierraPorArrastre(0), false)
   assert.equal(cierraPorArrastre(-120), false) // hacia arriba nunca cierra
+})
+
+// --- Una acción de hoja que navega (cuandoAterriceElAtras) ---------------------------------------------------------------------------
+// La regla del plan 06 para la primera hoja sin `historialDeRuta` cuya acción navega («Ver factura» en la hoja de cerrar sesión, que se abre sobre Más): se
+// cierra la hoja primero y se navega cuando el atrás de su cierre ya aterrizó, nunca con la entrada de la hoja puesta. Aquí corren el router real y el gestor real,
+// sobre la misma ventana falsa, y se mira qué quedó en el historial (la marca `{ fx, bajo }` de cada entrada) y adónde lleva un atrás.
+
+/** Facturas, Clientes (profundidad 1), Más encima de Clientes (la ruta es dueña de esa entrada: profundidad 2) y sobre Más la hoja de confirmación, con su entrada. */
+async function masConUnaHojaAbierta() {
+  const w = ventanaFalsa([{ hash: '#/facturas', state: null }])
+  const nav = crearNavegador(w.ventana)
+  const gestor = crearGestorDeCapas(w.ventana, 'p1')
+  nav.navegar({ id: 'clientes' })
+  nav.navegar({ id: 'mas' })
+  const capa = gestor.abrir(() => {})
+  await esperar()
+  return { w, nav, capa }
+}
+
+const MARCA_DE_MAS = { fx: 2, bajo: '#/clientes' }
+
+test('Ver factura sobre Más: la hoja se cierra, el atrás aterriza y entonces se reemplaza la entrada de Más; fx y bajo quedan como en un toque de fila y un atrás cae en el origen', async () => {
+  const { w, nav, capa } = await masConUnaHojaAbierta()
+  assert.deepEqual(w.estados(), [null, { fx: 1, bajo: '#/facturas' }, MARCA_DE_MAS, { ...MARCA_DE_MAS, ...hoja(1) }])
+  const antes = w.operaciones().length
+
+  cuandoAterriceElAtras(() => nav.navegar({ id: 'factura', facturaId: 12 }, { reemplazar: true }), w.ventana)
+  capa.cerrar()
+  assert.equal(w.actual(), '#/mas') // el atrás todavía no aterrizó: no se navegó con la entrada de la hoja puesta
+  assert.deepEqual(w.operaciones().slice(antes), ['atras'])
+
+  await esperar()
+  assert.deepEqual(w.operaciones().slice(antes), ['atras', 'reemplazar #/facturas/12', 'marcar']) // el atrás primero; después el reemplazo y la marca copiada
+  assert.equal(w.actual(), '#/facturas/12')
+  assert.equal(w.indice(), 2) // en el lugar de Más, no encima
+  assert.deepEqual(w.estados().slice(0, 3), [null, { fx: 1, bajo: '#/facturas' }, MARCA_DE_MAS]) // la entrada de Más ahora es la factura y conserva su marca
+  assert.equal(nav.hayHistorial(), true)
+
+  nav.atras({ id: 'facturas' })
+  await esperar()
+  assert.equal(w.actual(), '#/clientes') // un solo atrás vuelve al origen: ni Más ni la hoja quedaron enterradas
+})
+
+test('lo mismo sobre una pantalla sin historial debajo: la entrada de la ruta no tiene marca y el reemplazo no la inventa', async () => {
+  const w = ventanaFalsa([{ hash: '#/mas', state: null }]) // Más abierto con un enlace directo: fx 0
+  const nav = crearNavegador(w.ventana)
+  const capa = crearGestorDeCapas(w.ventana, 'p1').abrir(() => {})
+  await esperar()
+  const antes = w.operaciones().length
+
+  cuandoAterriceElAtras(() => nav.navegar({ id: 'factura', facturaId: 12 }, { reemplazar: true }), w.ventana)
+  capa.cerrar()
+  await esperar()
+  assert.deepEqual(w.operaciones().slice(antes), ['atras', 'reemplazar #/facturas/12']) // a profundidad 0 no hay marca que copiar
+  assert.equal(w.actual(), '#/facturas/12')
+  assert.equal(w.indice(), 0)
+  assert.deepEqual(w.estados()[0], null)
+})
+
+test('si el atrás nunca aterriza, luego corre igual pasado el tiempo de espera, y deja de escuchar', async () => {
+  const w = ventanaFalsa([{ hash: '#/facturas', state: null }], { sinAterrizar: true })
+  let corridas = 0
+  cuandoAterriceElAtras(
+    () => {
+      corridas++
+    },
+    w.ventana,
+    20,
+  )
+  assert.equal(w.oyentes('popstate'), 1)
+  assert.equal(corridas, 0)
+  await esperar(80)
+  assert.equal(corridas, 1)
+  assert.equal(w.oyentes('popstate'), 0)
+})
+
+test('corre una sola vez: otros popstate seguidos, y el que lanza lo que ella navega, no la repiten ni dejan el oyente puesto', async () => {
+  const w = ventanaFalsa([
+    { hash: '#/facturas', state: null },
+    { hash: '#/clientes', state: null },
+    { hash: '#/productos', state: null },
+  ])
+  let corridas = 0
+  cuandoAterriceElAtras(
+    () => {
+      corridas++
+      w.ventana.location.replace('#/otra') // navegar lanza `popstate` en el acto
+    },
+    w.ventana,
+    5_000, // si no limpiara su temporizador, esta prueba tardaría 5 s en terminar
+  )
+  w.ventana.history.back()
+  w.ventana.history.back()
+  await esperar()
+  assert.equal(corridas, 1)
+  assert.equal(w.oyentes('popstate'), 0)
 })
