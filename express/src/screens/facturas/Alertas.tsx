@@ -5,7 +5,7 @@
 // y se resuelven de a uno, empezando por los de arriba.
 import type { Alerta } from '~/lib/alertas'
 import { navegar, parseHash } from '~/router'
-import { precargarRuta } from '~/screens/registro'
+import { precargarRuta } from '~/screens/precarga'
 import { Icon } from '~/ui/Icon'
 
 export function Alertas(p: { visibles: Alerta[]; extra: number }): JSX.Element | null {

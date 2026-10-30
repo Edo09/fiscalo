@@ -12,9 +12,10 @@
 //
 // Se actualiza con el icono de la cabecera, al volver a la app tras `REFRESCO_VISIBLE_MS` oculta y al volver de un detalle (u otra pestaña) con datos ya en la caché: invalidar
 // `['facturas']`, `['stats']` y `['avisos']` recarga lo que está a la vista. No hay sondeo con el paso del tiempo ni gesto de jalar para actualizar. En Pendientes, «Verificar» pregunta a la
-// DGII, de a una, por las primeras tres facturas en proceso (los cuatro estados del grupo «En proceso»: ENVIADO, EN_PROCESO y sus RFCE_) y recarga: la lista nunca pide el estado por fila.
+// DGII, de a una, por las primeras tres facturas ENVIADO o EN_PROCESO (facturas/verificar.ts) y recarga: la lista nunca pide el estado por fila.
 //
-// La ruta llega como propiedad (`registro` se la pasa) y no de `useRuta`: con Más abierto, `useRuta` dice `mas` y la pantalla de detrás tiene que seguir con sus filtros.
+// La ruta llega como propiedad (el shell se la pasa, como a toda pantalla de `registro`) y no de `useRuta`: con Más abierto, `useRuta` dice `mas` y la pantalla de detrás tiene que seguir
+// con sus filtros (y no volver a pedir la lista).
 import { useEffect, useMemo, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { InvalidateOptions, QueryClient } from '@tanstack/react-query'
@@ -26,7 +27,7 @@ import { esAdmin, esMultiTipo, leerEntitlements, tiposFiltro } from '~/entitleme
 import type { UsuarioExpress } from '~/entitlements'
 import { calcularAlertas, tilesDe } from '~/lib/alertas'
 import type { Alerta } from '~/lib/alertas'
-import { bucketDe, etiquetaAmbiente } from '~/lib/etiquetas'
+import { etiquetaAmbiente } from '~/lib/etiquetas'
 import { normalizarFactura } from '~/lib/filas'
 import type { FacturaVista } from '~/lib/filas'
 import { estadoVacio, necesitaMasPaginas, visibles } from '~/lib/paginas'
@@ -52,6 +53,7 @@ import type { GrupoDeFiltro, OpcionDeFiltro } from './facturas/Filtros'
 import { TarjetaFactura } from './facturas/TarjetaFactura'
 import { Tiles } from './facturas/Tiles'
 import type { EstadoDeTiles } from './facturas/Tiles'
+import { filasPorVerificar } from './facturas/verificar'
 import './Facturas.css'
 
 type RutaFacturas = Extract<Ruta, { id: 'facturas' }>
@@ -59,9 +61,6 @@ type FiltrosDeLaPantalla = { q: string; estado: string; tipo: string }
 
 /** Facturas sin filtros: lo que se usa si la ruta que llega no es la de Facturas. `registro` nunca la manda, pero su tipo (`Ruta`) no lo dice. */
 const INICIO: RutaFacturas = { id: 'facturas' }
-
-/** Cuántas facturas consulta «Verificar» de una vez (anexo 6.2). */
-const MAX_VERIFICAR = 3
 
 /** El alto de una tarjeta sencilla de la lista (cliente, número y total, sin líneas de vínculo), en px: el del esqueleto, para que las filas que llegan ocupen el sitio que se les guardó. */
 const ALTO_DE_TARJETA = 104
@@ -80,12 +79,8 @@ const ESTADOS: OpcionDeFiltro[] = [
   { valor: 'aprobado', etiqueta: 'Aceptadas' },
 ]
 
-/** Las notas van en plural en el filtro (son varias facturas); los demás tipos llevan su nombre de `nombreTipo`. */
-const PLURAL_EN_FILTRO = new Map([
-  ['33', 'Notas de débito'],
-  ['34', 'Notas de crédito'],
-])
-const etiquetaDeTipo = (codigo: string): string => PLURAL_EN_FILTRO.get(codigo) ?? nombreTipo(codigo)
+/** Las notas de crédito van en plural en el filtro (anexo 6.2: son varias facturas); los demás tipos llevan su nombre de `nombreTipo`. */
+const etiquetaDeTipo = (codigo: string): string => (codigo === '34' ? 'Notas de crédito' : nombreTipo(codigo))
 
 // Lo que se invalida: la lista (y todo lo de una factura, que cuelga de `['facturas']`), las estadísticas y los avisos; una verificación solo toca las dos primeras.
 const DEL_INICIO: ReadonlyArray<readonly string[]> = [['facturas'], ['stats'], ['avisos']]
@@ -228,7 +223,7 @@ export default function Facturas(p: { ruta: Ruta }): JSX.Element {
   const estadoTiles: EstadoDeTiles = stats.data !== undefined ? 'listo' : stats.isError || !enLinea ? 'error' : 'cargando'
   const actualizando = lista.isFetching || stats.isFetching || avisos.isFetching
   const ambiente = entitlements !== null && entitlements.tenant.ambiente !== 'ecf' ? etiquetaAmbiente(entitlements.tenant.ambiente) : null
-  const porVerificar = filas.filter((f) => bucketDe(f.estado) === 'enProceso').slice(0, MAX_VERIFICAR)
+  const porVerificar = filasPorVerificar(filas)
   const [verificando, setVerificando] = useState(false)
 
   // --- Efectos
@@ -257,13 +252,17 @@ export default function Facturas(p: { ruta: Ruta }): JSX.Element {
   const buscar = (texto: string): void => filtrar({ q: texto.trim() === '' ? '' : texto })
   const reintentar = (): void => void (lista.isFetchNextPageError ? lista.fetchNextPage() : lista.refetch())
 
-  /** «Verificar»: pregunta a la DGII por el estado de las primeras tres en proceso, una tras otra, y recarga. Si una falla se para y lo dice: las demás fallarían igual. */
+  /**
+   * «Verificar»: pregunta a la DGII por el estado de las primeras tres ENVIADO o EN_PROCESO, una tras otra, y recarga. Si una falla se para y lo dice: las demás fallarían igual.
+   * Solo un `ApiError` trae un texto para el usuario (el servidor, tal cual); el de un error de JavaScript no se le enseña a nadie, pero queda en la consola (como en Login y SesionSheet).
+   */
   const verificar = async (): Promise<void> => {
     setVerificando(true)
     try {
       for (const f of porVerificar) await getEstado(f.id)
     } catch (e) {
-      mostrarToast(e instanceof ApiError ? e.message : 'No se pudo verificar el estado.', { tipo: 'error' })
+      if (e instanceof ApiError) mostrarToast(e.message, { tipo: 'error' })
+      else console.error('[verificar]', e)
     } finally {
       setVerificando(false)
       invalidar(cliente, DE_UNA_VERIFICACION)

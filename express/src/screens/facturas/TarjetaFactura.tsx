@@ -8,7 +8,7 @@ import { rd } from '~/lib/dinero'
 import { etiquetaDia } from '~/lib/fechas'
 import type { FacturaVista } from '~/lib/filas'
 import { navegar } from '~/router'
-import { precargarRuta } from '~/screens/registro'
+import { precargarRuta } from '~/screens/precarga'
 import { StatusChip } from '~/ui/StatusChip'
 
 export function TarjetaFactura(p: { f: FacturaVista; hoy: string; atenuada: boolean }): JSX.Element {
