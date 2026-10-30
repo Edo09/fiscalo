@@ -155,17 +155,23 @@ interface CuerpoBloqueable {
   style: { position: string; top: string; left: string; right: string; width: string }
 }
 
+/** La función que bloquea la página (cada llamada es una hoja y devuelve la que libera) y `activo()`, que dice si hay alguna hoja bloqueándola ahora. */
+export type BloqueoDeScroll = (() => () => void) & { activo(): boolean }
+
 /**
  * Un bloqueo de scroll sobre `win` y `cuerpo`: cada llamada a la función que devuelve bloquea la página (el cuerpo pasa a `position: fixed`, desplazado lo
  * que se había bajado para que no salte) y da la función que libera. Con varias hojas abiertas (una sobre otra) el cuerpo se queda fijo hasta que se libera
  * la última, y entonces recupera su estilo y la página vuelve al punto donde estaba. Liberar dos veces la misma hoja cuenta una (StrictMode, un cierre doble).
+ *
+ * `activo()` es verdadero mientras haya una hoja sin liberar. Con el cuerpo fijo `scrollY` vale 0 y el navegador lanza un `scroll` por eso (iOS 15 y anteriores):
+ * no es el usuario, es el bloqueo, y quien recuerda el desplazamiento de una pantalla (shell/desplazamiento.ts) tiene que poder distinguirlo.
  */
-export function crearBloqueoDeScroll(win: VentanaConScroll, cuerpo: CuerpoBloqueable): () => () => void {
+export function crearBloqueoDeScroll(win: VentanaConScroll, cuerpo: CuerpoBloqueable): BloqueoDeScroll {
   let bloqueos = 0
   let previo: CuerpoBloqueable['style'] | null = null
   let desplazado = 0
 
-  return function bloquear(): () => void {
+  function bloquear(): () => void {
     if (bloqueos === 0) {
       const estilo = cuerpo.style
       desplazado = win.scrollY
@@ -193,9 +199,11 @@ export function crearBloqueoDeScroll(win: VentanaConScroll, cuerpo: CuerpoBloque
       win.scrollTo(0, desplazado)
     }
   }
+  bloquear.activo = (): boolean => bloqueos > 0
+  return bloquear
 }
 
-let bloqueoDeLaPagina: (() => () => void) | undefined
+let bloqueoDeLaPagina: BloqueoDeScroll | undefined
 
 /**
  * Bloquea el scroll de la página con `position: fixed` en el cuerpo (iOS 15 y anteriores ignoran `overscroll-behavior` y la página se movería bajo la
@@ -204,6 +212,11 @@ let bloqueoDeLaPagina: (() => () => void) | undefined
 export function bloquearScroll(): () => void {
   if (!bloqueoDeLaPagina) bloqueoDeLaPagina = crearBloqueoDeScroll(window, document.body)
   return bloqueoDeLaPagina()
+}
+
+/** ¿Hay alguna hoja bloqueando el scroll de la página ahora? Sin bloqueo creado todavía (ninguna hoja se abrió en un navegador que lo pida), no. */
+export function scrollBloqueado(): boolean {
+  return bloqueoDeLaPagina?.activo() ?? false
 }
 
 /**

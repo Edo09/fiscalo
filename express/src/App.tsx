@@ -15,8 +15,12 @@
 // `#/mas` no es una pantalla sino una hoja: se dibuja la última ruta que no es Más (si se abre Más con un enlace directo, Facturas) y encima `Mas`. La pantalla de detrás
 // sigue montada mientras Más está abierto, con su estado y su desplazamiento.
 //
-// El desplazamiento de la página se recuerda por pestaña (Facturas, Clientes, Productos) en un `Map` del módulo y se restaura cuando esa pestaña vuelve a dibujarse (de un
-// detalle, o de otra pestaña); cualquier otra pantalla empieza arriba. Se olvida al cerrar sesión o al entrar otro usuario.
+// El desplazamiento de la página se recuerda por pestaña (Facturas, Clientes, Productos) en la memoria de shell/desplazamiento.ts (una por ventana, que dura lo que la página) y
+// se restaura cuando esa pestaña vuelve a dibujarse (de un detalle, o de otra pestaña); cualquier otra pantalla empieza arriba. Se olvida al cerrar sesión o al entrar otro
+// usuario. La memoria no guarda el scroll de una hoja que bloquea la página (iOS 15) y sigue intentando la restauración mientras la pantalla trae sus filas.
+//
+// Una pantalla que falla al dibujarse (un error, o un trozo perezoso que no bajó por una red mala) se queda en su propio límite de error dentro del shell: la barra y las
+// franjas siguen, y cambiar de pestaña la deja atrás. Lo que falle fuera de la pantalla lo atrapa el límite de error de main.tsx.
 //
 // SOLO DEV, detrás de `import.meta.env.DEV` (el build de producción no los trae, ni su CSS): la barra de desarrollo y la galería de primitivas en `#/dev/ui`.
 import { lazy, Suspense, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
@@ -34,8 +38,10 @@ import { Mas } from '~/screens/Mas'
 import { registro } from '~/screens/registro'
 import { SesionSheet } from '~/screens/SesionSheet'
 import { BarraInferior } from '~/shell/BarraInferior'
+import { memoriaDelShell } from '~/shell/desplazamiento'
 import { Franjas } from '~/shell/Franjas'
 import { cuandoAterriceElAtras } from '~/ui/capas'
+import { ErrorBoundary } from '~/ui/ErrorBoundary'
 import { OfflineBanner } from '~/ui/OfflineBanner'
 import { Skeleton } from '~/ui/Skeleton'
 import { ToastHost } from '~/ui/Toast'
@@ -51,9 +57,6 @@ type RutaDePantalla = Exclude<Ruta, { id: 'mas' }>
 
 /** Las pantallas raíz de las pestañas de la barra: las únicas cuyo desplazamiento se recuerda. */
 const RAICES_DE_PESTANA: readonly string[] = ['facturas', 'clientes', 'productos']
-
-/** El desplazamiento de la página (`scrollY`) de cada pestaña, por el id de su raíz. Dura lo que la página y se vacía al cambiar la sesión. */
-const desplazamientos = new Map<string, number>()
 
 // --- La galería (solo DEV) ----------------------------------------------------------------------------------------------------
 
@@ -82,10 +85,17 @@ function Autenticada(p: { usuario: UsuarioExpress; expirada: boolean }): JSX.Ele
   useVersionNueva()
   const entitlements = useMemo(() => leerEntitlements(usuario), [usuario])
 
+  // La memoria del desplazamiento de las pestañas (shell/desplazamiento.ts); la de la ventana es una sola.
+  const memoria = memoriaDelShell()
+
   // La pantalla de detrás de Más: la última ruta que no fue Más. Se guarda en una referencia que un efecto deja al día tras cada dibujo, y se lee al dibujar: cuando la ruta
-  // pasa a Más, el efecto del dibujo anterior ya la dejó con la pantalla en que se estaba. NO es un `useState` ajustado al dibujar (`if (...) setFondo(ruta)`): un componente
-  // que lee la ruta con `useSyncExternalStore` (lo hace `useRuta`) y además actualiza estado mientras se dibuja pierde la actualización de su suscripción, y el siguiente
-  // cambio a un hash igual al que quedó guardado ya no lo dibuja (Más no se abría la segunda vez). Con un enlace directo a `#/mas` todavía no hay ninguna, y el fondo es Facturas.
+  // pasa a Más, el efecto del dibujo anterior ya la dejó con la pantalla en que se estaba. Con un enlace directo a `#/mas` todavía no hay ninguna, y el fondo es Facturas.
+  // NO es un `useState` ajustado al dibujar (`if (...) setFondo(ruta)`), y la razón está medida: en React 18.3.1, si un componente cambia su propio estado mientras se dibuja,
+  // React repite el dibujo (`renderWithHooks`) y el `useSyncExternalStore` de esa segunda pasada compara contra el gancho de la primera, que ya trae el valor nuevo
+  // (`updateSyncExternalStore`: `prevSnapshot = hook.memoizedState`): no ve ningún cambio y no agenda el efecto que anota ese valor en la instancia del store. La instancia se
+  // queda con el valor de antes y el siguiente cambio del store de vuelta a él se juzga «sin cambio» y no vuelve a dibujar (Más no se abría la segunda vez: `#/productos`,
+  // `#/mas`, `#/productos`, `#/mas`). No es de `useRuta` ni de `router.ts`: pasa igual con un `useSyncExternalStore` crudo sobre `location.hash`, y con cualquier store externo
+  // (`useSession`, `useQuery`...). Por eso ningún componente de Express cambia su propio estado al dibujarse: tests/estado-al-dibujar.test.ts lo vigila en todo `express/src`.
   const ultimaPantalla = useRef<RutaDePantalla>(ruta.id === 'mas' ? { id: 'facturas' } : ruta)
   const pantalla: RutaDePantalla = ruta.id === 'mas' ? ultimaPantalla.current : ruta
   useEffect(() => {
@@ -108,14 +118,14 @@ function Autenticada(p: { usuario: UsuarioExpress; expirada: boolean }): JSX.Ele
   useEffect(
     () =>
       escucharSesion((evento) => {
-        desplazamientos.clear() // lo que se recordó es de la sesión que termina
+        memoria.olvidar() // lo que se recordó es de la sesión que termina
         const destino = rutaTrasEvento(evento, rutaActual.current)
         if (destino === null) return
         // Cuando entra otro usuario por la hoja de sesión, la entrada del historial de esa hoja es la actual y la hoja se cierra con este mismo cambio de sesión: se navega
         // cuando su atrás aterriza, no con la entrada de la hoja puesta (ui/capas.ts).
         cuandoAterriceElAtras(() => navegar(destino, { reemplazar: true }))
       }),
-    [],
+    [memoria],
   )
 
   // El desplazamiento. Las pestañas se identifican por su raíz (cambiar la búsqueda de Facturas no es otra pantalla); las demás, por su hash entero (un detalle y otro son
@@ -124,18 +134,10 @@ function Autenticada(p: { usuario: UsuarioExpress; expirada: boolean }): JSX.Ele
   const claveDePantalla = esRaiz ? pantalla.id : formatHash(pantalla)
   // `useEffect` y no `useLayoutEffect`: un cambio de ruta es una actualización síncrona y React vacía sus efectos antes de pintar, así que no hay un cuadro en el sitio
   // equivocado; y en un commit los efectos se arman DESPUÉS de que corren todas las limpiezas. Cuando una fila de Más cambia de pantalla, la limpieza de la hoja libera el
-  // bloqueo de scroll de iOS 15 y devuelve la página a donde estaba (ui/viewport.ts): este efecto, que va después, es el que deja la pantalla nueva arriba.
-  useEffect(() => {
-    window.scrollTo(0, desplazamientos.get(claveDePantalla) ?? 0)
-  }, [claveDePantalla])
-  useEffect(() => {
-    if (!esRaiz) return
-    const guardar = (): void => {
-      desplazamientos.set(claveDePantalla, window.scrollY)
-    }
-    window.addEventListener('scroll', guardar, { passive: true })
-    return () => window.removeEventListener('scroll', guardar)
-  }, [esRaiz, claveDePantalla])
+  // bloqueo de scroll de iOS 15 y devuelve la página a donde estaba (ui/viewport.ts): este efecto, que va después, es el que deja la pantalla nueva arriba. `restaurar`
+  // devuelve la función que deja de intentarlo, que es la limpieza del efecto.
+  useEffect(() => memoria.restaurar(claveDePantalla), [memoria, claveDePantalla])
+  useEffect(() => (esRaiz ? memoria.recordar(claveDePantalla) : undefined), [memoria, esRaiz, claveDePantalla])
 
   const hojaDeSesion = expirada ? <SesionSheet /> : null
   if (decision.kind === 'edicion' || entitlements === null) {
@@ -161,15 +163,19 @@ function Autenticada(p: { usuario: UsuarioExpress; expirada: boolean }): JSX.Ele
       <OfflineBanner />
       <Franjas />
       <main>
-        <Suspense
-          fallback={
-            <div className="shell__espera" aria-busy="true">
-              <Skeleton filas={5} />
-            </div>
-          }
-        >
-          {abierta && <Pantalla key={claveDePantalla} ruta={pantalla} />}
-        </Suspense>
+        {/* El límite de error de la pantalla: con la clave de la pantalla, cambiar de pestaña lo deja limpio. React.lazy recuerda un trozo que falló (al dibujar de nuevo lanza el
+            mismo error) y el navegador puede recordar la descarga fallida, así que lo que saca de ahí es el «Recargar» del propio límite de error. */}
+        <ErrorBoundary key={claveDePantalla}>
+          <Suspense
+            fallback={
+              <div className="shell__espera" aria-busy="true">
+                <Skeleton filas={5} />
+              </div>
+            }
+          >
+            {abierta && <Pantalla ruta={pantalla} />}
+          </Suspense>
+        </ErrorBoundary>
       </main>
       {conBarra && <BarraInferior entitlements={entitlements} />}
       {ruta.id === 'mas' && abierta && <Mas usuario={usuario} entitlements={entitlements} />}

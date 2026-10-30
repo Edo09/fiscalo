@@ -3,7 +3,8 @@
 //  - Reloj simulado: `setRelojSimulado` (lib/reloj.ts) hace que `hoy()` y `ahora()` marquen otra fecha y hora, y sigan corriendo desde ahí. Solo lo honra ese módulo.
 //    Los textos «hoy» y «ayer», el tile Hoy y los vencimientos lo leen al dibujarse: tras cambiarlo, lo que ya está en pantalla se actualiza en su próximo dibujo.
 //  - Ambiente: cambia `entitlements.tenant.ambiente` del usuario que está en memoria (pruebas, certificación o producción), para ver la etiqueta de Más y los avisos de
-//    cada ambiente. Pasa por `guardarSesion`, así que también lo guarda el store de sesión de este origen hasta el próximo `me()`, que trae el valor del servidor.
+//    cada ambiente. Pasa por `guardarSesion`, y el store de sesión persiste cada cambio (el `persist` de zustand no tiene un cambio «solo en memoria»): el valor falso también
+//    queda guardado en este origen hasta el próximo `me()`. `App` lo pide al abrir (`refrescarMe`), así que recargar la página devuelve el ambiente del servidor.
 // El interruptor del estado del certificado llega con el plan 09.
 import { useId, useState } from 'react'
 import type { ChangeEvent } from 'react'

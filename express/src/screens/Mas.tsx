@@ -89,6 +89,10 @@ export function Mas(p: { usuario: UsuarioExpress; entitlements: Entitlements }):
     setSaliendo(true)
     try {
       await cerrarSesionExpress() // al terminar App ve que no hay sesión y dibuja el Login; esta hoja se desmonta
+    } catch (e) {
+      // `cerrarSesionExpress` cierra la sesión pase lo que pase y solo después deja pasar un fallo (sesion.test.ts, 10f): App ya dibuja el Login y no queda nada que decirle al
+      // usuario. Se anota aquí y no se deja como rechazo sin atender: quien la llama (`alConfirmar`, `salirIgual`) la lanza con `void`.
+      console.error('[Mas] cerrar la sesión falló', e)
     } finally {
       setSaliendo(false)
     }

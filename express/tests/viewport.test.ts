@@ -2,7 +2,7 @@
 // ganchos de React: se prueba lo que deciden, que son funciones sobre una ventana y un cuerpo falsos que se portan como los del navegador.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { calcularInset, crearBloqueoDeScroll, crearMonitorDeTeclado, tecladoAbierto } from '~/ui/viewport'
+import { calcularInset, crearBloqueoDeScroll, crearMonitorDeTeclado, scrollBloqueado, tecladoAbierto } from '~/ui/viewport'
 
 test('calcularInset', () => {
   assert.equal(calcularInset(780, { height: 480, offsetTop: 0 }), 300)
@@ -270,4 +270,33 @@ test('después de liberar todo, un bloqueo nuevo mide de nuevo desde donde está
   assert.equal(p.style.top, '-75px')
   liberar()
   assert.deepEqual(p.llamadas, [[0, 200], [0, 75]])
+})
+
+test('activo() dice si hay alguna hoja bloqueando: desde el primer bloqueo hasta liberar el último', () => {
+  const p = paginaFalsa(300)
+  const bloquear = crearBloqueoDeScroll(p.win, p.cuerpo)
+  assert.equal(bloquear.activo(), false, 'sin hojas no hay bloqueo')
+  const liberarPadre = bloquear()
+  assert.equal(bloquear.activo(), true)
+  const liberarHija = bloquear()
+  liberarPadre()
+  assert.equal(bloquear.activo(), true, 'la hoja de arriba sigue abierta')
+  liberarHija()
+  assert.equal(bloquear.activo(), false)
+})
+
+test('activo() no se cuenta de menos si una misma hoja se libera dos veces, ni queda activo después de soltar todo', () => {
+  const p = paginaFalsa(50)
+  const bloquear = crearBloqueoDeScroll(p.win, p.cuerpo)
+  const liberarPadre = bloquear()
+  const liberarHija = bloquear()
+  liberarHija()
+  liberarHija() // un cierre doble no libera la hoja de abajo
+  assert.equal(bloquear.activo(), true)
+  liberarPadre()
+  assert.equal(bloquear.activo(), false)
+})
+
+test('scrollBloqueado sin ninguna hoja abierta dice que no, y preguntarlo no crea el bloqueo ni toca window (aquí no hay)', () => {
+  assert.equal(scrollBloqueado(), false)
 })

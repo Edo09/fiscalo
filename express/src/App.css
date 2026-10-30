@@ -1,10 +1,17 @@
 /* ============================================================
    FISCALPOINT EXPRESS — Shell
-   Lo que el shell pone y ninguna pantalla trae: el relleno mientras baja el trozo de una pantalla perezosa. Las franjas, la barra y las hojas tienen su CSS junto a su
-   componente.
+   Lo que el shell pone y ninguna pantalla trae: el relleno mientras baja el trozo de una pantalla perezosa y el ajuste del límite de error de una pantalla. Las franjas, la
+   barra y las hojas tienen su CSS junto a su componente.
    ============================================================ */
 
 /* El esqueleto de una pantalla que todavía no llegó: con los márgenes de una pantalla y el espacio de la barra de abajo, para que al llegar nada salte. */
 .shell__espera {
   padding: var(--sp-4) var(--gutter) calc(var(--bar-h) + var(--safe-b) + var(--sp-4));
+}
+
+/* El límite de error de una pantalla (ui/ErrorBoundary) dentro del shell: sin el alto de pantalla completa que tiene como límite raíz de main.tsx, y con el espacio de la
+   barra de abajo y el área segura, para que la barra no tape los botones. */
+main .limite-error {
+  min-height: 0;
+  padding-bottom: calc(var(--bar-h) + var(--safe-b) + var(--sp-6));
 }
