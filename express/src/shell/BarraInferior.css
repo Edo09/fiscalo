@@ -74,6 +74,35 @@
   display: flex;
 }
 
+/* La insignia de Facturas: la cuenta (o «9+») en un círculo de 20px (cabe «9+» de ancho) arriba a la derecha del icono, con un borde del color de la barra que la separa del icono.
+   El texto es --on-accent sobre el color pleno del tono: --danger (4.57:1 en el claro y 6.87:1 en el oscuro) o --accent (la pareja que vigila tokens.test.ts). Es decoración para quien
+   ve (`aria-hidden`): la cuenta y su tono la dice el `aria-label` de la pestaña. */
+.barra__insignia {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border: 2px solid var(--surface);
+  border-radius: var(--r-full);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.barra__insignia--danger {
+  background: var(--danger);
+}
+
+.barra__insignia--info {
+  background: var(--accent);
+}
+
 /* Una línea, con puntos suspensivos si no cabe (el nombre completo va en el `aria-label` del botón). */
 .barra__etiqueta {
   display: block;
@@ -166,6 +195,15 @@
   border: 2px solid var(--surface);
   border-radius: var(--r-full);
   background: var(--warning);
+}
+
+/* El mismo punto sobre el icono de Más (hay un aviso de numeración, un certificado en mal estado o una versión nueva): más chico y pegado a la esquina del icono de 24px. Su texto
+   para el lector de pantalla es la descripción de la pestaña. */
+.barra__punto--icono {
+  top: -3px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
 }
 
 /* El aro de una emisión en vuelo: rodea el círculo y gira (solo CSS, con `transform`; con movimiento reducido, base.css lo deja quieto). Va fuera del círculo

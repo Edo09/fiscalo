@@ -1,0 +1,430 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Facturas (el inicio)
+   La pantalla y sus piezas: la cabecera con su botón de actualizar, los tiles, los avisos, la búsqueda, los chips, las tarjetas y el «Cargar más». Todo con los tokens: los
+   colores de estado usan su -text sobre su -soft (4.5:1 en los dos temas, lo vigila tokens.test.ts) y los objetivos táctiles miden 48 px o más, con 8 px entre vecinos.
+   ============================================================ */
+
+/* Las secciones, una debajo de otra: cada una es hija directa y se separa de la siguiente con el mismo hueco. El relleno de abajo es el respiro sobre la barra inferior
+   (el espacio de la barra y el área segura ya los pone `.pantalla`). */
+.facturas__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--gutter);
+}
+
+/* ---- Cabecera: actualizar, verificar y el ambiente ---- */
+
+/* El botón de actualizar: 48x48, redondo, con el icono centrado. Mientras se pide algo, el icono gira (solo `transform`; con movimiento reducido, base.css lo deja quieto). */
+.facturas__refrescar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.facturas__refrescar:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .facturas__refrescar:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.facturas__refrescar--girando .icono {
+  animation: facturas-giro 0.9s linear infinite;
+}
+
+@keyframes facturas-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* «Verificar»: el botón de texto de siempre con menos relleno y letra de 14px, para que la cabecera (el título, este botón, el de actualizar y la etiqueta del ambiente)
+   quepa en 320px. Dos clases para ganarle a `.boton`, que se carga antes. */
+.facturas__verificar.boton {
+  padding: 0 var(--sp-2);
+  font-size: 14px;
+}
+
+/* La etiqueta del ambiente (solo cuando no es producción): color, texto y borde, nunca solo color. --warning-text sobre --warning-soft: 4.5:1 en los dos temas. */
+.facturas__ambiente {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.facturas__ambiente--warn {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+/* ---- Los tiles: dos columnas iguales ---- */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+/* Cargando, el sitio ya está guardado: el esqueleto no se dibuja en los primeros 150 ms y, sin esto, la sección mediría cero y la lista de abajo bajaría 96px al aparecer el tile. */
+.tiles[aria-busy="true"] {
+  min-height: 96px;
+}
+
+/* `min-height` y no `height`: con la letra del sistema al 200% el tile crece. El mismo alto que el esqueleto (ALTO_DEL_TILE, Tiles.tsx). `min-width: 0` para que una cifra larga
+   no ensanche la columna. */
+.tile {
+  min-width: 0;
+  min-height: 96px;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+}
+
+.tile__rotulo {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+/* La cifra grande: tipografía de títulos, cifras de ancho fijo (`.tabular`). En un teléfono de 320px la columna deja 116px y seis cifras (RD$ 198,240) no caben a 20px: a 18px sí. Si
+   aun así no cupiera (siete cifras de millones) se parte en la moneda y el número, o en medio del número si es lo único que hay, en vez de salirse. */
+.tile__monto {
+  margin: var(--sp-1) 0 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 340px) {
+  .tile__monto {
+    font-size: 18px;
+  }
+}
+
+.tile__cantidad {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tiles__reintentar {
+  grid-column: 1 / -1;
+}
+
+/* ---- Los avisos: filas de 48 px con el tono del aviso ---- */
+.alertas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* `min-height` y no `height`: un aviso largo (el que le dice al facturador que avise al administrador) se parte en dos líneas y la fila crece. */
+.alerta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.alerta--danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.alerta--warning {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+/* --accent-text sobre --info-soft (el mismo color que --accent-soft): una de las parejas que vigila tokens.test.ts. */
+.alerta--info {
+  border-color: var(--info);
+  background: var(--info-soft);
+  color: var(--accent-text);
+}
+
+.alerta:active {
+  filter: brightness(0.95);
+}
+
+.alerta__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Alineado con el contenido de las filas (el icono arranca tras el borde y el relleno de la fila). */
+.alertas__mas {
+  padding: 0 var(--sp-3);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ---- Los chips: una fila que se desplaza en horizontal ---- */
+
+/* La fila llega de borde a borde (los márgenes negativos se comen el relleno de la pantalla) y el relleno de la izquierda deja el primer chip alineado con el resto. El margen del final es
+   un elemento (el hueco de la fila más este, 16px) y no relleno: algunos motores no cuentan el relleno derecho de una fila flex que se desplaza, y el último chip quedaría pegado al
+   borde en unos y a 32px en otros. Sin la barra de desplazamiento: los chips cortados al borde ya dicen que hay más. */
+.filtros {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 0 0 var(--gutter);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.filtros::-webkit-scrollbar {
+  display: none;
+}
+
+.filtros::after {
+  content: "";
+  flex: none;
+  width: calc(var(--gutter) - var(--sp-2));
+}
+
+/* `position: relative`: el radio es `.sr-only` (absoluto, de 1px) y debe quedar dentro del chip; si no, al enfocarlo el navegador desplazaría la página hasta donde lo ponga. */
+.chip {
+  position: relative;
+  display: block;
+  flex: none;
+  margin: 0;
+}
+
+.chip__etiqueta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* El elegido: fondo suave, borde y texto de acento (--accent-text sobre --accent-soft: más de 4.5:1 en los dos temas), un aro más por dentro y la marca de verificación. */
+.chip__radio:checked + .chip__etiqueta {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* El foco se dibuja en el rótulo, que es lo que se ve (el patrón de SegmentedControl): `:focus` siempre y se quita al tocar donde hay :focus-visible. */
+.chip__radio:focus {
+  outline: none;
+}
+
+.chip__radio:focus + .chip__etiqueta {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.chip__radio:focus:not(:focus-visible) + .chip__etiqueta {
+  outline: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip__radio:not(:checked) + .chip__etiqueta:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.chip__radio:not(:checked) + .chip__etiqueta:active {
+  background: var(--surface-active);
+}
+
+/* ---- Las tarjetas ---- */
+.tarjetas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Un botón que se comporta como una tarjeta: todo adentro son `span` en bloque (en un `<button>` no caben otros elementos). */
+.tarjeta {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tarjeta:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tarjeta:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Sin conexión: datos que no se pueden actualizar. Apagada, no deshabilitada: se puede tocar. */
+.tarjeta--atenuada {
+  opacity: 0.65;
+}
+
+/* Un nombre muy largo, o sin espacios, se parte y no ensancha la tarjeta. */
+.tarjeta__cliente {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.tarjeta__numero {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Las líneas de vínculo: «Anulada por ...» en el tono de peligro (--danger-text sobre --surface: más de 4.5:1) y «Modifica ...» en el texto secundario. */
+.tarjeta__vinculo {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tarjeta__vinculo--danger {
+  color: var(--danger-text);
+}
+
+.tarjeta__vinculo--muted {
+  color: var(--text-2);
+}
+
+/* El pie: el total a la izquierda y el chip del estado a la derecha; si no caben, el chip baja. */
+.tarjeta__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.tarjeta__total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.tarjeta__monto {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* «Nota de crédito»: una etiqueta neutra junto al total negativo (--text-2 sobre --neutral-soft: una de las parejas que vigila tokens.test.ts). */
+.tarjeta__etiqueta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--neutral-soft);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---- «Cargar más»: 52 px, el alto del botón primario, aunque sea secundario ---- */
+.facturas__mas .boton {
+  min-height: var(--tap-lg);
+}
+
+/* ---- Los estados vacíos: el EmptyState trae su propio relleno de los lados, y la pantalla ya pone el suyo ---- */
+.facturas__vacio {
+  margin: 0 calc(var(--gutter) * -1);
+}
+
+/* El texto buscado va tal cual en el título: una cadena larga sin espacios se parte en vez de ensanchar la página. */
+.facturas__vacio .vacio__titulo {
+  overflow-wrap: anywhere;
+}

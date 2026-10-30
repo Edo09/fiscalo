@@ -7,6 +7,7 @@
 import { lazy } from 'react'
 import type { ComponentType } from 'react'
 import type { Ruta } from '~/router'
+import Facturas from './Facturas'
 import Pendiente from './Pendiente'
 
 type Pantalla = ComponentType<{ ruta: Ruta }>
@@ -22,8 +23,11 @@ function pantallaDe(id: IdPantalla): Pantalla {
   return cargar === undefined ? Pendiente : lazy(cargar)
 }
 
+// Facturas es del arranque: se importa y se pone aquí. Sus piezas piden `precargarRuta` a este mismo archivo (Facturas -> facturas/TarjetaFactura -> registro -> Facturas es un ciclo de
+// imports): es seguro porque `Facturas` y `precargarRuta` son declaraciones de función, que existen desde que se enlaza el módulo, y `precargarRuta` solo corre con un toque,
+// cuando todo está cargado. No lo cambies a una constante ni a una flecha.
 export const registro: Record<IdPantalla, Pantalla> = {
-  facturas: pantallaDe('facturas'),
+  facturas: Facturas,
   factura: pantallaDe('factura'),
   anular: pantallaDe('anular'),
   facturar: pantallaDe('facturar'),
