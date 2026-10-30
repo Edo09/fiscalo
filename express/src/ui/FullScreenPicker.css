@@ -1,0 +1,118 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — FullScreenPicker
+   Una capa de ventana completa: arriba, fijos, la X (48x48) y la búsqueda (48px); debajo, la lista con su scroll; abajo, el pie sobre el teclado.
+   ============================================================ */
+
+/* Llena la ventana de arriba hasta donde empieza el teclado (--kb-inset es 0 sin él), así que no necesita alto en vh ni en dvh: el pie y la lista quedan
+   siempre por encima del teclado. Mismo z-index que las hojas: con una hoja abierta desde el selector (o al revés) la de después en el documento va encima. */
+.selector {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: var(--kb-inset);
+  left: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  animation: selector-entra var(--mov) ease-out;
+}
+
+/* El foco entra al propio panel al abrir: no es un control, no lleva el anillo. */
+.selector:focus {
+  outline: none;
+}
+
+@keyframes selector-entra {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* La fila de arriba: la X a 8px del borde (su caja de 48px deja el icono casi a la altura del margen de 16px, como la «Volver» de la cabecera), la búsqueda
+   hasta el margen de 16px de la derecha, y el área segura de arriba, que es 0 salvo en un teléfono con muesca. La raya de abajo es una sombra interior. */
+.selector__cabecera {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: calc(var(--sp-1) + env(safe-area-inset-top, 0px)) var(--gutter) var(--sp-1) var(--sp-2);
+  background: var(--bg);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.selector__cerrar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.selector__cerrar:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .selector__cerrar:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* El campo de búsqueda mide 48px aquí (el TextField suelto mide 52): la fila de arriba es la barra fija y tiene que ser compacta. El botón de borrar de
+   dentro (48x48) se pega a la esquina del campo para no sobresalir de la caja. */
+.selector__busqueda {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.selector__busqueda .campo__entrada {
+  min-height: var(--tap);
+}
+
+.selector__busqueda .campo__borrar {
+  top: 0;
+  right: 0;
+}
+
+/* La lista se desplaza sola y no arrastra la página al llegar a su fin (iOS 15 y anteriores no lo entienden: ahí la página se bloquea, ui/viewport.ts). */
+.selector__cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: var(--sp-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.selector__cuerpo--sin-pie {
+  padding-bottom: calc(var(--sp-4) + max(0px, var(--safe-b) - var(--kb-inset)));
+}
+
+/* El pie: fondo sólido, una raya arriba y una columna (un botón con su razón debajo, o varios uno bajo otro, a 8px). */
+.selector__pie {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--gutter) calc(var(--sp-3) + max(0px, var(--safe-b) - var(--kb-inset)));
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--border);
+}

@@ -1,0 +1,26 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — ConfirmSheet
+   Una frase con la consecuencia y dos botones de 48px iguales: Cancelar a la izquierda, la acción a la derecha.
+   ============================================================ */
+
+.confirmar__consecuencia {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Los dos reparten el ancho por igual y miden lo mismo (48px): el primario mide 52 en el resto de la app, y aquí no tiene que pesar más que Cancelar. El
+   selector lleva dos clases para ganarle al `.boton--primario`, que se carga antes. Ninguno se deshabilita con razón, así que una fila vale. */
+.confirmar__botones {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.confirmar__botones .boton {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--tap);
+  padding-right: var(--sp-3);
+  padding-left: var(--sp-3);
+}

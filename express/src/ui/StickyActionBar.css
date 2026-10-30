@@ -1,0 +1,28 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — StickyActionBar
+   Fija abajo, sobre el teclado (--kb-inset), con fondo sólido y una raya arriba. Los hijos van en una columna a 8px.
+   ============================================================ */
+
+/* `bottom: var(--kb-inset)` y no `0`: con el teclado en pantalla la barra se sube lo que él tapa, y nunca queda detrás. El área segura de abajo (el
+   indicador de inicio de un iPhone) la cubre el propio fondo de la barra; con el teclado abierto ya no cuenta, porque está bajo el teclado. Por encima
+   de la barra inferior (z-index 20 contra 10) y bajo los avisos en banda, las hojas y el aviso emergente. Es una columna para que un botón deshabilitado con
+   `razon` la deje debajo y no a su lado, y estira un botón suelto a todo el ancho. */
+.accion-anclada {
+  position: fixed;
+  right: 0;
+  bottom: var(--kb-inset);
+  left: 0;
+  z-index: var(--z-accion);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--gutter) calc(var(--sp-3) + max(0px, var(--safe-b) - var(--kb-inset)));
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--border);
+}
+
+/* El hueco en el flujo: lo mide el componente. Sin él, lo último de la pantalla quedaría bajo la barra. */
+.accion-hueco {
+  flex: none;
+  width: 100%;
+}

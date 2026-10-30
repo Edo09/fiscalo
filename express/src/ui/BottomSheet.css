@@ -1,0 +1,137 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — BottomSheet
+   Hasta 85 dvh (85 vh donde dvh no existe), radio 20 arriba, asa de 48px, cuerpo con scroll propio y pie fijo. Sube con el teclado (--kb-inset).
+   ============================================================ */
+
+/* La raíz de la capa: llena la ventana, hasta donde empieza el teclado (--kb-inset es 0 sin él), así la hoja y su pie nunca quedan detrás. Es una capa
+   fija con z-index (un contexto de apilamiento propio, por encima de la barra, la acción anclada y los avisos en banda, por debajo del aviso emergente):
+   con una hoja sobre otra, la de arriba va después en el documento y se apila encima de la de abajo, fondo incluido. */
+.capa {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: var(--kb-inset);
+  left: 0;
+  z-index: var(--z-sheet);
+}
+
+/* El fondo atenúa la pantalla y la tapa: tocarlo no pasa a lo de detrás. `touch-action: none` para que arrastrar sobre él no desplace la página, y
+   `cursor: pointer` porque iOS solo entrega el clic a lo que parece pulsable (el clic llega al `body`, donde React escucha lo que sale de un portal). */
+.capa__fondo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-fondo);
+  background: rgba(15, 20, 40, 0.5);
+  cursor: pointer;
+  touch-action: none;
+  animation: capa-fondo-entra var(--mov) ease-out;
+}
+
+/* El alto: el 85% de lo visible menos lo que tapa el teclado (con el teclado, la capa ya subió y la hoja tiene que caber en lo que queda). `min-height` no hace
+   falta: crece con su contenido hasta el tope, y con la letra del sistema al 200% el cuerpo se desplaza antes que desbordar. El `transition` es solo para el
+   regreso del asa; el arrastre lo apaga mientras sigue al dedo. */
+.hoja {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(85vh - var(--kb-inset));
+  max-height: calc(85dvh - var(--kb-inset));
+  overflow: hidden;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: var(--surface);
+  box-shadow: var(--sh-lg);
+  color: var(--text);
+  transition: transform var(--mov-rapido) ease-out;
+  animation: hoja-entra var(--mov) ease-out;
+}
+
+/* El foco entra al propio panel al abrir (el lector de pantalla anuncia el título): no es un control, no lleva el anillo. */
+.hoja:focus {
+  outline: none;
+}
+
+@keyframes hoja-entra {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes capa-fondo-entra {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* El asa: 48px de alto para agarrarla con el pulgar, con la barrita de 36x4 en el centro. El navegador no empieza a desplazar desde ella. */
+.hoja__asa {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: var(--tap);
+  cursor: grab;
+  touch-action: none;
+}
+
+.hoja__asa-barra {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--text-3);
+}
+
+.hoja__titulo {
+  flex: none;
+  margin: 0;
+  padding: 0 var(--gutter) var(--sp-3);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* El cuerpo se desplaza solo, y con `overscroll-behavior: contain` no arrastra la página al llegar a su fin (iOS 15 y anteriores no lo entienden: ahí
+   la página se bloquea, ui/viewport.ts). `min-height: 0` para que un hijo de flex pueda encogerse por debajo de su contenido. El margen de 4px de arriba es para
+   que el anillo de foco del primer campo no lo corte el borde del contenedor que se desplaza. */
+.hoja__cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--sp-1) var(--gutter) var(--sp-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sin pie, el cuerpo es lo último: deja el área segura de abajo, que con el teclado abierto ya no cuenta (está bajo el teclado). */
+.hoja__cuerpo--sin-pie {
+  padding-bottom: calc(var(--sp-4) + max(0px, var(--safe-b) - var(--kb-inset)));
+}
+
+/* El pie: fondo sólido, una raya arriba y una columna (un botón con su razón debajo, o varios botones uno bajo otro, a 8px). Con el teclado abierto el
+   área segura no suma: ya está bajo el teclado. */
+.hoja__pie {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--gutter) calc(var(--sp-3) + max(0px, var(--safe-b) - var(--kb-inset)));
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--border);
+}

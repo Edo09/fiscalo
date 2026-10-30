@@ -1,0 +1,85 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Toast
+   Un aviso a la vez, sobre la barra inferior (56px más el área segura) y sobre el teclado (--kb-inset), en la capa más alta (60).
+   ============================================================ */
+
+/* La banda: llena el ancho pero no atrapa toques (solo el aviso los recibe). Sobre la barra y el teclado: la barra mide 56px más el área segura, y con el
+   teclado abierto la barra no está (se esconde) y el aviso queda 12px sobre el teclado. */
+.avisos {
+  position: fixed;
+  right: 0;
+  bottom: calc(var(--bar-h) + var(--safe-b) + var(--sp-4) + var(--kb-inset));
+  left: 0;
+  z-index: var(--z-toast);
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+
+.avisos--teclado {
+  bottom: calc(var(--kb-inset) + var(--sp-3));
+}
+
+/* Las dos regiones de anuncio (status y alert) ocupan el mismo sitio: solo una tiene un aviso dentro a la vez. */
+.avisos > div {
+  display: flex;
+  justify-content: center;
+}
+
+/* Una tarjeta elevada, igual en claro y en oscuro (los tokens de superficie y de texto ya son los de cada tema): 48px como mínimo para que el botón
+   «Deshacer» de dentro cumpla el objetivo táctil. El texto parte palabras largas (un e-NCF) en vez de ensanchar el aviso. */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-md);
+  color: var(--text);
+  pointer-events: auto;
+  animation: toast-entra var(--mov) ease-out;
+}
+
+.toast--info .icono {
+  color: var(--accent-text);
+}
+
+.toast--ok .icono {
+  color: var(--success-text);
+}
+
+.toast--error .icono {
+  color: var(--danger-text);
+}
+
+.toast__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* «Deshacer» a la derecha del texto: le quita al margen del aviso lo que le sobra al relleno de un botón de texto (16px a cada lado). */
+.toast .boton {
+  flex: none;
+  margin-right: calc(var(--sp-2) - var(--sp-4));
+}
+
+@keyframes toast-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

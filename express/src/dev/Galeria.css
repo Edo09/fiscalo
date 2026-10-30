@@ -1,0 +1,177 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Galería de primitivas (solo DEV)
+   Una columna de secciones. Solo usa tokens: la galería se ve en claro y en oscuro como el resto.
+   ============================================================ */
+
+.galeria {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--sp-4) var(--gutter) var(--sp-6);
+}
+
+.galeria__titulo-pagina {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* La línea de estado del historial y del teclado: texto de ancho fijo y que parte lo largo (el hash y el estado pueden ser largos). */
+.galeria__estado {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.galeria__seccion {
+  margin-top: var(--sp-6);
+}
+
+.galeria__titulo {
+  margin: 0 0 var(--sp-3);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.galeria__nota {
+  margin: 0 0 var(--sp-3);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Una fila de controles que pasa a la línea de abajo al llenarse. Un botón deshabilitado con razón NO va aquí: va en `.galeria__columna`. */
+.galeria__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.galeria__columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.galeria__pila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.galeria__caja {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+}
+
+.galeria__iconos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: var(--sp-2);
+}
+
+.galeria__icono {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.galeria__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.galeria__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* El botón de actualizar de la cabecera de muestra: 48x48, como los de la cabecera real. */
+.galeria__icono-boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* La lista del selector de muestra: filas de 64px, una debajo de otra, con el nombre y el RNC. */
+.galeria__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.galeria__elemento {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: var(--sp-2) var(--gutter);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.galeria__elemento small {
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.galeria__elemento:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .galeria__elemento:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.galeria__mas {
+  padding: var(--sp-3) var(--gutter);
+}
+
+.galeria__relleno {
+  padding: var(--sp-4) var(--gutter);
+}

@@ -1,0 +1,23 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — OfflineBanner
+   Una franja de ancho completo con el tono de aviso (--warning-text sobre --warning-soft: 4.5:1 en los dos temas, lo vigila tokens.test.ts).
+   ============================================================ */
+
+/* Va en el flujo, arriba de todo, y se desplaza con la página: las cabeceras de las pantallas son pegajosas y una franja pegajosa más se solaparía con ellas.
+   Arriba suma el área segura (0 salvo en un teléfono con muesca, donde la página llega hasta el borde): sin ella el texto quedaría bajo la barra de estado. La
+   raya de abajo es una sombra interior y no un borde, para no sumar un píxel. */
+.sin-conexion {
+  position: relative;
+  z-index: var(--z-banner);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: calc(var(--sp-2) + env(safe-area-inset-top, 0px)) var(--gutter) var(--sp-2);
+  background: var(--warning-soft);
+  box-shadow: inset 0 -1px 0 var(--warning);
+  color: var(--warning-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
