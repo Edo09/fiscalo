@@ -1,0 +1,82 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Login
+   Pantalla completa, sin barra inferior: la marca arriba, y debajo el formulario en una columna de a lo sumo 400px. Pegada arriba y no centrada en
+   vertical: con el teclado abierto el alto visible baja a unos 480px y el «Entrar» tiene que seguir a la vista.
+   ============================================================ */
+
+/* Los márgenes laterales respetan el área segura (la muesca, con el teléfono de lado); abajo, la barra de inicio de iOS. */
+.login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: calc(var(--sp-6) + env(safe-area-inset-top, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--sp-6) + var(--safe-b));
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  overscroll-behavior-y: contain;
+}
+
+.login__contenido {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 6vh;
+}
+
+/* ---- La marca: el logo (un SVG de menos de 2 KB) y «Express» ---- */
+.login__marca {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: calc(var(--sp-6) + var(--sp-2));
+}
+
+.login__logo {
+  display: block;
+  flex: none;
+  width: 56px;
+  height: 56px;
+}
+
+.login__nombre {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+/* ---- El formulario: una columna con 16px entre cada cosa ---- */
+.login__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+}
+
+/* Contraseña: el campo y, a su lado, el botón de mostrarla. `align-items: flex-end` los alinea por abajo: el campo no lleva mensaje debajo, así que su
+   caja de 52px y el botón de 48 acaban a la misma altura, y los 2px de margen centran el botón en la caja. */
+.login__clave {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.login__clave-campo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Ancho fijo: «Mostrar» y «Ocultar» no miden lo mismo y el campo no tiene que moverse al cambiar de uno a otro. */
+.login__ver {
+  flex: none;
+  min-width: 96px;
+  margin-bottom: 2px;
+}
+
+/* Un bloque normal, no una fila flex: el motivo por el que «Entrar» está deshabilitado sale debajo del botón. */
+.login__acciones {
+  display: block;
+}

@@ -1,0 +1,60 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Edición no habilitada
+   Pantalla completa, sin barra inferior: una columna centrada en vertical y en horizontal, con el logo, el título, el texto y las dos salidas.
+   ============================================================ */
+
+/* Los márgenes respetan el área segura, como en el Login. */
+.edicion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: calc(var(--sp-6) + env(safe-area-inset-top, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--sp-6) + var(--safe-b));
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  overscroll-behavior-y: contain;
+  text-align: center;
+}
+
+.edicion__contenido {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+.edicion__logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+}
+
+.edicion__titulo {
+  margin: var(--sp-5) 0 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.edicion__texto {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Una columna con 12px entre los dos botones (al menos 8px entre objetivos táctiles); cada uno a lo ancho. */
+.edicion__acciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+  margin-top: var(--sp-6);
+}
