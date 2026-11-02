@@ -1,0 +1,56 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Detalle: acciones
+   La fila de la acción secundaria y «Más» (dos botones de 48 px que se reparten el ancho) y las filas de la hoja «Más acciones» (48 px o más, de ancho completo).
+   ============================================================ */
+
+.acciones__fila {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* `min-width: 0`: un rótulo largo («Corregir y emitir de nuevo») se parte en vez de ensanchar la fila. */
+.acciones__fila > .boton {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mas__fila {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.mas__fila:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mas__fila:hover {
+    background: var(--surface-hover);
+  }
+}

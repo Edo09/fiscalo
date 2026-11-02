@@ -1,0 +1,98 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Detalle: líneas y totales
+   Cada línea: descripción arriba, cantidad × precio a la izquierda y el subtotal a la derecha, y el chip del ITBIS cuando no es el 18 %.
+   ============================================================ */
+
+.lineas {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linea {
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.linea:first-child {
+  border-top: 0;
+}
+
+.linea__descripcion {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.linea__cifras {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: var(--sp-1);
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.linea__cantidad {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.linea__subtotal {
+  flex: none;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.linea__chip {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--neutral-soft);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.lineas__vacio {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+/* ---- El bloque de totales ---- */
+.lineas__totales {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3) 0 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.lineas__total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.lineas__total dt,
+.lineas__total dd {
+  margin: 0;
+}
+
+.lineas__total--final {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}

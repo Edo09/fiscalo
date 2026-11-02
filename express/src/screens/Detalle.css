@@ -1,0 +1,21 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Detalle de una factura
+   Las secciones, una debajo de otra, con el mismo hueco; cada pieza (encabezado, aviso, línea de tiempo, líneas, datos DGII, acciones) tiene su CSS junto a su componente en screens/detalle.
+   ============================================================ */
+
+.detalle__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--gutter);
+}
+
+/* Sin conexión y con la factura ya leída: se ve, apagada (los datos no se pueden actualizar). */
+.detalle__cuerpo--atenuado {
+  opacity: 0.7;
+}
+
+/* El aviso de «Sin conexión» va sobre el cuerpo, con los mismos márgenes: no se apaga con lo que avisa. */
+.detalle__aviso {
+  padding: var(--sp-3) var(--gutter) 0;
+}

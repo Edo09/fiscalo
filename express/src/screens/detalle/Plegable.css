@@ -1,0 +1,59 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Detalle: sección plegable
+   Una tarjeta con el título como botón de 48 px de alto (todo el ancho) y el contenido debajo cuando está abierta.
+   ============================================================ */
+
+.plegable {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+}
+
+.plegable__titulo {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.plegable__boton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.plegable__boton:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plegable__boton:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.plegable__rotulo {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.plegable__cuerpo {
+  padding: 0 var(--sp-4) var(--sp-4);
+}
