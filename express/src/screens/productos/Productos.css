@@ -1,0 +1,273 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Productos (la lista, el formulario y el selector de unidad)
+   Todo con los tokens: los colores de estado usan su -text sobre su -soft (4.5:1 en los dos temas, lo vigila tokens.test.ts) y los objetivos táctiles miden 48px o más, con 8px entre vecinos.
+   ============================================================ */
+
+/* Las secciones, una debajo de otra, con el mismo hueco. */
+.productos__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--gutter);
+}
+
+.productos__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- La tarjeta de un producto: un botón que se comporta como una tarjeta (dentro, todo `span` en bloque) ---- */
+.producto-tarjeta {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.producto-tarjeta:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .producto-tarjeta:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Un producto inactivo se ve apagado, pero se puede tocar (para volver a activarlo). */
+.producto-tarjeta--inactivo {
+  opacity: 0.65;
+}
+
+/* El nombre, a lo sumo dos líneas: uno muy largo se corta con puntos suspensivos (y la tarjeta avisa «Se acorta en la factura»). */
+.producto-tarjeta__nombre {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.producto-tarjeta__precio {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.producto-tarjeta__itbis {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.producto-tarjeta__meta {
+  display: block;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.producto-tarjeta__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+/* La etiqueta neutra (--text-2 sobre --neutral-soft: una de las parejas que vigila tokens.test.ts). */
+.producto-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--neutral-soft);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---- «Cargar más»: 52px, el alto del botón primario, aunque sea secundario ---- */
+.productos__mas .boton {
+  min-height: var(--tap-lg);
+}
+
+/* ---- Los estados vacíos: el EmptyState trae su propio relleno de los lados y la pantalla ya pone el suyo. Lo buscado va tal cual en el título: lo largo se parte. ---- */
+.productos__vacio {
+  margin: 0 calc(var(--gutter) * -1);
+}
+
+.productos__vacio .vacio__titulo {
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   El formulario de un producto (la hoja de alta y la pantalla de edición)
+   ============================================================ */
+
+.producto__cuerpo {
+  padding: var(--sp-4) var(--gutter);
+}
+
+.producto-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* Un grupo con su etiqueta arriba (ITBIS, Es un, Unidad): la misma de los campos de texto (14/600). */
+.producto-form__grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.producto-form__etiqueta {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Lo que daría el precio con su ITBIS, bajo el campo. */
+.producto-form__vista {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.producto-form__nota {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.producto-form__error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ---- La unidad de ahora: una fila de 52px con borde de campo, que abre el selector ---- */
+.unidad-actual {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--tap-lg);
+  margin: 0;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--text-3);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.unidad-actual__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* La etiqueta «acepta fracciones», en la fila y en la lista. */
+.unidad__etiqueta {
+  flex: none;
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--neutral-soft);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ---- La lista del selector de unidad: filas de 56px con una raya entre ellas ---- */
+.unidades {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unidades > li {
+  border-bottom: 1px solid var(--border);
+}
+
+.unidad {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: var(--sp-2) var(--gutter);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.unidad:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .unidad:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.unidad[aria-current="true"] {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.unidad__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.unidades__vacio {
+  margin: 0;
+  padding: var(--sp-6) var(--gutter);
+  color: var(--text-2);
+  text-align: center;
+}
