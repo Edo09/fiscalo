@@ -31,10 +31,18 @@ jobs:
         run: npx vite build
       - name: HOOK express-node-tests
         if: ${{ hashFiles('express/tests/mock-api.test.mjs') != '' }}
-        run: node --test express/tests/mock-api.test.mjs
+        run: |
+          node --import ./express/tests/_loader.mjs --test "express/tests/**/*.test.ts"
+          node --test express/tests/mock-api.test.mjs
       - name: HOOK express-typecheck
         if: ${{ hashFiles('express/tsconfig.json') != '' }}
         run: npx tsc -p express/tsconfig.json --noEmit
       - name: HOOK express-graph-guard
         if: ${{ hashFiles('express/dev/check-graph.mjs') != '' }}
         run: node express/dev/check-graph.mjs
+      - name: Express, guardia del origen del API
+        if: ${{ hashFiles('express/dev/check-api-origin.mjs') != '' }}
+        run: node express/dev/check-api-origin.mjs
+      - name: Express, eslint
+        if: ${{ hashFiles('express/eslint.config.js') != '' }}
+        run: npx eslint -c express/eslint.config.js express
