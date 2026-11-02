@@ -49,7 +49,7 @@ function Tarjeta(p: { envio: EnvioRecord; u: { tenantId: number; userId: number 
     if (u === null) return
     setVerificando(true)
     try {
-      await verificarEnvio(u)
+      if (!(await verificarEnvio(u))) mostrarToast('Todavía sin cambios. Vuelve a verificar en unos minutos.')
     } catch (e) {
       // Solo un ApiError trae un texto para el usuario; el de un error de JavaScript no se le enseña a nadie, pero queda en la consola.
       if (e instanceof ApiError) mostrarToast(e.message, { tipo: 'error' })

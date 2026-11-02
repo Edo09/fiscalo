@@ -23,7 +23,7 @@ const ventana = {
 Object.defineProperty(globalThis, 'window', { value: ventana, configurable: true, writable: true })
 Object.defineProperty(globalThis, 'location', { value: ventana.location, configurable: true, writable: true })
 
-const { confirmarNoSeEmitio, emitirAhora, iniciarWizard, useWizardStore, wizard } = await import('~/screens/facturar/useWizard')
+const { confirmarNoSeEmitio, emitirAhora, iniciarWizard, useWizardStore, verificarEnvio, wizard } = await import('~/screens/facturar/useWizard')
 
 const U = { tenantId: 12, userId: 5 }
 
@@ -149,6 +149,31 @@ test('un 502 con la factura guardada queda sin confirmar y bloquea emitir otra; 
   await emitir()
   await esperar()
   assert.equal(pendientes.length, 1)
+})
+
+test('Verificar ahora: un estado nuevo cierra la incertidumbre y borra el borrador; uno igual avisa que no cambió', async () => {
+  cargarVenta()
+  const p = emitir()
+  await esperar()
+  pendientes[0].responder(json(502, { status: false, error: 'No se pudo confirmar si la DGII recibió la factura E450000000014. No la emitas de nuevo.', data: { factura_id: 41, e_ncf: 'E450000000014', estado_dgii: 'ENVIO_INCIERTO' } }))
+  await p
+  const estadoDe = (estado_dgii: string): Response => json(200, { status: true, data: { factura_id: 41, e_ncf: 'E450000000014', estado_dgii } })
+
+  const igual = verificarEnvio(U)
+  await esperar()
+  assert.ok(pendientes[1].url.endsWith('/api/facturas/41/estado'))
+  pendientes[1].responder(estadoDe('ENVIO_INCIERTO'))
+  assert.equal(await igual, false)
+  assert.equal(estado().envio?.fase, 'incierta')
+  assert.equal(estado().carrito?.lineas.length, 1)
+
+  const cambia = verificarEnvio(U)
+  await esperar()
+  pendientes[2].responder(estadoDe('ACEPTADO'))
+  assert.equal(await cambia, true)
+  assert.deepEqual([estado().envio?.fase, estado().envio?.estado], ['terminada', 'ACEPTADO'])
+  assert.equal(estado().carrito?.lineas.length, 0) // la venta ya es una factura: el borrador se borra
+  assert.equal(leerBorrador(U, ahora().getTime()), null)
 })
 
 test('un rechazo de la DGII deja los motivos y conserva el borrador para corregir y emitir de nuevo', async () => {

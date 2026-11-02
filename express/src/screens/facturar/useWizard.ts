@@ -304,22 +304,24 @@ const texto = (v: unknown): string | undefined => (typeof v === 'string' && v.tr
 
 /**
  * «Verificar ahora»: le pregunta a la DGII cómo va la factura (GET /api/facturas/{id}/estado) y actualiza el registro con la misma tabla de estados de la emisión. Si la
- * venta ya es una factura, borra el borrador. Lanza el ApiError del servidor si no se pudo preguntar: la pantalla lo dice.
+ * venta ya es una factura, borra el borrador. Dice si algo cambió (si no, la DGII todavía no responde y la pantalla lo avisa). Lanza el ApiError del servidor si no se pudo
+ * preguntar: la pantalla lo dice.
  */
-export async function verificarEnvio(u: UsuarioClave): Promise<void> {
+export async function verificarEnvio(u: UsuarioClave): Promise<boolean> {
   const r = estado().envio
-  if (r === null || r.facturaId === undefined) return
+  if (r === null || r.facturaId === undefined) return false
   const data = await getEstado(r.facturaId)
   const fila = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {}
   const nuevo = texto(fila.estado_dgii)
-  if (nuevo === undefined) return
+  if (nuevo === undefined) return false
   const actual = estado().envio
-  if (actual === null || actual.clave !== r.clave) return
+  if (actual === null || actual.clave !== r.clave) return false
   const siguiente = aplicarEstado(actual, nuevo, texto(fila.e_ncf))
   guardarEnvio(u, siguiente)
   poner({ envio: siguiente })
   refrescarListas()
   if (dejaFactura(clasificarEstado(nuevo))) descartarBorrador()
+  return siguiente.fase !== actual.fase || siguiente.estado !== actual.estado
 }
 
 // --- Lo que el resto de la app muestra del asistente ---------------------------------------------------------------------------------
