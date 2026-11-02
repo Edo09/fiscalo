@@ -1,0 +1,187 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Paso 3 del asistente: Revisar y emitir
+   Tarjetas de resumen, los totales alineados a la derecha con cifras de ancho fijo, el pago y la lista de errores. Los errores son filas de 48px o más que llevan al paso donde se corrigen.
+   ============================================================ */
+
+/* La cinta de MODO PRUEBAS: texto, borde y color (nunca solo color). --warning-text sobre --warning-soft: 4.5:1 en los dos temas. */
+.pr-pruebas {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-md);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.pr-cliente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.pr-cliente__texto {
+  min-width: 0;
+}
+
+.pr-cliente__nombre {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pr-cliente__detalle {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* Las líneas: nombre a la izquierda, importe a la derecha. */
+.pr-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-linea {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.pr-linea__texto {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pr-linea__importe {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.pr-nota {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* Los totales. */
+.pr-totales {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.pr-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-total--final {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* El pago: el control, el plazo y la fecha, una cosa debajo de otra. */
+.pr-pago {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.pr-pago__etiqueta {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pr-pago__texto {
+  margin: 0;
+}
+
+.pr-fecha {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* Un enlace dentro de un aviso: de 48px de alto para el dedo. */
+.pr-enlace {
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0 var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* La lista de errores: un recuadro rojo (--danger-text sobre --danger-soft) con una fila por error. */
+.pr-errores {
+  padding: var(--sp-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-lg);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.pr-errores__titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  font-weight: 700;
+}
+
+.pr-errores__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--danger-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pr-error:active {
+  background: var(--surface-active);
+}
