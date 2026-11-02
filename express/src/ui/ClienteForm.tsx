@@ -13,6 +13,7 @@
 // Además del contrato (`ClienteFormProps` de CONTEXTO.md) acepta dos propiedades opcionales: `anclarAccion` pone el botón en la barra de acción fija sobre el teclado (para una pantalla
 // completa; en una hoja el botón va al final del formulario) y `onSucio(true|false)` avisa si hay algo escrito, para que una hoja pregunte «¿Descartar?» antes de cerrarse.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ClientRow } from '@/api/types'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import {
@@ -28,7 +29,7 @@ import {
 import type { FormCliente, ResultadoRnc } from '~/lib/clientes'
 import { exigeComprador } from '~/lib/tiposEcf'
 import { useEnLinea } from '~/net/enLinea'
-import { clientesPorRnc, consultarRncExpress, crearCliente } from '~/net/clientes'
+import { claves, clientesPorRnc, consultarRncExpress, crearCliente } from '~/net/clientes'
 import { Banner } from './Banner'
 import { Button } from './Button'
 import { StickyActionBar } from './StickyActionBar'
@@ -111,6 +112,7 @@ export function ClienteForm(p: ClienteFormProps): JSX.Element {
   const exigeRnc = tipoEcf !== undefined && exigeComprador(tipoEcf, 0)
   const exigeVerificar = tipoEcf === '31' || tipoEcf === '45'
   const enLinea = useEnLinea()
+  const cliente = useQueryClient()
 
   const [f, setF] = useState(() => formInicial(inicial))
   const [intentos, setIntentos] = useState(0)
@@ -141,7 +143,7 @@ export function ClienteForm(p: ClienteFormProps): JSX.Element {
   // La consulta: cada cambio del RNC es un turno nuevo y deja sin valor las respuestas de los anteriores.
   useEffect(() => {
     const turno = turnos.siguiente()
-    setExistentes([])
+    setExistentes((a) => (a.length === 0 ? a : [])) // sin otro dibujo si ya estaba vacío
     if (!esRncOCedula(digitos)) {
       setConsulta(null)
       return
@@ -195,6 +197,7 @@ export function ClienteForm(p: ClienteFormProps): JSX.Element {
     try {
       const r = await crearCliente(construirAltaCliente(f))
       if (r.kind === 'creado') {
+        void cliente.invalidateQueries({ queryKey: claves.todos }) // las listas de clientes (y las búsquedas del asistente) ya no están al día
         onGuardado(r.fila)
         return
       }

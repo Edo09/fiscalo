@@ -96,6 +96,8 @@ export async function crearCliente(alta: AltaCliente): Promise<ResultadoAlta> {
       const fila = await buscarEntre(alta, clienteYaCreado)
       return fila !== null ? { kind: 'creado', fila } : { kind: 'fallo', mensaje }
     }
-    return { kind: 'rechazado', mensaje, existente: await buscarEntre(alta, duplicadoDelServidor) }
+    // Sin correo ni teléfono el servidor no rechaza nunca por «el mismo cliente»: no hay a quién buscar.
+    const puedeSerRepetido = (alta.email ?? '') !== '' || (alta.phone_number ?? '') !== ''
+    return { kind: 'rechazado', mensaje, existente: puedeSerRepetido ? await buscarEntre(alta, duplicadoDelServidor) : null }
   }
 }

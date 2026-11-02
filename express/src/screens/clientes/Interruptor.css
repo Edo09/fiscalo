@@ -65,8 +65,13 @@
   transform: translateX(20px);
 }
 
-/* El foco del teclado se ve en la pista (el `input` real no se ve). */
-.interruptor__entrada:focus-visible + .interruptor__pista {
+/* El foco se ve en la pista (el `input` real no se ve), con el mismo patrón de base.css: `:focus` es la red de los navegadores sin :focus-visible (Safari antes de 15.4), donde el
+   anillo sale siempre; donde :focus-visible existe, la segunda regla lo quita al tocar y deja el del teclado. */
+.interruptor__entrada:focus + .interruptor__pista {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+.interruptor__entrada:focus:not(:focus-visible) + .interruptor__pista {
+  outline: none;
 }
