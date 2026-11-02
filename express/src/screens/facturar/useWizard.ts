@@ -10,10 +10,10 @@
 //
 // El borrador se guarda 400 ms después del último cambio (y al ocultarse la página), dura 7 días y se borra al emitir con éxito. Una pantalla del asistente llama a
 // `iniciarWizard` al montarse: carga lo guardado del usuario de la sesión una sola vez, y otra vez si entra otro usuario.
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useSession } from '@/stores/auth'
-import { esAdmin, leerEntitlements } from '~/entitlements'
+import { esAdmin, leerEntitlements, tiposVenta } from '~/entitlements'
 import type { Entitlements, UsuarioExpress } from '~/entitlements'
 import {
   actualizarLinea,
@@ -26,6 +26,7 @@ import {
   elegirPago,
   quitarLinea,
   restaurarLinea,
+  tieneContenido,
 } from '~/lib/carrito'
 import type { Carrito, ClienteSel, Deshacer, LineaCarrito, Pago, ProductoSel, TipoItem } from '~/lib/carrito'
 import { clasificar, clasificarEstado } from '~/lib/clasificar'
@@ -34,6 +35,7 @@ import {
   aplicarEstado,
   aplicarOutcome,
   AUTOSAVE_MS,
+  bloqueaEmision,
   borrarBorrador,
   borrarEnvio,
   crearEnvio,
@@ -310,4 +312,35 @@ export async function verificarEnvio(u: UsuarioClave): Promise<void> {
   guardarEnvio(u, siguiente)
   poner({ envio: siguiente })
   if (dejaFactura(clasificarEstado(nuevo))) descartarBorrador()
+}
+
+// --- Lo que el resto de la app muestra del asistente ---------------------------------------------------------------------------------
+
+/** Lo que muestran el punto del borrador, las franjas «Enviando factura...» y «Factura sin confirmar» y el aviso de cerrar sesión (la forma de `IndicadoresFacturar`, lib/indicadores). */
+export interface IndicadoresDelAsistente {
+  /** Hay una factura a medias en el teléfono. */
+  borrador: boolean
+  /** Hay un envío en vuelo ahora mismo. */
+  enviando: boolean
+  /** Hay un envío cuyo resultado no se conoce: su e-NCF ('' si todavía no lo hay), el id de la factura si ya se guardó y la clave del registro. */
+  sinConfirmar: { eNcf: string; facturaId: number | null; clave: string } | null
+}
+
+/**
+ * Los indicadores del asistente para el shell: lo que `lib/indicadores.useIndicadoresFacturar` entrega a la barra, a las franjas, a Más y al aviso de versión. Carga lo guardado del
+ * usuario al montarse (el shell siempre está montado, así que un envío sin confirmar se ve desde cualquier pantalla y también tras recargar), y devuelve el mismo objeto mientras nada cambie.
+ */
+export function useIndicadoresDelAsistente(): IndicadoresDelAsistente {
+  const { entitlements, u } = useCuenta()
+  const tiposClave = tiposVenta(entitlements).join(',')
+  useEffect(() => {
+    if (u !== null) iniciarWizard(u, tiposClave === '' ? [] : tiposClave.split(','))
+  }, [u, tiposClave])
+  const borrador = useWizardStore((s) => s.carrito !== null && tieneContenido(s.carrito))
+  const enviando = useWizardStore((s) => s.enviando || s.envio?.fase === 'enviando')
+  const envio = useWizardStore((s) => s.envio)
+  return useMemo(() => {
+    const sinConfirmar = envio !== null && bloqueaEmision(envio) ? { eNcf: envio.eNcf ?? '', facturaId: envio.facturaId ?? null, clave: envio.clave } : null
+    return { borrador, enviando, sinConfirmar }
+  }, [borrador, enviando, envio])
 }
