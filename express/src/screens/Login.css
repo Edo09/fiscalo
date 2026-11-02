@@ -1,51 +1,142 @@
 /* ============================================================
    FISCALPOINT EXPRESS — Login
-   Pantalla completa, sin barra inferior: la marca arriba, y debajo el formulario en una columna de a lo sumo 400px. Pegada arriba y no centrada en
-   vertical: con el teclado abierto el alto visible baja a unos 480px y el «Entrar» tiene que seguir a la vista.
+   La marca de FiscalPoint (la del logo: nube azul tinta y un documento con la esquina doblada) y, encima, la hoja del formulario.
+   Teléfono: una franja de marca arriba (el logo y el nombre) y la hoja debajo, subida sobre la franja con la esquina de arriba a la derecha doblada, como
+   el documento del logo. Pegada arriba y no centrada en vertical: con el teclado abierto el alto visible baja a unos 480px y el «Entrar» tiene que seguir a
+   la vista. Desde 900px: dos columnas, el panel de marca (titular, texto y tres ventajas) y, a la derecha, la hoja como una tarjeta. La franja y el panel
+   son el mismo elemento (.login__marca).
    ============================================================ */
 
-/* Los márgenes laterales respetan el área segura (la muesca, con el teléfono de lado); abajo, la barra de inicio de iOS. */
+/* La marca es azul tinta en los dos temas, como el panel de la app completa: sus colores no cambian con el tema y por eso viven aquí y no en tokens.css.
+   Los textos sobre ella dan 4.5:1 o más sobre el tramo más claro del fondo (--marca-brillo): lo vigila tests/login-marca.test.ts. */
 .login {
+  --marca-brillo: #1c4487;
+  --marca-texto: #ffffff;
+  --marca-texto-2: #b4bfd6;
+  --marca-texto-3: #d7e0f1;
+  --marca-cian: #5cc8f6;
+  --marca-borde: rgba(255, 255, 255, 0.18);
+  --pliegue: 28px; /* el lado de la esquina doblada de la hoja; la franja se mete bajo la hoja otro tanto */
+
   display: flex;
   flex-direction: column;
-  align-items: center;
   min-height: 100vh;
   min-height: 100dvh;
-  padding-top: calc(var(--sp-6) + env(safe-area-inset-top, 0px));
-  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
-  padding-bottom: calc(var(--sp-6) + var(--safe-b));
-  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
   overscroll-behavior-y: contain;
 }
 
-.login__contenido {
-  width: 100%;
-  max-width: 400px;
-  margin-top: 6vh;
-}
-
-/* ---- La marca: el logo (un SVG de menos de 2 KB) y «Express» ---- */
+/* ---- La marca: franja arriba. Los márgenes laterales y de arriba respetan el área segura (la muesca, con el teléfono de lado). ---- */
 .login__marca {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: calc(var(--sp-6) + var(--sp-2));
+  position: relative;
+  padding-top: calc(var(--sp-5) + env(safe-area-inset-top, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--pliegue) + var(--sp-5));
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  color: var(--marca-texto);
+  background:
+    radial-gradient(120% 160% at 6% 0%, var(--marca-brillo) 0%, transparent 60%),
+    linear-gradient(155deg, #11162a 0%, #0c1020 60%, #090c18 100%);
 }
 
+.login__firma {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* El logo ya trae su baldosa blanca (icons/mark.svg): sobre el azul tinta se lee a cualquier tamaño. */
 .login__logo {
   display: block;
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
+/* «FiscalPoint.»: el punto va en el cian del borde del documento del logo. */
 .login__nombre {
-  margin: 0;
+  color: var(--marca-texto);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.login__punto {
+  color: var(--marca-cian);
+  font-weight: 900;
+}
+
+.login__edicion {
+  padding: 3px 10px;
+  border: 1px solid var(--marca-borde);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--marca-texto-3);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* El mensaje de marca no cabe en la franja del teléfono: solo se ve en el panel ancho. */
+.login__mensaje {
+  display: none;
+}
+
+/* ---- La hoja: sube sobre la franja. El recorte quita el triángulo de arriba a la derecha (se ve lo que hay detrás: la franja) y el ::after dibuja la
+   solapa doblada en el triángulo que queda, con su sombra sobre el papel. ---- */
+.login__hoja {
+  position: relative;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  margin-top: calc(var(--pliegue) * -1);
+  padding-top: var(--sp-6);
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--sp-6) + var(--safe-b));
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  border-radius: var(--r-xl) 0 0 0;
+  background: var(--surface);
+  clip-path: polygon(0 0, calc(100% - var(--pliegue)) 0, 100% var(--pliegue), 100% 100%, 0 100%);
+}
+
+.login__hoja::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--pliegue);
+  height: var(--pliegue);
+  background: rgba(40, 161, 219, 0.3); /* el cian del borde del documento del logo, translúcido: queda claro sobre la hoja blanca y azulado sobre la oscura */
+  box-shadow: -2px 2px 5px rgba(15, 20, 40, 0.22);
+  pointer-events: none;
+}
+
+/* El formulario no pasa de 400px aunque la hoja ocupe todo el ancho (una tableta). Con el teléfono alto, el pie baja al borde de abajo de la hoja. */
+.login__columna {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.login__titulo {
+  margin: 0 0 var(--sp-5);
   color: var(--text);
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 700;
-  line-height: 1.1;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 /* ---- El formulario: una columna con 16px entre cada cosa ---- */
@@ -79,4 +170,137 @@
 /* Un bloque normal, no una fila flex: el motivo por el que «Entrar» está deshabilitado sale debajo del botón. */
 .login__acciones {
   display: block;
+}
+
+.login__pie {
+  margin: auto 0 0;
+  padding-top: var(--sp-6);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* Sin el fondo azul o amarillo del autocompletar del navegador: sobre la hoja oscura desentona. */
+.login__hoja input:-webkit-autofill,
+.login__hoja input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: var(--text);
+}
+
+/* ---- Pantalla ancha: el panel de marca a la izquierda y la hoja, como una tarjeta, a la derecha ---- */
+@media (min-width: 900px) {
+  .login {
+    --pliegue: 32px;
+
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    background: var(--bg);
+  }
+
+  .login__marca {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 44px clamp(40px, 5vw, 72px);
+  }
+
+  /* El resplandor del acento abajo a la derecha, como en el panel de la app completa (sin su cuadrícula: el CSS de Express tiene presupuesto). */
+  .login__marca::after {
+    content: "";
+    position: absolute;
+    right: -140px;
+    bottom: -160px;
+    width: 460px;
+    height: 460px;
+    border-radius: var(--r-full);
+    background: radial-gradient(circle, rgba(42, 111, 219, 0.6) 0%, transparent 70%);
+    filter: blur(8px);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .login__firma {
+    max-width: none;
+    margin: 0;
+  }
+
+  .login__logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+  }
+
+  .login__nombre {
+    font-size: 28px;
+  }
+
+  /* El mensaje, centrado en lo que queda de alto entre la firma y el borde de abajo. */
+  .login__mensaje {
+    position: relative;
+    z-index: 1;
+    display: block;
+    max-width: 440px;
+    margin: auto 0;
+    padding: var(--sp-6) 0;
+  }
+
+  .login__titular {
+    margin: 0;
+    color: var(--marca-texto);
+    font-family: var(--font-display);
+    font-size: clamp(30px, 3.2vw, 40px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+
+  .login__texto {
+    margin: 14px 0 28px;
+    color: var(--marca-texto-2);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .login__ventajas {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .login__ventajas li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    color: var(--marca-texto-3);
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .login__ventajas .icono {
+    flex: none;
+    color: var(--marca-cian);
+  }
+
+  /* La hoja ya no sube sobre nada: es una tarjeta en la columna de la derecha, con las esquinas redondas y la de arriba a la derecha doblada. */
+  .login__hoja {
+    grid-column: 2;
+    align-self: center;
+    justify-self: center;
+    width: calc(100% - 64px);
+    max-width: 440px;
+    margin: 32px 0;
+    padding: 36px 32px 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl) 0 var(--r-xl) var(--r-xl);
+  }
+
+  .login__titulo {
+    font-size: 26px;
+  }
 }
