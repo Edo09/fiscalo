@@ -1,0 +1,10 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — AccionDePestana
+   La barra de acción (ui/StickyActionBar) subida el alto de la barra inferior más su área segura: queda sobre ella y no la tapa. Dos clases en el selector para ganarle a la de la barra,
+   que va primero. Sin el área segura de abajo en el relleno: ya la cubre la barra inferior.
+   ============================================================ */
+
+.accion-sobre-barra .accion-anclada {
+  bottom: calc(var(--bar-h) + var(--safe-b));
+  padding-bottom: var(--sp-3);
+}

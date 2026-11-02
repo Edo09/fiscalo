@@ -1,0 +1,72 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Interruptor
+   La fila entera es el objetivo táctil (56px); la pista mide 52x32 y la bola 24px. Encendido: pista de acento y bola a la derecha (la posición dice el estado, no solo el color).
+   ============================================================ */
+
+.interruptor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  min-height: 56px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.interruptor__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.interruptor__etiqueta {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.interruptor__ayuda {
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.interruptor__pista {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border: 1px solid var(--text-3);
+  border-radius: var(--r-full);
+  background: var(--neutral-soft);
+}
+
+.interruptor__bola {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--text-2);
+  transition: transform var(--mov-rapido);
+}
+
+.interruptor__entrada:checked + .interruptor__pista {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.interruptor__entrada:checked + .interruptor__pista .interruptor__bola {
+  background: var(--on-accent);
+  transform: translateX(20px);
+}
+
+/* El foco del teclado se ve en la pista (el `input` real no se ve). */
+.interruptor__entrada:focus-visible + .interruptor__pista {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}

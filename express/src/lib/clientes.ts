@@ -103,6 +103,15 @@ export function consultaDeBusqueda(texto: string): string {
   return modo.kind === 'rnc' ? modo.digitos : modo.kind === 'texto' ? modo.query : ''
 }
 
+/**
+ * ¿Hay otra página después de la `paginaActual`? Con la paginación del servidor (`totalPages`), la que dice; sin ella, solo si esta vino llena (una corta es la última): no se pide a ciegas una
+ * página que quizá no existe. Lo usan las listas de Clientes y de Productos.
+ */
+export function hayMasPaginas(r: { items: unknown[]; totalPages?: number | null }, paginaActual: number, pageSize: number): boolean {
+  if (typeof r.totalPages === 'number') return paginaActual < r.totalPages
+  return r.items.length >= pageSize
+}
+
 // --- Leer lo que mandó el servidor -----------------------------------------------------------------------------------------------------
 
 type Fila = Record<string, unknown>

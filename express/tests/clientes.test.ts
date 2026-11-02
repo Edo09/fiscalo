@@ -24,6 +24,7 @@ import {
   formatearRnc,
   formInicial,
   hayCambiosCliente,
+  hayMasPaginas,
   leerPrecarga,
   limpiarPrecarga,
   modoBusqueda,
@@ -86,6 +87,16 @@ test('coincidenciasRnc ignora los guiones de un RNC viejo y no confunde otro nú
   const filas = [fila({ id: '1', rnc: '1-31-25643-2' }), fila({ id: '2', rnc: '131256432' }), fila({ id: '3', rnc: '401123456' }), fila({ id: '4', rnc: null })]
   assert.deepEqual(coincidenciasRnc(filas, '131256432').map((f) => f.id), ['1', '2'])
   assert.deepEqual(coincidenciasRnc(filas, '13125'), []) // lo que no es de 9 u 11 dígitos no busca
+})
+
+test('hayMasPaginas usa totalPages y, sin él, la página llena', () => {
+  const pagina = (n: number, totalPages?: number | null) => ({ items: new Array(n).fill(0), totalPages })
+  assert.equal(hayMasPaginas(pagina(20, 3), 1, 20), true)
+  assert.equal(hayMasPaginas(pagina(20, 3), 3, 20), false)
+  assert.equal(hayMasPaginas(pagina(0, 0), 1, 20), false) // una lista vacía no tiene otra página
+  assert.equal(hayMasPaginas(pagina(20, null), 1, 20), true)
+  assert.equal(hayMasPaginas(pagina(7, null), 1, 20), false)
+  assert.equal(hayMasPaginas(pagina(20), 1, 20), true)
 })
 
 // --- La búsqueda ----------------------------------------------------------------------------------------------------------------------

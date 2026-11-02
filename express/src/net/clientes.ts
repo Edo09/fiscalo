@@ -8,7 +8,11 @@ import type { ConsultaRnc } from '@/api/rnc'
 import type { ClientRow, ListResult } from '@/api/types'
 import { formatoRnc, soloDigitos } from '@/pos/montos'
 import { clienteYaCreado, coincidenciasRnc, duplicadoDelServidor, esFalloAmbiguo, textoDeError } from '~/lib/clientes'
+import { num } from '~/lib/filas'
 import type { AltaCliente, EdicionCliente } from '~/lib/clientes'
+
+/** La fila con su `id` como número: MySQL lo manda como texto («12») y `ClientRow` promete un número. */
+const conIdNumerico = (f: ClientRow): ClientRow => ({ ...f, id: num(f.id) })
 
 /** Las claves de la caché de consultas: empiezan por el recurso de la app completa (`clients`) para tener su frescura (config/cache.ts), y invalidar `['clients']` las recarga todas. */
 export const claves = {
@@ -49,11 +53,13 @@ export async function clientesPorRnc(digitos: string): Promise<ClientRow[]> {
   const [planas, conGuiones] = await Promise.allSettled([pedir(soloDigitos(digitos)), pedir(formatoRnc(soloDigitos(digitos)))])
   const filas = [...(planas.status === 'fulfilled' ? planas.value : []), ...(conGuiones.status === 'fulfilled' ? conGuiones.value : [])]
   const vistas = new Set<number>()
-  return coincidenciasRnc(filas, soloDigitos(digitos)).filter((f) => {
-    if (vistas.has(f.id)) return false
-    vistas.add(f.id)
-    return true
-  })
+  return coincidenciasRnc(filas, soloDigitos(digitos))
+    .map(conIdNumerico)
+    .filter((f) => {
+      if (vistas.has(f.id)) return false
+      vistas.add(f.id)
+      return true
+    })
 }
 
 /** Lo que pasó al guardar un cliente nuevo. */
@@ -66,7 +72,8 @@ export type ResultadoAlta =
 async function buscarEntre(alta: AltaCliente, elegir: (filas: ClientRow[], alta: AltaCliente) => ClientRow | null): Promise<ClientRow | null> {
   try {
     const r = await listClients({ page: 1, pageSize: 25, query: alta.client_name })
-    return elegir(r.items, alta)
+    const fila = elegir(r.items, alta)
+    return fila === null ? null : conIdNumerico(fila)
   } catch {
     return null
   }
