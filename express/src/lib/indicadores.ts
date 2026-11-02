@@ -2,8 +2,9 @@
 // barra, las franjas «Enviando factura...» y «Factura sin confirmar», el «Actualizar» de Más) y para quien no debe actuar en medio de un envío (el aviso
 // de versión nueva, lib/version.ts).
 //
-// Por ahora es un relleno: no hay borrador ni nada en vuelo. El plan 07 reemplaza el cuerpo de `useIndicadoresFacturar` (que leerá `borrador` y `envio`) y
-// deja el tipo y la firma como están, porque la barra y las franjas del plan 06 ya los consumen.
+// Los lee el asistente de venta (screens/facturar/useWizard.ts): carga lo guardado del usuario al montarse el shell, así que un envío sin confirmar se ve desde cualquier
+// pantalla y también tras recargar. El tipo y la firma son los de siempre, porque la barra y las franjas del plan 06 ya los consumen.
+import { useIndicadoresDelAsistente } from '~/screens/facturar/useWizard'
 
 export type IndicadoresFacturar = {
   /** Hay un borrador de factura a medias en el teléfono. */
@@ -17,10 +18,7 @@ export type IndicadoresFacturar = {
   sinConfirmar: { eNcf: string; facturaId: number | null; clave: string } | null
 }
 
-/** El mismo objeto en cada llamada: quien lo ponga en las dependencias de un efecto no lo vuelve a ejecutar sin motivo. */
-const SIN_INDICADORES: IndicadoresFacturar = { borrador: false, enviando: false, sinConfirmar: null }
-
-/** Los indicadores de la factura de ahora. Relleno hasta el plan 07: sin borrador, nada en vuelo y nada sin confirmar. */
+/** Los indicadores de la factura de ahora: el mismo objeto mientras nada cambie, para quien los ponga en las dependencias de un efecto. */
 export function useIndicadoresFacturar(): IndicadoresFacturar {
-  return SIN_INDICADORES
+  return useIndicadoresDelAsistente()
 }
