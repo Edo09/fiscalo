@@ -49,6 +49,16 @@ export function puedeCompartirArchivos(): boolean {
   return sabeCompartirArchivos
 }
 
+/** ¿Acepta el aparato compartir ESTE archivo? Antes de llamar a `navigator.share`: puede negar uno por su tipo o su tamaño aunque comparta archivos. */
+export function puedeCompartirEste(archivo: File): boolean {
+  try {
+    const n = navigator as Navigator & { canShare?: (datos: { files: File[] }) => boolean }
+    return typeof n.canShare !== 'function' || n.canShare({ files: [archivo] })
+  } catch {
+    return false
+  }
+}
+
 export type EstadoPdf = 'ninguno' | 'cargando' | 'listo' | 'fallo'
 
 /** Baja por adelantado el PDF de la factura `id` mientras `activo` (aceptada). `reintentar` vuelve a pedirlo tras un fallo. */

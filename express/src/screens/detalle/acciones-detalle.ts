@@ -12,7 +12,7 @@ import { snapshot } from '~/lib/sesion'
 import { navegar } from '~/router'
 import { mostrarToast } from '~/ui/Toast'
 import { registrarAccionDetalle } from './acciones-registro'
-import { guardarPdf, pdfEnMano, puedeCompartirArchivos } from './pdf'
+import { guardarPdf, pdfEnMano, puedeCompartirArchivos, puedeCompartirEste } from './pdf'
 import type { PdfListo } from './pdf'
 import { pedirReenvio } from './reenvio'
 import { verificarEstado } from './verificar'
@@ -86,6 +86,10 @@ registrarAccionDetalle('compartir', async (f) => {
   const decision = decidirCompartir({ puedeCompartirArchivos: puedeCompartirArchivos(), tieneBlob: listo !== undefined })
   if (decision === 'archivo' && listo !== undefined) {
     const archivo = new File([listo.blob], nombreDelPdf(f, listo), { type: 'application/pdf' })
+    if (!puedeCompartirEste(archivo)) {
+      descargarBlob(listo.blob, nombreDelPdf(f, listo)) // el aparato comparte archivos, pero no este (tipo o tamaño)
+      return
+    }
     try {
       // Sin ningún `await` antes: el toque sigue vivo.
       await navigator.share({ files: [archivo], title: numeroDe(f), text: textoCompartir({ eNcf: numeroDe(f), cliente: f.cliente, total: f.total }, empresaDeLaSesion()) })
