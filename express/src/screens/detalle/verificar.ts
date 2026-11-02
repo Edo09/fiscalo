@@ -70,7 +70,10 @@ export function olvidarVerificacion(id: number): void {
   if (estados.delete(id)) for (const oyente of [...oyentes]) oyente()
 }
 
+/** Lo que pasa ahora con la verificación de la factura `id`. Es el mismo objeto mientras nada cambie (lo que un `useSyncExternalStore` necesita). */
+export const estadoDeVerificacion = (id: number): EstadoVerificacion => estados.get(id) ?? SIN_ESTADO
+
 /** Lo que pasa con la verificación de la factura `id`: si hay una consulta en curso y el texto del último fallo. */
 export function useVerificacion(id: number): EstadoVerificacion {
-  return useSyncExternalStore(suscribir, () => estados.get(id) ?? SIN_ESTADO)
+  return useSyncExternalStore(suscribir, () => estadoDeVerificacion(id))
 }
