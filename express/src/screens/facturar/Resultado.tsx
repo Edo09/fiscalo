@@ -93,6 +93,16 @@ function Tarjeta(p: { envio: EnvioRecord; u: { tenantId: number; userId: number 
     }
   }
 
+  // Con motivos, la primera línea («Motivos de la DGII:») es el título de la lista y va pegada a ella; el resto de las frases va después.
+  const hayMotivos = vista.motivos.length > 0
+  const lineasAntes = hayMotivos ? vista.lineas.slice(0, 1) : vista.lineas
+  const lineasDespues = hayMotivos ? vista.lineas.slice(1) : []
+  const linea = (l: string) => (
+    <p key={l} className={l.startsWith('No la vuelvas') ? 'rs__linea rs__linea--fuerte' : 'rs__linea'}>
+      {l}
+    </p>
+  )
+
   return (
     <div className="rs">
       <div className={`rs__icono rs__icono--${vista.tono}`}>{enviando ? <span className="rs__espera" aria-hidden="true" /> : <Icon name={ICONO[vista.tono]} size={40} />}</div>
@@ -103,18 +113,15 @@ function Tarjeta(p: { envio: EnvioRecord; u: { tenantId: number; userId: number 
             {d}
           </p>
         ))}
-        {vista.lineas.map((l) => (
-          <p key={l} className={l.startsWith('No la vuelvas') ? 'rs__linea rs__linea--fuerte' : 'rs__linea'}>
-            {l}
-          </p>
-        ))}
-        {vista.motivos.length > 0 && (
+        {lineasAntes.map(linea)}
+        {hayMotivos && (
           <ul className="rs__motivos">
             {vista.motivos.map((m) => (
               <li key={m}>{m}</li>
             ))}
           </ul>
         )}
+        {lineasDespues.map(linea)}
       </div>
       <div className="rs__acciones">
         {vista.acciones.map((a, i) => (
