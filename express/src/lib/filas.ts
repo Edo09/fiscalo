@@ -224,7 +224,8 @@ export function normalizarFactura(r: unknown): FacturaVista {
     notas: notasDeFila({ notas: filasDe(f.notas) as unknown as FilasDeNotas }),
     modifica: modificaDeFila(f as DeModifica),
     codigoModificacion: texto(f.codigo_modificacion),
-    respuestaDgii: leerRespuesta(f.respuesta_dgii),
+    // Un E32 de menos de 250 mil sale por el resumen de consumo: su respuesta (y los motivos de un rechazo) vive en `rfce_respuesta` y `respuesta_dgii` queda en null.
+    respuestaDgii: leerRespuesta(f.respuesta_dgii) ?? leerRespuesta(f.rfce_respuesta),
     montoGravado: numONulo(f.monto_gravado),
     montoExento: numONulo(f.monto_exento),
     totalItbis: numONulo(f.total_itbis),

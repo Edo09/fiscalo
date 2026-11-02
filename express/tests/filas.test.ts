@@ -464,6 +464,14 @@ test('normalizarFactura: respuesta_dgii es JSON en texto, y lo que no se puede l
   assert.equal(typeof respuesta('{"mensajes":[]}'), 'object')
 })
 
+test('normalizarFactura: un E32 de resumen de consumo trae su respuesta en rfce_respuesta, y respuesta_dgii manda si las dos vienen', () => {
+  const rechazo = '{"codigo":2,"estado":"Rechazado","mensajes":[{"valor":"El MontoTotal no corresponde","codigo":999}]}'
+  const del = (campos: Record<string, unknown>): unknown => normalizarFactura({ ...BASE, ...campos }).respuestaDgii
+  assert.deepEqual(del({ respuesta_dgii: null, rfce_respuesta: rechazo }), { codigo: 2, estado: 'Rechazado', mensajes: [{ valor: 'El MontoTotal no corresponde', codigo: 999 }] })
+  assert.equal(del({ respuesta_dgii: null, rfce_respuesta: null }), null)
+  assert.deepEqual(del({ respuesta_dgii: '{"estado":"Aceptado"}', rfce_respuesta: rechazo }), { estado: 'Aceptado' })
+})
+
 test('normalizarFactura: el cliente de la fila es client_name, y sin él company_name, el del registro del detalle o «Consumidor final»', () => {
   const nombre = (o: Record<string, unknown>): string => normalizarFactura({ ...BASE, ...o }).cliente
   assert.equal(nombre({ client_name: 'Constructora Cibao', company_name: 'Otra', cliente: DETALLE.cliente }), 'Constructora Cibao') // lo que se emitió
