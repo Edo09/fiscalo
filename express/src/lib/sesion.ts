@@ -18,7 +18,7 @@
 // Los datos de pantalla solo se vacían en un cierre explícito o ante otro usuario (queryClient.ts), nunca con un null inesperado.
 import { useSyncExternalStore } from 'react'
 import { me as meDelApi } from '@/api/auth'
-import { API_BASE_URL } from '@/api/config'
+import { API_BASE_URL, CABECERAS_CLIENTE } from '@/api/config'
 import { ApiError } from '@/api/errores'
 import { clearSession, getToken, setSession, useAuthStore } from '@/stores/auth'
 import type { SessionUser } from '@/stores/auth'
@@ -386,7 +386,7 @@ export async function enviarSignoutPendiente(token: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/auth/signout`, {
     method: 'POST',
     signal: AbortSignal.timeout(TIMEOUT_SIGNOUT_MS),
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...CABECERAS_CLIENTE, Authorization: `Bearer ${token}` },
     body: '{}',
   })
   if (res.ok || res.status === 401) return

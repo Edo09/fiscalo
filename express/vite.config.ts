@@ -37,6 +37,9 @@ export default defineConfig(({ command }) => ({
     'import.meta.env.VITE_API_BASE_URL': '""',
     'import.meta.env.VITE_API_KEY': '""',
     'import.meta.env.VITE_TENANT_ID': '""',
+    // Express se anuncia ante la API en cada petición (cabecera X-Fiscalpoint-Edicion, src/api/config.ts): una empresa que usa la app completa
+    // y Express recibe los límites y el bloque de Express solo en estas peticiones, y la app completa (que no define esto) queda como siempre.
+    'import.meta.env.VITE_EDICION_CLIENTE': '"express"',
   },
   build: {
     // Piso de navegadores: Chrome y WebView 90, Safari e iOS 14.5.

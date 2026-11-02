@@ -6,7 +6,7 @@
 // leer `success`/`error` para mostrar el motivo real del rechazo del login. Ese
 // texto pasa por la misma red de seguridad que el resto (errores.ts): uno claro
 // se muestra tal cual y uno técnico o en inglés se cambia por uno en español.
-import { API_BASE_URL } from './config'
+import { API_BASE_URL, CABECERAS_CLIENTE } from './config'
 import { errorDeRespuesta, networkError, textoError, type ContextoError } from './errores'
 import { getToken, type SessionUser } from '@/stores/auth'
 
@@ -26,6 +26,7 @@ async function authPost<T>(path: string, payload: unknown, withAuth = false): Pr
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    ...CABECERAS_CLIENTE,
   }
   if (withAuth) {
     const token = getToken()
@@ -92,6 +93,7 @@ export async function me(): Promise<SessionUser> {
       signal: AbortSignal.timeout(30_000),
       headers: {
         Accept: 'application/json',
+        ...CABECERAS_CLIENTE,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       // Identidad de la sesion: jamas desde la cache del navegador, que se

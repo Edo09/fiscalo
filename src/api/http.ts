@@ -3,7 +3,7 @@
 // Todo error sale como ApiError con un texto apto para el cajero: el del
 // servidor si es claro, o uno genérico si era técnico (ver errores.ts). Por eso
 // las pantallas pueden seguir haciendo `e instanceof ApiError ? e.message : …`.
-import { API_BASE_URL, API_KEY } from './config'
+import { API_BASE_URL, API_KEY, CABECERAS_CLIENTE } from './config'
 import { getToken, clearSession } from '@/stores/auth'
 import { codigoDe, errorDeRespuesta, networkError, referenciaDe, sesionExpirada, textoError, type ContextoError } from './errores'
 import type { ListResult } from './types'
@@ -23,7 +23,8 @@ const TIMEOUT_WRITE_MS = 90_000
 const TIMEOUT_BLOB_MS = 60_000
 
 function buildHeaders(extra?: HeadersInit): HeadersInit {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  // CABECERAS_CLIENTE es {} en la app completa (nada cambia) y la cabecera de Express en Express.
+  const headers: Record<string, string> = { Accept: 'application/json', ...CABECERAS_CLIENTE }
   // Auth de app: token de sesión del usuario (POST /api/auth/login) como Bearer.
   // Si no hay sesión, se cae a VITE_API_KEY (solo prod sin proxy / integración).
   const token = getToken()

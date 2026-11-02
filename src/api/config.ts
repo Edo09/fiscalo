@@ -23,3 +23,17 @@ export const DEFAULT_USER_ID = Number(import.meta.env.VITE_DEFAULT_USER_ID ?? 1)
  * Vacío => no se manda y el backend resuelve por email (único global).
  */
 export const TENANT_ID = import.meta.env.VITE_TENANT_ID ?? ''
+
+/**
+ * Edición con la que este cliente se anuncia ante la API (VITE_EDICION_CLIENTE). La app completa no la define y no manda nada;
+ * Express la fija en `express/vite.config.ts` (define) y manda la cabecera X-Fiscalpoint-Edicion en CADA petición, el login incluido.
+ * Una empresa que usa las dos versiones recibe los límites y el bloque de Express solo en las peticiones que la traen (API: TenantResolver::esFilaExpress).
+ * La cabecera solo restringe: no abre nada que la cuenta no tenga ya.
+ */
+export const EDICION_CLIENTE = import.meta.env.VITE_EDICION_CLIENTE ?? ''
+
+/**
+ * Las cabeceras con las que el cliente se anuncia: vacío en la app completa, `X-Fiscalpoint-Edicion: <edición>` en Express. Todo `fetch` a la API las suma
+ * (http.ts, auth.ts y el cierre de sesión pendiente de Express), porque son un mismo cliente: una petición sin ellas corre como la app completa.
+ */
+export const CABECERAS_CLIENTE: Readonly<Record<string, string>> = EDICION_CLIENTE === '' ? {} : { 'X-Fiscalpoint-Edicion': EDICION_CLIENTE }
