@@ -53,6 +53,7 @@ import { escucharSesion, snapshot } from '~/lib/sesion'
 import { resumenTotales } from '~/lib/totales'
 import { emitirVenta } from '~/net/emitir'
 import { getEstado } from '~/net/lecturas'
+import { queryClient } from '~/queryClient'
 import { formatHash, navegar } from '~/router'
 
 export interface ErrorDeEnvio {
@@ -238,6 +239,11 @@ export const wizard = {
 /** ¿Este resultado deja la venta registrada en una factura de verdad, de modo que el borrador ya no hace falta? Aceptada, en proceso y no encontrada. */
 const dejaFactura = (kind: Outcome['kind']): boolean => kind === 'aceptada' || kind === 'enProceso' || kind === 'noEncontrada'
 
+/** Una factura nueva (o con otro estado) cambia la lista, las estadísticas y los avisos de Facturas: lo que tengan en caché es de antes. */
+function refrescarListas(): void {
+  for (const queryKey of [['facturas'], ['stats'], ['avisos']]) void queryClient.invalidateQueries({ queryKey })
+}
+
 /** La respuesta del servidor llegó: se guarda lo que dice y, si la venta ya es una factura, se borra el borrador. */
 function terminarEnvio(u: UsuarioClave, registro: EnvioRecord, o: Outcome): void {
   const siguiente = aplicarOutcome(registro, o)
@@ -252,6 +258,7 @@ function terminarEnvio(u: UsuarioClave, registro: EnvioRecord, o: Outcome): void
     return
   }
   guardarEnvio(u, siguiente)
+  refrescarListas()
   if (!esDe(u)) return
   poner({ envio: siguiente, enviando: false })
   if (dejaFactura(o.kind)) descartarBorrador()
@@ -311,6 +318,7 @@ export async function verificarEnvio(u: UsuarioClave): Promise<void> {
   const siguiente = aplicarEstado(actual, nuevo, texto(fila.e_ncf))
   guardarEnvio(u, siguiente)
   poner({ envio: siguiente })
+  refrescarListas()
   if (dejaFactura(clasificarEstado(nuevo))) descartarBorrador()
 }
 

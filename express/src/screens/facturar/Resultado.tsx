@@ -59,14 +59,18 @@ function Tarjeta(p: { envio: EnvioRecord; u: { tenantId: number; userId: number 
     }
   }
 
-  /** Lleva cada acción a su sitio. Salir de un registro que ya cumplió lo suelta (uno sin confirmar se queda: sigue impidiendo emitir). */
+  /**
+   * Lleva cada acción a su sitio. Mirar la factura o Facturas deja el registro (volver con el atrás muestra otra vez este resultado); empezar otra cosa (una factura nueva, corregir
+   * esta, volver a editar) lo suelta, y así Revisar no lo toma por un envío pendiente. Uno sin confirmar nunca se suelta aquí: sigue impidiendo emitir (`soltarEnvio`).
+   */
   const hacer = (id: AccionId): void => {
-    if (id === 'verificar') {
-      void verificar()
-      return
+    const soltar = (): void => {
+      if (u !== null) soltarEnvio(u)
     }
-    if (u !== null) soltarEnvio(u)
     switch (id) {
+      case 'verificar':
+        void verificar()
+        break
       case 'verFactura':
         if (envio.facturaId !== undefined) navegar({ id: 'factura', facturaId: envio.facturaId })
         break
@@ -74,13 +78,16 @@ function Tarjeta(p: { envio: EnvioRecord; u: { tenantId: number; userId: number 
         navegar({ id: 'facturas' })
         break
       case 'nueva':
+        soltar()
         descartarBorrador()
         navegar({ id: 'facturar' }, { reemplazar: true })
         break
       case 'corregir': // la venta se queda en el borrador: se corrige y se emite como una factura nueva
+        soltar()
         navegar({ id: 'facturar' }, { reemplazar: true })
         break
       case 'volverRevisar':
+        soltar()
         navegar({ id: 'facturar-revisar' }, { reemplazar: true })
         break
     }
