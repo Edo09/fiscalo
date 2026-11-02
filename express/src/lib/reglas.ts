@@ -7,7 +7,10 @@
 import { decimalesDe } from '@/lib/format'
 import type { Carrito, LineaCarrito } from '~/lib/carrito'
 import { fechaLimiteEfectiva, MAX_NOMBRE } from '~/lib/carrito'
+import type { Ambiente } from '~/entitlements'
 import { rd } from '~/lib/dinero'
+import { estadoNumeracion } from '~/lib/numeracion'
+import type { SecuenciaStats } from '~/lib/numeracion'
 import { exigeComprador, permiteCredito } from '~/lib/tiposEcf'
 import { resumenTotales } from '~/lib/totales'
 
@@ -134,4 +137,35 @@ export function estadoBotonEmitir(e: EntradaRevision): { kind: EstadoBoton; etiq
   const errores = validarRevision(e)
   if (errores.length > 0) return { kind: 'corregir', etiqueta: `Corregir ${errores.length} ${errores.length === 1 ? 'campo' : 'campos'}` }
   return { kind: 'listo', etiqueta: `Emitir E${tipo} · ${rd(resumenTotales(e.carrito.lineas).total)}` }
+}
+
+/** Por qué un cliente no se puede elegir para este comprobante: sin RNC (el crédito fiscal y el gubernamental lo exigen) o con el RNC de la empresa (no se factura a uno mismo). */
+export function estadoFilaCliente(c: { rnc: string | null }, tipo: string, rncEmisor: string): { seleccionable: boolean; motivo: 'sinRnc' | 'rncPropio' | null } {
+  const rnc = soloDigitos(c.rnc ?? '')
+  const propio = soloDigitos(rncEmisor)
+  if (rnc !== '' && propio !== '' && rnc === propio) return { seleccionable: false, motivo: 'rncPropio' }
+  if (tipo !== '32' && rnc === '') return { seleccionable: false, motivo: 'sinRnc' }
+  return { seleccionable: true, motivo: null }
+}
+
+const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/**
+ * ¿Queda numeración vigente para este tipo? Sale de `secuencias` de las estadísticas (GET /api/facturas/stats) y de `estadoNumeracion`, el mismo cálculo del aviso de Facturas: es
+ * false solo si el tipo está agotado o, en producción, sin rango registrado. Sin la fila del tipo, o sin estadísticas, es null: no se sabe, y no se bloquea (el servidor decide).
+ */
+export function rangoVigenteDe(stats: unknown, tipo: string, ambiente: Ambiente, hoy: string): boolean | null {
+  const filas = esObjeto(stats) && Array.isArray(stats.secuencias) ? stats.secuencias : []
+  for (const fila of filas) {
+    if (!esObjeto(fila) || String(fila.type ?? '').replace(/^E/i, '') !== tipo) continue
+    const secuencia: SecuenciaStats = {
+      type: `E${tipo}`,
+      total_emitidos: typeof fila.total_emitidos === 'number' || typeof fila.total_emitidos === 'string' ? fila.total_emitidos : 0,
+      restantes: typeof fila.restantes === 'number' || typeof fila.restantes === 'string' ? fila.restantes : null,
+      vencimiento: typeof fila.vencimiento === 'string' ? fila.vencimiento : null,
+    }
+    const estado = estadoNumeracion(secuencia, ambiente, hoy)
+    return estado !== 'agotada' && estado !== 'sinRango'
+  }
+  return null
 }

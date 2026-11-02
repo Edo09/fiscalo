@@ -1,0 +1,79 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Asistente de venta: lo común de los pasos
+   La pantalla sin la barra inferior (el asistente tiene su propia barra de acción), el cuerpo, la cabecera con «1 / 3» y la X, y la tarjeta.
+   ============================================================ */
+
+/* `.pantalla` deja al pie el espacio de la barra inferior; el asistente la esconde y su barra de acción deja su propio hueco. Dos clases para ganarle a `.pantalla`. */
+.pantalla.paso {
+  padding-bottom: 0;
+}
+
+/* Las secciones una debajo de otra con el mismo hueco. */
+.paso__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--gutter);
+}
+
+/* «1 / 3» en la cabecera. */
+.paso__numero {
+  flex: none;
+  padding: 0 var(--sp-2);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* La X: 48x48, redonda, el icono al centro. */
+.paso__salir {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.paso__salir:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .paso__salir:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* El nombre del comprobante bajo el selector de tipo. */
+.paso__tipo {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* Una tarjeta: fondo, borde y esquinas. */
+.paso__tarjeta {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+/* El título de una sección («En la factura»). */
+.paso__seccion {
+  margin: var(--sp-2) 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}

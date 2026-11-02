@@ -5,7 +5,7 @@ import { createFacturaSchema } from '@/api/schemas/factura'
 import { agregarLibre, agregarProducto, carritoVacio, elegirCliente, elegirPago } from '~/lib/carrito'
 import type { Carrito, ClienteSel, LineaCarrito, ProductoSel } from '~/lib/carrito'
 import { construirPayloadVenta } from '~/lib/payload'
-import { estadoBotonEmitir, validarLinea, validarRevision } from '~/lib/reglas'
+import { estadoBotonEmitir, estadoFilaCliente, rangoVigenteDe, validarLinea, validarRevision } from '~/lib/reglas'
 import type { EntradaRevision } from '~/lib/reglas'
 
 const cliente = (c: Partial<ClienteSel> = {}): ClienteSel => ({ id: 3, nombre: 'Min. de Obras', rnc: '401123456', permiteCredito: true, descuento: 0, ...c })
@@ -117,4 +117,26 @@ test('Corregir cuenta los campos: un error de cliente y uno de línea son 2', ()
   const carrito = { ...e.carrito, cliente: null, lineas: [{ ...e.carrito.lineas[0], precio: 0 }] }
   assert.deepEqual(estadoBotonEmitir({ ...e, carrito }), { kind: 'corregir', etiqueta: 'Corregir 2 campos' })
   assert.deepEqual(estadoBotonEmitir({ ...e, carrito: { ...carrito, cliente: cliente() } }), { kind: 'corregir', etiqueta: 'Corregir 1 campo' })
+})
+
+test('un cliente se puede elegir salvo sin RNC (E31 y E45) o con el RNC de la empresa; el consumo acepta cualquiera menos el propio', () => {
+  const sin = { rnc: null }
+  const propio = { rnc: '131-00000-1' }
+  assert.deepEqual(estadoFilaCliente(sin, '45', '131000001'), { seleccionable: false, motivo: 'sinRnc' })
+  assert.deepEqual(estadoFilaCliente(sin, '31', '131000001'), { seleccionable: false, motivo: 'sinRnc' })
+  assert.deepEqual(estadoFilaCliente(sin, '32', '131000001'), { seleccionable: true, motivo: null })
+  assert.deepEqual(estadoFilaCliente(propio, '45', '131000001'), { seleccionable: false, motivo: 'rncPropio' })
+  assert.deepEqual(estadoFilaCliente(propio, '32', '131000001'), { seleccionable: false, motivo: 'rncPropio' })
+  assert.deepEqual(estadoFilaCliente({ rnc: '401123456' }, '45', '131000001'), { seleccionable: true, motivo: null })
+})
+
+test('la numeración: agotada o sin rango bloquea; vigente, o sin dato del tipo, no', () => {
+  const fila = (p: Record<string, unknown>) => ({ secuencias: [{ type: 'E45', total_emitidos: 10, restantes: 500, vencimiento: '2027-12-31', ...p }] })
+  assert.equal(rangoVigenteDe(fila({}), '45', 'ecf', '2026-10-27'), true)
+  assert.equal(rangoVigenteDe(fila({ restantes: 0 }), '45', 'ecf', '2026-10-27'), false) // agotada
+  assert.equal(rangoVigenteDe(fila({ restantes: null }), '45', 'ecf', '2026-10-27'), false) // producción sin rango
+  assert.equal(rangoVigenteDe(fila({ restantes: null }), '45', 'testecf', '2026-10-27'), true) // en pruebas no hay límite y no es un problema
+  assert.equal(rangoVigenteDe(fila({}), '31', 'ecf', '2026-10-27'), null) // sin la fila del tipo no se sabe
+  assert.equal(rangoVigenteDe(undefined, '45', 'ecf', '2026-10-27'), null)
+  assert.equal(rangoVigenteDe({ secuencias: 'x' }, '45', 'ecf', '2026-10-27'), null)
 })
