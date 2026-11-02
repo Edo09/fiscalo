@@ -1,0 +1,125 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Resultado de una emisión
+   Una columna centrada: el icono de su tono (la forma además del color), el título, lo que se sabe de la factura, lo que se explica y las acciones, anchas, de 52px (la primera)
+   y 48px (las demás) con 8px entre ellas.
+   ============================================================ */
+
+.rs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-6) var(--gutter) var(--sp-6);
+  text-align: center;
+}
+
+/* El icono en un círculo de 72px: el fondo suave y el color del texto de su tono (4.5:1 en los dos temas). */
+.rs__icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--r-full);
+}
+
+.rs__icono--ok {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.rs__icono--info {
+  background: var(--info-soft);
+  color: var(--accent-text);
+}
+
+.rs__icono--warning {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.rs__icono--danger {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.rs__icono--neutral {
+  background: var(--neutral-soft);
+  color: var(--text-2);
+}
+
+/* La espera de «Emitiendo…»: un aro que gira (solo `transform`; con movimiento reducido, base.css lo deja quieto). */
+.rs__espera {
+  width: 32px;
+  height: 32px;
+  border: 4px solid var(--accent-soft-2);
+  border-top-color: var(--accent);
+  border-radius: var(--r-full);
+  animation: rs-giro 0.9s linear infinite;
+}
+
+@keyframes rs-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rs__texto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+}
+
+.rs__titulo {
+  margin: 0 0 var(--sp-1);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.rs__dato {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* El e-NCF, en grande. */
+.rs__dato--ncf {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rs__linea {
+  margin: 0;
+  color: var(--text-2);
+}
+
+/* «No la vuelvas a emitir»: lo que más importa, en el color del texto y en negrita. */
+.rs__linea--fuerte {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Los motivos de la DGII: una tarjeta con el texto tal cual, alineado a la izquierda para poder leerlo. */
+.rs__motivos {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-6);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-lg);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  text-align: left;
+}
+
+.rs__motivos li + li {
+  margin-top: var(--sp-2);
+}
+
+.rs__acciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: 100%;
+}

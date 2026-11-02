@@ -20,6 +20,8 @@ import {
   nuevaClave,
   sinPeticion,
   TTL_BORRADOR_MS,
+  varianteDe,
+  vistaDeEnvio,
 } from '~/lib/envio'
 import type { EnvioRecord } from '~/lib/envio'
 
@@ -106,4 +108,80 @@ test('el borrador se guarda y se lee, no se guarda vacío, es de cada usuario y 
   assert.equal(leerBorrador(U, AHORA), null)
   escribirTexto(claveUsuario(U.tenantId, U.userId, 'borrador'), JSON.stringify({ guardadoEn: AHORA, carrito: { tipo: 5 } }))
   assert.equal(leerBorrador(U, AHORA), null)
+})
+
+// --- La pantalla de resultado --------------------------------------------------------------------------------------------------------------
+
+const registro = (p: Partial<EnvioRecord>): EnvioRecord => ({ ...envio(), eNcf: 'E450000000014', facturaId: 41, ...p })
+const ids = (r: EnvioRecord, s = 0): string[] => vistaDeEnvio(r, s).acciones.map((a) => a.id)
+
+test('cada registro tiene su variante: la factura terminada se mira por su estado', () => {
+  assert.equal(varianteDe(registro({ fase: 'terminada', estado: 'ACEPTADO' })), 'aceptada')
+  assert.equal(varianteDe(registro({ fase: 'terminada', estado: 'RFCE_ACEPTADO_CONDIC' })), 'aceptada')
+  assert.equal(varianteDe(registro({ fase: 'terminada', estado: 'RECHAZADO' })), 'rechazada')
+  assert.equal(varianteDe(registro({ fase: 'terminada', estado: 'NO_ENCONTRADO' })), 'noEncontrada')
+  assert.equal(varianteDe(registro({ fase: 'terminada', estado: 'ERROR' })), 'incierta') // lo que no es veredicto no se muestra como veredicto
+  for (const fase of ['enviando', 'enProceso', 'incierta', 'noGuardada', 'comprobando'] as const) assert.equal(varianteDe(registro({ fase })), fase)
+})
+
+test('enviando: el texto de espera cambia a los 8 s y Seguir después sale a los 20 s', () => {
+  const r = registro({ fase: 'enviando', facturaId: undefined, eNcf: undefined })
+  assert.deepEqual([vistaDeEnvio(r, 0).titulo, vistaDeEnvio(r, 0).lineas], ['Emitiendo E45…', ['Firmando y enviando a la DGII', 'Si se corta la señal, la factura queda guardada.']])
+  assert.equal(vistaDeEnvio(r, 9).lineas[0], 'La DGII está tardando. No toques Emitir')
+  assert.deepEqual([ids(r, 19), ids(r, 20)], [[], ['verFacturas']])
+  assert.equal(vistaDeEnvio(r, 20).acciones[0].etiqueta, 'Seguir después')
+})
+
+test('aceptada: el número, el cliente y el total, y Ver factura, Nueva factura y Ver Facturas; nunca una pregunta sin salida', () => {
+  const v = vistaDeEnvio(registro({ fase: 'terminada', estado: 'ACEPTADO' }), 0)
+  assert.equal(v.titulo, 'Factura aceptada')
+  assert.deepEqual(v.datos, ['E450000000014', 'Min. de Obras', 'RD$ 11,800.00'])
+  assert.deepEqual(v.acciones.map((a) => a.id), ['verFactura', 'nueva', 'verFacturas'])
+  assert.equal(v.acciones[0].primaria, true)
+})
+
+test('lo incierto dice "No la vuelvas a emitir" y nunca ofrece Nueva factura: guardada sin confirmar y sin saber', () => {
+  const incierta = vistaDeEnvio(registro({ fase: 'incierta', estado: 'ENVIO_INCIERTO' }), 0)
+  assert.deepEqual([incierta.titulo, ...incierta.lineas], ['Tu factura quedó guardada', 'Esperando a la DGII.', 'No la vuelvas a emitir.', 'No la entregues todavía.'])
+  assert.deepEqual(incierta.acciones.map((a) => a.id), ['verificar', 'verFactura', 'verFacturas'])
+  const sinSaber = vistaDeEnvio(registro({ fase: 'comprobando', facturaId: undefined, eNcf: undefined }), 0)
+  assert.equal(sinSaber.titulo, 'No pudimos confirmar si se emitió')
+  assert.ok(sinSaber.lineas.includes('No la vuelvas a emitir.'))
+  assert.deepEqual(sinSaber.acciones.map((a) => a.id), ['verFacturas'])
+  for (const r of [registro({ fase: 'incierta' }), registro({ fase: 'comprobando' }), registro({ fase: 'incierta', facturaId: undefined })]) assert.equal(ids(r).includes('nueva'), false)
+  assert.equal(vistaDeEnvio(registro({ fase: 'incierta', facturaId: undefined }), 0).acciones[0].id, 'verFacturas') // sin factura que verificar, Ver Facturas pasa a primera
+})
+
+test('rechazada trae los motivos tal cual; no encontrada y no guardada dicen lo suyo', () => {
+  const rechazada = vistaDeEnvio(registro({ fase: 'terminada', estado: 'RECHAZADO', motivos: ['El RNC del comprador no coincide con su nombre.'] }), 0)
+  assert.equal(rechazada.titulo, 'La DGII rechazó la factura')
+  assert.deepEqual(rechazada.motivos, ['El RNC del comprador no coincide con su nombre.'])
+  assert.equal(rechazada.lineas[0], 'Motivos de la DGII:')
+  assert.deepEqual(rechazada.acciones.map((a) => a.id), ['corregir', 'verFactura', 'nueva'])
+  assert.equal(vistaDeEnvio(registro({ fase: 'terminada', estado: 'RECHAZADO' }), 0).lineas[0], 'La DGII no dio el motivo.')
+  assert.equal(vistaDeEnvio(registro({ fase: 'terminada', estado: 'NO_ENCONTRADO' }), 0).titulo, 'La DGII no encontró este comprobante')
+  const noGuardada = vistaDeEnvio(registro({ fase: 'noGuardada', mensaje: 'Espera unos minutos y vuelve a intentarlo.', facturaId: undefined }), 0)
+  assert.equal(noGuardada.titulo, 'No se pudo emitir')
+  assert.ok(noGuardada.lineas.includes('«Espera unos minutos y vuelve a intentarlo.»'))
+  assert.deepEqual(noGuardada.acciones.map((a) => a.id), ['volverRevisar'])
+})
+
+test('ningún texto de ninguna variante dice "Error 502" ni deja pasar texto técnico', () => {
+  const todos: EnvioRecord[] = [
+    registro({ fase: 'enviando' }),
+    registro({ fase: 'terminada', estado: 'ACEPTADO' }),
+    registro({ fase: 'terminada', estado: 'RECHAZADO', motivos: ['x'] }),
+    registro({ fase: 'terminada', estado: 'NO_ENCONTRADO' }),
+    registro({ fase: 'enProceso' }),
+    registro({ fase: 'incierta' }),
+    registro({ fase: 'noGuardada', mensaje: 'No se pudo emitir la factura en la DGII.' }),
+    registro({ fase: 'comprobando' }),
+  ]
+  for (const r of todos) {
+    for (const s of [0, 10, 30]) {
+      const v = vistaDeEnvio(r, s)
+      const texto = [v.titulo, ...v.datos, ...v.lineas, ...v.acciones.map((a) => a.etiqueta)].join(' | ')
+      assert.doesNotMatch(texto, /Error 502|SQLSTATE|undefined|NaN/)
+    }
+  }
 })

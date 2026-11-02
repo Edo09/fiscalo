@@ -11,6 +11,8 @@ import { carritoDeJson, tieneContenido } from '~/lib/carrito'
 import type { Carrito, TipoItem } from '~/lib/carrito'
 import { clasificarEstado } from '~/lib/clasificar'
 import type { Outcome } from '~/lib/clasificar'
+import { rd } from '~/lib/dinero'
+import { TEXTO_NO_ENCONTRADO, TITULO_NO_ENCONTRADO } from '@/features/invoices/reenvio'
 
 /** De quién son los datos guardados: la empresa y el usuario (la sesión de otro en el mismo teléfono no ve ni retoma lo de este). */
 export interface UsuarioClave {
@@ -192,4 +194,120 @@ export function guardarEnvio(u: UsuarioClave, r: EnvioRecord): void {
 
 export function borrarEnvio(u: UsuarioClave): void {
   borrar(claveUsuario(u.tenantId, u.userId, 'envio'))
+}
+
+// --- Qué se le dice a la persona --------------------------------------------------------------------------------------------------------
+
+export type Variante = 'enviando' | 'aceptada' | 'enProceso' | 'incierta' | 'rechazada' | 'noEncontrada' | 'noGuardada' | 'comprobando'
+export type AccionId = 'verFactura' | 'nueva' | 'verFacturas' | 'verificar' | 'corregir' | 'volverRevisar'
+export type TonoResultado = 'ok' | 'info' | 'warning' | 'danger' | 'neutral'
+
+export interface Accion {
+  id: AccionId
+  etiqueta: string
+  primaria?: boolean
+}
+
+export interface VistaEnvio {
+  variante: Variante
+  tono: TonoResultado
+  titulo: string
+  /** El e-NCF, el cliente y el total, para la tarjeta. */
+  datos: string[]
+  /** Lo que se explica, una frase por línea. */
+  lineas: string[]
+  /** Los motivos de la DGII de un rechazo, tal cual. */
+  motivos: string[]
+  acciones: Accion[]
+}
+
+/** La variante de un registro: qué pantalla le toca. Una factura terminada se mira por su estado: aceptada, rechazada o no encontrada. */
+export function varianteDe(r: EnvioRecord): Variante {
+  switch (r.fase) {
+    case 'enviando':
+    case 'enProceso':
+    case 'incierta':
+    case 'noGuardada':
+    case 'comprobando':
+      return r.fase
+    case 'terminada': {
+      const kind = clasificarEstado(r.estado ?? '')
+      return kind === 'aceptada' || kind === 'rechazada' || kind === 'noEncontrada' ? kind : 'incierta'
+    }
+  }
+}
+
+/** Desde cuántos segundos enviando se ofrece «Seguir después», y el primer corte del texto de espera. */
+export const SEGUIR_DESPUES_S = 20
+const TARDANDO_S = 8
+
+/**
+ * Lo que dice y ofrece la pantalla de resultado para un registro. `segundos` es lo que lleva enviando. Las reglas del texto: nunca «Error 502» ni un texto técnico; lo incierto
+ * dice siempre «No la vuelvas a emitir» y no ofrece «Nueva factura»; nunca se afirma que un número se usó o no se usó; los motivos de la DGII salen tal cual.
+ */
+export function vistaDeEnvio(r: EnvioRecord, segundos: number): VistaEnvio {
+  const variante = varianteDe(r)
+  const datos = [r.eNcf, r.clienteNombre ?? 'Consumidor final', rd(r.total)].filter((d): d is string => d !== undefined)
+  const vista = (tono: TonoResultado, titulo: string, lineas: string[], acciones: Accion[], extra: { motivos?: string[]; sinDatos?: boolean } = {}): VistaEnvio => ({
+    variante,
+    tono,
+    titulo,
+    datos: extra.sinDatos === true ? [rd(r.total)] : datos,
+    lineas,
+    motivos: extra.motivos ?? [],
+    acciones,
+  })
+  const verFactura: Accion[] = r.facturaId === undefined ? [] : [{ id: 'verFactura', etiqueta: 'Ver factura' }]
+  const verificar: Accion[] = r.facturaId === undefined ? [] : [{ id: 'verificar', etiqueta: 'Verificar ahora' }]
+  switch (variante) {
+    case 'enviando':
+      return vista(
+        'info',
+        `Emitiendo E${r.tipo}…`,
+        [segundos < TARDANDO_S ? 'Firmando y enviando a la DGII' : 'La DGII está tardando. No toques Emitir', 'Si se corta la señal, la factura queda guardada.'],
+        segundos >= SEGUIR_DESPUES_S ? [{ id: 'verFacturas', etiqueta: 'Seguir después' }] : [],
+        { sinDatos: true },
+      )
+    case 'aceptada':
+      return vista('ok', 'Factura aceptada', [], [{ id: 'verFactura', etiqueta: 'Ver factura', primaria: true }, { id: 'nueva', etiqueta: 'Nueva factura' }, { id: 'verFacturas', etiqueta: 'Ver Facturas' }])
+    case 'enProceso':
+      return vista('info', 'La DGII la está revisando', ['Puedes seguir trabajando. Verifica o abre la factura para ver cuándo la acepta.'], [
+        ...verificar.map((a) => ({ ...a, primaria: true })),
+        ...verFactura,
+        { id: 'nueva', etiqueta: 'Nueva factura' },
+      ])
+    case 'incierta':
+      return vista('warning', 'Tu factura quedó guardada', ['Esperando a la DGII.', 'No la vuelvas a emitir.', 'No la entregues todavía.'], [
+        ...verificar.map((a) => ({ ...a, primaria: true })),
+        ...verFactura,
+        { id: 'verFacturas', etiqueta: 'Ver Facturas', primaria: verificar.length === 0 },
+      ])
+    case 'rechazada':
+      return vista(
+        'danger',
+        'La DGII rechazó la factura',
+        [r.motivos !== undefined && r.motivos.length > 0 ? 'Motivos de la DGII:' : 'La DGII no dio el motivo.', 'Corrige lo que indica y emítela de nuevo, o abre la factura para ver qué más se puede hacer.'].filter(
+          (l) => l !== '',
+        ),
+        [{ id: 'corregir', etiqueta: 'Corregir y emitir de nuevo', primaria: true }, ...verFactura, { id: 'nueva', etiqueta: 'Nueva factura' }],
+        { motivos: r.motivos ?? [] },
+      )
+    case 'noEncontrada':
+      return vista('neutral', TITULO_NO_ENCONTRADO, [TEXTO_NO_ENCONTRADO], [...verFactura.map((a) => ({ ...a, primaria: true })), ...verificar, { id: 'nueva', etiqueta: 'Nueva factura' }])
+    case 'noGuardada':
+      return vista(
+        'warning',
+        'No se pudo emitir',
+        ['El servidor no guardó la factura.', ...(r.mensaje !== undefined ? [`«${r.mensaje}»`] : []), 'Revisa los datos y vuelve a intentarlo.'],
+        [{ id: 'volverRevisar', etiqueta: 'Volver y editar', primaria: true }],
+        { sinDatos: true },
+      )
+    case 'comprobando':
+      return vista(
+        'warning',
+        'No pudimos confirmar si se emitió',
+        ['Se cortó la señal mientras emitías. Puede que la factura sí se haya guardado.', 'No la vuelvas a emitir.', 'Búscala en Facturas antes de intentarlo otra vez.'],
+        [{ id: 'verFacturas', etiqueta: 'Ver Facturas', primaria: true }],
+      )
+  }
 }
