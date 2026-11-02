@@ -1,0 +1,18 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — ClienteForm
+   Los campos y los avisos en una columna a 16px (los avisos de la consulta a la DGII se pegan al campo del RNC con el mismo hueco), y los botones al final en otra columna a 8px.
+   ============================================================ */
+
+.cliente-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* El botón principal con «Guardar como cliente nuevo» o «Cancelar» debajo: una columna a 8px, y un botón con su razón (sin conexión) deja la razón debajo. */
+.cliente-form__acciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
