@@ -66,7 +66,7 @@ export interface FilaMas {
  * del relleno en `screens/registro`: ese archivo importa componentes, y esta lógica se prueba sin DOM. Que la fila no salga no cierra la ruta: un
  * hash escrito a mano pasa la guardia y dibuja el relleno.
  */
-export const PANTALLAS_LISTAS: { empresa: boolean; numeracion: boolean; usuarios: boolean } = { empresa: false, numeracion: false, usuarios: false }
+export const PANTALLAS_LISTAS: { empresa: boolean; numeracion: boolean; usuarios: boolean } = { empresa: true, numeracion: true, usuarios: false }
 
 /**
  * Las filas de Más, en este orden (anexo 5.2): Mi empresa, Numeración e-CF, Usuarios, Ayuda y soporte, Tema y Cerrar sesión. Mi empresa y Numeración

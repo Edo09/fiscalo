@@ -114,12 +114,12 @@ test('las personas del mock arman la barra del recorrido manual', () => {
 
 // --- filasMas -----------------------------------------------------------------------------------------------------------------------
 
-test('filasMas tal como se entrega: solo Ayuda (si hay soporte), Tema y Cerrar sesión', () => {
-  assert.deepEqual(PANTALLAS_LISTAS, { empresa: false, numeracion: false, usuarios: false })
+test('filasMas tal como se entrega: Mi empresa y Numeración (con el módulo de configuración), Ayuda si hay soporte, Tema y Cerrar sesión; Usuarios todavía no', () => {
+  assert.deepEqual(PANTALLAS_LISTAS, { empresa: true, numeracion: true, usuarios: false })
   const e = ent(TODOS)
-  assert.deepEqual(ids(filasMas(e, { admin: true, soporte: true })), ['ayuda', 'tema', 'salir'])
-  assert.deepEqual(ids(filasMas(e, { admin: true, soporte: false })), ['tema', 'salir'])
-  assert.deepEqual(ids(filasMas(e, { admin: false, soporte: false })), ['tema', 'salir'])
+  assert.deepEqual(ids(filasMas(e, { admin: true, soporte: true })), ['empresa', 'numeracion', 'ayuda', 'tema', 'salir'])
+  assert.deepEqual(ids(filasMas(e, { admin: true, soporte: false })), ['empresa', 'numeracion', 'tema', 'salir'])
+  assert.deepEqual(ids(filasMas(e, { admin: false, soporte: false })), ['empresa', 'numeracion', 'tema', 'salir'])
 })
 
 test('filasMas con todas las pantallas listas: Mi empresa, Numeración, Usuarios, Ayuda, Tema y Cerrar sesión, en ese orden', () => {
