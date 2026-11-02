@@ -19,7 +19,6 @@ import { nombreTipo } from '~/lib/tiposEcf'
 import { useEnLinea } from '~/net/enLinea'
 import { buscarClientes } from '~/net/catalogo'
 import { navegar } from '~/router'
-import type { Ruta } from '~/router'
 import { Banner } from '~/ui/Banner'
 import { BottomSheet } from '~/ui/BottomSheet'
 import { Button } from '~/ui/Button'
@@ -53,7 +52,7 @@ function clienteDeFacturarA(v: unknown): ClienteSel | null {
 
 const ALTO_FILA = 64
 
-export default function PasoCliente(_p: { ruta: Ruta }): JSX.Element {
+export default function PasoCliente(): JSX.Element {
   const { entitlements, u } = useCuenta()
   const carrito = useWizardStore((s) => s.carrito)
   const recuperado = useWizardStore((s) => s.recuperado)

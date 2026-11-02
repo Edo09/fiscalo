@@ -1,0 +1,182 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — Paso 2 del asistente: Productos y líneas
+   Las fichas del catálogo en dos columnas y las líneas de la factura en tarjetas, con la cantidad más y menos de 48x48 y 8px entre vecinos.
+   ============================================================ */
+
+/* Las fichas: dos columnas iguales; cada ficha mide 72px o más. */
+.pp-fichas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-fichas > li {
+  display: flex;
+  min-width: 0;
+}
+
+.pp-ficha {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-1);
+  width: 100%;
+  min-height: 72px;
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pp-ficha:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pp-ficha:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.pp-ficha__nombre {
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pp-ficha__precio {
+  color: var(--text-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cuántas hay ya en la factura: --accent-text sobre --accent-soft, con texto, nunca solo el color. */
+.pp-ficha__cant {
+  align-self: flex-start;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Las líneas de la factura. */
+.pp-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Una línea: arriba el nombre (que la abre) y el importe, abajo el detalle y la cantidad. */
+.pp-linea {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.pp-linea__editar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pp-linea__nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pp-linea__detalle {
+  color: var(--text-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-linea__importe {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* El menos, la cantidad y el más: botones de 48x48 con 8px entre ellos; ocupa toda la fila de abajo, a la derecha. */
+.pp-paso {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.pp-paso__boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pp-paso__boton:active {
+  background: var(--surface-active);
+}
+
+.pp-paso__cantidad {
+  min-width: 48px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* El resumen de la barra de acción: cuántas líneas y el total. */
+.pp-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  color: var(--text-2);
+}
+
+.pp-total__monto {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}

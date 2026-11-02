@@ -1,0 +1,126 @@
+/* ============================================================
+   FISCALPOINT EXPRESS — La hoja de una línea
+   Los campos en una columna a 16px; cantidad y precio lado a lado. Los objetivos táctiles miden 48px o más (la fila de la unidad, 56px) con 8px entre vecinos.
+   ============================================================ */
+
+.ls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* Cantidad y precio, en dos columnas iguales: cada campo trae su propia etiqueta y su mensaje. */
+.ls__par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.ls__grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ls__etiqueta {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* La fila de la unidad: parece un campo y abre el selector a pantalla completa. */
+.ls__unidad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap-lg);
+  margin: 0;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ls__unidad:active {
+  background: var(--surface-active);
+}
+
+.ls__error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Base e ITBIS de la línea, al vuelo. */
+.ls__montos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* El selector de unidades: una lista de filas de 56px. */
+.ls__unidades {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ls__opcion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 var(--sp-4);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ls__opcion[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.ls__opcion:active {
+  background: var(--surface-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ls__opcion:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.ls__vacio {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-4);
+  color: var(--text-2);
+  text-align: center;
+}
