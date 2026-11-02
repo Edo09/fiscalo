@@ -22,7 +22,20 @@ export type Cargador = () => Promise<{ default: Pantalla }>
  * `precargarRuta` la baja antes de que se toque: es la misma función para las dos cosas, y así la precarga nunca baja un trozo distinto del que la pantalla usa. Vacío por ahora:
  * la primera es el Detalle, en la tarea 21 de este plan.
  */
-export const CARGADORES: Partial<Record<Ruta['id'], Cargador>> = {}
+export const CARGADORES: Partial<Record<Ruta['id'], Cargador>> = {
+  factura: () => import('./Detalle'),
+  facturar: () => import('./facturar/PasoCliente'),
+  'facturar-productos': () => import('./facturar/PasoProductos'),
+  'facturar-revisar': () => import('./facturar/PasoRevisar'),
+  'facturar-resultado': () => import('./facturar/Resultado'),
+  clientes: () => import('./clientes/Clientes'),
+  'cliente-nuevo': () => import('./clientes/ClienteNuevo'),
+  cliente: () => import('./clientes/ClienteDetalle'),
+  productos: () => import('./productos/Productos'),
+  producto: () => import('./productos/ProductoForm'),
+  'mas-empresa': () => import('./mas/Empresa'),
+  'mas-numeracion': () => import('./mas/Numeracion'),
+}
 
 /**
  * Baja el trozo de la pantalla de `id` sin dibujarla, para que al abrirla ya esté. Se llama en el `pointerdown` del control que lleva a ella (el
