@@ -194,10 +194,11 @@ export default function PasoRevisar(): JSX.Element {
             <span>Subtotal</span>
             <span>{rd(totales.subtotal)}</span>
           </div>
+          {/* El Subtotal es la suma de las líneas de arriba, que ya traen su descuento: la fila no resta, avisa cuánto trae incluido (si restara, subtotal - descuento + ITBIS no daría el TOTAL). */}
           {totales.descuentos > 0 && (
-            <div className="pr-total">
-              <span>Descuento</span>
-              <span>-{rd(totales.descuentos)}</span>
+            <div className="pr-total pr-total--nota">
+              <span>Incluye descuento</span>
+              <span>{rd(totales.descuentos)}</span>
             </div>
           )}
           {totales.itbisPorTasa.map((t) => (
