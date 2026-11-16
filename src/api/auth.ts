@@ -7,8 +7,8 @@
 // texto pasa por la misma red de seguridad que el resto (errores.ts): uno claro
 // se muestra tal cual y uno técnico o en inglés se cambia por uno en español.
 import { API_BASE_URL } from './config'
-import { errorDeRespuesta, networkError, textoError, type ContextoError } from './errores'
-import { getToken, type SessionUser } from '@/stores/auth'
+import { errorDeRespuesta, networkError, sesionExpirada, textoError, type ContextoError } from './errores'
+import { clearSession, getToken, type SessionUser } from '@/stores/auth'
 
 export interface LoginResult {
   token: string
@@ -111,13 +111,88 @@ export async function me(): Promise<SessionUser> {
   return body.data.user
 }
 
-/** Revoca el token en el backend (best-effort). El borrado local lo hace clearSession(). */
+/**
+ * Revoca el token en el backend (best-effort). El borrado local lo hace clearSession().
+ * `todas: true`: para un usuario de soporte (acceso global) el backend cierra TODAS
+ * sus sesiones, porque cada cambio de empresa abrió una nueva y dejó la anterior
+ * viva (otra pestaña, otra empresa cliente). Para cualquier otro usuario no cambia
+ * nada: se cierra solo esta sesión, como siempre.
+ */
 export async function logout(): Promise<void> {
   try {
-    await authPost('/api/auth/signout', {}, true)
+    await authPost('/api/auth/signout', { todas: true }, true)
   } catch {
     /* aunque falle la revocación remota, cerramos sesión local igual */
   }
+}
+
+/** Una empresa a la que un usuario de soporte puede pasar su sesión. */
+export interface EmpresaAcceso {
+  id: number
+  nombre: string
+  rnc: string
+  /** ecf (producción), certecf o testecf. */
+  ambiente: string
+  /** Es la empresa del usuario (la suya, no la de un cliente). */
+  propia: boolean
+}
+
+export interface EmpresasAcceso {
+  /** Empresa de la sesión ahora. */
+  actual: number | null
+  empresas: EmpresaAcceso[]
+}
+
+/**
+ * Usuario de soporte (acceso global): las empresas a las que puede pasar su
+ * sesión (GET /api/auth/empresas). Para cualquier otro usuario el backend
+ * responde 403.
+ */
+export async function empresasAccesoGlobal(): Promise<EmpresasAcceso> {
+  const token = getToken()
+  const ctx: ContextoError = { metodo: 'GET', path: '/api/auth/empresas' }
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/auth/empresas`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(30_000),
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      cache: 'no-store',
+    })
+  } catch (e) {
+    throw networkError(e, ctx)
+  }
+  // Sesión que ya no vale (le quitaron el acceso, venció, o la empresa se desactivó):
+  // al login, como cualquier otra petición (http.ts). Si no, el selector se quedaría
+  // en "Tu sesión expiró" con un Reintentar que vuelve a dar 401.
+  if (res.status === 401) {
+    clearSession()
+    throw sesionExpirada(null, ctx)
+  }
+  const body = await leerSobre<EmpresasAcceso>(res, ctx)
+  if (!body || body.success !== true || !body.data) {
+    throw errorDeRespuesta(textoError(body), res.status, ctx)
+  }
+  return body.data
+}
+
+/**
+ * Usuario de soporte: abre una sesión NUEVA en otra empresa (POST
+ * /api/auth/empresa), con la misma respuesta que el login: un token nuevo y el
+ * usuario con los permisos de su rol en esa empresa. La sesión de la que sale
+ * sigue valiendo en su empresa: otra pestaña abierta no pasa sola a la nueva.
+ * Quien llama guarda la sesión nueva y recarga la app, porque todo lo que hay
+ * en pantalla y en la caché es de la empresa anterior.
+ */
+export async function cambiarEmpresa(tenantId: number): Promise<LoginResult> {
+  const body = await authPost<LoginResult>('/api/auth/empresa', { tenant_id: tenantId }, true)
+  if (!body.data?.token || !body.data.user) {
+    throw errorDeRespuesta(null, 200, { metodo: 'POST', path: '/api/auth/empresa', ilegible: true })
+  }
+  return body.data
 }
 
 /** Respuesta de POST /api/auth/pos-handoff (api-gratex docs/api/pos.md). */

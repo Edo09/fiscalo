@@ -46,6 +46,16 @@ export function descartarSinGuardar(): void {
   if (registro) registro.liberado = true
 }
 
+/**
+ * Deshace descartarSinGuardar cuando la salida que el usuario aceptó no ocurrió
+ * (cambiar de empresa falló y la vista sigue en pantalla con lo escrito): el aviso
+ * vuelve a valer. Llamarlo solo si había algo sin guardar ANTES de preguntar; si
+ * no, se rearmaría una vista que ya se había liberado sola al guardar.
+ */
+export function rearmarSinGuardar(): void {
+  if (registro) registro.liberado = false
+}
+
 /** Cierre o recarga de la pestaña: el navegador pone su propio texto. */
 const alDescargar = (e: BeforeUnloadEvent) => {
   if (!haySinGuardar() && !guardandoAhora()) return

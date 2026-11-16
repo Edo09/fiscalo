@@ -3,10 +3,13 @@ import { toast } from 'sonner'
 import { Icon, Btn, Avatar, Dropdown, MenuItem, type IconName } from '@/components/ui'
 import { getEmisor, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import { useSession, clearSession } from '@/stores/auth'
-import { logout, posHandoff } from '@/api/auth'
+import { useSession, clearSession, setSession } from '@/stores/auth'
+import { cambiarEmpresa, logout, posHandoff, type EmpresaAcceso } from '@/api/auth'
 import { hasModule } from '@/config/permissions'
 import { usePosActivo } from '@/features/pos/usePosActivo'
+import { CambiarEmpresaModal } from '@/features/auth/CambiarEmpresaModal'
+import { enEmpresaDeCliente, iniciales, tieneAccesoGlobal } from '@/features/auth/accesoGlobal'
+import { haySinGuardar, rearmarSinGuardar } from '@/hooks/useAvisoSalida'
 import { puedeVerVista, type Nav, type NavPayload, type ViewId } from '@/config/navigation'
 
 // Accesos del botón "Nueva". Cada uno se muestra solo si el rol puede abrir su
@@ -39,11 +42,53 @@ export function Navbar({
   const nuevos = NUEVOS.filter((n) => puedeVerVista(user, n.view))
 
   // Empresa real del tenant (GET /api/emisor) — misma caché que Configuración.
+  // Un usuario de soporte trae además la de su sesión: sirve si el emisor no está configurado.
   const emisorQ = useApiQuery(['emisor'], getEmisor)
-  const empresaNombre = emisorQ.data?.nombre_comercial || emisorQ.data?.razon_social || ''
-  const empresaIniciales = empresaNombre
-    ? empresaNombre.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
-    : '…'
+  const empresaNombre = emisorQ.data?.nombre_comercial || emisorQ.data?.razon_social || user?.empresa?.nombre || ''
+  const empresaIniciales = empresaNombre ? iniciales(empresaNombre) : '…'
+  const empresaRnc = emisorQ.data?.rnc || user?.empresa?.rnc || ''
+
+  // Soporte (acceso global, api-gratex docs/modules/acceso-global.md): puede pasar
+  // su sesión a otra empresa. En la de un cliente la caja se pinta de aviso.
+  const accesoGlobal = tieneAccesoGlobal(user)
+  const deCliente = enEmpresaDeCliente(user)
+  const [selector, setSelector] = useState(false)
+  const [entrandoA, setEntrandoA] = useState<string | null>(null)
+
+  // habiaSinGuardar: la vista tenía algo sin guardar y el usuario aceptó perderlo. Si el
+  // cambio falla, la vista sigue en pantalla y su aviso tiene que volver a valer.
+  const entrar = async (e: EmpresaAcceso, habiaSinGuardar: boolean) => {
+    setEntrandoA(e.nombre)
+    try {
+      // Sesión NUEVA en esa empresa (token nuevo): esta pestaña se queda con ella; otra
+      // abierta sigue con su token en la empresa que muestra, hasta que se recargue.
+      const s = await cambiarEmpresa(e.id)
+      setSession(s.token, s.user)
+      // Lo que hay en pantalla y en la caché es de la empresa anterior: se recarga
+      // la app entera, y abre en el panel (la vista guardada era de la otra empresa).
+      try {
+        localStorage.setItem('fiscalo.view', 'dashboard')
+      } catch {
+        /* sin almacenamiento: abre en la vista que tenía */
+      }
+      window.location.reload()
+    } catch (err) {
+      setEntrandoA(null)
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession()
+        return
+      }
+      if (habiaSinGuardar) rearmarSinGuardar()
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar de empresa. Inténtalo de nuevo.')
+    }
+  }
+  // El selector se cierra antes de preguntar por lo que haya sin guardar: si no,
+  // quedarían dos diálogos uno encima del otro.
+  const elegirEmpresa = (e: EmpresaAcceso) => {
+    setSelector(false)
+    const habia = haySinGuardar()
+    confirmarSalida(() => void entrar(e, habia))
+  }
 
   // Botón POS (api-gratex docs/specs/pos.md A1): solo si la empresa tiene el
   // POS activo y el rol tiene el módulo 'pos' (mismo criterio que el menú).
@@ -82,20 +127,38 @@ export function Navbar({
 
   return (
     <>
-    {loggingOut && (
+    {(loggingOut || entrandoA !== null) && (
       <div className="overlay" style={{ zIndex: 9999 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
-          <span style={{ color: '#fff', fontSize: 14, opacity: 0.85 }}>Cerrando sesión…</span>
+          <span style={{ color: '#fff', fontSize: 14, opacity: 0.85 }}>
+            {entrandoA !== null ? `Entrando a ${entrandoA}…` : 'Cerrando sesión…'}
+          </span>
         </div>
       </div>
     )}
+    {selector && <CambiarEmpresaModal onClose={() => setSelector(false)} onElegir={elegirEmpresa} />}
     <header className="navbar">
       <button className="icon-btn mobile-only" onClick={onOpenMobileNav}><Icon name="menu" /></button>
-      <div className="co-switch desktop-only" style={{ cursor: 'default' }} title={emisorQ.data?.rnc ? `RNC ${emisorQ.data.rnc}` : undefined}>
-        <span className="co-logo">{empresaIniciales}</span>
-        <span className="nm">{emisorQ.loading ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
-      </div>
+      {accesoGlobal ? (
+        <button
+          type="button"
+          className={'co-switch desktop-only' + (deCliente ? ' soporte' : '')}
+          onClick={() => setSelector(true)}
+          title={(deCliente ? 'Estás como soporte en la empresa de un cliente. ' : '')
+            + (empresaRnc ? `RNC ${empresaRnc}. ` : '') + 'Clic para cambiar de empresa.'}
+        >
+          <span className="co-logo">{empresaIniciales}</span>
+          <span className="nm">{emisorQ.loading && !user?.empresa ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
+          {deCliente && <span className="co-tag">Soporte</span>}
+          <Icon name="chevron-down" size={14} />
+        </button>
+      ) : (
+        <div className="co-switch desktop-only" style={{ cursor: 'default' }} title={empresaRnc ? `RNC ${empresaRnc}` : undefined}>
+          <span className="co-logo">{empresaIniciales}</span>
+          <span className="nm">{emisorQ.loading ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
+        </div>
+      )}
       <div className="navbar-search desktop-only" onClick={onOpenSearch}>
         <Icon name="search" /><span style={{ flex: 1 }}>Buscar facturas, clientes, e-CF…</span>
         <span className="kbd">⌘K</span>
@@ -124,10 +187,26 @@ export function Navbar({
           <Icon name={theme === 'light' ? 'moon' : 'sun'} />
         </button>
         <span className="navbar-divider"></span>
+        {/* En el teléfono la caja de la empresa no se ve: sin esto, nada diría que la
+            sesión está en la empresa de un cliente. */}
+        {deCliente && (
+          <span className="co-tag mobile-only" title={`Soporte en ${user?.empresa?.nombre ?? 'otra empresa'}`}>
+            Soporte
+          </span>
+        )}
         <Dropdown align="right" width={220} trigger={
           <div className="user-chip"><Avatar name={userName} size={30} /><div className="desktop-only col"><span className="nm">{userName}</span><span className="rl">{userRole}</span></div></div>
         }>
           <div className="menu-label">{userEmail}</div>
+          {accesoGlobal && (
+            <>
+              {/* En el teléfono la caja de la empresa no se ve: aquí dice dónde está. */}
+              {user?.empresa && (
+                <div className="menu-label">{deCliente ? 'Soporte en ' : 'En '}{user.empresa.nombre}</div>
+              )}
+              <MenuItem icon="arrow-left-right" onClick={() => setSelector(true)}>Cambiar de empresa</MenuItem>
+            </>
+          )}
           <MenuItem icon="settings" onClick={() => nav('configuracion')}>Configuración</MenuItem>
           <div className="menu-sep"></div>
           <MenuItem icon="log-out" danger onClick={() => confirmarSalida(() => void handleLogout())}>Cerrar sesión</MenuItem>

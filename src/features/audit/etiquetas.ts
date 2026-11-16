@@ -40,6 +40,8 @@ const ACCIONES: Record<string, string> = {
   LOGIN_SUCCESS: 'Inicio de sesión',
   LOGIN_FAILED: 'Inicio de sesión fallido',
   LOGOUT: 'Cierre de sesión',
+  // Un usuario de soporte (acceso global) pasó su sesión a esta empresa.
+  CAMBIO_EMPRESA: 'Entrada de soporte',
   CREATE: 'Creación',
   UPDATE: 'Modificación',
   DELETE: 'Eliminación',
@@ -72,6 +74,8 @@ export function etiquetaAccion(accion: string): string {
 export function tonoAccion(r: Pick<AuditLogRow, 'action' | 'success'>): BadgeTone {
   if (!r.success) return 'danger'
   if (r.action === 'DELETE' || r.action === 'AJUSTE_ANULAR' || r.action === 'LOGO_DELETE') return 'warning'
+  // Que se note: alguien de fuera de la empresa entró con su propio usuario.
+  if (r.action === 'CAMBIO_EMPRESA') return 'warning'
   if (r.action === 'CREATE' || r.action === 'EMIT' || r.action === 'INTEGRACION_EMIT') return 'success'
   if (r.action.startsWith('LOGIN') || r.action === 'LOGOUT' || r.action.startsWith('DGII_AUTH')) return 'info'
   return 'neutral'

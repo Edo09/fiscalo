@@ -10,6 +10,17 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
+/** Empresa de la sesión de un usuario de soporte (api-gratex docs/modules/acceso-global.md). */
+export interface EmpresaSesion {
+  id: number
+  nombre: string
+  rnc: string
+  /** ecf (producción), certecf o testecf. */
+  ambiente: string
+  /** Es la empresa del propio usuario; false = está en la de un cliente. */
+  propia?: boolean
+}
+
 /** Usuario autenticado, tal como lo devuelve POST /api/auth/login. */
 export interface SessionUser {
   id: number
@@ -20,6 +31,11 @@ export interface SessionUser {
   /** Módulos del rol (ej. ["facturas","gastos"] o ["*"] para admin). Lo provee
       el backend en login y /api/auth/me; ausente en sesiones viejas (fail-open). */
   permissions?: string[]
+  /** Solo usuarios de soporte (master.users.acceso_global): pueden pasar su
+      sesión a otra empresa. Ausente para todos los demás. */
+  acceso_global?: boolean
+  /** Solo con acceso_global: la empresa en la que está la sesión ahora. */
+  empresa?: EmpresaSesion
 }
 
 interface AuthState {
