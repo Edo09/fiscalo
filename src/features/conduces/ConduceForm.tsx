@@ -73,7 +73,7 @@ export interface InicialConduce {
   clienteCompleto: boolean
   /** El cliente del documento ya no existe: el formulario abre sin cliente y lo dice. */
   clienteBorrado: boolean
-  /** Cargos de la cotización que no pasan al conduce (solo al crear con cotización); null = no tenía, o no hay cotización. */
+  /** Cargos y descuento de la cotización que no pasan al conduce (solo al crear con cotización); null = no tenía, o no hay cotización. */
   avisoCargos: string | null
 }
 

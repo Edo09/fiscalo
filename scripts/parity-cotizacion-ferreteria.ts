@@ -13,9 +13,15 @@
 import { readFileSync } from 'node:fs'
 import { totalesFerreteria } from '../src/features/cotizaciones/formatos/ferreteria/totales.ts'
 import type { TotalesFerreteria } from '../src/features/cotizaciones/formatos/ferreteria/totales.ts'
+import { r2 } from '../src/features/invoices/montosLinea.ts'
 
 interface LineaFixture { quantity: number; description: string; amount: number; indicador_facturacion: number }
-interface AjustesFixture { cargos_bancarios: number; manejo_bancario: number; mano_obra: number; abono: number; retencion_isr: boolean }
+// `descuento` es opcional: el fixture del backend lo trae solo en los casos con descuento (los 10 de las
+// hojas de Excel no lo tienen y deben seguir dando exactamente lo mismo).
+interface AjustesFixture {
+  cargos_bancarios: number; manejo_bancario: number; mano_obra: number; abono: number; retencion_isr: boolean
+  descuento?: number
+}
 interface CasoFixture { id: string; lineas: LineaFixture[]; ajustes: AjustesFixture; esperado: Record<string, unknown> }
 
 const fixture = JSON.parse(
@@ -26,6 +32,8 @@ const fixture = JSON.parse(
 const CAMPOS = new Map<string, keyof TotalesFerreteria>([
   ['lineas', 'lineas'],
   ['subtotal', 'subtotal'],
+  ['descuento', 'descuento'],
+  ['subtotal_neto', 'subtotalNeto'],
   ['itbis', 'itbis'],
   ['cargos_bancarios', 'cargosBancarios'],
   ['manejo_bancario', 'manejoBancario'],
@@ -56,14 +64,18 @@ const calcular = (lineas: LineaFixture[], a: AjustesFixture): TotalesFerreteria 
       manoObra: a.mano_obra,
       abono: a.abono,
       retencion: a.retencion_isr,
+      descuento: a.descuento ?? 0,
     },
   )
 
-// Los mismos 10 casos que el backend: un fixture vacío o a medias no pasa en silencio.
+// Los mismos 16 casos que el backend (las 3 hojas, los bordes de redondeo y los 6 del descuento): un
+// fixture vacío o a medias no pasa en silencio.
 const ids = fixture.casos.map((c) => c.id).join(',')
-chk(`el fixture trae los 10 casos (${ids})`, ids === [
+chk(`el fixture trae los 16 casos (${ids})`, ids === [
   'pintura', 'pintura_retencion_abono', 'pintura_mano_obra', 'b150000049', 'ceramicas',
   'redondeo_8475', 'flotante', 'mixto', 'exento', 'largo_60',
+  'descuento_captura', 'descuento_mixto', 'descuento_centavos', 'descuento_retencion_abono',
+  'descuento_total', 'descuento_excesivo',
 ].join(','))
 
 for (const caso of fixture.casos) {
@@ -73,6 +85,15 @@ for (const caso of fixture.casos) {
       // Mismo criterio que FerreteriaFormato::errorAbono: null = el abono no pasa de lo adeudado.
       const aceptado = t.abono <= t.adeudado
       chk(`${caso.id}: abono ${t.abono} ${esperado === null ? 'aceptado' : 'rechazado'} (adeudado ${t.adeudado})`,
+        aceptado === (esperado === null))
+      continue
+    }
+    if (clave === 'error_descuento') {
+      // Mismo criterio que FerreteriaFormato::errorDescuento: null = el descuento PEDIDO no pasa del Sub-total
+      // (totalesFerreteria lo acota, así que se mira lo escrito en el caso, no t.descuento).
+      const pedido = r2(caso.ajustes.descuento ?? 0)
+      const aceptado = pedido <= t.subtotal
+      chk(`${caso.id}: descuento ${pedido} ${esperado === null ? 'aceptado' : 'rechazado'} (sub-total ${t.subtotal})`,
         aceptado === (esperado === null))
       continue
     }

@@ -104,6 +104,23 @@ export function avisoCargosConduce(c: CotizacionRow): string | null {
   return `La cotización ${c.code || `#${c.id}`} tenía cargos adicionales (${lista}): no pasan al conduce ni a la factura que salga de él.`
 }
 
+/**
+ * Aviso del conduce nuevo cuando su cotización tenía descuento (la fila
+ * "Descuento"): un conduce no lleva montos ni descuentos, y la factura que se
+ * hace desde él parte de los precios de sus líneas, sin el descuento. null si
+ * no tenía.
+ */
+export function avisoDescuentoConduce(c: CotizacionRow): string | null {
+  const descuento = redondear(aNumero(c.ajustes?.descuento), 2)
+  if (!(descuento > 0)) return null
+  return `La cotización ${c.code || `#${c.id}`} tenía un descuento de RD$ ${fmt(descuento)}: no pasa al conduce ni a la factura que salga de él.`
+}
+
+/** Lo que la cotización traía y no pasa al conduce (cargos y descuento), en un solo aviso; null si no traía nada. */
+export function avisoAjustesConduce(c: CotizacionRow): string | null {
+  return [avisoCargosConduce(c), avisoDescuentoConduce(c)].filter((a): a is string => a !== null).join(' ') || null
+}
+
 // --- Validación ----------------------------------------------------------------
 
 /** Todo lo que se valida antes de guardar o pedir la vista previa. */

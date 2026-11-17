@@ -37,7 +37,7 @@ const linea = (id: number, cambio: Partial<LineaFerreteriaForm> = {}): LineaFerr
   id, prodId: '', descripcion: `ARTICULO ${id}`, cantidad: 1, precio: 100, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',
   ...cambio,
 })
-const SIN_AJUSTES = { cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false }
+const SIN_AJUSTES = { cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false, descuento: 0 }
 const form = (cambio: Partial<FormFerreteria> = {}): FormFerreteria => ({
   cliente, clienteEscrito: { buscador: '', libre: '' }, fecha: '2026-09-02', lineas: [linea(1)], ajustes: SIN_AJUSTES,
   ...cambio,
@@ -57,7 +57,7 @@ const cuerpo = cuerpoFerreteria({
     linea(1, { prodId: '55', descripcion: '  FUNDAS CEMENTO GRIS ', cantidad: 2, precio: 935 }),
     linea(2, { descripcion: 'CORTE DE TUBO', cantidad: 1.5, precio: 84.74583, unidadMedida: 47, indFact: 4, tipoItem: 'Servicio' }),
   ],
-  ajustes: { cargosBancarios: 100.004, manejoBancario: 0, manoObra: 1500, abono: 0, retencion: true },
+  ajustes: { cargosBancarios: 100.004, manejoBancario: 0, manoObra: 1500, abono: 0, retencion: true, descuento: 0 },
   date: '2026-09-02 10:15:00',
 })
 chk('cuerpo: formato, cliente, fecha, líneas y ajustes como los espera el API', JSON.stringify(cuerpo) === JSON.stringify({
@@ -73,6 +73,14 @@ chk('cuerpo: formato, cliente, fecha, líneas y ajustes como los espera el API',
 const sinFecha = cuerpoFerreteria({ clienteId: 7, lineas: [linea(1)], ajustes: SIN_AJUSTES })
 chk('cuerpo sin fecha: no lleva `date` (el PUT conserva la guardada)', !('date' in sinFecha))
 chk('cuerpo: retencion_isr es booleano también sin retención', sinFecha.ajustes.retencion_isr === false)
+// El descuento solo viaja si hay uno: un API que no lo conoce rechaza el concepto
+// desconocido, y las cotizaciones sin descuento tienen que seguir guardándose igual.
+chk('cuerpo sin descuento: no lleva la clave `descuento` (ni con 0 ni con un residuo menor que un centavo)',
+  !('descuento' in sinFecha.ajustes)
+  && !('descuento' in cuerpoFerreteria({ clienteId: 7, lineas: [linea(1)], ajustes: { ...SIN_AJUSTES, descuento: 0.004 } }).ajustes))
+chk('cuerpo con descuento: `descuento` en RD$ a centavos, junto a los demás ajustes',
+  JSON.stringify(cuerpoFerreteria({ clienteId: 7, lineas: [linea(1)], ajustes: { ...SIN_AJUSTES, descuento: 5940.004, manoObra: 20 } }).ajustes)
+  === JSON.stringify({ cargos_bancarios: 0, manejo_bancario: 0, mano_obra: 20, abono: 0, retencion_isr: false, descuento: 5940 }))
 
 // --- Cliente -----------------------------------------------------------------
 chk('sin cliente', errores(form({ cliente: null }))?.cliente === 'Elige un cliente de la lista o créalo con el botón +.')
@@ -124,6 +132,26 @@ chk('abono igual a lo adeudado con retención (pintura: 47,301.80)',
 // Borde de coma flotante (spec 6.2): 13.70 + 2.47 = 16.17, retención 0.69, abono 15.48 justo.
 chk('abono justo de 15.48 sobre 13.70 con retención',
   errores(form({ lineas: [linea(1, { precio: 13.7 })], ajustes: { ...SIN_AJUSTES, retencion: true, abono: 15.48 } })) === null)
+
+// --- Descuento ---------------------------------------------------------------
+// Sub-total de las líneas del formulario: 200 (2 × 100). Hasta ahí vale; más, no.
+const dosLineas = [linea(1), linea(2)]
+const conDescuento = (descuento: number, extra: Partial<FormFerreteria['ajustes']> = {}) =>
+  errores(form({ lineas: dosLineas, ajustes: { ...SIN_AJUSTES, descuento, ...extra } }))
+chk('descuento menor que el sub-total pasa', conDescuento(50) === null)
+chk('descuento igual al sub-total pasa (un 100%)', conDescuento(200) === null)
+chk('descuento mayor que el sub-total: el error va al campo, con los dos montos',
+  conDescuento(200.01)?.ajustes.descuento === 'El descuento (RD$ 200.01) no puede ser mayor que el sub-total (RD$ 200.00).')
+chk('descuento negativo', conDescuento(-1)?.ajustes.descuento === 'El monto de «Descuento» no puede ser negativo.')
+chk('descuento con 3 decimales', conDescuento(10.005)?.ajustes.descuento === 'El monto de «Descuento» admite hasta 2 decimales.')
+chk('con un descuento que se pasa, el resto del formulario no se marca', Object.keys(conDescuento(500)?.ajustes ?? {}).join() === 'descuento')
+// El abono se juzga contra lo adeudado YA con el descuento: 200 − 50 = 150 + ITBIS 27 = 177.
+chk('abono justo sobre lo adeudado con descuento (177.00)', conDescuento(50, { abono: 177 }) === null)
+chk('abono mayor que lo adeudado con descuento',
+  conDescuento(50, { abono: 177.01 })?.ajustes.abono === 'El abono (RD$ 177.01) no puede ser mayor que lo adeudado (RD$ 177.00).')
+// Sin líneas con valor el Sub-total es 0: cualquier descuento se pasa.
+chk('descuento sin sub-total', errores(form({ lineas: [linea(1, { precio: 0.001 })], ajustes: { ...SIN_AJUSTES, descuento: 1 } }))
+  ?.ajustes.descuento?.includes('(RD$ 0.00)') === true)
 
 console.log(`\n${total - fallos}/${total} OK`)
 process.exit(fallos === 0 ? 0 : 1)

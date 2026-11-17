@@ -230,8 +230,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       // Lo que el origen no trae sale con los defaults de una línea libre:
       // gravado 18%, Unidad (43), Bien (la cotización de Gratex no trae nada de
       // eso). La de Ferretería trae su producto, unidad, indicador y tipo: con
-      // el producto ligado, emitir descuenta inventario.
-      desc: 0, indFact: (l.indFact ?? 1) as IndicadorFacturacion, unidadMedida: l.unidadMedida ?? 43,
+      // el producto ligado, emitir descuenta inventario. Y, si la cotización
+      // traía descuento, la parte que le tocó a cada línea (en %).
+      desc: l.desc ?? 0, indFact: (l.indFact ?? 1) as IndicadorFacturacion, unidadMedida: l.unidadMedida ?? 43,
       tipoItem: l.tipoItem ?? 'Bien',
     })),
   )
@@ -276,6 +277,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // El prefill (cotización) solo trae id + nombre del cliente: se busca el
   // registro completo para que la ficha muestre el RNC real (E31 lo requiere).
   const prefillClientId = prefill?.clienteId ? Number(prefill.clienteId) : null
+  // La cotización ya traía su descuento y va repartido en las líneas: el del
+  // cliente no se pone encima (sería descontar dos veces).
+  const descuentoDeOrigen = (prefill?.descuentoOrigen ?? 0) > 0
   const clienteEnriquecido = useRef(false)
   const clienteDetalle = useApiQuery(
     ['clients', 'detail', prefillClientId],
@@ -289,15 +293,16 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       setCliente(completo)
       // Al llegar el cliente real llegan sus condiciones: se aplican igual que
       // si se hubiera elegido a mano, para que convertir una cotizacion no se
-      // comporte distinto que crear la factura desde cero.
-      if (completo.descuento > 0) {
+      // comporte distinto que crear la factura desde cero. Salvo el descuento
+      // del cliente, si la cotización ya trajo el suyo (ver descuentoDeOrigen).
+      if (completo.descuento > 0 && !descuentoDeOrigen) {
         setLineas((ls) => ls.map((l) => ({ ...l, desc: completo.descuento })))
       }
       if (!completo.permiteCredito) {
         setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
       }
     }
-  }, [clienteDetalle.data, cliente])
+  }, [clienteDetalle.data, cliente, descuentoDeOrigen])
 
   // Secuencias e-CF del ambiente activo, para mostrar el próximo e-NCF a usar.
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
@@ -363,7 +368,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   const avisosConversion = prefill?.origen
     ? [
         ...(prefill.avisos ?? []),
-        ...(descuentoCliente > 0
+        // Con el descuento de la cotización repartido en las líneas, el del
+        // cliente no se aplicó: no se avisa de algo que no pasó.
+        ...(descuentoCliente > 0 && !descuentoDeOrigen
           ? [deConduce
               ? `Se aplicó el descuento fijo del cliente (${descuentoCliente}%) a los precios del conduce.`
               : `Se aplicó el descuento fijo del cliente (${descuentoCliente}%): el total difiere del de la cotización.`]
