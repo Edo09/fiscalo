@@ -114,7 +114,7 @@ export function ClientsView({ nav }: { nav: Nav }) {
               <tbody>
                 {rows.map((c, i) => (
                   <tr key={c.id} onClick={() => setPerfil(raws[i])}>
-                    <td><div className="row gap-sm"><Avatar name={c.nombre} size={30} /><div><span className="cell-main">{c.nombre}</span>{c.contacto && <div className="cell-sub">{c.contacto}</div>}</div></div></td>
+                    <td><div className="row gap-sm"><Avatar name={c.nombre} size={30} /><div><span className="cell-main">{c.nombre}</span>{c.contacto && c.contacto !== c.nombre && <div className="cell-sub">{c.contacto}</div>}</div></div></td>
                     <td>{c.doc ? <><span className="mono text-sm">{c.doc}</span><div className="cell-sub">{c.tipo}</div></> : <span className="muted-3">—</span>}</td>
                     <td className="muted text-sm">{c.ciudad || '—'}</td>
                     <td className="muted text-sm">{c.email || '—'}</td>
@@ -240,7 +240,8 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     if (cambiados.length === 0) { toast.info('No hay cambios que guardar.'); onClose(); return }
     const reglas: Partial<Record<keyof typeof form, () => string | undefined>> = {
       client_name: () => errorTexto(form.client_name, LARGO.nombreCliente, 'El nombre de contacto', 'Escribe el nombre de contacto.'),
-      company_name: () => errorTexto(form.company_name, LARGO.empresa, 'La empresa', 'Escribe la empresa.'),
+      // Opcional: borrarla vale (el backend la guarda en blanco y no toca la razón social).
+      company_name: () => errorTexto(form.company_name, LARGO.empresa, 'La empresa'),
       razon_social: () => errorTexto(form.razon_social, LARGO.razonSocial, 'La razón social'),
       rnc: () => errorRnc(form.rnc),
       email: () => errorCorreo(form.email),
@@ -290,7 +291,7 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
         <Avatar name={cliente.nombre} size={52} />
         <div style={{ flex: 1 }}>
           <div className="fw6" style={{ fontSize: 16 }}>{cliente.nombre}</div>
-          {cliente.contacto && <div className="text-sm muted">{cliente.contacto}</div>}
+          {cliente.contacto && cliente.contacto !== cliente.nombre && <div className="text-sm muted">{cliente.contacto}</div>}
           {cliente.doc && <div className="text-xs muted-3 mono">{cliente.tipo}: {cliente.doc}</div>}
         </div>
       </div>
