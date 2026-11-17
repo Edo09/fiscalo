@@ -15,7 +15,12 @@ import { totalesFerreteria } from '../src/features/cotizaciones/formatos/ferrete
 import type { TotalesFerreteria } from '../src/features/cotizaciones/formatos/ferreteria/totales.ts'
 
 interface LineaFixture { quantity: number; description: string; amount: number; indicador_facturacion: number }
-interface AjustesFixture { cargos_bancarios: number; manejo_bancario: number; mano_obra: number; abono: number; retencion_isr: boolean }
+// `descuento` es opcional: el fixture del backend lo trae solo en los casos con descuento (los 10 de las
+// hojas de Excel no lo tienen y deben seguir dando exactamente lo mismo).
+interface AjustesFixture {
+  cargos_bancarios: number; manejo_bancario: number; mano_obra: number; abono: number; retencion_isr: boolean
+  descuento?: number
+}
 interface CasoFixture { id: string; lineas: LineaFixture[]; ajustes: AjustesFixture; esperado: Record<string, unknown> }
 
 const fixture = JSON.parse(
@@ -26,6 +31,8 @@ const fixture = JSON.parse(
 const CAMPOS = new Map<string, keyof TotalesFerreteria>([
   ['lineas', 'lineas'],
   ['subtotal', 'subtotal'],
+  ['descuento', 'descuento'],
+  ['subtotal_neto', 'subtotalNeto'],
   ['itbis', 'itbis'],
   ['cargos_bancarios', 'cargosBancarios'],
   ['manejo_bancario', 'manejoBancario'],
@@ -56,6 +63,7 @@ const calcular = (lineas: LineaFixture[], a: AjustesFixture): TotalesFerreteria 
       manoObra: a.mano_obra,
       abono: a.abono,
       retencion: a.retencion_isr,
+      descuento: a.descuento ?? 0,
     },
   )
 

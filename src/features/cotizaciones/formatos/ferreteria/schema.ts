@@ -103,6 +103,8 @@ const ajustesSchema = z.object({
   manoObra: monto('Costo mano de obra'),
   abono: monto('Abono realizado'),
   retencion: z.boolean(),
+  // Que no pase del Sub-total se juzga abajo, con los totales ya calculados.
+  descuento: monto('Descuento'),
 })
 
 /** Esquema del formulario con las reglas de unidad del catálogo cargado. */
@@ -160,13 +162,25 @@ export function ferreteriaFormSchema(reglas: ReglasUnidad) {
               : 'Elige un cliente de la lista o créalo con el botón +.',
         })
       }
-      // El abono no puede pasar de lo adeudado (TOTAL − retención), comparando
-      // los montos ya redondeados, con el mismo texto que
-      // FerreteriaFormato::errorAbono.
       const t = totalesFerreteria(
         val.lineas.map((l) => ({ cantidad: l.cantidad, precio: l.precio, indFact: l.indFact })),
         val.ajustes,
       )
+      // El descuento no puede pasar del Sub-total (el documento no queda en
+      // negativo): se compara el monto escrito, ya a centavos, con el Sub-total
+      // de las líneas, y totalesFerreteria no lo acota en silencio al guardar.
+      // Mismo texto que FerreteriaFormato::errorDescuento.
+      const descuento = r2(val.ajustes.descuento)
+      if (descuento > t.subtotal) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ajustes', 'descuento'],
+          message: `El descuento (RD$ ${fmt(descuento)}) no puede ser mayor que el sub-total (RD$ ${fmt(t.subtotal)}).`,
+        })
+      }
+      // El abono no puede pasar de lo adeudado (TOTAL − retención), comparando
+      // los montos ya redondeados, con el mismo texto que
+      // FerreteriaFormato::errorAbono.
       if (t.abono > t.adeudado) {
         ctx.addIssue({
           code: 'custom',
@@ -232,6 +246,9 @@ export function mapearErrores(error: z.ZodError, lineas: { id: number }[]): Erro
  * cantidades y los precios viajan con el redondeo con que la pantalla calculó
  * los totales (2 y 4 decimales), y los cargos y el abono, a centavos.
  * `retencion_isr` va siempre como booleano: el backend calcula el 5%.
+ * `descuento` solo viaja si hay uno: un backend que todavía no lo conoce
+ * rechaza el concepto desconocido, y así las cotizaciones sin descuento siguen
+ * guardándose igual con él.
  * `date` ausente = el backend usa ahora (POST) o conserva la guardada (PUT).
  */
 export function cuerpoFerreteria(datos: {
@@ -262,6 +279,7 @@ export function cuerpoFerreteria(datos: {
       mano_obra: r2(a.manoObra),
       abono: r2(a.abono),
       retencion_isr: a.retencion,
+      ...(r2(a.descuento) > 0 ? { descuento: r2(a.descuento) } : {}),
     },
   }
 }

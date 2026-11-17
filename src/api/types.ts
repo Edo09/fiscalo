@@ -687,8 +687,10 @@ export interface CotizacionRow {
   itbis?: string | number | null
   /**
    * Ajustes por concepto (cargos_bancarios, manejo_bancario, mano_obra, abono,
-   * retencion_isr), montos DECIMAL como string. Siempre objeto: `{}` en Gratex;
-   * una clave ausente es 0. `retencion_isr` es el monto guardado, no la casilla.
+   * retencion_isr y descuento), montos DECIMAL como string. Siempre objeto: `{}`
+   * en Gratex; una clave ausente es 0. `retencion_isr` es el monto guardado, no
+   * la casilla. `descuento` es el descuento en RD$ de la fila "Descuento":
+   * `subtotal` va SIN restarlo e `itbis` y `total` ya lo llevan.
    */
   ajustes?: Record<string, string | number>
 }
@@ -723,8 +725,15 @@ export interface AjustesFerreteria {
   manejo_bancario?: number
   mano_obra?: number
   abono?: number
-  /** Casilla "Retención Renta 5%": el backend calcula el 5% del Sub-total en cada guardado. */
+  /** Casilla "Retención Renta 5%": el backend calcula el 5% del Sub-total (ya con el descuento) en cada guardado. */
   retencion_isr: boolean
+  /**
+   * Descuento en RD$ (fila "Descuento", bajo el Sub-total): se resta del
+   * Sub-total ANTES del ITBIS. ≥ 0, hasta 2 decimales y no más que el
+   * Sub-total. Solo se manda si hay uno: un backend sin soporte rechaza el
+   * concepto desconocido (ver BrandingData.cotizacion_descuento).
+   */
+  descuento?: number
 }
 
 /** Línea del formato Ferretería: de un producto del catálogo o libre (`product_id` null). */
@@ -1258,6 +1267,13 @@ export interface BrandingData {
    * el front lo trata como 'gratex'.
    */
   cotizacion_formato?: string
+  /**
+   * El backend acepta `ajustes.descuento` en las cotizaciones de Ferretería y lo
+   * suma bien al TOTAL y al PDF. Ausente si el backend todavía no lo expone: la
+   * fila "Descuento" no se muestra (salvo en una cotización que ya tiene uno),
+   * porque ese backend rechazaría el guardado con un concepto que no conoce.
+   */
+  cotizacion_descuento?: boolean
   /**
    * El POS está activo para la empresa (master tenants.pos_enabled). Con esto
    * se muestra el botón POS del navbar. Ausente si el backend no lo expone: sin POS.
