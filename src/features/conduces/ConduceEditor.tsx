@@ -9,7 +9,7 @@ import { useFormatoTenant } from '@/features/cotizaciones/formatos/useFormatoTen
 import { clienteDeFila, lineasDeFila } from '@/features/cotizaciones/formatos/ferreteria/lineas'
 import { hoyLocal } from '@/lib/date'
 import {
-  MSG_CONDUCE_NO_EXISTE, MSG_COTIZACION_NO_EXISTE, MSG_SOLO_FERRETERIA, avisoCargosConduce,
+  MSG_CONDUCE_NO_EXISTE, MSG_COTIZACION_NO_EXISTE, MSG_SOLO_FERRETERIA, avisoAjustesConduce,
 } from './schema'
 import { ConduceForm, type InicialConduce } from './ConduceForm'
 
@@ -90,7 +90,8 @@ function desdeCotizacion(row: CotizacionRow): DocumentoConduce {
       fechaGuardada: '',
       // Con su precio interno, su ITBIS y bien/servicio: los usa Facturar.
       lineas: lineasDeFila(row),
-      avisoCargos: avisoCargosConduce(row),
+      // Cargos y descuento: un conduce no lleva montos (ver avisoAjustesConduce).
+      avisoCargos: avisoAjustesConduce(row),
     },
     clientId: row.client_id ?? null,
     clienteNombre: row.client_name || '',

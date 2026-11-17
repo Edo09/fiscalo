@@ -8,8 +8,8 @@
 //   node scripts/test-schema-conduce.ts
 import {
   BTN_SEGUIR_EN_CONDUCE, BTN_VOLVER_A_LA_LISTA, MSG_CLIENTE_BORRADO, MSG_CONDUCE_NO_EXISTE, MSG_COTIZACION_NO_EXISTE,
-  MSG_FECHA, MSG_SIN_CLIENTE, MSG_SIN_LINEAS, MSG_SOLO_FERRETERIA, PREGUNTA_VOLVER_A_LA_LISTA, avisoCargosConduce,
-  conduceFormSchema, confirmacionEliminar, cuerpoConduce, destinoSeguirEnConduce, lineaVacia, mapearErroresConduce,
+  MSG_FECHA, MSG_SIN_CLIENTE, MSG_SIN_LINEAS, MSG_SOLO_FERRETERIA, PREGUNTA_VOLVER_A_LA_LISTA, avisoAjustesConduce,
+  avisoCargosConduce, avisoDescuentoConduce, conduceFormSchema, confirmacionEliminar, cuerpoConduce, destinoSeguirEnConduce, lineaVacia, mapearErroresConduce,
   sinErroresConduce, tituloConduceGuardado,
 } from '../src/features/conduces/schema.ts'
 import type { ConduceGuardado, FormConduce } from '../src/features/conduces/schema.ts'
@@ -156,6 +156,21 @@ chk('sin código: la nombra por su id', (avisoCargosConduce(cot({ mano_obra: 10 
 const casos = [conCargos, cot({}), cot({ abono: 5 }), cot({ manejo_bancario: '0.01' }), cot({ cargos_bancarios: -3 })]
 chk('mismo criterio que avisosCargos() al facturar la cotización',
   casos.every((c) => (avisoCargosConduce(c) !== null) === (avisosCargos(c).length > 0)))
+
+console.log('Aviso del descuento de la cotización')
+// Un conduce no lleva montos ni descuentos: se dice al abrirlo, junto a los cargos.
+chk('con descuento: cuánto era y que no pasa al conduce ni a su factura', avisoDescuentoConduce(cot({ descuento: '5940.00' }))
+  === 'La cotización COT-000012 tenía un descuento de RD$ 5,940.00: no pasa al conduce ni a la factura que salga de él.')
+chk('sin descuento, con 0.00 o sin ajustes: no hay aviso', avisoDescuentoConduce(cot({})) === null
+  && avisoDescuentoConduce(cot({ descuento: '0.00' })) === null && avisoDescuentoConduce({ id: 3 }) === null)
+chk('sin código: la nombra por su id', (avisoDescuentoConduce(cot({ descuento: 10 }, null)) ?? '').startsWith('La cotización #12 tenía un descuento de RD$ 10.00'))
+chk('solo descuento: el aviso del conduce es el del descuento', avisoAjustesConduce(cot({ descuento: '5940.00' })) === avisoDescuentoConduce(cot({ descuento: '5940.00' })))
+chk('solo cargos: el aviso del conduce es el de siempre, sin cambios', avisoAjustesConduce(conCargos) === avisoCargosConduce(conCargos))
+chk('cargos y descuento: los dos avisos, el de cargos primero',
+  avisoAjustesConduce(cot({ mano_obra: '1500.00', descuento: '5940.00' }))
+  === 'La cotización COT-000012 tenía cargos adicionales (Costo mano de obra RD$ 1,500.00): no pasan al conduce ni a la factura que salga de él. '
+    + 'La cotización COT-000012 tenía un descuento de RD$ 5,940.00: no pasa al conduce ni a la factura que salga de él.')
+chk('nada que avisar: null', avisoAjustesConduce(cot({ abono: '200.00', retencion_isr: '50.00' })) === null)
 
 console.log('Textos de la pantalla')
 chk('cotización que ya no existe', MSG_COTIZACION_NO_EXISTE === 'Esta cotización ya no existe')

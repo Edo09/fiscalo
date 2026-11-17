@@ -186,13 +186,14 @@ export function SimpleInvoiceFormView({
   const clienteCajaRef = useRef<HTMLDivElement | null>(null)
   const [fecha, setFecha] = useState(hoyLocal)
   // Con borrador, sus líneas: el precio ya trae el ITBIS (ver conversion.ts de
-  // Ferretería) y el descuento lo pone el cliente al cargar. Sin fila vacía al
-  // final, como al abrir una factura guardada: "Descripción" agrega otra.
+  // Ferretería) y el descuento lo pone el cliente al cargar, salvo que la
+  // cotización traiga el suyo: entonces cada línea ya llega con su %. Sin fila
+  // vacía al final, como al abrir una factura guardada: "Descripción" agrega otra.
   const [lineas, setLineas] = useState<Linea[]>(() =>
     borrador && borrador.lineas.length > 0
       ? borrador.lineas.map((l, i) => ({
           id: i + 1, prodId: l.prodId ?? '', descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precio,
-          desc: 0, unidadMedida: l.unidadMedida ?? null,
+          desc: l.desc ?? 0, unidadMedida: l.unidadMedida ?? null,
         }))
       : [lineaVacia(1)],
   )
@@ -325,6 +326,9 @@ export function SimpleInvoiceFormView({
   // condiciones como al elegirlo a mano (seleccionarCliente): su descuento pasa
   // a las líneas y, sin crédito, el pago queda de contado.
   const borradorClienteId = borrador?.clienteId ? Number(borrador.clienteId) : null
+  // La cotización ya traía su descuento y va repartido en las líneas: el del
+  // cliente no se pone encima (sería descontar dos veces).
+  const descuentoDeOrigen = (borrador?.descuentoOrigen ?? 0) > 0
   const clienteEnriquecido = useRef(false)
   const clienteDetalle = useApiQuery(
     ['clients', 'detail', borradorClienteId],
@@ -339,11 +343,14 @@ export function SimpleInvoiceFormView({
       const completo = mapClientRow(row)
       setCliente(completo)
       // Las líneas del borrador arrancan en 0%: con descuento queda igual que
-      // seleccionarCliente, y sin él no pisa uno escrito mientras cargaba.
-      if (completo.descuento > 0) setLineas((ls) => ls.map((l) => ({ ...l, desc: completo.descuento })))
+      // seleccionarCliente, y sin él no pisa uno escrito mientras cargaba. Si la
+      // cotización trajo el suyo, las líneas ya llevan su %: el del cliente no va encima.
+      if (completo.descuento > 0 && !descuentoDeOrigen) {
+        setLineas((ls) => ls.map((l) => ({ ...l, desc: completo.descuento })))
+      }
       if (!completo.permiteCredito) setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
     }
-  }, [clienteDetalle.data, cliente])
+  }, [clienteDetalle.data, cliente, descuentoDeOrigen])
 
   // Lista de metodos que ofrece el formulario (el credito depende del cliente).
   const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', ...METODOS_CREDITO, 'Cheque']
@@ -806,7 +813,9 @@ export function SimpleInvoiceFormView({
   const avisosConversion = borrador
     ? [
         ...(borrador.avisos ?? []),
-        ...(pctCliente > 0
+        // Con el descuento de la cotización repartido en las líneas, el del
+        // cliente no se aplicó: no se avisa de algo que no pasó.
+        ...(pctCliente > 0 && !descuentoDeOrigen
           ? [deConduce
               ? `Se aplicó el descuento fijo del cliente (${pctCliente}%) a los precios del conduce.`
               : `Se aplicó el descuento fijo del cliente (${pctCliente}%): el total difiere del de la cotización.`]

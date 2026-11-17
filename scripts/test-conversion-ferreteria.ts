@@ -7,10 +7,11 @@
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/test-conversion-ferreteria.ts
 import type { CotizacionRow } from '../src/api/types.ts'
-import { r2 } from '../src/features/invoices/montosLinea.ts'
+import { montosLinea, r2, redondear, totalesDocumento } from '../src/features/invoices/montosLinea.ts'
 import {
-  avisosCargos, ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill,
+  avisosCargos, avisosDescuento, descuentoDe, ferreteriaAFacturaPrefill, ferreteriaAFacturaSimplePrefill,
 } from '../src/features/cotizaciones/formatos/ferreteria/conversion.ts'
+import { totalesFerreteria } from '../src/features/cotizaciones/formatos/ferreteria/totales.ts'
 
 let fallos = 0
 let total = 0
@@ -147,6 +148,102 @@ igual('simple sin columnas de la 026: 18% por defecto y sin unidad', ferreteriaA
 igual('sin code: el aviso nombra #id', avisosCargos({ ...vieja, ajustes: { cargos_bancarios: '25.50' } }), [
   'La cotización #12 tenía cargos adicionales: Cargos bancarios RD$ 25.50 — agrégalos como línea si corresponde.',
 ])
+
+// --- Descuento de la cotización -----------------------------------------------
+// Una cotización con la fila "Descuento": 1,000 al 18% (2 × 500), 250 al 16% y 50 exento,
+// Sub-total 1,300.00 y un descuento de 130.00 (10%). Hecho a mano: reparto 100 / 25 / 5
+// (10% de cada línea), netos 900 / 225 / 45, ITBIS 162.00 + 36.00 + 0 = 198.00, TOTAL 1,368.00.
+const AVISO_DESCUENTO = 'La cotización COT-000020 tenía un descuento de RD$ 130.00 (10% del sub-total): pasó a las líneas '
+  + 'de la factura. Si el cliente tiene un descuento fijo, no se suma a este.'
+const conDescuento: CotizacionRow = {
+  id: 20,
+  code: 'COT-000020',
+  client_id: 7,
+  client_name: CLIENTE,
+  formato: 'ferreteria',
+  subtotal: '1300.00',
+  // itbis y total YA llevan el descuento; subtotal no.
+  itbis: '198.00',
+  total: '1368.00',
+  ajustes: { descuento: '130.00' },
+  items: [
+    { description: 'CEMENTO', quantity: '2.000', amount: '500.0000', subtotal: '1000.00', product_id: 55, unidad_medida: '43',
+      indicador_facturacion: 1, indicador_bien_servicio: 1, itbis_amount: '180.00' },
+    { description: 'FLETE', quantity: '1.000', amount: '250.0000', subtotal: '250.00', product_id: null, unidad_medida: '43',
+      indicador_facturacion: 2, indicador_bien_servicio: 2, itbis_amount: '40.00' },
+    { description: 'VARILLA EXENTA', quantity: '4.000', amount: '12.5000', subtotal: '50.00', product_id: 57, unidad_medida: '43',
+      indicador_facturacion: 4, indicador_bien_servicio: 1, itbis_amount: '0.00' },
+  ],
+}
+igual('descuentoDe: el de la fila, a centavos', descuentoDe(conDescuento), 130)
+igual('descuentoDe: sin descuento, con 0.00, negativo o sin ajustes → 0',
+  [descuentoDe(fila), descuentoDe({ ...conDescuento, ajustes: { descuento: '0.00' } }),
+    descuentoDe({ ...conDescuento, ajustes: { descuento: '-5' } }), descuentoDe({ id: 1 })], [0, 0, 0, 0])
+
+const ecfD = ferreteriaAFacturaPrefill(conDescuento)
+igual('descuento e-CF: el descuento de origen viaja (y marca que el del cliente no va encima)', ecfD.descuentoOrigen, 130)
+igual('descuento e-CF: cada línea con su 10% (la parte que le tocó)', ecfD.lineas.map((l) => l.desc), [10, 10, 10])
+igual('descuento e-CF: el aviso dice cuánto era y que pasó a las líneas', ecfD.avisos, [AVISO_DESCUENTO])
+igual('descuento e-CF: lo demás de la línea no cambia', ecfD.lineas[0], {
+  nombre: 'CEMENTO', cantidad: 2, precio: 500, desc: 10, prodId: '55', unidadMedida: 43, indFact: 1, tipoItem: 'Bien',
+})
+{
+  // La factura calcula lo mismo que la cotización, al centavo.
+  const montos = ecfD.lineas.map((l) => montosLinea({ cant: l.cantidad, precio: l.precio, desc: l.desc ?? 0, indFact: (l.indFact ?? 1) as 1 | 2 | 3 | 4 }, false))
+  const t = totalesDocumento(montos)
+  igual('descuento e-CF: la factura da sub-total 1,170, descuentos 130, ITBIS 198 y TOTAL 1,368',
+    [t.subtotal, t.descuentos, t.itbis, t.total], [1170, 130, 198, 1368])
+}
+igual('descuento e-CF: avisosDescuento y los cargos van juntos si hay los dos',
+  ferreteriaAFacturaPrefill({ ...conDescuento, ajustes: { descuento: '130.00', mano_obra: '50.00' } }).avisos?.length, 2)
+igual('descuento e-CF: sin descuento no hay `descuentoOrigen` ni `desc`',
+  [ecf.descuentoOrigen, ecf.lineas.some((l) => 'desc' in l)], [undefined, false])
+
+const simpleD = ferreteriaAFacturaSimplePrefill(conDescuento)
+igual('descuento simple: el descuento de origen viaja', simpleD.descuentoOrigen, 130)
+igual('descuento simple: cada línea con su 10%', simpleD.lineas.map((l) => l.desc), [10, 10, 10])
+igual('descuento simple: el mismo aviso', simpleD.avisos, [AVISO_DESCUENTO])
+igual('descuento simple: el precio sigue con ITBIS incluido (500 × 1.18)', simpleD.lineas[0].precio, 590)
+{
+  // Mismas cuentas que SimpleInvoiceFormView (cantidad a 3, precio a 4, % por línea): 1,062 + 261 + 45.
+  const total = r2(simpleD.lineas.reduce((a, l) => {
+    const cant = redondear(l.cantidad, 3)
+    const precio = redondear(l.precio, 4)
+    const bruto = r2(cant * precio)
+    const desc = (l.desc ?? 0) > 0 ? Math.min(bruto, r2((cant * precio * (l.desc ?? 0)) / 100)) : 0
+    return a + r2(bruto - desc)
+  }, 0))
+  igual('descuento simple: la factura cobra 1,368.00 (el TOTAL de la cotización)', total, 1368)
+}
+igual('descuento simple: sin descuento no hay `descuentoOrigen` ni `desc`',
+  [simple.descuentoOrigen, simple.lineas.some((l) => 'desc' in l)], [undefined, false])
+
+// Con centavos el % de cada línea no es redondo, y aun así la factura e-CF da el mismo ITBIS y TOTAL que la
+// cotización: 1,506.43 de descuento sobre las 4 líneas de `fila` (tasas 18% / 16% / 18% / exento).
+{
+  const D = 1506.43
+  const fd: CotizacionRow = { ...fila, ajustes: { descuento: '1506.43' } }
+  const p = ferreteriaAFacturaPrefill(fd)
+  const montos = p.lineas.map((l) => montosLinea({ cant: l.cantidad, precio: l.precio, desc: l.desc ?? 0, indFact: (l.indFact ?? 1) as 1 | 2 | 3 | 4 }, false))
+  const t = totalesDocumento(montos)
+  const c = totalesFerreteria(
+    [{ cantidad: 7, precio: 2000, indFact: 1 }, { cantidad: 1, precio: 1000, indFact: 2 },
+      { cantidad: 2.5, precio: 13.7, indFact: 1 }, { cantidad: 3, precio: 10, indFact: 4 }],
+    { cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false, descuento: D },
+  )
+  igual('con centavos: el descuento repartido suma 1,506.43', t.descuentos, D)
+  igual('con centavos: sub-total, ITBIS y TOTAL de la factura = los de la cotización',
+    [t.subtotal, t.itbis, t.total], [c.subtotalNeto, c.itbis, c.total])
+  igual('con centavos: cada % está entre 0 y 100', p.lineas.every((l) => (l.desc ?? 0) > 0 && (l.desc ?? 0) <= 100), true)
+}
+igual('avisosDescuento: sin descuento → ninguno', avisosDescuento(fila), [])
+igual('avisosDescuento: porcentaje con decimales y nombre por id si no hay code',
+  avisosDescuento({ ...conDescuento, code: null, ajustes: { descuento: '100.00' } }), [
+    'La cotización #20 tenía un descuento de RD$ 100.00 (7.69% del sub-total): pasó a las líneas de la factura. '
+    + 'Si el cliente tiene un descuento fijo, no se suma a este.',
+  ])
+igual('un descuento mayor que el sub-total no pasa de las líneas: cada una al 100%',
+  ferreteriaAFacturaPrefill({ ...conDescuento, ajustes: { descuento: '99999.00' } }).lineas.map((l) => l.desc), [100, 100, 100])
 
 console.log(`\n${total - fallos}/${total} OK`)
 process.exit(fallos === 0 ? 0 : 1)
