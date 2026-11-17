@@ -91,7 +91,8 @@ export function NombreClienteLibre({
         onGuardado(mapClientRow(igual))
         return
       }
-      // El backend pide nombre y empresa; de un cliente de mostrador solo se sabe el nombre.
+      // De un cliente de mostrador solo se sabe el nombre. Se manda también como empresa
+      // (ya es opcional en el backend) para que se guarde y se vea igual que los de antes.
       // createClient devuelve siempre el registro con su id (ver api/clients).
       const row = await createClient({ client_name: nombre, company_name: nombre })
       await queryClient.invalidateQueries({ queryKey: ['clients'] })

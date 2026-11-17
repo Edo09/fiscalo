@@ -60,9 +60,11 @@ async function clienteConRnc(rnc: string): Promise<string | null> {
  * cliente creado vía `onCreated`.
  *
  * El RNC va primero: "Consultar" trae los datos de la DGII, así que el alta
- * puede quedar en escribir el RNC y guardar. El backend solo exige nombre y
- * empresa; RNC, teléfono y correo son opcionales (el correo, si se escribe,
- * tiene que ser válido).
+ * puede quedar en escribir el RNC y guardar. El backend solo exige el nombre
+ * de contacto; empresa, RNC, teléfono y correo son opcionales (el correo, si se
+ * escribe, tiene que ser válido). Sin empresa se guarda en blanco y los
+ * documentos usan el nombre de contacto: el comprador del e-CF toma el primero
+ * con texto de razón social, empresa y contacto.
  */
 export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props) {
   const queryClient = useQueryClient()
@@ -83,7 +85,8 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
   const validar = (): boolean => {
     const todos: Partial<Record<keyof Campos, string | undefined>> = {
       client_name: errorTexto(f.client_name, LARGO.nombreCliente, 'El nombre de contacto', 'Escribe el nombre de contacto.'),
-      company_name: errorTexto(f.company_name, LARGO.empresa, 'La empresa', 'Escribe la empresa o razón social.'),
+      // Opcional: en blanco vale, solo se revisa el largo.
+      company_name: errorTexto(f.company_name, LARGO.empresa, 'La empresa'),
       rnc: errorRnc(f.rnc),
       phone_number: errorTelefono(f.phone_number),
       email: errorCorreo(f.email),
@@ -183,7 +186,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
           autoFocus
         />
         {campo('client_name', 'Nombre de contacto', { placeholder: 'Juan Pérez', maxLength: LARGO.nombreCliente })}
-        {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL', maxLength: LARGO.empresa })}
+        {campo('company_name', 'Empresa / razón social', { placeholder: 'Comercial XYZ SRL', maxLength: LARGO.empresa }, false)}
         {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel', maxLength: LARGO.telefono }, false)}
         {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email', maxLength: LARGO.correo }, false)}
         {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
