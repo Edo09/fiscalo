@@ -326,18 +326,23 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; gap: 9px; padding: 5px 9px;
   border: 1px solid var(--border); border-radius: var(--r-md);
   background: var(--surface); cursor: pointer; transition: border 0.12s, background .12s;
+  /* Puede encogerse: cuando la barra no alcanza, el nombre pierde letras ("…") en
+     vez de empujar el menú de usuario fuera de la pantalla. Antes medía siempre lo
+     de su contenido (hasta ~290px con la marca de soporte) y la barra se desbordaba
+     por debajo de ~935px de ancho. Solo se encoge el nombre: logo, marca y flecha no. */
+  min-width: 0;
 }
 .co-switch:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-.co-logo { width: 22px; height: 22px; border-radius: 6px; background: var(--neutral-soft); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--text-2); }
-.co-switch .nm { font-size: 13px; font-weight: 600; max-width: 150px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-logo { width: 22px; height: 22px; border-radius: 6px; background: var(--neutral-soft); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--text-2); flex-shrink: 0; }
+.co-switch .nm { font-size: 13px; font-weight: 600; max-width: 150px; min-width: 0; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Usuario de soporte (acceso global): el selector es un botón, y dentro de la
    empresa de un cliente se pinta de aviso para que no se confunda con la suya. */
 button.co-switch { font: inherit; color: var(--text); }
 button.co-switch:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-.co-switch .lucide { color: var(--text-3); }
+.co-switch .lucide { color: var(--text-3); flex-shrink: 0; }
 .co-switch.soporte { border-color: var(--warning); background: var(--warning-soft); }
 .co-switch.soporte:hover { border-color: var(--warning); }
-.co-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--warning); }
+.co-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--warning); flex-shrink: 0; }
 /* La misma marca en el teléfono, junto al avatar (ahí la caja de la empresa no se ve). */
 .navbar-actions .co-tag { padding: 2px 8px; line-height: 18px; place-items: center; border: 1px solid var(--warning); border-radius: 999px; background: var(--warning-soft); }
 

@@ -145,7 +145,7 @@ export function Navbar({
           type="button"
           className={'co-switch desktop-only' + (deCliente ? ' soporte' : '')}
           onClick={() => setSelector(true)}
-          title={(deCliente ? 'Estás como soporte en la empresa de un cliente. ' : '')
+          title={(empresaNombre ? `${empresaNombre}. ` : '') + (deCliente ? 'Estás como soporte en la empresa de un cliente. ' : '')
             + (empresaRnc ? `RNC ${empresaRnc}. ` : '') + 'Clic para cambiar de empresa.'}
         >
           <span className="co-logo">{empresaIniciales}</span>
@@ -154,7 +154,7 @@ export function Navbar({
           <Icon name="chevron-down" size={14} />
         </button>
       ) : (
-        <div className="co-switch desktop-only" style={{ cursor: 'default' }} title={empresaRnc ? `RNC ${empresaRnc}` : undefined}>
+        <div className="co-switch desktop-only" style={{ cursor: 'default' }} title={[empresaNombre, empresaRnc && `RNC ${empresaRnc}`].filter(Boolean).join(' · ') || undefined}>
           <span className="co-logo">{empresaIniciales}</span>
           <span className="nm">{emisorQ.loading ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
         </div>
