@@ -96,19 +96,39 @@ export function Navbar({
         <span className="co-logo">{empresaIniciales}</span>
         <span className="nm">{emisorQ.loading ? 'Cargando…' : empresaNombre || 'Empresa sin configurar'}</span>
       </div>
-      <div className="navbar-search desktop-only" onClick={onOpenSearch}>
-        <Icon name="search" /><span style={{ flex: 1 }}>Buscar facturas, clientes, e-CF…</span>
-        <span className="kbd">⌘K</span>
+      {/* Buscador: el hueco toma el espacio libre de la barra y el cuadro se adapta al
+          ancho que le toque (etiqueta larga → corta → solo el icono; ver "NAVBAR —
+          BUSCADOR" en responsive.css). Con el icono solo, `aria-label` y `title` son
+          lo que lo nombra. */}
+      <div className="navbar-search-slot desktop-only">
+        <div
+          className="navbar-search" role="button" tabIndex={0}
+          aria-label="Buscar facturas, clientes, e-CF" title="Buscar (Ctrl+K o ⌘K)"
+          onClick={onOpenSearch}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSearch() } }}
+        >
+          <Icon name="search" />
+          <span className="navbar-search-txt">
+            <span className="largo">Buscar facturas, clientes, e-CF…</span>
+            <span className="corto">Buscar…</span>
+          </span>
+          <span className="kbd">⌘K</span>
+        </div>
       </div>
-      <div className="navbar-spacer"></div>
       <div className="navbar-actions">
         <button className="icon-btn mobile-only" onClick={onOpenSearch}><Icon name="search" /></button>
+        {/* Llave de caja: el acceso al POS tiene que verse desde lejos (estilos en
+            bold.css, "NAVBAR — POS"). Con el icono de tienda en vez del de impresora,
+            que sugería "imprimir", y un spinner mientras se abre la pestaña. */}
         {puedePos && (
-          <Btn
-            size="sm" icon="printer" className="desktop-only"
+          <button
+            type="button" className="btn btn-sm navbar-pos desktop-only"
             onClick={() => void abrirPos()} disabled={abriendoPos}
             title="Abrir el punto de venta en una pestaña nueva"
-          >POS</Btn>
+          >
+            <span className="navbar-pos-ic"><Icon name={abriendoPos ? 'loader' : 'store'} /></span>
+            POS
+          </button>
         )}
         {/* Sin ningún acceso permitido no hay botón: un menú vacío no lleva a nada. */}
         {nuevos.length > 0 && (
