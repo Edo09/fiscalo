@@ -1,7 +1,8 @@
 # Descuento en la cotización de Ferretería
 
-Fecha: 2026-11-17. Estado: el front está hecho (rama `worktree-cotizacion-descuento`, sin subir). **Falta el cambio
-del API** (abajo): sin él, el front no muestra la fila.
+Fecha: 2026-11-17. Estado: el front y el API están hechos. **El API se despliega a mano y primero**: hasta que
+`api-gratex` con este cambio esté en producción, el front no muestra la fila (no lee `cotizacion_descuento` en
+`GET /api/branding`) y todo sigue igual.
 
 ## Qué se pidió y por qué
 
@@ -87,7 +88,10 @@ solo si > 0. `GET /api/cotizaciones`: `ajustes.descuento` como DECIMAL en texto,
 (`subtotal` es la suma de las líneas SIN descuento; `itbis` y `total` ya lo llevan). `GET /api/branding`:
 `cotizacion_descuento: true`.
 
-## Lo que falta en `api-gratex` (sin migración: `cotizacion_ajustes.concepto` es `VARCHAR(30)`, `descuento` cabe)
+## El cambio en `api-gratex` (sin migración: `cotizacion_ajustes.concepto` es `VARCHAR(30)`, `descuento` cabe)
+
+Hecho en el commit `feat(cotizaciones): descuento en la cotizacion de Ferreteria (totales, validacion, PDF y senal en
+branding)` de `api-gratex`:
 
 1. `src/Utils/Cotizacion/FerreteriaFormato.php`
    - `AJUSTES_MONTO` += `'descuento'`; `ETIQUETAS_AJUSTE['descuento'] = 'Descuento'`; el `$out` inicial de
@@ -100,17 +104,21 @@ solo si > 0. `GET /api/cotizaciones`: `ajustes.descuento` como DECIMAL en texto,
 2. `src/Utils/Cotizacion/FerreteriaCotizacionPdf.php`: en `filasTotales()`, con descuento > 0, una fila
    `['Descuento', -descuento]` entre Sub-total e ITBIS (se imprime `-5,940.00`).
 3. `src/Controllers/brandingController.php` (junto a `cotizacion_formato`): `'cotizacion_descuento' => true`.
-4. `cotizacionModel.php` **no cambia**: `ajustesAGuardar` recorre las claves de `$cot['ajustes']` y toma el monto de
+4. `cotizacionModel.php` **no cambió**: `ajustesAGuardar` recorre las claves de `$cot['ajustes']` y toma el monto de
    `$tot[$concepto]`; guarda `descuento` solo si > 0. La cabecera guarda `subtotal` bruto, `itbis` y `total` netos; las
    líneas guardan su base e ITBIS sin descuento.
-5. Pruebas y documentación: casos con descuento en `tools/fixtures/cotizacion_ferreteria.json` y
-   `tools/test_cotizacion_ferreteria.php` (el script de paridad del front ya lee `descuento` y `subtotal_neto`; el
-   fixture se vuelve a copiar byte a byte), `tests/test_cotizaciones_ferreteria.http`, `docs/api/cotizaciones.md`,
-   `docs/modules/cotizaciones-formatos.md` (tablas de Totales, Ajustes y PDF) y `docs/database/schema.md`.
+5. Pruebas y documentación: seis casos con descuento en `tools/fixtures/cotizacion_ferreteria.json` (el front corre la
+   misma copia byte a byte con `scripts/parity-cotizacion-ferreteria.ts`: 167 comprobaciones), `tools/test_cotizacion_ferreteria.php`
+   (595, con 1,500 casos al azar contra una referencia en enteros) y `tools/test_conduces.php` (425; sus huellas de los diez
+   casos de antes no se movieron: lo que ya se imprimía sigue idéntico), `tests/test_cotizaciones_ferreteria.http`,
+   `docs/api/cotizaciones.md`, `docs/modules/cotizaciones-formatos.md`, `docs/modules/branding-plantillas.md` y
+   `docs/database/schema.md`, y la línea base de CI recapturada (`tools/express_golden/baseline_suites.json`).
 
-Despliegue: **el API primero, a mano; después el front.** Mientras el API no lo sepa, el front no muestra la fila y
-todo sigue igual. Bajar el API después de guardar cotizaciones con descuento no está soportado: el PDF viejo
-ignoraría el concepto y el TOTAL impreso no cuadraría con el guardado.
+Despliegue: **el API primero, a mano; después el front** (sin migración). Mientras el API no lo sepa, el front no
+muestra la fila y todo sigue igual. Bajar el API después de guardar cotizaciones con descuento no está soportado: el
+PDF viejo ignoraría el concepto y el TOTAL impreso no cuadraría con el guardado. Para comprobarlo ya desplegado:
+`GET /api/branding` debe traer `cotizacion_descuento: true` y el bloque F12 de `tests/test_cotizaciones_ferreteria.http`
+(crear con descuento, obtener, PDF, editar sin descuento) da lo que dice cada comentario.
 
 ## Cómo se verificó
 
@@ -123,10 +131,15 @@ node scripts/test-schema-cotizacion-ferreteria.ts && node scripts/test-conversio
 node scripts/test-schema-conduce.ts && node scripts/parity-cotizacion-ferreteria.ts
 ```
 
-Además, un prototipo en PHP de `totales()` con el `Redondeo` real del API recalculó 4,000 casos del front con 0
-diferencias, y la pantalla se probó contra un mock local (guardar, recargar, editar, quitar el descuento, error por
-pasarse del Sub-total, API viejo sin la señal, convertir a e-CF y factura simple, el aviso del conduce; claro,
-oscuro y 375 px).
+Del lado del API (`php tools/test_cotizacion_ferreteria.php`, `php tools/test_conduces.php` y
+`php tools/express_baseline.php --comparar`, que es lo que corre el CI): las mismas cuentas en PHP, con el
+`Redondeo` real, dan lo mismo que el front en el fixture y en 4,000 casos al azar (0 diferencias), y el contenido
+del PDF (la fila `Descuento`, su orden y sus montos) se comprueba inflando los streams del PDF.
+
+La pantalla se probó contra un mock local cuya cuenta es aparte (en enteros): guardar, recargar, editar, quitar el
+descuento, error por pasarse del Sub-total, API viejo sin la señal, convertir a e-CF y factura simple, el aviso del
+conduce; claro, oscuro y 375 px. **No se vio el PDF impreso a ojo** (no hay visor de PDF en la máquina de desarrollo):
+conviene abrir en producción el PDF de una cotización con descuento después de desplegar el API.
 
 ## Fuera de alcance (ideas)
 
