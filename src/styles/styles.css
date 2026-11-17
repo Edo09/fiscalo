@@ -260,8 +260,17 @@ a { color: inherit; text-decoration: none; }
   padding: 0 20px;
   position: sticky; top: 0; z-index: 30;
 }
+/* Hueco elástico del buscador: toma TODO el espacio libre de la barra (hasta 460px)
+   y es contenedor de consulta, así el buscador de dentro se adapta al ancho que le
+   toque (ver "NAVBAR — BUSCADOR" en responsive.css) sin depender de cuánto midan el
+   nombre de la empresa o el del usuario. Antes el buscador (flex:1) competía por
+   ese espacio con un separador vacío (flex:1) y se quedaba con la mitad. */
+.navbar-search-slot {
+  flex: 1 1 0; min-width: 36px; max-width: 460px;
+  container-name: busqueda; container-type: inline-size;
+}
 .navbar-search {
-  flex: 1; max-width: 460px;
+  width: 100%;
   display: flex; align-items: center; gap: 9px;
   background: var(--bg); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 7px 12px;
@@ -269,15 +278,19 @@ a { color: inherit; text-decoration: none; }
   transition: border 0.12s, box-shadow 0.12s;
 }
 .navbar-search:hover { border-color: var(--border-strong); }
-.navbar-search .lucide { width: 16px; height: 16px; }
-.navbar-search .kbd { margin-left: auto; }
+.navbar-search .lucide { width: 16px; height: 16px; flex-shrink: 0; }
+/* Una sola línea siempre: si no cabe, termina en "…". Antes el texto se partía en
+   3-4 líneas y el cuadro crecía más alto que la barra. */
+.navbar-search-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navbar-search-txt .corto { display: none; }
+.navbar-search .kbd { margin-left: auto; flex-shrink: 0; }
 .kbd {
   font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 5px; padding: 1px 6px; box-shadow: var(--sh-xs);
 }
-.navbar-spacer { flex: 1; }
-.navbar-actions { display: flex; align-items: center; gap: 4px; }
+/* margin-left:auto empuja las acciones a la derecha (lo hacía un separador flex:1). */
+.navbar-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 
 .icon-btn {
   width: 34px; height: 34px; border-radius: var(--r-sm);
