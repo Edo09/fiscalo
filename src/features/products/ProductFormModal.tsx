@@ -19,6 +19,7 @@ import { useInventarioEstricto } from '@/features/inventory/useInventarioEstrict
 import { redondear } from '@/features/invoices/montosLinea'
 import { decimalesDe, fmtCantidad } from '@/lib/format'
 import { payloadOtrosPrecios, problemaPrecioExtra, SIN_OTROS_PRECIOS, textosDeOtrosPrecios } from '@/lib/listasPrecio'
+import { textoMargen } from '@/lib/margenProducto'
 import { useSession } from '@/stores/auth'
 import type { Producto } from '@/types/domain'
 
@@ -143,6 +144,10 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
   const [errorFoto, setErrorFoto] = useState<string | null>(null)
   const [fotoRota, setFotoRota] = useState(false)
   const elegirFotoRef = useRef<HTMLInputElement>(null)
+  const nombreRef = useRef<HTMLInputElement>(null)
+  // Guardado en curso. `saving` deshabilita los botones, pero React lo pinta después: dos clics en el mismo instante
+  // llegaban los dos a `save` y creaban el producto dos veces.
+  const enCurso = useRef(false)
   // La vista previa de una foto nueva es un blob: se libera al cambiarla o al cerrar.
   const vistaNueva = foto.tipo === 'nueva' ? foto.vista : null
   useEffect(() => () => { if (vistaNueva) URL.revokeObjectURL(vistaNueva) }, [vistaNueva])
@@ -174,6 +179,9 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
   const categories = useMemo(() => catsQ.data?.items ?? [], [catsQ.data])
   const warehouses = useMemo(() => whQ.data?.items ?? [], [whQ.data])
   const unidades = useUnidadesMedida()
+  // Sigla de la unidad elegida (UND, KG…): va al lado de la existencia y del stock mínimo.
+  const unidadElegida = unidades.find((u) => u.id === unidadMedida)
+  const codigoUnidad = unidadElegida?.codigo ?? (unidadMedida === 43 ? 'UND' : '')
   // Existencia en kg o metros puede llevar fracción; en unidades o cajas no.
   // Se revisa mientras se escribe y al cambiar la unidad, no solo al guardar:
   // antes 12.5 se guardaba como 12 sin decir nada.
@@ -202,7 +210,22 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
     setWarehouseId(String((principal ?? warehouses[0]).id))
   }, [warehouses, editing, warehouseId])
 
-  const save = async () => {
+  /**
+   * "Guardar y nuevo": deja el formulario listo para el siguiente producto. Conserva lo que suele repetirse al
+   * cargar varios (tipo, ITBIS, unidad, categoría y almacén) y vacía lo demás, la foto incluida. El producto nuevo
+   * arranca Activo, como un alta normal: un "Inactivo" que se arrastrara lo dejaría fuera de la facturación y del POS.
+   */
+  const limpiarParaOtro = () => {
+    setNombre(''); setSku(''); setPrecio(''); setCosto(''); setStock(''); setStockMin('')
+    setOtros(textosDeOtrosPrecios(SIN_OTROS_PRECIOS))
+    setFoto({ tipo: 'ninguna' }); setErrorFoto(null); setFotoRota(false)
+    setActivo(true)
+    setError(null); setSaving(false); enCurso.current = false
+    nombreRef.current?.focus()
+  }
+
+  const save = async (opciones?: { nuevo?: boolean }) => {
+    if (enCurso.current) return
     // Las reglas del backend, antes de enviar. El campo numérico deja teclear
     // un signo menos, y un precio negativo volvía del servidor como error.
     const n = nombre.trim()
@@ -218,6 +241,7 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
     if (problema) { setError(problema); return }
     setError(null)
     setSaving(true)
+    enCurso.current = true
     const payload = {
       nombre: nombre.trim(),
       sku: sku.trim() || undefined,
@@ -295,10 +319,14 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
         toast.success(editing ? `Producto "${payload.nombre}" actualizado.` : `Producto "${payload.nombre}" creado.`)
       }
       onSaved(creado)
-      onClose()
+      // "Guardar y nuevo" solo existe al crear desde la lista: el modal sigue abierto y limpio. Cualquier otro
+      // guardado (editar, o crear con Guardar) cierra como siempre.
+      if (opciones?.nuevo && !editing && !initial) limpiarParaOtro()
+      else onClose()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo guardar el producto.')
       setSaving(false)
+      enCurso.current = false
     }
   }
 
@@ -323,7 +351,7 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
       title={editing ? 'Editar producto' : 'Nuevo producto'}
       sub={editing ? product?.nombre : 'Agrega un artículo al catálogo'}
       icon="package"
-      width={560}
+      width={640}
       onClose={onClose}
       footer={
         <>
@@ -339,7 +367,10 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
             <Btn variant="ghost" icon="trash-2" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={() => setConfirmDel(true)}>Eliminar</Btn>
           ))}
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-          <Btn variant="primary" icon="save" onClick={save} disabled={saving || preparandoFoto}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
+          {!editing && !initial && (
+            <Btn variant="secondary" onClick={() => save({ nuevo: true })} disabled={saving || preparandoFoto}>Guardar y nuevo</Btn>
+          )}
+          <Btn variant="primary" icon="save" onClick={() => save()} disabled={saving || preparandoFoto}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
         </>
       }
     >
@@ -349,75 +380,58 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
         </div>
       )}
 
-      <div className="form-grid">
-        <div className="field full">
+      <div className="pf-cabecera">
+        <button
+          type="button" className="pf-foto" onClick={() => elegirFotoRef.current?.click()} disabled={preparandoFoto || saving}
+          aria-label={foto.tipo === 'ninguna' ? 'Elegir foto' : 'Cambiar foto'}
+        >
+          {preparandoFoto ? <Icon name="loader" className="spin" size={22} />
+            : srcFoto && !fotoRota ? <img src={srcFoto} alt="" onError={() => setFotoRota(true)} />
+            : <Icon name={fotoRota ? 'alert-triangle' : 'package'} size={22} />}
+        </button>
+        <input ref={elegirFotoRef} type="file" accept={TIPOS_FOTO.join(',')} hidden
+          onChange={(e) => { void elegirFoto(e.target.files?.[0]); e.target.value = '' }} />
+        <div className="field pf-nombre">
           <label className="label">Nombre <span className="req">*</span></label>
-          <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto o servicio" autoFocus maxLength={MAX_NOMBRE} />
+          <input ref={nombreRef} className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto o servicio" autoFocus maxLength={MAX_NOMBRE} />
         </div>
-        <div className="field full">
-          <label className="label">Foto <span className="opt">(opcional)</span></label>
-          <div className="foto-producto">
-            <div className="foto-producto-vista">
-              {preparandoFoto ? <Icon name="loader" className="spin" size={22} />
-                : srcFoto && !fotoRota ? <img src={srcFoto} alt="" onError={() => setFotoRota(true)} />
-                : <Icon name={fotoRota ? 'alert-triangle' : 'package'} size={26} />}
-            </div>
-            <div className="foto-producto-acciones">
-              <div className="row gap-sm">
-                <Btn size="sm" icon="upload" onClick={() => elegirFotoRef.current?.click()} disabled={preparandoFoto || saving}>
-                  {foto.tipo === 'ninguna' ? 'Elegir foto' : 'Cambiar foto'}
-                </Btn>
-                {foto.tipo !== 'ninguna' && (
-                  <Btn size="sm" variant="ghost" icon="trash-2" style={{ color: 'var(--danger)' }} disabled={preparandoFoto || saving}
-                    onClick={() => { setErrorFoto(null); setFotoRota(false); setFoto({ tipo: 'ninguna' }) }}>Quitar</Btn>
-                )}
-              </div>
-              <span className="text-sm muted">
-                {errorFoto
-                  ? <span style={{ color: 'var(--danger)' }}>{errorFoto}</span>
-                  : fotoRota ? 'No se pudo cargar la foto guardada. Puedes cambiarla o quitarla.'
-                  : foto.tipo === 'nueva' ? 'Se sube al guardar.'
-                  : foto.tipo === 'ninguna' && product?.imagen ? 'Se quita al guardar.'
-                  : 'JPG, PNG o WebP. Se ve en el POS y en la lista de productos.'}
-              </span>
-            </div>
-            <input ref={elegirFotoRef} type="file" accept={TIPOS_FOTO.join(',')} hidden
-              onChange={(e) => { void elegirFoto(e.target.files?.[0]); e.target.value = '' }} />
-          </div>
-        </div>
-        <div className="field">
-          <label className="label">SKU <span className="opt">(opcional)</span></label>
-          <input className="input" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="Ej. ALM-0451" />
-        </div>
-        <div className="field">
-          <label className="label">Categoría <span className="opt">(opcional)</span></label>
-          <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={catsQ.loading}>
-            <option value="">Sin categoría</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label className="label">Almacén</label>
-          <select className="select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} disabled={whQ.loading}>
-            {warehouses.length === 0 && <option value="">{whQ.loading ? 'Cargando…' : 'Sin almacenes'}</option>}
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.nombre}</option>)}
-          </select>
-        </div>
+        <span className="pf-activo" onClick={() => setActivo(!activo)}>
+          <Switch on={activo} onChange={setActivo} />
+          <span>Activo</span>
+        </span>
+      </div>
+      <div className="pf-nota-foto hint">
+        <span>
+          {errorFoto
+            ? <span style={{ color: 'var(--danger)' }}>{errorFoto}</span>
+            : fotoRota ? 'No se pudo cargar la foto guardada. Puedes cambiarla o quitarla.'
+            : foto.tipo === 'nueva' ? 'Se sube al guardar.'
+            : foto.tipo === 'ninguna' && product?.imagen ? 'Se quita al guardar.'
+            : 'JPG, PNG o WebP. Se ve en el POS y en la lista de productos.'}
+        </span>
+        {foto.tipo !== 'ninguna' && (
+          <Btn size="sm" variant="ghost" icon="trash-2" style={{ color: 'var(--danger)' }} disabled={preparandoFoto || saving}
+            onClick={() => { setErrorFoto(null); setFotoRota(false); setFoto({ tipo: 'ninguna' }) }}>Quitar</Btn>
+        )}
+      </div>
+
+      <div className="pf-fila">
         <div className="field">
           <label className="label">Tipo</label>
           <Seg options={['Bien', 'Servicio']} value={tipo} onChange={(v) => setTipo(v as 'Bien' | 'Servicio')} />
         </div>
         <div className="field">
           <label className="label">ITBIS</label>
-          <div className="row gap-sm" style={{ alignItems: 'center', minHeight: 36 }}>
-            <Switch on={gravado} onChange={setGravado} />
-            <span className="text-sm muted">{gravado ? 'Gravado 18%' : 'Exento'}</span>
-          </div>
+          <Seg options={['18%', 'Exento']} value={gravado ? '18%' : 'Exento'} onChange={(v) => setGravado(v === '18%')} />
         </div>
         <div className="field">
           <label className="label">Unidad de medida</label>
           <UnidadMedidaSelect value={unidadMedida} onChange={setUnidadMedida} />
         </div>
+      </div>
+
+      <h4 className="pf-seccion">Precios</h4>
+      <div className="pf-fila">
         <div className="field">
           <label className="label">Precio 1 (RD$)</label>
           <input className="input num" type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0.00" />
@@ -426,34 +440,50 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
           <label className="label">Costo (RD$)</label>
           <input className="input num" type="number" min="0" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="0.00" />
         </div>
-        <div className="full grid-3">
-          {([2, 3, 4] as const).map((lista, i) => (
-            <div className="field" key={lista}>
-              <label className="label">Precio {lista} <span className="opt">(opcional)</span></label>
-              <input
-                className="input num" type="number" min="0" step="0.01" placeholder="—" value={otros[i]}
-                onChange={(e) => setOtros((prev) => prev.map((t, j) => (j === i ? e.target.value : t)) as [string, string, string])}
-              />
+        <div className="field">
+          <label className="label">Margen</label>
+          <input className="input num" readOnly tabIndex={-1} value={textoMargen(precio, costo)} aria-live="polite" />
+        </div>
+      </div>
+      <div className="pf-fila">
+        {([2, 3, 4] as const).map((lista, i) => (
+          <div className="field" key={lista}>
+            <label className="label">Precio {lista}</label>
+            <input
+              className="input num" type="number" min="0" step="0.01" placeholder="—" value={otros[i]}
+              onChange={(e) => setOtros((prev) => prev.map((t, j) => (j === i ? e.target.value : t)) as [string, string, string])}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="hint pf-nota">Otras listas de precio. Vacío = no aplica.</div>
+
+      {tipo === 'Bien' && (
+        <>
+          <h4 className="pf-seccion">Inventario</h4>
+          <div className="pf-fila">
+            <div className="field">
+              <label className="label">Almacén</label>
+              <select className="select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} disabled={whQ.loading}>
+                {warehouses.length === 0 && <option value="">{whQ.loading ? 'Cargando…' : 'Sin almacenes'}</option>}
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.nombre}</option>)}
+              </select>
             </div>
-          ))}
-        </div>
-        <div className="field full">
-          <div className="hint" style={{ marginTop: 0 }}>Déjalos vacíos si no aplican.</div>
-        </div>
-        {tipo === 'Bien' && (
-          <>
             <div className={'field' + (problemaStock ? ' field-error' : '')}>
               <label className="label">Existencia</label>
-              {stockSoloLectura ? (
-                // Un Bien sin existencia anotada vale 0 para el bloqueo: se ve igual que en la lista.
-                <input className="input num" readOnly value={fmtCantidad(Number(stock) || 0)} />
-              ) : (
-                <input
-                  className="input num" type="number" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
-                  value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—"
-                  aria-invalid={problemaStock != null || undefined}
-                />
-              )}
+              <div className="pf-con-sufijo">
+                {stockSoloLectura ? (
+                  // Un Bien sin existencia anotada vale 0 para el bloqueo: se ve igual que en la lista.
+                  <input className="input num" readOnly value={fmtCantidad(Number(stock) || 0)} />
+                ) : (
+                  <input
+                    className="input num" type="number" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
+                    value={stock} onChange={(e) => setStock(e.target.value)} placeholder="—"
+                    aria-invalid={problemaStock != null || undefined}
+                  />
+                )}
+                {codigoUnidad && <span className="pf-sufijo" title={unidadElegida?.descripcion}>{codigoUnidad}</span>}
+              </div>
               {problemaStock && <div className="err-msg">{problemaStock}</div>}
               {estricto && !editing && (
                 <div className="hint">Cantidad con la que abre el inventario; después solo cambia con un ajuste.</div>
@@ -461,35 +491,47 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
             </div>
             <div className={'field' + (problemaMin ? ' field-error' : '')}>
               <label className="label">Stock mínimo</label>
-              <input
-                className="input num" type="number" min="0" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
-                value={stockMin} onChange={(e) => setStockMin(e.target.value)} placeholder="—"
-                aria-invalid={problemaMin != null || undefined}
-              />
+              <div className="pf-con-sufijo">
+                <input
+                  className="input num" type="number" min="0" step={fracciona ? 'any' : 1} inputMode={fracciona ? 'decimal' : 'numeric'}
+                  value={stockMin} onChange={(e) => setStockMin(e.target.value)} placeholder="—"
+                  aria-invalid={problemaMin != null || undefined}
+                />
+                {codigoUnidad && <span className="pf-sufijo" title={unidadElegida?.descripcion}>{codigoUnidad}</span>}
+              </div>
               {problemaMin && <div className="err-msg">{problemaMin}</div>}
             </div>
-            {stockSoloLectura && (
-              <div className="field full">
-                <div className="row gap-sm hint" style={{ marginTop: 0, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                  <span>
-                    Tu empresa bloquea las ventas sin existencia: aquí la existencia no se escribe. Cambia con un
-                    ajuste de inventario o al registrar una compra.
-                  </span>
-                  {nav && puedeVerVista(user, 'ajuste-nuevo') && (
-                    <Btn variant="secondary" size="sm" icon="git-compare" onClick={() => nav('ajuste-nuevo')}>
-                      Ir a Ajuste de inventario
-                    </Btn>
-                  )}
-                </div>
+          </div>
+          {stockSoloLectura && (
+            <div className="field">
+              <div className="row gap-sm hint" style={{ marginTop: 0, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <span>
+                  Tu empresa bloquea las ventas sin existencia: aquí la existencia no se escribe. Cambia con un
+                  ajuste de inventario o al registrar una compra.
+                </span>
+                {nav && puedeVerVista(user, 'ajuste-nuevo') && (
+                  <Btn variant="secondary" size="sm" icon="git-compare" onClick={() => nav('ajuste-nuevo')}>
+                    Ir a Ajuste de inventario
+                  </Btn>
+                )}
               </div>
-            )}
-          </>
-        )}
-        <div className="field full">
-          <span className="row gap-sm" style={{ alignItems: 'center', cursor: 'pointer' }} onClick={() => setActivo(!activo)}>
-            <Switch on={activo} onChange={setActivo} />
-            <span className="text-sm">Activo (visible en facturación)</span>
-          </span>
+            </div>
+          )}
+        </>
+      )}
+
+      <h4 className="pf-seccion">Clasificación</h4>
+      <div className="pf-fila pf-fila-2">
+        <div className="field">
+          <label className="label">SKU</label>
+          <input className="input" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="Ej. ALM-0451" />
+        </div>
+        <div className="field">
+          <label className="label">Categoría</label>
+          <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={catsQ.loading}>
+            <option value="">Sin categoría</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
         </div>
       </div>
     </Modal>

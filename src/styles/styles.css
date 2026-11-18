@@ -1198,3 +1198,22 @@ button.menu-item:focus-visible { background: var(--surface-hover); }
   display: grid; place-items: center; background: var(--neutral-soft); color: var(--text-2);
 }
 .producto-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- Formulario de producto por secciones (ProductFormModal) --------------- */
+.pf-cabecera { display: flex; align-items: flex-end; gap: 14px; }
+.pf-cabecera .pf-nombre { flex: 1; min-width: 0; margin-bottom: 0; }
+.pf-foto { width: 56px; height: 56px; flex-shrink: 0; padding: 0; border: 1px dashed var(--border); border-radius: var(--r-md); overflow: hidden; display: grid; place-items: center; background: var(--surface-2); color: var(--text-3); cursor: pointer; }
+.pf-foto:hover:not(:disabled) { border-color: var(--text-3); }
+.pf-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf-activo { display: inline-flex; align-items: center; gap: 8px; padding-bottom: 8px; white-space: nowrap; cursor: pointer; font-size: 13px; }
+.pf-nota-foto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }
+.pf-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 16px; }
+.pf-fila-2 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.pf-seccion { font-size: 13px; font-weight: 600; color: var(--text); margin: 16px 0 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.pf-nota { margin: -6px 0 4px; }
+.pf-con-sufijo { position: relative; }
+.pf-con-sufijo .input { padding-right: 72px; }
+.pf-con-sufijo input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+.pf-con-sufijo input[type='number']::-webkit-inner-spin-button,
+.pf-con-sufijo input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pf-sufijo { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-3); }
