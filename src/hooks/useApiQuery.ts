@@ -38,7 +38,7 @@ export interface ApiQueryState<T> {
 export function useApiQuery<T>(
   key: readonly unknown[],
   fn: () => Promise<T>,
-  opts: { keepPrevious?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean } = {},
+  opts: { keepPrevious?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean; enabled?: boolean } = {},
 ): ApiQueryState<T> {
   const q = useQuery({
     queryKey: key,
@@ -59,6 +59,9 @@ export function useApiQuery<T>(
     // Solo si quien llama lo pide. Pasarla en undefined taparía la del
     // QueryClient (main.tsx): TanStack mezcla las opciones con un spread.
     ...(opts.refetchOnWindowFocus !== undefined && { refetchOnWindowFocus: opts.refetchOnWindowFocus }),
+    // Consulta que depende de algo que aún no hay (un cliente sin elegir): `enabled: false` no la dispara.
+    // Mientras esté apagada y sin dato, `loading` sigue en true: quien la apaga lo sabe y no lo muestra.
+    ...(opts.enabled !== undefined && { enabled: opts.enabled }),
   })
   return {
     data: q.data ?? null,

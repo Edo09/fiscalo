@@ -25,6 +25,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { id: 'facturas-simples', label: 'Facturas simples' },
   { id: 'cotizaciones', label: 'Cotizaciones' },
   { id: 'clients', label: 'Clientes' },
+  { id: 'cobros', label: 'Cobros' },
   { id: 'products', label: 'Productos y servicios' },
   { id: 'categories', label: 'Categorías' },
   { id: 'warehouses', label: 'Almacenes' },

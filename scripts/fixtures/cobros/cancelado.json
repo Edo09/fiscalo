@@ -1,0 +1,37 @@
+{
+    "status": true,
+    "data": {
+        "id": 11,
+        "client_id": 2,
+        "cliente": {
+            "id": 2,
+            "nombre": "Beta SA",
+            "contacto": "Beta Contacto",
+            "empresa": "Beta SA",
+            "rnc": "",
+            "email": "",
+            "telefono": ""
+        },
+        "periodo": "2026-12",
+        "descripcion": null,
+        "monto": 1000,
+        "monto_pagado": 0,
+        "saldo": 0,
+        "fecha_vencimiento": "2026-12-10",
+        "estado": "Cancelado",
+        "dias_atraso": 0,
+        "dias_para_vencer": null,
+        "con_abonos": false,
+        "cancelado_at": "2026-11-16 10:00:00",
+        "motivo_cancelacion": "El cliente pidio saltar diciembre",
+        "generado_de_cobro_id": null,
+        "ultimo_pago": null,
+        "ultimo_recordatorio": null,
+        "recordatorios": 0,
+        "created_at": "2026-11-16 10:00:00",
+        "updated_at": "2026-11-16 10:00:00",
+        "pagos": [],
+        "recordatorios_lista": [],
+        "genero": []
+    }
+}

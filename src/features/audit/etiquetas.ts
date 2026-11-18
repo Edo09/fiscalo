@@ -21,6 +21,7 @@ const MODULOS: Record<string, string> = {
   proveedores: 'Proveedores',
   categories: 'Categorías',
   warehouses: 'Almacenes',
+  cobros: 'Cobros',
   cotizaciones: 'Cotizaciones',
   // Los conduces se registran con su propio módulo aunque su permiso sea el de
   // cotizaciones: 'conduces' no está en el catálogo de permisos y saldría crudo.
@@ -57,6 +58,13 @@ const ACCIONES: Record<string, string> = {
   AJUSTE_CREAR: 'Ajuste de inventario',
   AJUSTE_ANULAR: 'Anulación de ajuste',
   INVENTARIO_CONFIG: 'Regla de existencias',
+  // Cobros: la configuración mensual de un cliente, pagos, cancelaciones y recordatorios hechos a mano.
+  CONFIG: 'Cobro mensual configurado',
+  PAYMENT: 'Pago registrado',
+  VOID_PAYMENT: 'Pago anulado',
+  CANCEL: 'Cobro cancelado',
+  REOPEN: 'Cobro reabierto',
+  REMINDER: 'Recordatorio anotado',
   ASSIGN: 'Asignación de rol',
   LOGO_UPLOAD: 'Logo subido',
   LOGO_DELETE: 'Logo eliminado',
@@ -73,10 +81,10 @@ export function etiquetaAccion(accion: string): string {
 /** Color del badge de la acción: lo fallido manda sobre el tipo de acción. */
 export function tonoAccion(r: Pick<AuditLogRow, 'action' | 'success'>): BadgeTone {
   if (!r.success) return 'danger'
-  if (r.action === 'DELETE' || r.action === 'AJUSTE_ANULAR' || r.action === 'LOGO_DELETE') return 'warning'
+  if (r.action === 'DELETE' || r.action === 'AJUSTE_ANULAR' || r.action === 'LOGO_DELETE' || r.action === 'VOID_PAYMENT' || r.action === 'CANCEL') return 'warning'
   // Que se note: alguien de fuera de la empresa entró con su propio usuario.
   if (r.action === 'CAMBIO_EMPRESA') return 'warning'
-  if (r.action === 'CREATE' || r.action === 'EMIT' || r.action === 'INTEGRACION_EMIT') return 'success'
+  if (r.action === 'CREATE' || r.action === 'EMIT' || r.action === 'INTEGRACION_EMIT' || r.action === 'PAYMENT') return 'success'
   if (r.action.startsWith('LOGIN') || r.action === 'LOGOUT' || r.action.startsWith('DGII_AUTH')) return 'info'
   return 'neutral'
 }

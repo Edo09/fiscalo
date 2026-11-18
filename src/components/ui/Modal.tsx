@@ -1,5 +1,5 @@
 // Diálogo modal centrado (cierra con Escape o click en el overlay).
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
 import { Btn } from './Btn'
 
@@ -14,14 +14,22 @@ export interface ModalProps {
   footer?: ReactNode
   onClose: () => void
   width?: number
+  /**
+   * true = no se puede cerrar (ni con la X, ni con Escape, ni tocando fuera): hay un guardado en curso, y cerrar a
+   * medias dejaría a la persona sin saber si se guardó. Por defecto se cierra (nada cambia para quien no lo pasa).
+   */
+  bloqueado?: boolean
 }
-export function Modal({ title, sub, icon, children, footer, onClose, width = 520 }: ModalProps) {
+export function Modal({ title, sub, icon, children, footer, onClose, width = 520, bloqueado = false }: ModalProps) {
   const [closing, setClosing] = useState(false)
+  // El valor de AHORA, no el del montaje: el listener de Escape se registra una sola vez.
+  const bloqueadoAhora = useRef(bloqueado)
+  useEffect(() => { bloqueadoAhora.current = bloqueado })
   // Pasos por X/overlay/Escape: anima la salida antes de desmontar. Los botones
   // del footer (Cancelar/Guardar) los provee cada caller con su propio onClose
   // directo, así que cierran al instante — fuera del alcance de este componente.
   const requestClose = () => {
-    if (closing) return
+    if (closing || bloqueadoAhora.current) return
     setClosing(true)
     setTimeout(onClose, EXIT_MS)
   }
@@ -46,7 +54,7 @@ export function Modal({ title, sub, icon, children, footer, onClose, width = 520
             <h3>{title}</h3>
             {sub && <div className="sub">{sub}</div>}
           </div>
-          <Btn variant="ghost" size="sm" icon="x" onClick={requestClose} />
+          <Btn variant="ghost" size="sm" icon="x" onClick={requestClose} aria-label="Cerrar" title="Cerrar" />
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}

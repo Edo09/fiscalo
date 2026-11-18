@@ -40,6 +40,8 @@ const POR_RECURSO: Record<string, number> = {
   facturas: FRESCURA.VOLATIL,
   'facturas-simples': FRESCURA.VOLATIL,
   gastos: FRESCURA.VOLATIL,
+  // Cobros: otro usuario registra un pago, y el estado (Vencido) cambia solo con la fecha.
+  cobros: FRESCURA.VOLATIL,
   // Los e-CF entrantes llegan empujados por la DGII: es una bandeja de entrada.
   'ecf-recibidos': FRESCURA.VOLATIL,
   // Los rangos e-NCF suelen registrarse por fuera (phpMyAdmin / otro operador).

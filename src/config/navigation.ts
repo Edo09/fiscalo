@@ -24,6 +24,7 @@ export type ViewId =
   | 'punto-venta'
   | 'conduce-editar'
   | 'clientes'
+  | 'cobros'
   | 'productos'
   | 'categorias'
   | 'almacenes'
@@ -67,6 +68,9 @@ export interface ConduceRef { kind: 'conduce'; id: number }
 /** Conduce nuevo a partir de una cotización de Ferretería (botón "Conduce"). */
 export interface ConduceDesdeCotizacion { kind: 'conduce-desde-cotizacion'; cotizacionId: number }
 
+/** Abre Cobros con el panel de ese cliente (botón "Cobros" de la ficha del cliente). */
+export interface ClienteCobrosRef { kind: 'cliente-cobros'; clientId: number }
+
 /**
  * Ajuste de inventario con las líneas ya puestas: lo que el aviso de existencia
  * de una factura manda a `ajuste-nuevo` (botón "Ir a Ajuste de inventario"). Cada
@@ -82,7 +86,7 @@ export interface AjustePrefill {
 
 export type NavPayload =
   | Factura | EcfTipo | FacturaPrefill | FacturaSimplePrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef
-  | ConduceRef | ConduceDesdeCotizacion | AjustePrefill | null
+  | ConduceRef | ConduceDesdeCotizacion | AjustePrefill | ClienteCobrosRef | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
@@ -122,6 +126,12 @@ export function isCotizacionRef(p: NavPayload): p is CotizacionRef {
 /** ¿El payload apunta a un conduce guardado? */
 export function isConduceRef(p: unknown): p is ConduceRef {
   return p != null && (p as ConduceRef).kind === 'conduce'
+}
+
+/** ¿El payload pide abrir Cobros en el panel de un cliente? */
+export function isClienteCobrosRef(p: unknown): p is ClienteCobrosRef {
+  return p != null && (p as ClienteCobrosRef).kind === 'cliente-cobros'
+    && Number.isInteger((p as ClienteCobrosRef).clientId) && (p as ClienteCobrosRef).clientId > 0
 }
 
 /** ¿El payload pide un conduce nuevo desde una cotización? */
@@ -196,6 +206,7 @@ export function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayl
   if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
   if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
   if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
+  if (isClienteCobrosRef(p1) && isClienteCobrosRef(p2)) return p1.clientId === p2.clientId
   // Dos ajustes con las mismas líneas (mismo producto y cantidad, en el mismo orden) abren lo mismo.
   if (isAjustePrefill(p1) && isAjustePrefill(p2)) {
     return p1.lineas.length === p2.lineas.length
@@ -288,6 +299,8 @@ export const NAV: NavGroup[] = [
       // El POS solo vende; esto se administra aqui. Solo con el POS activo.
       { id: 'punto-venta', label: 'Punto de venta', icon: 'printer', module: 'pos', requierePos: true },
       { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
+      // Cuentas por cobrar por cliente (api-gratex docs/modules/cobros.md): módulo RBAC propio.
+      { id: 'cobros', label: 'Cobros', icon: 'wallet', module: 'cobros' },
     ],
   },
   {
@@ -473,6 +486,7 @@ export const TITLES: Record<ViewId, string> = {
   'punto-venta': 'Punto de venta',
   'conduce-editar': 'Conduce',
   clientes: 'Clientes',
+  cobros: 'Cobros',
   productos: 'Productos',
   categorias: 'Categorías',
   almacenes: 'Almacenes',

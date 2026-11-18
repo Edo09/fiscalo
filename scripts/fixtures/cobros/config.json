@@ -1,0 +1,11 @@
+{
+    "status": true,
+    "data": {
+        "client_id": 1,
+        "monto_mensual": 6000,
+        "dia_vencimiento": 31,
+        "descripcion": "Mensualidad",
+        "activo": true,
+        "updated_at": "2026-11-16 10:00:00"
+    }
+}

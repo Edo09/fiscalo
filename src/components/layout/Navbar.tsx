@@ -19,6 +19,7 @@ const NUEVOS: { view: ViewId; payload?: NavPayload; icon: IconName; label: strin
   { view: 'gastos', payload: { kind: 'nuevo' }, icon: 'receipt', label: 'Gasto menor' },
   { view: 'compras', payload: { kind: 'nuevo' }, icon: 'shopping-cart', label: 'Compra' },
   { view: 'cotizacion-nueva', icon: 'file-plus', label: 'Cotización' },
+  { view: 'cobros', payload: { kind: 'nuevo' }, icon: 'wallet', label: 'Cobro' },
 ]
 
 export interface NavbarProps {
@@ -179,7 +180,15 @@ export function Navbar({
             <Btn variant="primary" size="sm" icon="plus">Nueva</Btn>
           }>
             {nuevos.map((n) => (
-              <MenuItem key={n.view} icon={n.icon} onClick={() => nav(n.view, n.payload)}>{n.label}</MenuItem>
+              <MenuItem
+                key={n.view} icon={n.icon}
+                // Cobros recibe la señal como objeto NUEVO en cada clic (compara por identidad): con el mismo objeto,
+                // la segunda vez que se pulsa "Cobro" no cambiaba nada y el formulario no se abría. Gastos y Compras
+                // siguen con el suyo: con un objeto nuevo preguntarían por lo sin guardar al repetir el clic.
+                onClick={() => nav(n.view, n.view === 'cobros' && n.payload ? { ...n.payload } : n.payload)}
+              >
+                {n.label}
+              </MenuItem>
             ))}
           </Dropdown>
         )}

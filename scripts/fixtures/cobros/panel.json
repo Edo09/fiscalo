@@ -1,0 +1,327 @@
+{
+    "status": true,
+    "data": {
+        "cliente": {
+            "id": 1,
+            "nombre": "ACME SRL",
+            "contacto": "Ana Gómez",
+            "empresa": "ACME",
+            "rnc": "131256432",
+            "email": "a@x.do",
+            "telefono": "809-555-0001"
+        },
+        "config": {
+            "client_id": 1,
+            "monto_mensual": 6000,
+            "dia_vencimiento": 31,
+            "descripcion": "Mensualidad",
+            "activo": true,
+            "updated_at": "2026-11-16 10:00:00"
+        },
+        "resumen": {
+            "saldo_pendiente": 6000,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 1,
+            "cobros_vencidos": 0,
+            "total_cobrado": 29000,
+            "total_facturado": 35000,
+            "proximo_vencimiento": {
+                "cobro_id": 6,
+                "periodo": "2027-03",
+                "fecha_vencimiento": "2027-03-31",
+                "saldo": 6000
+            },
+            "vencido_desde": null
+        },
+        "sugerido": {
+            "periodo": "2027-04",
+            "monto": 6000,
+            "fecha_vencimiento": "2027-04-30",
+            "descripcion": "Mensualidad"
+        },
+        "cobros": [
+            {
+                "id": 6,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2027-03",
+                "descripcion": "Mensualidad",
+                "monto": 6000,
+                "monto_pagado": 0,
+                "saldo": 6000,
+                "fecha_vencimiento": "2027-03-31",
+                "estado": "Pendiente",
+                "dias_atraso": 0,
+                "dias_para_vencer": 135,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": 5,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": null,
+                "pagos": []
+            },
+            {
+                "id": 5,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2027-02",
+                "descripcion": "Mensualidad",
+                "monto": 6000,
+                "monto_pagado": 6000,
+                "saldo": 0,
+                "fecha_vencimiento": "2027-02-28",
+                "estado": "Pagado",
+                "dias_atraso": 0,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": 4,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": "2026-11-16 10:00:00",
+                "pagos": [
+                    {
+                        "id": 6,
+                        "cobro_id": 5,
+                        "monto": 6000,
+                        "fecha_pago": "2026-11-16",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2027-01",
+                "descripcion": "Mensualidad",
+                "monto": 6000,
+                "monto_pagado": 6000,
+                "saldo": 0,
+                "fecha_vencimiento": "2027-01-31",
+                "estado": "Pagado",
+                "dias_atraso": 0,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": 3,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": "2026-11-16 10:00:00",
+                "pagos": [
+                    {
+                        "id": 5,
+                        "cobro_id": 4,
+                        "monto": 6000,
+                        "fecha_pago": "2026-11-16",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2026-12",
+                "descripcion": "Mensualidad",
+                "monto": 6000,
+                "monto_pagado": 6000,
+                "saldo": 0,
+                "fecha_vencimiento": "2026-12-31",
+                "estado": "Pagado",
+                "dias_atraso": 0,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": 2,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": "2026-11-16 10:00:00",
+                "pagos": [
+                    {
+                        "id": 4,
+                        "cobro_id": 3,
+                        "monto": 6000,
+                        "fecha_pago": "2026-11-16",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    }
+                ]
+            },
+            {
+                "id": 2,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2026-11",
+                "descripcion": "Mensualidad",
+                "monto": 6000,
+                "monto_pagado": 6000,
+                "saldo": 0,
+                "fecha_vencimiento": "2026-11-30",
+                "estado": "Pagado",
+                "dias_atraso": 0,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": 1,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": "2026-11-16 10:00:00",
+                "pagos": [
+                    {
+                        "id": 3,
+                        "cobro_id": 2,
+                        "monto": 6000,
+                        "fecha_pago": "2026-11-16",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    }
+                ]
+            },
+            {
+                "id": 1,
+                "client_id": 1,
+                "cliente": {
+                    "id": 1,
+                    "nombre": "ACME SRL",
+                    "contacto": "Ana Gómez",
+                    "empresa": "ACME",
+                    "rnc": "131256432",
+                    "email": "a@x.do",
+                    "telefono": "809-555-0001"
+                },
+                "periodo": "2026-10",
+                "descripcion": "Mensualidad",
+                "monto": 5000,
+                "monto_pagado": 5000,
+                "saldo": 0,
+                "fecha_vencimiento": "2026-10-31",
+                "estado": "Pagado",
+                "dias_atraso": 0,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": null,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": "2026-11-16 10:00:00",
+                "pagos": [
+                    {
+                        "id": 14,
+                        "cobro_id": 1,
+                        "monto": 3000,
+                        "fecha_pago": "2026-11-16",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    },
+                    {
+                        "id": 2,
+                        "cobro_id": 1,
+                        "monto": 3000,
+                        "fecha_pago": "2026-11-10",
+                        "metodo": "efectivo",
+                        "observaciones": null,
+                        "anulado": true,
+                        "anulado_at": "2026-11-16 10:00:00",
+                        "motivo_anulacion": "Rebote",
+                        "created_at": "2026-11-16 10:00:00"
+                    },
+                    {
+                        "id": 1,
+                        "cobro_id": 1,
+                        "monto": 2000,
+                        "fecha_pago": "2026-10-20",
+                        "metodo": "transferencia",
+                        "observaciones": "Abono",
+                        "anulado": false,
+                        "anulado_at": null,
+                        "motivo_anulacion": null,
+                        "created_at": "2026-11-16 10:00:00"
+                    }
+                ]
+            }
+        ],
+        "recordatorios": []
+    }
+}

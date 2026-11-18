@@ -1,0 +1,151 @@
+{
+    "status": true,
+    "data": {
+        "hoy": "2026-11-16",
+        "ahora": "2026-11-16 10:00:00",
+        "mes": "2026-11",
+        "dias": 7,
+        "totales": {
+            "pendiente": 21000,
+            "vencido": 3300,
+            "por_vencer": 6200,
+            "cobrado_mes": 32150.5,
+            "por_cobrar_mes": 6200,
+            "facturado_mes": 15350.5,
+            "cobros_abiertos": 9,
+            "cobros_vencidos": 3,
+            "clientes_con_saldo": 6,
+            "clientes_con_atraso": 2
+        },
+        "antiguedad": [
+            {
+                "tramo": "vigente",
+                "etiqueta": "Vigente",
+                "cobros": 6,
+                "monto": 17700
+            },
+            {
+                "tramo": "1-30",
+                "etiqueta": "1 a 30 días",
+                "cobros": 1,
+                "monto": 800
+            },
+            {
+                "tramo": "31-60",
+                "etiqueta": "31 a 60 días",
+                "cobros": 1,
+                "monto": 1500
+            },
+            {
+                "tramo": "61-90",
+                "etiqueta": "61 a 90 días",
+                "cobros": 0,
+                "monto": 0
+            },
+            {
+                "tramo": "90+",
+                "etiqueta": "Más de 90 días",
+                "cobros": 1,
+                "monto": 1000
+            }
+        ],
+        "proximos": [
+            {
+                "id": 18,
+                "client_id": 8,
+                "cliente": {
+                    "id": 8,
+                    "nombre": "Hotel 100% SA",
+                    "contacto": "Hotel Contacto",
+                    "empresa": "Hotel 100% SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "periodo": "2026-11",
+                "descripcion": null,
+                "monto": 5000,
+                "monto_pagado": 0,
+                "saldo": 5000,
+                "fecha_vencimiento": "2026-11-16",
+                "estado": "Pendiente",
+                "dias_atraso": 0,
+                "dias_para_vencer": 0,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": null,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": null
+            },
+            {
+                "id": 17,
+                "client_id": 7,
+                "cliente": {
+                    "id": 7,
+                    "nombre": "Golf SA",
+                    "contacto": "Golf Contacto",
+                    "empresa": "Golf SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "periodo": "2026-11",
+                "descripcion": null,
+                "monto": 1200,
+                "monto_pagado": 0,
+                "saldo": 1200,
+                "fecha_vencimiento": "2026-11-18",
+                "estado": "Pendiente",
+                "dias_atraso": 0,
+                "dias_para_vencer": 2,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": null,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": null
+            }
+        ],
+        "atrasados": [
+            {
+                "client_id": 6,
+                "cliente": {
+                    "id": 6,
+                    "nombre": "Foxtrot SA",
+                    "contacto": "Foxtrot Contacto",
+                    "empresa": "Foxtrot SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "cobros_vencidos": 2,
+                "saldo_vencido": 2500,
+                "mas_antiguo": "2026-08-15",
+                "dias_atraso": 93
+            },
+            {
+                "client_id": 7,
+                "cliente": {
+                    "id": 7,
+                    "nombre": "Golf SA",
+                    "contacto": "Golf Contacto",
+                    "empresa": "Golf SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "cobros_vencidos": 1,
+                "saldo_vencido": 800,
+                "mas_antiguo": "2026-10-31",
+                "dias_atraso": 16
+            }
+        ]
+    }
+}

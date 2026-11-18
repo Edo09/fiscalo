@@ -1,0 +1,114 @@
+{
+    "status": true,
+    "data": {
+        "cliente": {
+            "id": 7,
+            "nombre": "Golf SA",
+            "contacto": "Golf Contacto",
+            "empresa": "Golf SA",
+            "rnc": "",
+            "email": "",
+            "telefono": ""
+        },
+        "config": null,
+        "resumen": {
+            "saldo_pendiente": 2000,
+            "saldo_vencido": 800,
+            "cobros_abiertos": 2,
+            "cobros_vencidos": 1,
+            "total_cobrado": 0,
+            "total_facturado": 2000,
+            "proximo_vencimiento": {
+                "cobro_id": 17,
+                "periodo": "2026-11",
+                "fecha_vencimiento": "2026-11-18",
+                "saldo": 1200
+            },
+            "vencido_desde": "2026-10-31"
+        },
+        "sugerido": {
+            "periodo": "2026-12",
+            "monto": null,
+            "fecha_vencimiento": null,
+            "descripcion": null
+        },
+        "cobros": [
+            {
+                "id": 17,
+                "client_id": 7,
+                "cliente": {
+                    "id": 7,
+                    "nombre": "Golf SA",
+                    "contacto": "Golf Contacto",
+                    "empresa": "Golf SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "periodo": "2026-11",
+                "descripcion": null,
+                "monto": 1200,
+                "monto_pagado": 0,
+                "saldo": 1200,
+                "fecha_vencimiento": "2026-11-18",
+                "estado": "Pendiente",
+                "dias_atraso": 0,
+                "dias_para_vencer": 2,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": null,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": null,
+                "pagos": []
+            },
+            {
+                "id": 16,
+                "client_id": 7,
+                "cliente": {
+                    "id": 7,
+                    "nombre": "Golf SA",
+                    "contacto": "Golf Contacto",
+                    "empresa": "Golf SA",
+                    "rnc": "",
+                    "email": "",
+                    "telefono": ""
+                },
+                "periodo": "2026-10",
+                "descripcion": null,
+                "monto": 800,
+                "monto_pagado": 0,
+                "saldo": 800,
+                "fecha_vencimiento": "2026-10-31",
+                "estado": "Vencido",
+                "dias_atraso": 16,
+                "dias_para_vencer": null,
+                "con_abonos": false,
+                "cancelado_at": null,
+                "motivo_cancelacion": null,
+                "generado_de_cobro_id": null,
+                "ultimo_pago": null,
+                "ultimo_recordatorio": null,
+                "recordatorios": 0,
+                "created_at": "2026-11-16 10:00:00",
+                "updated_at": null,
+                "pagos": []
+            }
+        ],
+        "recordatorios": [
+            {
+                "id": 2,
+                "cobro_id": 17,
+                "periodo": "2026-11",
+                "fecha_hora": "2026-11-16 09:30:00",
+                "canal": "mensaje",
+                "nota": null,
+                "usuario": "edo",
+                "created_at": "2026-11-16 10:00:00"
+            }
+        ]
+    }
+}
