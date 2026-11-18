@@ -260,8 +260,17 @@ a { color: inherit; text-decoration: none; }
   padding: 0 20px;
   position: sticky; top: 0; z-index: 30;
 }
+/* Hueco elástico del buscador: toma TODO el espacio libre de la barra (hasta 460px)
+   y es contenedor de consulta, así el buscador de dentro se adapta al ancho que le
+   toque (ver "NAVBAR — BUSCADOR" en responsive.css) sin depender de cuánto midan el
+   nombre de la empresa o el del usuario. Antes el buscador (flex:1) competía por
+   ese espacio con un separador vacío (flex:1) y se quedaba con la mitad. */
+.navbar-search-slot {
+  flex: 1 1 0; min-width: 36px; max-width: 460px;
+  container-name: busqueda; container-type: inline-size;
+}
 .navbar-search {
-  flex: 1; max-width: 460px;
+  width: 100%;
   display: flex; align-items: center; gap: 9px;
   background: var(--bg); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 7px 12px;
@@ -269,15 +278,19 @@ a { color: inherit; text-decoration: none; }
   transition: border 0.12s, box-shadow 0.12s;
 }
 .navbar-search:hover { border-color: var(--border-strong); }
-.navbar-search .lucide { width: 16px; height: 16px; }
-.navbar-search .kbd { margin-left: auto; }
+.navbar-search .lucide { width: 16px; height: 16px; flex-shrink: 0; }
+/* Una sola línea siempre: si no cabe, termina en "…". Antes el texto se partía en
+   3-4 líneas y el cuadro crecía más alto que la barra. */
+.navbar-search-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navbar-search-txt .corto { display: none; }
+.navbar-search .kbd { margin-left: auto; flex-shrink: 0; }
 .kbd {
   font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 5px; padding: 1px 6px; box-shadow: var(--sh-xs);
 }
-.navbar-spacer { flex: 1; }
-.navbar-actions { display: flex; align-items: center; gap: 4px; }
+/* margin-left:auto empuja las acciones a la derecha (lo hacía un separador flex:1). */
+.navbar-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 
 .icon-btn {
   width: 34px; height: 34px; border-radius: var(--r-sm);
@@ -313,18 +326,23 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; gap: 9px; padding: 5px 9px;
   border: 1px solid var(--border); border-radius: var(--r-md);
   background: var(--surface); cursor: pointer; transition: border 0.12s, background .12s;
+  /* Puede encogerse: cuando la barra no alcanza, el nombre pierde letras ("…") en
+     vez de empujar el menú de usuario fuera de la pantalla. Antes medía siempre lo
+     de su contenido (hasta ~290px con la marca de soporte) y la barra se desbordaba
+     por debajo de ~935px de ancho. Solo se encoge el nombre: logo, marca y flecha no. */
+  min-width: 0;
 }
 .co-switch:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-.co-logo { width: 22px; height: 22px; border-radius: 6px; background: var(--neutral-soft); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--text-2); }
-.co-switch .nm { font-size: 13px; font-weight: 600; max-width: 150px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-logo { width: 22px; height: 22px; border-radius: 6px; background: var(--neutral-soft); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--text-2); flex-shrink: 0; }
+.co-switch .nm { font-size: 13px; font-weight: 600; max-width: 150px; min-width: 0; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Usuario de soporte (acceso global): el selector es un botón, y dentro de la
    empresa de un cliente se pinta de aviso para que no se confunda con la suya. */
 button.co-switch { font: inherit; color: var(--text); }
 button.co-switch:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-.co-switch .lucide { color: var(--text-3); }
+.co-switch .lucide { color: var(--text-3); flex-shrink: 0; }
 .co-switch.soporte { border-color: var(--warning); background: var(--warning-soft); }
 .co-switch.soporte:hover { border-color: var(--warning); }
-.co-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--warning); }
+.co-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--warning); flex-shrink: 0; }
 /* La misma marca en el teléfono, junto al avatar (ahí la caja de la empresa no se ve). */
 .navbar-actions .co-tag { padding: 2px 8px; line-height: 18px; place-items: center; border: 1px solid var(--warning); border-radius: 999px; background: var(--warning-soft); }
 
@@ -392,6 +410,8 @@ button.co-switch:focus-visible { outline: none; border-color: var(--accent); box
   box-shadow: var(--sh-xs);
 }
 .card-pad { padding: 18px; }
+/* Recorta el contenido a las esquinas redondeadas (p. ej. una fila de totales con fondo). */
+.card-clip { overflow: hidden; }
 .card-head {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 18px; border-bottom: 1px solid var(--border);
@@ -473,8 +493,34 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th.num { text-align: right; }
 .tbl .muted { color: var(--text-3); }
 .tbl .strong { font-weight: 600; }
+
+/* Pie de tabla: las mismas celdas que el cuerpo. Sin regla propia caía al relleno del
+   navegador (1px) y la etiqueta y el importe del total no quedaban bajo sus columnas.
+   Las vistas que fijan el relleno en línea (padding: 11px 14px) siguen mandando sobre
+   esta regla. Las variantes compacta y móvil están junto a las del cuerpo. */
+.tbl tfoot td { padding: var(--tfoot-py, 11px) 14px; }
+/* Fila de totales con cuerpo (opt-in): <tfoot className="tbl-total">. El relleno
+   horizontal sale de la regla de arriba, así el total siempre queda bajo su columna. */
+.tbl tfoot.tbl-total { --tfoot-py: 13px; }
+.tbl tfoot.tbl-total td {
+  background: color-mix(in oklab, var(--accent) 4%, var(--surface-2));
+  border-top: 1px solid var(--border-strong);
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.tbl-total-n { margin-left: 2px; font-size: 12.5px; font-weight: 500; color: var(--text-3); }
+.tbl tfoot.tbl-total .cur { margin-right: 5px; font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+
+/* Tabla de cifras (opt-in): columnas numéricas parejas y sin saltos de línea. Con poco
+   ancho hace scroll dentro de .tbl-wrap en vez de apretar el nombre del producto. */
+.tbl-cifras { min-width: 720px; }
+.tbl-cifras th.num { width: 12%; }
+.tbl-cifras td.num { white-space: nowrap; }
+
 .cell-main { font-weight: 600; color: var(--text); }
 .cell-sub { font-size: 12px; color: var(--text-3); }
+/* Sin dato ("—") y nota breve junto a una cifra ("de ficha"): que no compitan con ella. */
+.cell-empty { color: var(--text-3); }
+.cell-tag { margin-right: 8px; font-size: 11px; font-weight: 500; color: var(--text-3); cursor: help; }
 .cell-desc { font-size: 12px; color: var(--text-3); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-check { width: 36px; }
 
@@ -874,6 +920,7 @@ button.menu-item:focus-visible { background: var(--surface-hover); }
 .density-compact .card-head { padding: 11px 14px; }
 .density-compact .tbl tbody td { padding: 8px 14px; }
 .density-compact .tbl thead th { padding: 8px 14px; }
+.density-compact .tbl tfoot td { padding: 8px 14px; }
 .density-compact .page { padding-top: 18px; }
 .density-compact .kpi-grid, .density-compact .dash-grid { gap: 12px; }
 

@@ -175,7 +175,8 @@ export function InventoryValueView() {
         </p>
       )}
 
-      <Card noPad>
+      {/* card-clip: la fila de totales lleva fondo y no debe asomar por las esquinas redondeadas. */}
+      <Card noPad className="card-clip">
         {loading ? (
           <LoadingState rows={8} />
         ) : error ? (
@@ -188,15 +189,15 @@ export function InventoryValueView() {
           </EmptyState>
         ) : (
           <div className="tbl-wrap">
-            <table className="tbl">
+            <table className="tbl tbl-cifras">
               <thead>
                 <tr>
                   <th>Producto</th>
-                  <th style={{ textAlign: 'right' }}>Entradas</th>
-                  <th style={{ textAlign: 'right' }}>Salidas</th>
-                  <th style={{ textAlign: 'right' }}>Existencia</th>
-                  <th style={{ textAlign: 'right' }}>Costo promedio</th>
-                  <th style={{ textAlign: 'right' }}>Valor inventario</th>
+                  <th className="num">Entradas</th>
+                  <th className="num">Salidas</th>
+                  <th className="num">Existencia</th>
+                  <th className="num">Costo promedio</th>
+                  <th className="num">Valor inventario</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,37 +213,43 @@ export function InventoryValueView() {
                       </div>
                     </td>
                     <td className="num text-sm" style={r.entradas > 0 ? { color: 'var(--success)' } : undefined}>
-                      {r.entradas ? fmtCantidad(r.entradas) : '—'}
+                      {r.entradas ? fmtCantidad(r.entradas) : <span className="cell-empty">—</span>}
                     </td>
                     <td className="num text-sm" style={r.salidas > 0 ? { color: 'var(--danger)' } : undefined}>
-                      {r.salidas ? fmtCantidad(r.salidas) : '—'}
+                      {r.salidas ? fmtCantidad(r.salidas) : <span className="cell-empty">—</span>}
                     </td>
                     {/* Un saldo negativo es un descuadre real, no un cero: se marca. */}
                     <td className="num fw6" style={r.existencia < 0 ? { color: 'var(--danger)' } : undefined}>
                       {fmtCantidad(r.existencia)}
                     </td>
                     <td className="num text-sm">
-                      <Money value={r.costo_promedio} cur={false} />
+                      {/* En la misma línea, a la izquierda de la cifra: así la fila no crece y los
+                          importes siguen alineados por su borde derecho. */}
                       {!r.costo_ponderado && (
-                        <div
-                          className="cell-sub"
+                        <span
+                          className="cell-tag"
                           title="Sin entradas en el libro: se muestra el costo de la ficha del producto, no un promedio calculado."
                         >
                           de ficha
-                        </div>
+                        </span>
                       )}
+                      <Money value={r.costo_promedio} cur={false} />
                     </td>
                     <td className="num fw6"><Money value={r.valor_inventario} cur={false} /></td>
                   </tr>
                 ))}
               </tbody>
+              {/* El total es del inventario completo, no de la página: así lo calcula el API. */}
               {totales && (
-                <tfoot>
+                <tfoot className="tbl-total">
                   <tr>
-                    <td colSpan={5} className="fw6 text-sm">
-                      Total del inventario ({totales.productos} {totales.productos === 1 ? 'producto' : 'productos'})
+                    <td colSpan={5}>
+                      Total del inventario{' '}
+                      <span className="tbl-total-n">
+                        ({totales.productos} {totales.productos === 1 ? 'producto' : 'productos'})
+                      </span>
                     </td>
-                    <td className="num fw6"><Money value={totales.valor} cur={false} /></td>
+                    <td className="num"><Money value={totales.valor} /></td>
                   </tr>
                 </tfoot>
               )}
@@ -261,10 +268,11 @@ export function InventoryValueView() {
           onPage={setPage}
           onPageSize={(n) => { setPageSize(n); setPage(1) }}
           pageSizeOptions={PAGE_SIZES}
+          className="mt-lg"
         />
       )}
 
-      <p className="text-xs muted-3" style={{ marginTop: 12 }}>
+      <p className="text-xs muted-3" style={{ marginTop: 16 }}>
         El costo promedio es el ponderado de las entradas registradas en el libro; los productos sin
         entradas muestran el costo de su ficha. Los servicios no aparecen: no tienen existencia.
       </p>

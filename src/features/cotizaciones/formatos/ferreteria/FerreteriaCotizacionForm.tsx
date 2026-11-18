@@ -27,6 +27,7 @@ import {
   type ErroresFerreteria, type LineaFerreteriaForm,
 } from './schema'
 import { BloqueCliente } from './BloqueCliente'
+import { CampoDescuento } from './CampoDescuento'
 import { DescripcionLinea } from './DescripcionLinea'
 import { clienteDeFila, formatearRnc, lineaDesdeProducto, lineaLibre, lineasDeFila } from './lineas'
 import { cambiosLineas, fotoLineas, idNuevo, idParaFilaEnBlanco } from './cambios'
@@ -50,6 +51,10 @@ import '@/styles/factura-doc.css'
 
    Los totales de la pantalla salen de totalesFerreteria(), las mismas cuentas
    que hace el servidor al guardar (que ignora cualquier total que se le mande).
+
+   El descuento tiene su propia fila bajo el Sub-total (CampoDescuento): se resta
+   ANTES del ITBIS y de la retención, y solo se ofrece si el backend lo guarda
+   (branding.cotizacion_descuento). Los cargos y abonos siguen debajo del ITBIS.
    No hay envío por correo: para este formato todavía no existe. */
 
 /** Opciones del indicador de facturación DGII (tasa de ITBIS de la línea). */
@@ -60,9 +65,11 @@ const IND_FACT_OPCIONES: { value: IndicadorFacturacion; label: string }[] = [
   { value: 4, label: 'Exento' },
 ]
 
-const SIN_AJUSTES: AjustesFerreteriaForm = { cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false }
+const SIN_AJUSTES: AjustesFerreteriaForm = {
+  cargosBancarios: 0, manejoBancario: 0, manoObra: 0, abono: 0, retencion: false, descuento: 0,
+}
 
-/** Cargos y abonos guardados: montos DECIMAL como texto; una clave ausente es 0. */
+/** Descuento, cargos y abonos guardados: montos DECIMAL como texto; una clave ausente es 0. */
 function ajustesDeFila(row: CotizacionRow): AjustesFerreteriaForm {
   const a = row.ajustes ?? {}
   return {
@@ -73,6 +80,7 @@ function ajustesDeFila(row: CotizacionRow): AjustesFerreteriaForm {
     // Se guarda el MONTO de la retención; la casilla solo dice si la hay. Al
     // guardar, el backend la vuelve a calcular sobre el Sub-total de ese momento.
     retencion: aNumero(a.retencion_isr) > 0,
+    descuento: aNumero(a.descuento),
   }
 }
 
@@ -213,11 +221,16 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   /** Las líneas que se guardan: las filas vacías se descartan sin avisar (ver lineaEnBlanco). */
   const enUso = lineas.filter((l) => !lineaEnBlanco(l))
   // Un negativo también cuenta: el grupo no se puede cerrar con el error dentro.
+  // El descuento no cuenta aquí: tiene su propia fila bajo el Sub-total, fuera del grupo.
   const hayAjustes = ajustes.cargosBancarios !== 0 || ajustes.manejoBancario !== 0 || ajustes.manoObra !== 0
     || ajustes.abono !== 0 || ajustes.retencion
   // Abierto si el usuario lo abrió o si ya tiene algo: con valores no se puede
   // esconder, porque cambian el TOTAL.
   const ajustesVisibles = ajustesAbiertos || hayAjustes
+  // La fila "Descuento" solo sale si el backend sabe guardarla (branding), o si
+  // la cotización ya trae uno: el backend viejo rechazaría un concepto que no
+  // conoce, y ofrecer la fila para que el guardado falle sería peor que no ofrecerla.
+  const descuentoVisible = branding?.cotizacion_descuento === true || ajustes.descuento !== 0
 
   // --- Qué se tocó respecto a la cotización cargada (como la factura simple) ---
   // Una nueva no tiene foto: nada sale marcado y hayCambios es false.
@@ -231,6 +244,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   // --- Salir sin guardar ---
   // Una nueva avisa en cuanto tiene algo escrito; una existente, cuando se tocó algo.
   const hayAlgoEscrito = cliente != null || clienteLibre.trim() !== '' || enUso.length > 0 || hayAjustes
+    || ajustes.descuento !== 0
   const salida = useAvisoSalida(
     editando ? hayCambios : hayAlgoEscrito,
     editando
@@ -680,6 +694,16 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
             <div className="fx-total-linea">
               <span>Sub-total</span><span><Money value={t.subtotal} cur={false} /></span>
             </div>
+            {/* Descuento: se resta del Sub-total ANTES del ITBIS, que se calcula
+                sobre lo que queda (igual que la retención). Fuera de "Cargos y
+                abonos", que se suman o se restan después. */}
+            {descuentoVisible && (
+              <CampoDescuento
+                subtotal={t.subtotal} value={ajustes.descuento}
+                error={errores.ajustes.descuento} cambiado={ajusteCambiado('descuento')}
+                onValue={(v) => updAjuste('descuento', v)}
+              />
+            )}
             <div className="fx-total-linea">
               <span>{t.etiquetaItbis}</span><span><Money value={t.itbis} cur={false} /></span>
             </div>

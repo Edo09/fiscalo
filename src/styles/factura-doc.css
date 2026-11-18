@@ -1004,6 +1004,14 @@
 .fx-ajuste-monto { width: 120px; flex: 0 0 auto; border-bottom-color: var(--border-strong); }
 .fx-ajuste-err { justify-content: flex-end; padding: 0 12px; }
 
+/* Fila "Descuento" (bajo el Sub-total): el % y el monto en RD$ van juntos a la
+   derecha. El % es mas angosto; el signo menos recuerda que se resta. */
+.fx-descuento-campos { display: inline-flex; align-items: baseline; gap: 6px; }
+.fx-ajuste-pct { width: 60px; flex: 0 0 auto; border-bottom-color: var(--border-strong); }
+.fx-ajuste-pct.fx-mod { border-bottom-color: var(--warning); }
+.fx-descuento-signo { font-size: 12.5px; color: var(--text-3); }
+.fx-descuento-menos { margin-left: 4px; }
+
 .fx-ajuste-check {
   display: flex;
   align-items: center;

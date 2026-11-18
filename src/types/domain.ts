@@ -194,6 +194,13 @@ export interface FacturaPrefill {
   /** Avisos bajo el banner de conversión (ej. cargos de la cotización que no se copiaron). */
   avisos?: string[]
   /**
+   * Descuento en RD$ que traía el origen (la fila "Descuento" de la cotización).
+   * Ya viaja repartido en el `desc` de cada línea, así que el descuento fijo del
+   * cliente NO se aplica encima (sería descontar dos veces) ni se avisa de él.
+   * Ausente = el origen no tenía descuento: se aplica el del cliente, como siempre.
+   */
+  descuentoOrigen?: number
+  /**
    * Los campos opcionales ligan la línea al catálogo. Ausentes = línea libre
    * como hasta ahora: sin producto, unidad 43, indicador 1, 'Bien'.
    */
@@ -201,6 +208,8 @@ export interface FacturaPrefill {
     nombre: string
     cantidad: number
     precio: number
+    /** % de descuento de la línea (0–100): la parte que le tocó del descuento del origen. Ausente = 0. */
+    desc?: number
     prodId?: string
     /** Código DGII de la unidad (= unidades_medida.id). */
     unidadMedida?: number
@@ -222,8 +231,15 @@ export interface FacturaSimplePrefill {
   origenTipo?: 'conduce'
   /** Avisos bajo el banner de conversión. */
   avisos?: string[]
-  /** `precio` YA incluye el ITBIS: la factura simple cobra precios finales. */
-  lineas: { prodId?: string; descripcion: string; cantidad: number; precio: number; unidadMedida?: number | null }[]
+  /** Descuento en RD$ que traía el origen, ya repartido en el `desc` de las líneas (ver FacturaPrefill.descuentoOrigen). */
+  descuentoOrigen?: number
+  /**
+   * `precio` YA incluye el ITBIS: la factura simple cobra precios finales.
+   * `desc` = % de descuento de la línea (la parte que le tocó del descuento del origen); ausente = 0.
+   */
+  lineas: {
+    prodId?: string; descripcion: string; cantidad: number; precio: number; desc?: number; unidadMedida?: number | null
+  }[]
 }
 
 export interface Proveedor {

@@ -12,6 +12,29 @@
    ============================================================ */
 
 /* ============================================================
+   NAVBAR — BUSCADOR (por contenedor, no por viewport)
+   El hueco .navbar-search-slot toma el espacio libre de la barra y el
+   buscador decide qué mostrar según el ancho que le toca. Un @media tendría
+   que adivinar cuánto miden el nombre de la empresa y el del usuario; así no.
+     ≥300px  icono + "Buscar facturas, clientes, e-CF…" + ⌘K
+     ≤299px  sin el ⌘K: la etiqueta completa vale más que el atajo
+     ≤254px  etiqueta corta: "Buscar…"
+     ≤109px  solo el icono, en un cuadrado de 36px
+   Se escriben de mayor a menor: la regla de cada tramo se suma a las anteriores.
+   ============================================================ */
+@container busqueda (max-width: 299px) {
+  .navbar-search .kbd { display: none; }
+}
+@container busqueda (max-width: 254px) {
+  .navbar-search-txt .largo { display: none; }
+  .navbar-search-txt .corto { display: inline; }
+}
+@container busqueda (max-width: 109px) {
+  .navbar-search { width: 36px; height: 36px; padding: 0; justify-content: center; }
+  .navbar-search-txt { display: none; }
+}
+
+/* ============================================================
    TABLET — ≤1024px
    ============================================================ */
 @media (max-width: 1024px) {
@@ -93,6 +116,7 @@
   .card-head { padding: 12px 14px; flex-wrap: wrap; row-gap: 8px; }
   .tbl thead th { padding: 9px 10px; }
   .tbl tbody td { padding: 9px 10px; }
+  .tbl tfoot td { padding: 9px 10px; }
 
   /* ---- Toolbar: buscador a todo el ancho; filtros se reparten debajo ---- */
   .toolbar { gap: 8px; }
