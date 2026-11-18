@@ -52,6 +52,8 @@
 
 /* El interruptor del cobro mensual es un <button class="switch">: sin el borde ni el relleno del botón. */
 .cobros-interruptor { border: 0; padding: 0; cursor: pointer; }
+/* Su fila es un <label> dentro de .field, que le daba display:block, negrita y margen: así se queda en una línea, con el texto normal. */
+.field label.cobros-interruptor-fila { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-bottom: 0; cursor: pointer; }
 
 /* Fila de pagos dentro del historial del cliente. */
 .cobros-pagos { background: var(--surface-2); padding: 8px 12px 12px; }

@@ -13,7 +13,7 @@ import {
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { nuevaClave } from '../clave'
 import { admitePago, conceptoCobro, fechaCorta, periodoLargo, textoSiguiente } from '../format'
-import { useDetalleCobro, useRegistrarPago, useRelojServidor } from '../hooks'
+import { useDetalleParaFormulario, useRegistrarPago, useRelojServidor } from '../hooks'
 import { Aviso } from './Aviso'
 import { EstadoCobroBadge } from './EstadoCobroBadge'
 
@@ -21,7 +21,8 @@ import { EstadoCobroBadge } from './EstadoCobroBadge'
 const CODIGOS_CLAVE_USADA = ['CLAVE_CON_OTROS_DATOS', 'CLAVE_REPETIDA', 'PAGO_ANULADO']
 
 export function PagoFormModal({ cobroId, onClose }: { cobroId: number; onClose: () => void }) {
-  const { data, error, loading, reload } = useDetalleCobro(cobroId)
+  // Espera al dato fresco: el monto por defecto sale del saldo al montarse el formulario (ver useDetalleParaFormulario).
+  const { data, error, loading, reload } = useDetalleParaFormulario(cobroId)
   if (loading) return <Modal title="Registrar pago" icon="banknote" onClose={onClose}><LoadingState rows={3} /></Modal>
   // Un error SIN dato es el que no deja abrir el formulario. Con dato (un refetch que falló) el formulario sigue:
   // desmontarlo borraría lo que la persona ya escribió, y "Reintentar" le cambiaría la clave de idempotencia.

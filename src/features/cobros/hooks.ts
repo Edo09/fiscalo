@@ -1,6 +1,7 @@
 // Datos de Cobros con TanStack Query: consultas (con su caché) y mutaciones. Toda mutación invalida
 // ['cobros'] entera: un pago cambia a la vez la lista, el dashboard, el panel del cliente, los
 // recordatorios y el siguiente cobro generado, y es más barato volver a pedirlos que acertar cuáles.
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   anularPagoCobro, cancelarCobro, createCobro, getClienteCobros, getCobro, getRecordatoriosCobros, getResumenCobros,
@@ -58,6 +59,22 @@ export function useRecordatoriosCobros(dias = DIAS_PROXIMOS, cada = DIAS_RECORDA
 /** El panel de un cliente: configuración, resumen, cobros con sus pagos y recordatorios. */
 export function usePanelCliente(clientId: number) {
   return useApiQuery(cobrosKeys.cliente(clientId), () => getClienteCobros(clientId))
+}
+
+/**
+ * El cobro para un FORMULARIO que toma su estado inicial al montarse (el monto por defecto de un pago, los campos de una edición):
+ * como useDetalleCobro, pero `loading` sigue en true hasta que llega un dato FRESCO de esta apertura. Con el dato viejo de la caché
+ * (de antes de cancelar o reabrir el cobro, de un pago de otro usuario…) el formulario arrancaba con valores que ya no valen (un pago de
+ * RD$ 0.00, un monto de otro momento) y, al llegar el dato nuevo, no se corregían. Si el refetch falla, se usa el dato de la caché, con su
+ * aviso; si no hay dato, es el error de siempre.
+ */
+export function useDetalleParaFormulario(id: number) {
+  const q = useDetalleCobro(id)
+  const [fresco, setFresco] = useState(false)
+  useEffect(() => {
+    if (q.data && !q.fetching) setFresco(true)
+  }, [q.data, q.fetching])
+  return { ...q, loading: q.loading || (q.data !== null && !fresco) }
 }
 
 /** Un cobro con todo su historial. Los formularios lo leen aquí para mostrar el saldo de AHORA. */

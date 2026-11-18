@@ -102,7 +102,7 @@ export function ConfigClienteForm({ clientId, config, periodoInicial }: {
         <div className="field full">
           {/* Un interruptor de verdad (botón con role="switch"): se alcanza con el teclado, y es el único control que
               decide si el cobro del mes siguiente se genera solo. La etiqueta lo activa al tocar el texto. */}
-          <label className="row gap-sm" style={{ alignItems: 'center', cursor: 'pointer' }}>
+          <label className="cobros-interruptor-fila">
             <button
               type="button" role="switch" aria-checked={activo} className={'switch cobros-interruptor' + (activo ? ' on' : '')}
               onClick={() => setActivo(!activo)}

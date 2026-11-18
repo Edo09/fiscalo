@@ -13,7 +13,7 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { ClientCombobox } from '@/features/clients/ClientCombobox'
 import { periodoLargo, textoSiguiente, vencimientoDe } from '../format'
-import { cobrosKeys, useActualizarCobro, useCrearCobro, useDetalleCobro } from '../hooks'
+import { cobrosKeys, useActualizarCobro, useCrearCobro, useDetalleParaFormulario } from '../hooks'
 import { useCobrosUi } from '../store'
 import { Aviso } from './Aviso'
 
@@ -32,7 +32,8 @@ export function CobroFormModal({ cobroId, clientId, onClose }: Props) {
 }
 
 function EditarCobro({ cobroId, onClose }: { cobroId: number; onClose: () => void }) {
-  const { data, error, loading, reload } = useDetalleCobro(cobroId)
+  // Espera al dato fresco: los campos del formulario salen del cobro al montarse (con uno viejo, guardar pisaría el cambio de otro).
+  const { data, error, loading, reload } = useDetalleParaFormulario(cobroId)
   if (loading) return <Modal title="Editar cobro" icon="edit-3" onClose={onClose}><LoadingState rows={3} /></Modal>
   // Solo un error SIN dato impide abrirlo: con dato (un refetch fallido) el formulario sigue y no pierde lo escrito.
   if (!data) {

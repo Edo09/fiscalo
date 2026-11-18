@@ -50,6 +50,10 @@ Se tocaron tres componentes compartidos, siempre con una prop opcional que no ca
   Con dato (la red se cayó al refrescar) el formulario sigue, con un aviso de que los datos pueden estar viejos;
   desmontarlo borraba lo escrito. Las mutaciones invalidan la caché también al fallar (un 409 o un tiempo agotado
   dejan datos viejos en pantalla).
+- **Un formulario espera el primer dato fresco al abrirse** (`useDetalleParaFormulario`): toma su estado inicial al
+  montarse (el monto por defecto de un pago, los campos de una edición) y, con el dato viejo de la caché (de antes de
+  cancelar o reabrir el cobro, del pago de otro usuario), arrancaba con valores que ya no valen: al pagar un cobro recién
+  reabierto el monto salía en RD$ 0.00, y guardar una edición habría pisado el cambio de otro.
 - **Hora de RD, no la del navegador**: el dashboard trae `hoy` y `ahora` del servidor; `useRelojServidor` los lee de
   la caché y les suma el tiempo transcurrido. La fecha de un pago y la hora de un recordatorio salen de ahí: un
   usuario de soporte en otra zona horaria ya no ve su fecha "de mañana" rechazada.
