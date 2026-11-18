@@ -10,6 +10,7 @@
 //   node scripts/test-lineas-ferreteria.ts
 import type { ConduceRow, CotizacionRow } from '../src/api/types.ts'
 import type { Producto } from '../src/types/domain.ts'
+import { SIN_OTROS_PRECIOS } from '../src/lib/listasPrecio.ts'
 import {
   clienteDeFila, formatearRnc, indicadorDe, lineaDesdeProducto, lineaLibre, lineasDeFila, siguienteId,
 } from '../src/features/cotizaciones/formatos/ferreteria/lineas.ts'
@@ -108,7 +109,8 @@ igual('null o ausente: vacío', [formatearRnc(null), formatearRnc(undefined)], [
 console.log('Línea de un producto del catálogo')
 const producto = (p: Partial<Producto>): Producto => ({
   id: '55', sku: 'CEM-01', nombre: 'FUNDAS CEMENTO GRIS', cat: 'Construcción', categoryId: 2, warehouseId: 1,
-  tipo: 'Bien', precio: 935, costo: 700, stock: 40, min: 5, itbis: 18, unidadMedida: 43, estado: 'activo', ...p,
+  tipo: 'Bien', precio: 935, otrosPrecios: SIN_OTROS_PRECIOS, costo: 700, stock: 40, min: 5, itbis: 18, unidadMedida: 43,
+  estado: 'activo', ...p,
 })
 igual('su nombre, su precio SIN ITBIS, 18% → 1, su unidad, Bien, cantidad 1', lineaDesdeProducto(producto({}), 3),
   { id: 3, prodId: '55', descripcion: 'FUNDAS CEMENTO GRIS', cantidad: 1, precio: 935, indFact: 1, unidadMedida: 43, tipoItem: 'Bien' })
@@ -118,6 +120,10 @@ igual('un servicio con su unidad', lineaDesdeProducto(producto({ id: '56', tipo:
   { id: 2, prodId: '56', descripcion: 'FUNDAS CEMENTO GRIS', cantidad: 1, precio: 935, indFact: 1, unidadMedida: 47, tipoItem: 'Servicio' })
 igual('sin unidad (0): 43', lineaDesdeProducto(producto({ unidadMedida: 0 }), 1).unidadMedida, 43)
 igual('un tipo que no es Servicio: Bien', lineaDesdeProducto(producto({ tipo: 'Producto' }), 1).tipoItem, 'Bien')
+igual('con otro precio elegido: la línea lleva ese precio',
+  lineaDesdeProducto(producto({ otrosPrecios: [900, null, null] }), 3, 900).precio, 900)
+igual('sin precio elegido: el del producto (el conduce no pregunta)',
+  lineaDesdeProducto(producto({ otrosPrecios: [900, null, null] }), 3).precio, 935)
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

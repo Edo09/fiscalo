@@ -18,6 +18,7 @@ import { puedeVerVista, type Nav } from '@/config/navigation'
 import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { redondear } from '@/features/invoices/montosLinea'
 import { decimalesDe, fmtCantidad } from '@/lib/format'
+import { payloadOtrosPrecios, problemaPrecioExtra, SIN_OTROS_PRECIOS, textosDeOtrosPrecios } from '@/lib/listasPrecio'
 import { useSession } from '@/stores/auth'
 import type { Producto } from '@/types/domain'
 
@@ -131,6 +132,8 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
   const [precio, setPrecio] = useState(
     product ? String(product.precio) : (initial?.precio ? String(initial.precio) : ''),
   )
+  // Listas de precio 2, 3 y 4 (opcionales): vacío o 0 = esa lista no aplica.
+  const [otros, setOtros] = useState<[string, string, string]>(textosDeOtrosPrecios(product?.otrosPrecios ?? SIN_OTROS_PRECIOS))
   const [costo, setCosto] = useState(product ? String(product.costo) : '')
   const [stock, setStock] = useState(product?.stock != null ? String(product.stock) : '')
   const [stockMin, setStockMin] = useState(product?.min != null ? String(product.min) : '')
@@ -203,11 +206,13 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
     // Las reglas del backend, antes de enviar. El campo numérico deja teclear
     // un signo menos, y un precio negativo volvía del servidor como error.
     const n = nombre.trim()
+    const problemaOtros = ([2, 3, 4] as const).map((lista, i) => problemaPrecioExtra(otros[i], lista)).find((m) => m !== null) ?? null
     const problema =
       !n ? 'Escribe el nombre del producto o servicio.'
       : n.length > MAX_NOMBRE ? `El nombre no puede pasar de ${MAX_NOMBRE} caracteres.`
       : Number(precio) < 0 ? 'El precio no puede ser negativo.'
       : Number(costo) < 0 ? 'El costo no puede ser negativo.'
+      : problemaOtros ? problemaOtros
       : !unidadValida(unidadMedida, unidades) ? 'Elige la unidad de medida: la que tenía no está en el catálogo de la DGII.'
       : problemaStock ?? problemaMin
     if (problema) { setError(problema); return }
@@ -222,6 +227,9 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
       indicador_facturacion: gravado ? 1 : 4, // 1=gravado 18%, 4=exento
       unidad_medida: String(unidadMedida),
       precio: Number(precio) || 0,
+      // Las listas 2 a 4 viajan SIEMPRE, al crear y al editar: el API reescribe la fila entera y
+      // lo que no llegue queda en NULL (así se borraban al editar un producto).
+      ...payloadOtrosPrecios(otros),
       costo: Number(costo) || 0,
       // `stock` viaja siempre, también al editar con el bloqueo activo: el API lo ignora en
       // ese caso y el libro es quien lo mueve. La bandera del navegador puede estar vieja (el
@@ -250,6 +258,7 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
           warehouseId: payload.warehouse_id ?? null,
           tipo,
           precio: payload.precio,
+          otrosPrecios: [payload.precio_2, payload.precio_3, payload.precio_4],
           costo: payload.costo,
           stock: payload.stock,
           min: payload.stock_minimo,
@@ -410,12 +419,26 @@ export function ProductFormModal({ product, initial, nav, onClose, onSaved }: Pr
           <UnidadMedidaSelect value={unidadMedida} onChange={setUnidadMedida} />
         </div>
         <div className="field">
-          <label className="label">Precio (RD$)</label>
+          <label className="label">Precio 1 (RD$)</label>
           <input className="input num" type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0.00" />
         </div>
         <div className="field">
           <label className="label">Costo (RD$)</label>
           <input className="input num" type="number" min="0" step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="0.00" />
+        </div>
+        <div className="full grid-3">
+          {([2, 3, 4] as const).map((lista, i) => (
+            <div className="field" key={lista}>
+              <label className="label">Precio {lista} <span className="opt">(opcional)</span></label>
+              <input
+                className="input num" type="number" min="0" step="0.01" placeholder="—" value={otros[i]}
+                onChange={(e) => setOtros((prev) => prev.map((t, j) => (j === i ? e.target.value : t)) as [string, string, string])}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="field full">
+          <div className="hint" style={{ marginTop: 0 }}>Déjalos vacíos si no aplican.</div>
         </div>
         {tipo === 'Bien' && (
           <>

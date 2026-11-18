@@ -14,6 +14,8 @@ import { r2, redondear } from '@/features/invoices/montosLinea'
 import { presentDocument } from '@/lib/file'
 import { ahoraLocal } from '@/lib/date'
 import { aNumero } from '@/lib/format'
+import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { ElegirPrecio } from '@/features/products/ElegirPrecio'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useSession } from '@/stores/auth'
@@ -64,6 +66,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [prodPicker, setProdPicker] = useState(false)
   const [prodQuery, setProdQuery] = useState('')
+  /** Producto con varias listas de precio que espera a que se elija una. */
+  const [porElegir, setPorElegir] = useState<Producto | null>(null)
   const [errorForm, setErrorForm] = useState<string | null>(null)
   const [errorCliente, setErrorCliente] = useState<string | null>(null)
   /** Cantidad inválida por línea (id → texto), tras intentar guardar. */
@@ -126,11 +130,19 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
   )
 
   // --- Líneas ---
-  const addProducto = (p: Producto) => {
-    setLineas((ls) => [...ls, { id: Date.now(), description: p.nombre, quantity: 1, amount: p.precio }])
+  const addProducto = (p: Producto, precio: number = p.precio) => {
+    setLineas((ls) => [...ls, { id: Date.now(), description: p.nombre, quantity: 1, amount: precio }])
     setProdPicker(false)
     setProdQuery('')
+    setPorElegir(null)
     setErrorForm(null)
+  }
+  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
+  // agrega ya, como siempre.
+  const elegirProducto = (p: Producto) => {
+    const e = eleccionDePrecio(p)
+    if (e.tipo === 'directo') addProducto(p, e.precio)
+    else setPorElegir(p)
   }
   const addLineaLibre = () => { setLineas((ls) => [...ls, LINEA_VACIA()]); setErrorForm(null) }
   const quitarErrCant = (id: number) =>
@@ -469,17 +481,21 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
       )}
 
       {prodPicker && (
-        <Modal title="Agregar producto o servicio" icon="package" onClose={() => setProdPicker(false)}>
-          <div className="search-input mb-md" style={{ width: '100%' }}>
-            <Icon name="search" />
-            <input
-              placeholder="Buscar por nombre, SKU o categoría…"
-              value={prodQuery}
-              onChange={(e) => setProdQuery(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {productos.loading ? (
+        <Modal title="Agregar producto o servicio" icon="package" onClose={() => { setProdPicker(false); setPorElegir(null) }}>
+          {!porElegir && (
+            <div className="search-input mb-md" style={{ width: '100%' }}>
+              <Icon name="search" />
+              <input
+                placeholder="Buscar por nombre, SKU o categoría…"
+                value={prodQuery}
+                onChange={(e) => setProdQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+          {porElegir ? (
+            <ElegirPrecio producto={porElegir} onElegir={(precio) => addProducto(porElegir, precio)} onVolver={() => setPorElegir(null)} />
+          ) : productos.loading ? (
             <div className="state" style={{ padding: 28 }}><Spinner /></div>
           ) : productos.error ? (
             <div className="state" style={{ padding: 28 }}>
@@ -493,18 +509,24 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
             </div>
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
-              {catalogoFiltrado.map((p) => (
-                <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addProducto(p)}>
-                  <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}>
-                    <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} />
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div className="fw6 text-sm">{p.nombre}</div>
-                    <div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div>
+              {catalogoFiltrado.map((p) => {
+                const etiqueta = etiquetaPrecios(p)
+                return (
+                  <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => elegirProducto(p)}>
+                    <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}>
+                      <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} />
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div className="fw6 text-sm">{p.nombre}</div>
+                      <div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div>
+                    </div>
+                    <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
+                      <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
+                      {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                    </span>
                   </div>
-                  <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </Modal>

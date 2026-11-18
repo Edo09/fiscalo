@@ -2,6 +2,7 @@
 import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserRow } from './types'
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { aNumero, colorFor } from '@/lib/format'
+import { otrosPreciosDeFila } from '@/lib/listasPrecio'
 import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
 import { estadoExistencia } from '@/features/inventory/existencia'
 import { dgiiLabel } from './estadosDgii'
@@ -121,6 +122,7 @@ function armarProducto(r: ProductRow, estricto: boolean): Producto {
     warehouseId: r.warehouse_id ?? null,
     tipo,
     precio: Number(r.precio ?? 0),
+    otrosPrecios: otrosPreciosDeFila(r),
     costo: Number(r.costo ?? 0),
     stock,
     min,

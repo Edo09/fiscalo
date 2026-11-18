@@ -612,6 +612,10 @@ export interface ProductRow {
   /** 0=No facturable | 1=ITBIS 18% (gravado) | 2=16% | 3=Tasa cero | 4=Exento */
   indicador_facturacion?: number | null
   precio?: number | string | null
+  /** Listas de precio 2 a 4 (migración 019, DECIMAL(18,4) desde la 029): NULL = no aplica. */
+  precio_2?: number | string | null
+  precio_3?: number | string | null
+  precio_4?: number | string | null
   costo?: number | string | null
   unidad_medida?: string | null
   /**
@@ -635,6 +639,13 @@ export interface CreateProductInput {
   indicador_bien_servicio?: number
   indicador_facturacion?: number
   precio?: number
+  /**
+   * Listas de precio 2 a 4: un número, o null = no aplica. El formulario las manda SIEMPRE: el API
+   * reescribe la fila entera al editar y lo que no llegue queda en NULL.
+   */
+  precio_2?: number | null
+  precio_3?: number | null
+  precio_4?: number | null
   costo?: number
   unidad_medida?: string
   /** Hasta 3 decimales, y solo si la unidad admite fracciones (kg, metro…). */

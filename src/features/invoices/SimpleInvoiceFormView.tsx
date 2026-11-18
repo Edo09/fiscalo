@@ -22,6 +22,8 @@ import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument, printDocument } from '@/lib/file'
 import { hoyLocal } from '@/lib/date'
 import { aNumero, fmtCantidad } from '@/lib/format'
+import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { ElegirPrecio } from '@/features/products/ElegirPrecio'
 import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/components/unidadesMedida'
 import { useAnchoTirilla } from '@/stores/impresora'
 import { imprimirRecibo, type OrigenRecibo } from './imprimirRecibo'
@@ -204,6 +206,8 @@ export function SimpleInvoiceFormView({
   const [nuevoCliente, setNuevoCliente] = useState(false)
   const [catalogoAbierto, setCatalogoAbierto] = useState(false)
   const [buscaProd, setBuscaProd] = useState('')
+  /** Producto con varias listas de precio que espera a que se elija una. */
+  const [porElegir, setPorElegir] = useState<Producto | null>(null)
   const [cambiandoCliente, setCambiandoCliente] = useState(false)
   const [pdfBusy, setPdfBusy] = useState<FormatoImpresion | null>(null)
   const anchoTirilla = useAnchoTirilla()
@@ -376,13 +380,13 @@ export function SimpleInvoiceFormView({
    * Si la ultima linea sigue vacia se reemplaza, para no dejar huecos cuando se
    * abre el catalogo nada mas entrar.
    */
-  const addProducto = (p: Producto) => {
+  const addProducto = (p: Producto, precio: number = p.precio) => {
     const desde = (id: number): Linea => ({
       id,
       prodId: p.id,
       descripcion: p.nombre,
       cantidad: 1,
-      precio: p.precio,
+      precio,
       desc: cliente?.descuento ?? 0,
       // Sin esto toda línea se imprimía como UND, también el cable por metro, y
       // no había con qué saber si la cantidad admite fracciones.
@@ -400,6 +404,14 @@ export function SimpleInvoiceFormView({
     setExistenciasVistas((m) => new Map(m).set(Number(p.id), existenciaDe(p)))
     setCatalogoAbierto(false)
     setBuscaProd('')
+    setPorElegir(null)
+  }
+  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
+  // agrega ya, como siempre.
+  const elegirProducto = (p: Producto) => {
+    const e = eleccionDePrecio(p)
+    if (e.tipo === 'directo') addProducto(p, e.precio)
+    else setPorElegir(p)
   }
 
   const delLinea = (id: number) => setLineas((ls) => (ls.length === 1 ? ls : ls.filter((l) => l.id !== id)))
@@ -1204,20 +1216,24 @@ export function SimpleInvoiceFormView({
           title="Agregar del catálogo"
           sub="El producto trae su precio"
           icon="package"
-          onClose={() => { setCatalogoAbierto(false); setBuscaProd('') }}
+          onClose={() => { setCatalogoAbierto(false); setBuscaProd(''); setPorElegir(null) }}
         >
-          <div className="search-input mb-md" style={{ width: '100%' }}>
-            <Icon name="search" />
-            <input
-              placeholder="Buscar por nombre, SKU o categoría…"
-              value={buscaProd}
-              onChange={(e) => setBuscaProd(e.target.value)}
-              autoFocus
-            />
-            {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
-          </div>
+          {!porElegir && (
+            <div className="search-input mb-md" style={{ width: '100%' }}>
+              <Icon name="search" />
+              <input
+                placeholder="Buscar por nombre, SKU o categoría…"
+                value={buscaProd}
+                onChange={(e) => setBuscaProd(e.target.value)}
+                autoFocus
+              />
+              {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
+            </div>
+          )}
 
-          {productos.loading ? (
+          {porElegir ? (
+            <ElegirPrecio producto={porElegir} onElegir={(precio) => addProducto(porElegir, precio)} onVolver={() => setPorElegir(null)} />
+          ) : productos.loading ? (
             <LoadingState rows={4} />
           ) : productos.error ? (
             <ErrorState title="No se pudo cargar el catálogo" onRetry={productos.reload}>
@@ -1234,9 +1250,15 @@ export function SimpleInvoiceFormView({
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -10px' }}>
               {catalogo.map((p) => {
-                const precio = <span className="fx-prod-precio"><Money value={p.precio} cur={false} /></span>
+                const etiqueta = etiquetaPrecios(p)
+                const precio = (
+                  <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
+                    <span className="fx-prod-precio"><Money value={p.precio} cur={false} /></span>
+                    {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                  </span>
+                )
                 return (
-                  <button type="button" key={p.id} className="fx-prod" onClick={() => addProducto(p)}>
+                  <button type="button" key={p.id} className="fx-prod" onClick={() => elegirProducto(p)}>
                     <Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} style={{ color: 'var(--text-3)' }} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span className="fx-prod-nombre" style={{ display: 'block' }}>{p.nombre}</span>

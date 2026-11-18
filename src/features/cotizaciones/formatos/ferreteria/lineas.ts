@@ -84,15 +84,17 @@ export function formatearRnc(rnc: string | null | undefined): string {
 /**
  * Línea de un artículo del catálogo: su nombre, su precio SIN ITBIS, su
  * unidad, su tasa y si es bien o servicio. En el conduce el precio no se ve:
- * queda guardado para Facturar.
+ * queda guardado para Facturar. `precio` es el de la lista que se eligió (un
+ * producto con varias listas pregunta); sin él, el del producto: el conduce no
+ * pregunta y se queda con el precio 1.
  */
-export function lineaDesdeProducto(p: Producto, id: number): LineaFerreteriaForm {
+export function lineaDesdeProducto(p: Producto, id: number, precio: number = p.precio): LineaFerreteriaForm {
   return {
     id,
     prodId: p.id,
     descripcion: p.nombre,
     cantidad: 1,
-    precio: p.precio,
+    precio,
     indFact: indFactFromItbis(p.itbis),
     unidadMedida: p.unidadMedida || 43,
     tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',

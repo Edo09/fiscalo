@@ -18,6 +18,7 @@ import {
 } from '@/features/inventory/existencia'
 import { useInventarioEstricto } from '@/features/inventory/useInventarioEstricto'
 import { ProductFormModal } from '@/features/products/ProductFormModal'
+import { ElegirPrecio } from '@/features/products/ElegirPrecio'
 import { UnidadMedidaSelect } from '@/components/UnidadMedidaSelect'
 import {
   MSG_UNIDAD, admiteDecimales, problemaCantidad, unidadValida, useUnidadesMedida,
@@ -25,6 +26,7 @@ import {
 import { presentDocument } from '@/lib/file'
 import { isoLocal } from '@/lib/date'
 import { fmtCantidad } from '@/lib/format'
+import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
@@ -237,6 +239,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     })),
   )
   const [prodPicker, setProdPicker] = useState(false)
+  /** Producto con varias listas de precio que espera a que se elija una. */
+  const [precioDe, setPrecioDe] = useState<Producto | null>(null)
   /** Id de la línea libre que se está convirtiendo en producto del catálogo. */
   const [nuevoProdLinea, setNuevoProdLinea] = useState<number | null>(null)
   // Se resuelve contra el estado actual en vez de guardar una copia: si la línea
@@ -402,11 +406,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     }
   }
 
-  const addLinea = (p: Producto) => {
+  const addLinea = (p: Producto, precio: number = p.precio) => {
     setLineas([...lineas, {
       id: Date.now(), prodId: p.id, nombre: p.nombre, descripcion: '', cant: 1,
-      // El producto define el indicador y la unidad por defecto.
-      precio: p.precio, desc: descuentoCliente, indFact: indFactFromItbis(p.itbis),
+      // El producto define el indicador y la unidad por defecto; el precio, la lista elegida.
+      precio, desc: descuentoCliente, indFact: indFactFromItbis(p.itbis),
       unidadMedida: p.unidadMedida || 43,
       tipoItem: p.tipo === 'Servicio' ? 'Servicio' : 'Bien',
     }])
@@ -414,6 +418,14 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     setExistenciasVistas((m) => new Map(m).set(Number(p.id), existenciaDe(p)))
     setProdPicker(false)
     setProdQuery('')
+    setPrecioDe(null)
+  }
+  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
+  // agrega ya, como siempre.
+  const elegirProducto = (p: Producto) => {
+    const e = eleccionDePrecio(p)
+    if (e.tipo === 'directo') addLinea(p, e.precio)
+    else setPrecioDe(p)
   }
   // Línea libre: una descripción sin producto del catálogo (como en un gasto).
   // El usuario escribe descripción, cantidad y precio; default gravado 18% / Unidad.
@@ -1264,13 +1276,17 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
         />
       )}
       {prodPicker && (
-        <Modal title="Agregar producto o servicio" icon="package" onClose={() => { setProdPicker(false); setProdQuery('') }}>
-          <div className="search-input mb-md" style={{ width: '100%' }}>
-            <Icon name="search" />
-            <input placeholder="Buscar por nombre, SKU o categoría…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
-            {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
-          </div>
-          {productos.loading ? (
+        <Modal title="Agregar producto o servicio" icon="package" onClose={() => { setProdPicker(false); setProdQuery(''); setPrecioDe(null) }}>
+          {!precioDe && (
+            <div className="search-input mb-md" style={{ width: '100%' }}>
+              <Icon name="search" />
+              <input placeholder="Buscar por nombre, SKU o categoría…" value={prodQuery} onChange={(e) => setProdQuery(e.target.value)} autoFocus />
+              {productos.fetching && !productos.loading && <Icon name="loader" className="spin" />}
+            </div>
+          )}
+          {precioDe ? (
+            <ElegirPrecio producto={precioDe} onElegir={(precio) => addLinea(precioDe, precio)} onVolver={() => setPrecioDe(null)} />
+          ) : productos.loading ? (
             <div className="row" style={{ justifyContent: 'center', padding: 28 }}><Spinner /></div>
           ) : productos.error ? (
             <div className="state" style={{ padding: 28 }}><span className="text-sm" style={{ color: 'var(--danger)' }}>{productos.error}</span></div>
@@ -1283,9 +1299,15 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
               {catalogo.map((p) => {
-                const precio = <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
+                const etiqueta = etiquetaPrecios(p)
+                const precio = (
+                  <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
+                    <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
+                    {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                  </span>
+                )
                 return (
-                  <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => addLinea(p)}>
+                  <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => elegirProducto(p)}>
                     <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}><Icon name={p.tipo === 'Servicio' ? 'wrench' : 'box'} size={15} /></span>
                     <div style={{ flex: 1 }}><div className="fw6 text-sm">{p.nombre}</div><div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div></div>
                     {estricto && p.tipo !== 'Servicio' ? (

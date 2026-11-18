@@ -1,4 +1,5 @@
 import type { IconName } from '@/components/ui/Icon'
+import type { OtrosPrecios } from '@/lib/listasPrecio'
 // Tipos de dominio para la UI (datos de ejemplo del prototipo).
 // Independientes del esquema de base de datos en `@/types/database`.
 
@@ -63,6 +64,8 @@ export interface Producto {
   warehouseId: number | null
   tipo: string
   precio: number
+  /** Listas de precio 2, 3 y 4 (precio_2..4); null = esa lista no aplica a este producto. */
+  otrosPrecios: OtrosPrecios
   costo: number
   stock: number | null
   min: number | null

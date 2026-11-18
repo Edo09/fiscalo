@@ -289,14 +289,15 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
   /**
    * Artículo del catálogo (lineaDesdeProducto: su nombre, su precio SIN ITBIS,
    * su unidad, su tasa y si es bien o servicio). Si la última fila sigue vacía
-   * se reemplaza, para no dejar huecos.
+   * se reemplaza, para no dejar huecos. `precio` es el de la lista que se eligió
+   * en el buscador (un producto con varias listas pregunta antes); sin él, el del producto.
    */
-  const addProducto = (p: Producto) => {
+  const addProducto = (p: Producto, precio?: number) => {
     setLineas((ls) => {
       const ultima = ls[ls.length - 1]
       return ultima && lineaEnBlanco(ultima)
-        ? [...ls.slice(0, -1), lineaDesdeProducto(p, idParaFilaEnBlanco(ultima, ls, original?.lineas ?? null))]
-        : [...ls, lineaDesdeProducto(p, idNuevo(ls, original?.lineas ?? null))]
+        ? [...ls.slice(0, -1), lineaDesdeProducto(p, idParaFilaEnBlanco(ultima, ls, original?.lineas ?? null), precio)]
+        : [...ls, lineaDesdeProducto(p, idNuevo(ls, original?.lineas ?? null), precio)]
     })
     quitarErrForm()
   }

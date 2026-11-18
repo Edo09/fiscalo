@@ -8,10 +8,17 @@ import { Icon, Money, Spinner } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { fmtCantidad, fmtPrecio } from '@/lib/format'
+import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
 import type { Producto } from '@/types/domain'
+import { ElegirPrecio } from './ElegirPrecio'
 
 interface ProductoComboboxProps {
-  onSelect: (producto: Producto) => void
+  /**
+   * `precio` solo viaja con `mostrarPrecio`: el de la lista que se eligió. Un producto con varias
+   * listas de precio pregunta antes (ElegirPrecio, dentro del desplegable); con una sola se agrega ya.
+   * Sin `mostrarPrecio` (gasto, conduce) no se pregunta nada: llega solo el producto.
+   */
+  onSelect: (producto: Producto, precio?: number) => void
   placeholder?: string
   /** ms de espera tras la última tecla antes de consultar la API. */
   debounceMs?: number
@@ -38,6 +45,8 @@ export function ProductoCombobox({
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  /** Producto con varias listas de precio que espera a que se elija una. */
+  const [elegir, setElegir] = useState<Producto | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,16 +63,24 @@ export function ProductoCombobox({
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setElegir(null) }
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [])
 
-  const select = (p: Producto) => {
-    onSelect(p)
+  const terminar = (p: Producto, precio?: number) => {
+    if (precio === undefined) onSelect(p)
+    else onSelect(p, precio)
     setInput('')
     setOpen(false)
+    setElegir(null)
+  }
+  const select = (p: Producto) => {
+    if (!mostrarPrecio) { terminar(p); return }
+    const e = eleccionDePrecio(p)
+    if (e.tipo === 'directo') terminar(p, e.precio)
+    else setElegir(p)
   }
 
   return (
@@ -81,7 +98,9 @@ export function ProductoCombobox({
 
       {open && (
         <div className="menu combobox-menu">
-          {error ? (
+          {elegir ? (
+            <ElegirPrecio producto={elegir} onElegir={(precio) => terminar(elegir, precio)} onVolver={() => setElegir(null)} />
+          ) : error ? (
             <div className="combobox-msg" style={{ color: 'var(--danger)' }}>{error}</div>
           ) : loading && rows.length === 0 ? (
             <div className="combobox-msg row gap-sm" style={{ justifyContent: 'center' }}><Spinner /> Buscando…</div>
@@ -106,11 +125,13 @@ export function ProductoCombobox({
                   </div>
                 </div>
                 {!ocultarMonto && (
-                  <span className="text-xs muted" style={{ whiteSpace: 'nowrap' }}>
+                  <span className="text-xs muted" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                     {/* El precio con sus decimales (hasta 4): es el que se copia a la línea. */}
                     {mostrarPrecio
                       ? <>Precio <span className="num">{fmtPrecio(p.precio)}</span></>
                       : <>Costo <Money value={p.costo} cur={false} /></>}
+                    {/* "3 precios": avisa que al elegirlo se pregunta cuál usar. */}
+                    {mostrarPrecio && etiquetaPrecios(p) && <><br />{etiquetaPrecios(p)}</>}
                   </span>
                 )}
               </div>
