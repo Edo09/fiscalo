@@ -5,7 +5,8 @@ import { Icon, Btn, RefreshButton, Avatar, Card, KPI, Drawer, EmptyState, Loadin
 import { ApiError, listClients, updateClient, deleteClient, mapClientRow, listUbicaciones } from '@/api'
 import type { ClientRow, Ubicacion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
-import type { Nav } from '@/config/navigation'
+import { puedeVerVista, type Nav } from '@/config/navigation'
+import { useSession } from '@/stores/auth'
 import type { Cliente } from '@/types/domain'
 import { NewClientModal } from './NewClientModal'
 import {
@@ -192,6 +193,7 @@ function opcionesUbicacion(
 /* Drawer de cliente: datos editables, guarda con PUT /api/clients. */
 function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Nav; onClose: () => void }) {
   const queryClient = useQueryClient()
+  const { user } = useSession()
   const cliente: Cliente = mapClientRow(client)
   const { data: ubicaciones } = useApiQuery(['ubicaciones'], listUbicaciones)
   // Foto del registro al abrir: se compara contra ella para mandar solo lo que
@@ -284,6 +286,10 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
         <>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
           <Btn variant="secondary" icon="plus" onClick={() => { onClose(); nav('factura-nueva') }}>Nueva factura</Btn>
+          {/* Cobros de este cliente: su cobro mensual, lo que debe y su historial (solo con el módulo). */}
+          {puedeVerVista(user, 'cobros') && (
+            <Btn variant="secondary" icon="wallet" onClick={() => { onClose(); nav('cobros', { kind: 'cliente-cobros', clientId: client.id }) }}>Cobros</Btn>
+          )}
           <Btn variant="primary" icon="save" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
         </>
       }>

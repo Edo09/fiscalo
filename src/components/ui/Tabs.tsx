@@ -13,12 +13,16 @@ export interface TabsProps {
 }
 export function Tabs({ tabs, active, onChange }: TabsProps) {
   return (
-    <div className="tabs">
+    <div className="tabs" role="tablist">
       {tabs.map((t) => (
         <div
           key={t.id}
           className={'tab' + (active === t.id ? ' on' : '')}
           onClick={() => onChange(t.id)}
+          role="tab"
+          aria-selected={active === t.id}
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(t.id) } }}
         >
           {t.label}
           {t.count != null && (

@@ -227,12 +227,6 @@ export function postJson<T>(path: string, payload: unknown): Promise<T> {
   })
 }
 
-/** Construye un query string a partir de pares definidos. */
-export function qs(params: Record<string, string | number | undefined>): string {
-  const sp = new URLSearchParams()
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== '' && v !== null) sp.set(k, String(v))
-  }
-  const s = sp.toString()
-  return s ? `?${s}` : ''
-}
+// El query string vive en qs.ts (sin dependencias, para probar con Node lo que arma rutas); se re-exporta
+// porque siempre se importó desde este módulo.
+export { qs } from './qs'

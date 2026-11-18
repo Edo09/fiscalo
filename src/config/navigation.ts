@@ -24,6 +24,8 @@ export type ViewId =
   | 'punto-venta'
   | 'conduce-editar'
   | 'clientes'
+  | 'cobros'
+  | 'cobros-tenants'
   | 'productos'
   | 'categorias'
   | 'almacenes'
@@ -67,6 +69,9 @@ export interface ConduceRef { kind: 'conduce'; id: number }
 /** Conduce nuevo a partir de una cotización de Ferretería (botón "Conduce"). */
 export interface ConduceDesdeCotizacion { kind: 'conduce-desde-cotizacion'; cotizacionId: number }
 
+/** Abre Cobros con el panel de ese cliente (botón "Cobros" de la ficha del cliente). */
+export interface ClienteCobrosRef { kind: 'cliente-cobros'; clientId: number }
+
 /**
  * Ajuste de inventario con las líneas ya puestas: lo que el aviso de existencia
  * de una factura manda a `ajuste-nuevo` (botón "Ir a Ajuste de inventario"). Cada
@@ -82,7 +87,7 @@ export interface AjustePrefill {
 
 export type NavPayload =
   | Factura | EcfTipo | FacturaPrefill | FacturaSimplePrefill | NuevoSignal | FacturaSimpleRef | CotizacionRef
-  | ConduceRef | ConduceDesdeCotizacion | AjustePrefill | null
+  | ConduceRef | ConduceDesdeCotizacion | AjustePrefill | ClienteCobrosRef | null
 
 /** ¿El payload es un borrador de factura (conversión de cotización)? */
 export function isFacturaPrefill(p: NavPayload): p is FacturaPrefill {
@@ -122,6 +127,12 @@ export function isCotizacionRef(p: NavPayload): p is CotizacionRef {
 /** ¿El payload apunta a un conduce guardado? */
 export function isConduceRef(p: unknown): p is ConduceRef {
   return p != null && (p as ConduceRef).kind === 'conduce'
+}
+
+/** ¿El payload pide abrir Cobros en el panel de un cliente? */
+export function isClienteCobrosRef(p: unknown): p is ClienteCobrosRef {
+  return p != null && (p as ClienteCobrosRef).kind === 'cliente-cobros'
+    && Number.isInteger((p as ClienteCobrosRef).clientId) && (p as ClienteCobrosRef).clientId > 0
 }
 
 /** ¿El payload pide un conduce nuevo desde una cotización? */
@@ -196,6 +207,7 @@ export function mismoDestino(v1: ViewId, p1: NavPayload, v2: ViewId, p2: NavPayl
   if (isCotizacionRef(p1) && isCotizacionRef(p2)) return p1.id === p2.id
   if (isConduceRef(p1) && isConduceRef(p2)) return p1.id === p2.id
   if (isConduceDesdeCotizacion(p1) && isConduceDesdeCotizacion(p2)) return p1.cotizacionId === p2.cotizacionId
+  if (isClienteCobrosRef(p1) && isClienteCobrosRef(p2)) return p1.clientId === p2.clientId
   // Dos ajustes con las mismas líneas (mismo producto y cantidad, en el mismo orden) abren lo mismo.
   if (isAjustePrefill(p1) && isAjustePrefill(p2)) {
     return p1.lineas.length === p2.lineas.length
@@ -250,6 +262,12 @@ export interface NavItem {
   /** Solo para el rol admin (por nombre de rol, no por módulo). Ver esRolAdmin(). */
   soloAdmin?: boolean
   /**
+   * Solo para las cuentas de soporte (users.acceso_global, ver features/auth/accesoGlobal). No es fail-open: sin
+   * `acceso_global: true` en la sesión no se muestra, ni con rol admin ni con todos los módulos. El servidor lo exige
+   * igual (api-gratex: /api/cobros-tenants responde 403 a quien no lo tiene).
+   */
+  soloAccesoGlobal?: boolean
+  /**
    * Solo para los tenants con este formato de cotización (los conduces son de
    * Ferretería). Además de `module`, no en vez de él. Ver puedeVerItem().
    */
@@ -288,6 +306,8 @@ export const NAV: NavGroup[] = [
       // El POS solo vende; esto se administra aqui. Solo con el POS activo.
       { id: 'punto-venta', label: 'Punto de venta', icon: 'printer', module: 'pos', requierePos: true },
       { id: 'clientes', label: 'Clientes', icon: 'users', module: 'clients' },
+      // Cuentas por cobrar por cliente (api-gratex docs/modules/cobros.md): módulo RBAC propio.
+      { id: 'cobros', label: 'Cobros', icon: 'wallet', module: 'cobros' },
     ],
   },
   {
@@ -330,6 +350,10 @@ export const NAV: NavGroup[] = [
     items: [
       { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield', module: 'users' },
       { id: 'bitacora', label: 'Bitácora', icon: 'history', soloAdmin: true },
+      // Lo que LA PLATAFORMA le cobra a las empresas que la usan (api-gratex docs/modules/cobros.md, "Cobros de tenants"):
+      // solo cuentas de soporte. No es el módulo Cobros de la empresa (que cobra a sus clientes), ni depende de la empresa
+      // en la que esté la sesión.
+      { id: 'cobros-tenants', label: 'Cobros de tenants', icon: 'wallet', soloAccesoGlobal: true },
       // 'configuracion' sin módulo RBAC propio → siempre visible.
       { id: 'configuracion', label: 'Configuración', icon: 'settings' },
     ],
@@ -370,6 +394,12 @@ export function navSoloAdmin(view: ViewId): boolean {
   return NAV.some((g) => g.items.some((i) => i.id === top && i.soloAdmin))
 }
 
+/** ¿La vista (o su item del menú) es solo para las cuentas de soporte (acceso global)? */
+export function navSoloAccesoGlobal(view: ViewId): boolean {
+  const top = navTopFor(view)
+  return NAV.some((g) => g.items.some((i) => i.id === top && i.soloAccesoGlobal))
+}
+
 /** Módulo RBAC asociado a una vista (resolviendo subvistas a su item del menú).
     undefined => la vista no está gateada (siempre accesible). */
 export function navModuleFor(view: ViewId): string | undefined {
@@ -402,6 +432,8 @@ export function navRequierePos(view: ViewId): boolean {
 export interface SesionNav {
   role?: string
   permissions?: string[]
+  /** Cuenta de soporte (master.users.acceso_global): solo ella ve lo `soloAccesoGlobal`. */
+  acceso_global?: boolean
 }
 
 /**
@@ -417,10 +449,12 @@ export interface SesionNav {
  */
 export function puedeVerItem(
   user: SesionNav | null | undefined,
-  it: { module?: string; soloAdmin?: boolean; formato?: FormatoId; requierePos?: boolean },
+  it: { module?: string; soloAdmin?: boolean; soloAccesoGlobal?: boolean; formato?: FormatoId; requierePos?: boolean },
   formato?: FormatoId | null,
   posActivo?: boolean | null,
 ): boolean {
+  // Lo de soporte tampoco es fail-open: sin el acceso global en la sesión no se muestra (ni a un admin).
+  if (it.soloAccesoGlobal && user?.acceso_global !== true) return false
   if (it.formato !== undefined && formato !== it.formato) return false
   // Como el formato: un item del POS solo se ve cuando se SABE que la empresa lo tiene.
   if (it.requierePos && posActivo !== true) return false
@@ -435,7 +469,10 @@ export function puedeVerVista(
 ): boolean {
   return puedeVerItem(
     user,
-    { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), formato: navFormatoFor(view), requierePos: navRequierePos(view) },
+    {
+      module: navModuleFor(view), soloAdmin: navSoloAdmin(view), soloAccesoGlobal: navSoloAccesoGlobal(view),
+      formato: navFormatoFor(view), requierePos: navRequierePos(view),
+    },
     formato,
     posActivo,
   )
@@ -451,7 +488,7 @@ export function puedeVerVista(
 export function debeSalirDeVista(
   user: SesionNav | null | undefined, view: ViewId, formato: FormatoId | null, posActivo: boolean | null = null,
 ): boolean {
-  if (!puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view) })) return true
+  if (!puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), soloAccesoGlobal: navSoloAccesoGlobal(view) })) return true
   // POS: igual que el formato, solo se saca cuando se SABE que la empresa no lo tiene.
   if (navRequierePos(view) && posActivo === false) return true
   const exigido = navFormatoFor(view)
@@ -473,6 +510,8 @@ export const TITLES: Record<ViewId, string> = {
   'punto-venta': 'Punto de venta',
   'conduce-editar': 'Conduce',
   clientes: 'Clientes',
+  cobros: 'Cobros',
+  'cobros-tenants': 'Cobros de tenants',
   productos: 'Productos',
   categorias: 'Categorías',
   almacenes: 'Almacenes',

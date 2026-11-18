@@ -14,8 +14,8 @@ import type { NavItem, SesionNav, ViewId } from '../src/config/navigation.ts'
 import type { NavPayload } from '../src/config/navigation.ts'
 import {
   NAV, TITLES, claveEditorConduce, debeSalirDeVista, isConduceDesdeCotizacion, isConduceRef, isNuevoSignal, mismoDestino,
-  navFormatoFor, navModuleFor, navRequierePos, navSoloAdmin, navTopFor, payloadAlVolver, payloadConduce, puedeVerItem,
-  puedeVerVista,
+  navFormatoFor, navModuleFor, navRequierePos, navSoloAccesoGlobal, navSoloAdmin, navTopFor, payloadAlVolver, payloadConduce,
+  puedeVerItem, puedeVerVista,
 } from '../src/config/navigation.ts'
 import { esRolAdmin, hasModule } from '../src/config/permissions.ts'
 
@@ -27,8 +27,10 @@ const chk = (desc: string, ok: boolean) => {
   console.log(`  [${ok ? 'OK  ' : 'FALLA'}] ${desc}`)
 }
 
-// La regla de antes, copiada tal cual estaba puedeVerItem antes del formato.
-const antes = (user: SesionNav | null | undefined, it: { module?: string; soloAdmin?: boolean }): boolean => {
+// La regla de antes, copiada tal cual estaba puedeVerItem antes del formato; más lo de soporte (soloAccesoGlobal, "Cobros
+// de tenants"), que llegó después y tampoco es fail-open: sin acceso_global en la sesión no se ve, ni siendo admin.
+const antes = (user: SesionNav | null | undefined, it: { module?: string; soloAdmin?: boolean; soloAccesoGlobal?: boolean }): boolean => {
+  if (it.soloAccesoGlobal && user?.acceso_global !== true) return false
   if (it.soloAdmin) return esRolAdmin(user?.role)
   const perms = user?.permissions
   return !it.module || !perms || hasModule(perms, it.module)
@@ -78,7 +80,7 @@ const sinFormato = VISTAS.filter((v) => navFormatoFor(v) === undefined)
   const difsVer: string[] = []
   const difsSalir: string[] = []
   for (const v of sinFormato) {
-    const reglas = { module: navModuleFor(v), soloAdmin: navSoloAdmin(v) }
+    const reglas = { module: navModuleFor(v), soloAdmin: navSoloAdmin(v), soloAccesoGlobal: navSoloAccesoGlobal(v) }
     for (const s of SESIONES) {
       for (const f of FORMATOS) {
         if (puedeVerVista(s.user, v, f, true) !== antes(s.user, reglas)) difsVer.push(`${v}/${s.nombre}/${nombreFormato(f)}`)
@@ -146,7 +148,8 @@ for (const f of [undefined, null, 'gratex'] as const) {
   const visibles = SESIONES.flatMap((s) => items.filter((it) => puedeVerItem(s.user, it, f)))
   chk(`formato ${nombreFormato(f)}: ningún item con formato`, !visibles.some((it) => it.formato !== undefined))
 }
-chk('ferreteria + admin + POS activo: se ven todos los items', items.every((it) => puedeVerItem(admin, it, 'ferreteria', true)))
+chk('ferreteria + admin + POS activo: se ven todos los items menos los de soporte', items.filter((it) => !it.soloAccesoGlobal).every((it) => puedeVerItem(admin, it, 'ferreteria', true)))
+chk('ferreteria + admin de soporte + POS activo: se ven todos, los de soporte también', items.every((it) => puedeVerItem({ ...admin, acceso_global: true }, it, 'ferreteria', true)))
 
 console.log('Punto de venta (POS)')
 {
