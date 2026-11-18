@@ -933,16 +933,34 @@
 .fx-cond-sel--campo:not(.fx-mod):hover { background: var(--surface-hover); }
 .fx-cond-sel--campo:not(.fx-mod):focus-visible { background: var(--accent-soft); }
 
-/* Rejilla de lineas del e-CF (8 columnas). */
+/* Rejilla de lineas del e-CF (9 columnas): quitar, descripcion, cantidad,
+   unidad, precio, monto de ITBIS, tasa de ITBIS, descuento e importe. */
 .fx-grid-ecf {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 62px 96px 96px 56px 86px 110px;
+  grid-template-columns: 22px minmax(0, 1fr) 56px 76px 92px 88px 76px 52px 104px;
   gap: 10px;
   align-items: start;
 }
 
+/* Ventana justa (portatil con zoom, ventana a medias): la hoja pierde el ancho
+   del menu lateral y las 8 columnas fijas se comen la descripcion. Se afinan los
+   anchos para que la columna de monto de ITBIS no deje la descripcion peor que
+   antes de existir. Las variantes (cotizacion, conduce) ponen sus propias
+   columnas con mas especificidad y no les afecta. */
+@media (max-width: 1240px) {
+  .fx-grid-ecf { grid-template-columns: 22px minmax(0, 1fr) 48px 64px 84px 80px 70px 44px 92px; }
+}
+
 .fx-grid-ecf > .fx-importe,
 .fx-grid-ecf > .fx-num { align-self: center; }
+
+/* Monto de ITBIS e importe de la linea de factura: van pegados arriba, a la
+   altura de los campos (la descripcion crece con "+ Detalle" y centrarlos los
+   dejaba mas abajo que el precio). El monto es un dato derivado, asi que va mas
+   discreto que el importe (sin negrita ni color pleno). */
+.fx-grid-ecf > .fx-importe--itbis,
+.fx-grid-ecf > .fx-importe--ancho { align-self: start; }
+.fx-importe--itbis { font-weight: 400; color: var(--text-2); }
 
 /* Rejilla de lineas de COTIZACION: hereda todo lo del e-CF (responsive, rotulos
    por celda, hover del boton de borrar) y solo cambia las columnas. Una
@@ -1130,6 +1148,9 @@
   .fx-grid-conduce > .fx-gutter { order: -2; }
   .fx-grid-conduce > .fx-desc { order: -1; }
   .fx-grid-ecf > .fx-desc { grid-column: 1 / -1; }
+  /* Factura: el importe de la linea (el total) ocupa su propia fila a todo el
+     ancho; los campos de arriba se emparejan de dos en dos. */
+  .fx-grid-ecf > .fx-importe--ancho { grid-column: 1 / -1; }
   .fx-cierre { grid-template-columns: 1fr; }
   /* La cabecera se oculta EN EL MISMO breakpoint en que colapsa la rejilla: si
      no, entre 720 y 900 px los rotulos quedan desalineados de sus columnas. */

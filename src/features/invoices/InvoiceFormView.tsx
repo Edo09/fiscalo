@@ -970,8 +970,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             <span style={{ textAlign: 'right' }}>Cant.</span>
             <span>Unidad</span>
             <span style={{ textAlign: 'right' }}>Precio</span>
-            <span style={{ textAlign: 'right' }}>Desc%</span>
+            <span style={{ textAlign: 'right' }}>Monto ITBIS</span>
             <span>ITBIS</span>
+            <span style={{ textAlign: 'right' }}>Desc%</span>
             <span style={{ textAlign: 'right' }}>Importe</span>
           </div>
 
@@ -1084,16 +1085,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                   {le?.precio && <span className="fx-err">{le.precio}</span>}
                 </div>
 
-                <div className="fx-cell" data-label="Desc%">
-                  <input
-                    className={'fx-field fx-num' + (le?.desc ? ' fx-field--err' : '')}
-                    type="number" inputMode="decimal"
-                    value={l.desc}
-                    onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)}
-                    aria-label={`Descuento del ítem ${i + 1}`}
-                  />
-                  {le?.desc && <span className="fx-err">{le.desc}</span>}
-                </div>
+                <span className="fx-importe fx-importe--itbis fx-cell" data-label="Monto ITBIS">
+                  <Money value={c.itbis} cur={false} />
+                </span>
 
                 <select
                   className="fx-tasa fx-cell" data-label="ITBIS"
@@ -1106,9 +1100,19 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
                   {IND_FACT_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
 
-                <span className="fx-importe fx-cell" data-label="Importe">
+                <div className="fx-cell" data-label="Desc%">
+                  <input
+                    className={'fx-field fx-num' + (le?.desc ? ' fx-field--err' : '')}
+                    type="number" inputMode="decimal"
+                    value={l.desc}
+                    onChange={(e) => updLinea(l.id, 'desc', +e.target.value || 0)}
+                    aria-label={`Descuento del ítem ${i + 1}`}
+                  />
+                  {le?.desc && <span className="fx-err">{le.desc}</span>}
+                </div>
+
+                <span className="fx-importe fx-importe--ancho fx-cell" data-label="Importe">
                   <Money value={c.importe} cur={false} />
-                  <span className="fx-contador" style={{ display: 'block' }}>ITBIS <Money value={c.itbis} cur={false} /></span>
                 </span>
               </div>
             )
