@@ -14,6 +14,14 @@
 //   al instante mientras se refresca. Al refrescarlo, las líneas de TODAS las
 //   ventas toman el precio y la existencia nuevos: en pantalla siempre el
 //   precio que va a cobrar el servidor.
+// - Listas de precio: cada línea recuerda la suya (1 a 4) y cobra el precio de
+//   ESA lista. Si el catálogo nuevo ya no la ofrece, la línea vuelve al precio
+//   1 y `listaPerdida` dice cuál era, para avisarlo: nunca se sigue cobrando
+//   una lista que no existe ni se cambia de lista sin decirlo. Cambiar de lista
+//   a propósito (`cambiarLista` una línea, `aplicarLista` las de la venta, p. ej.
+//   con la lista del cliente) toma el precio del catálogo de ahora y quita ese aviso.
+//   Elegir con `cambiarLista` la lista en que la línea ya está (el precio 1 que se
+//   le cobra) tampoco cambia nada más que quitarlo.
 // - Cobro (F5): cada intento lleva una clave. Si no se sabe cómo terminó (se
 //   cayó la red con la petición en el aire), esa venta queda CONGELADA con esa
 //   clave hasta reintentar: cambiarla y cobrar con otra clave podría emitir la
@@ -21,12 +29,18 @@
 //   de recargar, el reintento sale con la misma clave.
 import { create } from 'zustand'
 import type { CatalogoPos, ClientePos, ProductoPos, VentaCuerpo } from './api'
+import { centavosDeLista, lineasCambiables, opcionesPos, type NumeroLista } from './listas.ts'
 
 export interface LineaCarrito {
   productoId: number
   nombre: string
   sku: string | null
+  /** Precio de SU lista (final con ITBIS, en centavos): el que va a cobrar el servidor. */
   precioCentavos: number
+  /** Lista de precio de la línea (1 a 4). Un carrito guardado antes de las listas no la trae: es la 1. */
+  lista: NumeroLista
+  /** Lista que tenía y el catálogo nuevo ya no ofrece: la línea volvió al precio 1 y hay que avisarlo. */
+  listaPerdida?: 2 | 3 | 4
   tasa: number
   cantidad: number
   decimales: boolean
@@ -69,8 +83,22 @@ interface CarritoState {
   activaId: string
   /** De quién son: "<caja>.<empleado>"; null = de nadie todavía (sin sesión). */
   dueno: string | null
-  /** Agrega 1 unidad; si el producto ya está, suma a su línea (V1). */
-  agregar: (p: ProductoPos) => void
+  /**
+   * Agrega 1 unidad; si el producto ya está, suma a su línea (V1) y `lista` no cuenta: un solo precio por
+   * producto en la venta. Si no está, entra al precio de esa lista (la 1 por defecto).
+   */
+  agregar: (p: ProductoPos, lista?: NumeroLista) => void
+  /**
+   * Pasa a esa lista las líneas de la venta activa que se pueden cambiar (lineasCambiables: productos que el catálogo de ahora
+   * la ofrece y que no están ya en ella), al precio de esa lista, y dice cuántas cambió. Con un cobro en duda no toca nada: 0.
+   */
+  aplicarLista: (lista: NumeroLista) => number
+  /**
+   * Pasa la línea de ese producto a esa lista, al precio que le da el catálogo. No hace nada si el producto no la ofrece o si hay un
+   * cobro en duda. Si la línea ya está en ella no cambia de lista ni de precio, pero pierde su aviso de lista perdida (el cajero acaba
+   * de elegir el precio que se le cobra); sin aviso, no hace nada.
+   */
+  cambiarLista: (productoId: number, lista: NumeroLista) => void
   cambiarCantidad: (productoId: number, cantidad: number) => void
   quitar: (productoId: number) => void
   /** La venta activa queda vacía, sin cliente y sin cobro pendiente. */
@@ -129,18 +157,64 @@ function sinVenta(s: CarritoState, id: string): Partial<CarritoState> {
   return { ventas, activaId: activa.id, ...espejo(activa) }
 }
 
-/** Precio y existencia del catálogo nuevo; con cobro en duda, nada cambia. */
+/** La línea con lo que dice el catálogo nuevo: el precio de SU lista, o el 1 (avisando cuál se perdió) si ya no se ofrece. */
+function lineaAlDia(l: LineaCarrito, p: ProductoPos): LineaCarrito {
+  const alDia = { ...l, nombre: p.nombre, sku: p.sku, tasa: p.tasa, decimales: p.decimales, stock: p.stock }
+  // La 1 es el precio del producto y siempre está; las otras salen de `listas` y pueden dejar de ofrecerse.
+  if (l.lista === 1) return { ...alDia, precioCentavos: p.precio_centavos }
+  const centavos = centavosDeLista(p, l.lista)
+  return centavos === null
+    ? { ...alDia, lista: 1, precioCentavos: p.precio_centavos, listaPerdida: l.lista }
+    : { ...alDia, precioCentavos: centavos }
+}
+
+/** Precio, lista y existencia del catálogo nuevo; con cobro en duda, nada cambia. */
 function conCatalogo(v: VentaAbierta, porId: Map<number, ProductoPos>): VentaAbierta {
   if (v.cobroEnDuda || v.lineas.length === 0) return v
   return {
     ...v,
     lineas: v.lineas.map((l) => {
       const p = porId.get(l.productoId)
-      return p
-        ? { ...l, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio_centavos, tasa: p.tasa, decimales: p.decimales, stock: p.stock }
-        : l
+      return p ? lineaAlDia(l, p) : l
     }),
   }
+}
+
+/**
+ * La venta con sus líneas cambiables pasadas a esa lista (todas, o solo las de un producto): el precio de SU producto en el
+ * catálogo y fuera el aviso de lista perdida. Y cuántas líneas cambió. Con un cobro en duda, o sin catálogo, no cambia nada.
+ */
+function pasarALista(
+  v: VentaAbierta, catalogo: CatalogoPos | null, lista: NumeroLista, productoId?: number,
+): { venta: VentaAbierta; cambiadas: number } {
+  if (v.cobroEnDuda || !catalogo) return { venta: v, cambiadas: 0 }
+  const lineas = productoId === undefined ? v.lineas : v.lineas.filter((l) => l.productoId === productoId)
+  const nuevas = new Map<number, LineaCarrito>()
+  for (const l of lineasCambiables(lineas, catalogo.productos, lista)) {
+    const p = catalogo.productos.find((x) => x.id === l.productoId)
+    const centavos = p ? centavosDeLista(p, lista) : null
+    if (centavos === null) continue
+    const nueva = { ...l, lista, precioCentavos: centavos }
+    delete nueva.listaPerdida
+    nuevas.set(l.productoId, nueva)
+  }
+  if (nuevas.size === 0) return { venta: v, cambiadas: 0 }
+  return { venta: { ...v, lineas: v.lineas.map((l) => nuevas.get(l.productoId) ?? l) }, cambiadas: nuevas.size }
+}
+
+/**
+ * La venta con la línea de ese producto sin su aviso de lista perdida: para cuando el cajero vuelve a elegir el precio que ya se cobra.
+ * Solo si la línea está en esa lista, el catálogo de ahora la sigue ofreciendo (como opcionesPos) y la línea tiene el aviso; no toca
+ * su lista ni su precio. Con un cobro en duda, sin catálogo o sin nada que quitar, devuelve la misma venta.
+ */
+function sinAvisoDeLista(v: VentaAbierta, catalogo: CatalogoPos | null, lista: NumeroLista, productoId: number): VentaAbierta {
+  if (v.cobroEnDuda || !catalogo) return v
+  const p = catalogo.productos.find((x) => x.id === productoId)
+  const l = v.lineas.find((x) => x.productoId === productoId)
+  if (!p || !l || l.lista !== lista || l.listaPerdida === undefined || !opcionesPos(p).some((o) => o.lista === lista)) return v
+  const sin = { ...l }
+  delete sin.listaPerdida
+  return { ...v, lineas: v.lineas.map((x) => (x === l ? sin : x)) }
 }
 
 // --- Guardado en el equipo ----------------------------------------------------
@@ -158,6 +232,8 @@ function leerGuardadas(dueno: string): Guardadas | null {
       ? g.ventas.filter((v): v is VentaAbierta =>
         !!v && typeof v.id === 'string' && typeof v.numero === 'number' && Array.isArray(v.lineas))
         .slice(0, MAX_VENTAS)
+        // Lo guardado antes de las listas no trae `lista` en las líneas: es la 1.
+        .map((v) => ({ ...v, lineas: v.lineas.map((l) => ({ ...l, lista: l.lista ?? 1 })) }))
       : []
     if (ventas.length === 0) return null
     return { ventas, activaId: typeof g.activaId === 'string' ? g.activaId : ventas[0].id }
@@ -194,18 +270,35 @@ export const useCarritoStore = create<CarritoState>()((set, get) => ({
   ventas: [inicial],
   activaId: inicial.id,
   dueno: null,
-  agregar: (p) => set((s) => enActiva(s, (v) => {
+  agregar: (p, lista = 1) => set((s) => enActiva(s, (v) => {
     if (v.cobroEnDuda) return v
     const existe = v.lineas.find((l) => l.productoId === p.id)
     if (existe) {
       return { ...v, lineas: v.lineas.map((l) => (l.productoId === p.id ? { ...l, cantidad: Math.min(l.cantidad + 1, 99999) } : l)) }
     }
+    // Si el catálogo no ofrece esa lista (la pantalla solo deja elegir entre las ofrecidas: no debería pasar), entra en la 1.
+    const centavos = centavosDeLista(p, lista)
     const linea: LineaCarrito = {
-      productoId: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio_centavos, tasa: p.tasa,
+      productoId: p.id, nombre: p.nombre, sku: p.sku, tasa: p.tasa,
+      precioCentavos: centavos ?? p.precio_centavos, lista: centavos === null ? 1 : lista,
       cantidad: 1, decimales: p.decimales, stock: p.stock,
     }
     return { ...v, lineas: [...v.lineas, linea], iniciadaMs: v.lineas.length === 0 ? Date.now() : v.iniciadaMs }
   })),
+  aplicarLista: (lista) => {
+    const s = get()
+    const { venta, cambiadas } = pasarALista(activaDe(s), s.catalogo, lista)
+    set((x) => enActiva(x, () => venta))
+    return cambiadas
+  },
+  cambiarLista: (productoId, lista) => {
+    const s = get()
+    const v = activaDe(s)
+    const { venta } = pasarALista(v, s.catalogo, lista, productoId)
+    // Si no se movió porque ya estaba en esa lista, elegirla otra vez solo le quita el aviso de lista perdida (si lo tenía).
+    const nueva = venta === v ? sinAvisoDeLista(v, s.catalogo, lista, productoId) : venta
+    set((x) => enActiva(x, () => nueva))
+  },
   cambiarCantidad: (productoId, cantidad) => set((s) => enActiva(s, (v) => (v.cobroEnDuda ? v : {
     ...v, lineas: v.lineas.map((l) => (l.productoId === productoId ? { ...l, cantidad } : l)),
   }))),

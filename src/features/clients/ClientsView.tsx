@@ -7,6 +7,7 @@ import type { ClientRow, Ubicacion } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { puedeVerVista, type Nav } from '@/config/navigation'
 import { useSession } from '@/stores/auth'
+import { listaDeCliente } from '@/lib/listasPrecio'
 import type { Cliente } from '@/types/domain'
 import { NewClientModal } from './NewClientModal'
 import {
@@ -208,8 +209,10 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     direccion: client.direccion ?? '',
     municipio: client.municipio ?? '',
     provincia: client.provincia ?? '',
-    // Condiciones comerciales del cliente (descuento y crédito).
+    // Condiciones comerciales del cliente (descuento, lista de precio y crédito).
     descuento: String(client.descuento ?? 0),
+    // '' = sin lista; si no, '1' a '4' (el valor del select).
+    lista_precio: String(listaDeCliente(client.lista_precio) ?? ''),
     permitir_credito: Number(client.permitir_credito ?? 0) === 1,
   }))
   const [form, setForm] = useState(inicial)
@@ -259,10 +262,12 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
     setErrores(e)
     if (Object.keys(e).length > 0) return
 
-    const cambios: Record<string, string | number> = {}
+    const cambios: Record<string, string | number | null> = {}
     for (const k of cambiados) {
       if (k === 'permitir_credito') cambios[k] = form.permitir_credito ? 1 : 0
       else if (k === 'descuento') cambios[k] = Number(form.descuento) || 0
+      // Sin lista: null la quita (con la clave ausente el backend conserva la guardada).
+      else if (k === 'lista_precio') cambios[k] = form.lista_precio === '' ? null : Number(form.lista_precio)
       // Solo los dígitos: con guiones, un RNC de 9 no cabe en la columna de 11.
       else if (k === 'rnc') cambios[k] = soloDigitos(form.rnc)
       else cambios[k] = form[k].trim()
@@ -348,6 +353,18 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
           </select>
         </div>
         <div className={claseCampo('descuento')}><label className="label">Descuento por defecto (%)</label><input className="input" inputMode="decimal" value={form.descuento} onChange={set('descuento')} />{errorDe('descuento')}</div>
+        {/* Un registro sin la clave viene de una API o de un tenant que aún no tiene la columna (migración 039): ahí guardar una lista
+            se ignoraría (API vieja) o fallaría con un error genérico. Con la columna la clave siempre llega (null o 1 a 4). */}
+        {client.lista_precio !== undefined && (
+          <div className="field">
+            <label className="label">Lista de precio por defecto</label>
+            <select className="input" aria-label="Lista de precio por defecto" value={form.lista_precio} onChange={set('lista_precio')}>
+              <option value="">Ninguna (preguntar cada vez)</option>
+              {([1, 2, 3, 4] as const).map((n) => <option key={n} value={n}>Precio {n}</option>)}
+            </select>
+            <div className="hint">Con una lista, los productos que la tengan se agregan a ese precio sin preguntar. Se suma al descuento.</div>
+          </div>
+        )}
         <div className="field">
           <label className="label">Crédito</label>
           <label className="text-sm">

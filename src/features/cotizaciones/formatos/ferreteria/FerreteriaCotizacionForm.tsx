@@ -262,6 +262,11 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
     // El nombre libre ya no aplica: o se eligió un cliente, o se va a buscar otro.
     setClienteLibre('')
     quitarErrCliente()
+    // Su lista de precio rige los productos que se agreguen después; las líneas que ya están
+    // conservan su precio y solo se avisa. Cargar una cotización guardada no pasa por aquí.
+    if (c?.listaPrecio && lineas.some((l) => l.precio > 0)) {
+      toast.info(`Este cliente compra al Precio ${c.listaPrecio}. Los productos que ya agregaste conservan su precio unitario.`)
+    }
   }
 
   // --- Líneas ---
@@ -290,7 +295,8 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
    * Artículo del catálogo (lineaDesdeProducto: su nombre, su precio SIN ITBIS,
    * su unidad, su tasa y si es bien o servicio). Si la última fila sigue vacía
    * se reemplaza, para no dejar huecos. `precio` es el de la lista que se eligió
-   * en el buscador (un producto con varias listas pregunta antes); sin él, el del producto.
+   * en el buscador (un producto con varias listas pregunta antes, salvo que el
+   * cliente tenga la suya); sin él, el del producto.
    */
   const addProducto = (p: Producto, precio?: number) => {
     setLineas((ls) => {
@@ -531,6 +537,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
           onBusquedaChange={(texto) => { setBusquedaCliente(texto); quitarErrCliente() }}
           onLibreChange={(v) => { setClienteLibre(v); quitarErrCliente() }}
           onNuevoCliente={() => setNuevoCliente(true)}
+          mostrarListaPrecio
         />
 
         {/* --- Líneas: las columnas de la hoja, más unidad e ITBIS --- */}
@@ -673,6 +680,7 @@ export function FerreteriaCotizacionForm({ nav, cotizacionId }: { nav: Nav; coti
               <ProductoCombobox
                 onSelect={addProducto}
                 mostrarPrecio
+                listaCliente={cliente?.listaPrecio ?? null}
                 placeholder="Agregar del catálogo: nombre, SKU o categoría…"
               />
             </div>

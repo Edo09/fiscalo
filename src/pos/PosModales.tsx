@@ -102,10 +102,14 @@ export function CantidadModal({ linea, onAceptar, onCerrar }: {
   )
 }
 
-export function ConfirmarModal({ titulo, texto, confirmar, onConfirmar, onCerrar }: {
+export function ConfirmarModal({ titulo, texto, confirmar, cancelar = 'No', peligro = true, onConfirmar, onCerrar }: {
   titulo: string
   texto: ReactNode
   confirmar: string
+  /** Lo que dice el botón de la izquierda, el que cierra el diálogo sin hacer nada. */
+  cancelar?: string
+  /** El botón de confirmar va en rojo: lo que descarta una venta. false (azul) para un cambio que no pierde nada. */
+  peligro?: boolean
   onConfirmar: () => void
   onCerrar: () => void
 }) {
@@ -124,8 +128,8 @@ export function ConfirmarModal({ titulo, texto, confirmar, onConfirmar, onCerrar
       </div>
       <p className="pos-sub" style={{ margin: '4px 0 20px' }}>{texto}</p>
       <div className="pos-modal-pie">
-        <Btn className="pos-boton-grande" onClick={onCerrar}>No</Btn>
-        <Btn variant="danger" className="pos-boton-grande" onClick={onConfirmar}>{confirmar}</Btn>
+        <Btn className="pos-boton-grande" onClick={onCerrar}>{cancelar}</Btn>
+        <Btn variant={peligro ? 'danger' : 'primary'} className="pos-boton-grande" onClick={onConfirmar}>{confirmar}</Btn>
       </div>
     </Overlay>
   )

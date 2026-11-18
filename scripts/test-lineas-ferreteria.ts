@@ -95,7 +95,7 @@ igual('sin client_id: null', clienteDeFila({ client_id: null, client_name: 'X' }
 igual('client_id 0: null', clienteDeFila({ client_id: 0 }), null)
 igual('con id y nombre: una ficha con solo eso', clienteDeFila(cotizacion), {
   id: '7', nombre: 'FERRETERIA EL CLAVO', contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
-  balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false,
+  balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false, listaPrecio: null,
 })
 igual('sin nombre: «Cliente #id»', clienteDeFila({ client_id: 9, client_name: null })?.nombre, 'Cliente #9')
 

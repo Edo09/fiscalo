@@ -5,6 +5,7 @@ import { Btn, Icon, Modal } from '@/components/ui'
 import { ApiError, CODIGO_CLIENTE_SIN_ELEGIR, createClient, listClients, mapClientRow } from '@/api'
 import type { ConsultaRnc, NewClientInput } from '@/api'
 import { RncConsultaField } from '@/components/RncConsultaField'
+import { listaDeCliente } from '@/lib/listasPrecio'
 import type { Cliente } from '@/types/domain'
 import {
   LARGO, errorCorreo, errorDescuento, errorRnc, errorTelefono, errorTexto, soloDigitos,
@@ -25,12 +26,13 @@ interface Props {
   nombreInicial?: string
 }
 
-type Campos = { client_name: string; company_name: string; email: string; phone_number: string; rnc: string; descuento: string; permitir_credito: boolean }
+// `lista_precio` es '' (ninguna) o '1' a '4': el valor de su select.
+type Campos = { client_name: string; company_name: string; email: string; phone_number: string; rnc: string; descuento: string; lista_precio: string; permitir_credito: boolean }
 
-type CamposTexto = Exclude<keyof Campos, 'permitir_credito'>
+type CamposTexto = Exclude<keyof Campos, 'permitir_credito' | 'lista_precio'>
 
 // Crédito habilitado por defecto (migración 035 de api-gratex): se quita editando el cliente.
-const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', permitir_credito: true }
+const VACIO: Campos = { client_name: '', company_name: '', email: '', phone_number: '', rnc: '', descuento: '0', lista_precio: '', permitir_credito: true }
 
 /**
  * Campos iniciales a partir de lo buscado. El buscador acepta nombre, RNC o
@@ -111,6 +113,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
   const guardar = async () => {
     if (!validar() || guardando) return
     setGuardando(true)
+    const lista = listaDeCliente(f.lista_precio)
     const enviado: NewClientInput = {
       client_name: f.client_name.trim(),
       company_name: f.company_name.trim(),
@@ -121,6 +124,8 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
       // Condiciones comerciales: la factura las hereda al elegir este cliente.
       descuento: Number(f.descuento) || 0,
       permitir_credito: f.permitir_credito ? 1 : 0,
+      // Solo si se eligió una: sin la clave, el cliente queda sin lista y se le pregunta cada vez.
+      ...(lista ? { lista_precio: lista } : {}),
     }
     try {
       // createClient devuelve siempre el registro con su id (ver api/clients).
@@ -145,7 +150,7 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
     }
   }
 
-  // Solo los campos de texto: el RNC y el checkbox de credito se renderizan aparte.
+  // Solo los campos de texto: el RNC, la lista de precio y el checkbox de credito se renderizan aparte.
   const campo = (k: Exclude<CamposTexto, 'rnc'>, label: string, extra: Record<string, unknown> = {}, req = true) => (
     <div className={'field' + (errores[k] ? ' field-error' : '')}>
       <label>{label} {req ? <span className="req">*</span> : <span className="opt">(opcional)</span>}</label>
@@ -190,6 +195,14 @@ export function NewClientModal({ onClose, onCreated, nombreInicial = '' }: Props
         {campo('phone_number', 'Teléfono', { placeholder: '809-000-0000', type: 'tel', maxLength: LARGO.telefono }, false)}
         {campo('email', 'Correo', { placeholder: 'cliente@correo.com', type: 'email', maxLength: LARGO.correo }, false)}
         {campo('descuento', 'Descuento por defecto (%)', { placeholder: '0', inputMode: 'decimal' }, false)}
+        <div className="field">
+          <label>Lista de precio por defecto <span className="opt">(opcional)</span></label>
+          <select className="input" aria-label="Lista de precio por defecto" value={f.lista_precio} onChange={(e) => set('lista_precio', e.target.value)}>
+            <option value="">Ninguna (preguntar cada vez)</option>
+            {([1, 2, 3, 4] as const).map((n) => <option key={n} value={n}>Precio {n}</option>)}
+          </select>
+          <div className="hint">Con una lista, los productos que la tengan se agregan a ese precio sin preguntar. Se suma al descuento.</div>
+        </div>
         <div className="field">
           <label>
             <input

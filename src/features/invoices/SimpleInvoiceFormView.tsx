@@ -22,7 +22,7 @@ import { useAvisoSalida } from '@/hooks/useAvisoSalida'
 import { presentDocument, printDocument } from '@/lib/file'
 import { hoyLocal } from '@/lib/date'
 import { aNumero, fmtCantidad } from '@/lib/format'
-import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { clienteVigente, eleccionDePrecio, precioParaMostrar } from '@/lib/listasPrecio'
 import { ElegirPrecio } from '@/features/products/ElegirPrecio'
 import { admiteDecimales, problemaCantidad, useUnidadesMedida } from '@/components/unidadesMedida'
 import { useAnchoTirilla } from '@/stores/impresora'
@@ -161,14 +161,15 @@ export function SimpleInvoiceFormView({
 
   // Con borrador arranca con el cliente de la cotización. Es un placeholder
   // con id y nombre (igual que en la factura e-CF): el efecto de más abajo trae
-  // la ficha completa y con ella sus condiciones (descuento y crédito).
+  // la ficha completa y con ella sus condiciones (descuento, lista de precio
+  // y crédito).
   const [cliente, setCliente] = useState<Cliente | null>(() =>
     borrador && borrador.clienteId
       ? {
           id: borrador.clienteId, nombre: borrador.clienteNombre || `Cliente #${borrador.clienteId}`,
           contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
           balance: 0, facturas: 0, estado: '', desde: '',
-          descuento: 0, permiteCredito: false,
+          descuento: 0, permiteCredito: false, listaPrecio: null,
         }
       : null,
   )
@@ -362,13 +363,18 @@ export function SimpleInvoiceFormView({
   /**
    * Elegir cliente arrastra sus condiciones: su % de descuento pasa a todas las
    * lineas y, si no tiene credito, el pago vuelve a contado (el backend lo
-   * rechaza con 422, igual que en la factura con comprobante).
+   * rechaza con 422, igual que en la factura con comprobante). Su lista de
+   * precio rige los productos que se agreguen despues; las lineas que ya estan
+   * conservan su precio y solo se avisa.
    */
   const seleccionarCliente = (c: Cliente | null) => {
     setCliente(c)
     const pct = c?.descuento ?? 0
     setLineas((ls) => ls.map((l) => ({ ...l, desc: pct })))
     if (c && !c.permiteCredito) setMetodo((m) => (esMetodoCredito(m) ? 'Efectivo' : m))
+    if (c?.listaPrecio && lineas.some((l) => l.precio > 0)) {
+      toast.info(`Este cliente compra al Precio ${c.listaPrecio}. Los productos que ya agregaste conservan su precio unitario.`)
+    }
   }
 
   const addLinea = () => {
@@ -406,10 +412,14 @@ export function SimpleInvoiceFormView({
     setBuscaProd('')
     setPorElegir(null)
   }
-  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
-  // agrega ya, como siempre.
+  // Lista de precio por defecto del cliente que rige (clienteVigente: el elegido o, al editar sin
+  // cambiarlo, el de la factura guardada). Un nombre libre la quita: a diferencia del crédito, que el
+  // backend sigue validando contra el cliente guardado, el precio se piensa para quien se escribió.
+  // Los productos que la ofrecen se agregan a ese precio sin preguntar; si no, con varias listas de
+  // precio el producto no se agrega hasta elegir una, y con una sola (o ninguna) se agrega ya.
+  const listaCliente = clienteVigente(cliente, clienteGuardado, editando, clienteLibre)?.listaPrecio ?? null
   const elegirProducto = (p: Producto) => {
-    const e = eleccionDePrecio(p)
+    const e = eleccionDePrecio(p, listaCliente)
     if (e.tipo === 'directo') addProducto(p, e.precio)
     else setPorElegir(p)
   }
@@ -935,6 +945,11 @@ export function SimpleInvoiceFormView({
                 )}
               </>
             )}
+            {listaCliente && (
+              <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
+                Lista de precio del cliente: Precio {listaCliente}
+              </span>
+            )}
             {marcarCliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{problemaCliente}</span>}
           </div>
 
@@ -1250,11 +1265,12 @@ export function SimpleInvoiceFormView({
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -10px' }}>
               {catalogo.map((p) => {
-                const etiqueta = etiquetaPrecios(p)
+                // Lo que se agregaría con un toque: el precio de la lista del cliente o, si no, el de siempre.
+                const fila = precioParaMostrar(p, listaCliente)
                 const precio = (
                   <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
-                    <span className="fx-prod-precio"><Money value={p.precio} cur={false} /></span>
-                    {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                    <span className="fx-prod-precio"><Money value={fila.precio} cur={false} /></span>
+                    {fila.etiqueta && <span className="text-xs muted">{fila.etiqueta}</span>}
                   </span>
                 )
                 return (

@@ -486,6 +486,12 @@
 .pos-exist { font-size: 12px; color: var(--text-3); white-space: nowrap; }
 .pos-exist.bajo { color: var(--warning); font-weight: 600; }
 .pos-exist.agotado { color: var(--danger); font-weight: 600; }
+/* "N precios": el producto tiene varias listas de precio y tocarlo pregunta con cuál entra. Etiqueta
+   suave: avisa sin competir con el precio. Si no cabe junto al precio y la existencia, baja a su fila. */
+.pos-producto-listas {
+  padding: 0 8px; border-radius: var(--r-full); background: var(--neutral-soft); color: var(--text-2);
+  font-size: 11px; font-weight: 600; line-height: 1.6; white-space: nowrap;
+}
 
 .pos-carrito {
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
@@ -564,6 +570,18 @@
 .pos-linea-info b { font-size: 15px; line-height: 1.25; }
 .pos-linea-info small { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
 .pos-linea-info .pos-linea-aviso { display: flex; align-items: center; gap: 4px; color: var(--warning); font-weight: 600; }
+/* "Precio N" de la línea: su producto tiene varios precios y tocarlo reabre el selector para cambiar el de esta línea.
+   Va junto al texto del precio y, si no cabe, baja a su renglón (el ancho del carrito cambia con el tamaño de la pantalla). */
+.pos-linea-precio { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.pos-linea-lista {
+  display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 6px 0 11px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-full); background: var(--surface-2); color: var(--text);
+  font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+/* La transición, el hundirse al presionar, el hover del mouse y el foco los da el bloque "Teclas y botones" (más abajo);
+   aquí solo queda el color del toque. */
+.pos-linea-lista:not(:disabled):active { background: var(--accent-soft); border-color: var(--accent); }
+.pos-linea-lista:disabled { opacity: 0.4; cursor: default; }
 .pos-linea-importe { font-size: 16px; font-variant-numeric: tabular-nums; text-align: right; }
 .pos-cant { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .pos-cant button {
@@ -597,6 +615,8 @@
 /* "RD$" delante de un precio: más chico y suave, el número manda. */
 .pos-moneda { font-size: .68em; font-weight: 600; color: var(--text-3); margin-right: 3px; letter-spacing: .01em; }
 .pos-cliente-barra .pos-cliente-ahorro { color: var(--success); font-weight: 600; }
+/* Su lista de precio por defecto: con el peso del renglón del descuento, pero sin el verde del ahorro (una lista no ahorra nada). */
+.pos-cliente-barra .pos-cliente-lista { font-weight: 600; }
 /* "Quitar" el cliente: en rojo, es deshacer el crédito fiscal de la venta. */
 .pos-cliente-barra .pos-cliente-quitar { color: var(--danger); }
 .pos-cliente-barra .pos-cliente-quitar:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
@@ -633,6 +653,21 @@
 .pos-cantidad-visor.vacio { color: var(--text-3); }
 .pos-cantidad-ayuda { min-height: 28px; padding: 6px 2px; font-size: 13px; color: var(--text-3); text-align: center; }
 .pos-cantidad-ayuda .error { color: var(--danger); font-weight: 600; }
+
+/* Elegir el precio (ElegirPrecioModal): un botón grande por cada precio del producto, con "Precio N"
+   a la izquierda y el monto (ITBIS incluido, como en la tarjeta) a la derecha. */
+.pos-precio-ops { display: flex; flex-direction: column; gap: 10px; }
+.pos-precio-op {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 64px; padding: 8px 18px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-2); color: var(--text);
+  font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--pos-t1) ease-out, border-color var(--pos-t1) ease-out, transform var(--pos-t1) var(--pos-curva);
+}
+.pos-precio-op b { font-size: 22px; white-space: nowrap; }
+.pos-precio-op:active { background: var(--accent-soft); border-color: var(--accent); transform: scale(.985); transition-duration: 40ms; }
+.pos-precio-op:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Pantalla angosta: el carrito baja debajo de la grilla. */
 @media (max-width: 900px) {
@@ -908,14 +943,14 @@
 /* ---- Teclas y botones: se hunden al presionar --------------------------------- */
 .pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-producto, .pos-cant button,
   .pos-forma, .pos-billete, .pos-billete-menos, .pos-producto-menos, .pos-producto-quitar, .pos-conteo-fila,
-  .pos-buscador-limpiar, .pos-sel, .pos-sel-op, .pos-enlace) {
+  .pos-buscador-limpiar, .pos-sel, .pos-sel-op, .pos-enlace, .pos-linea-lista) {
   transition:
     background-color var(--pos-t1) ease-out, border-color var(--pos-t1) ease-out, color var(--pos-t1) ease-out,
     box-shadow var(--pos-t2) ease-out, opacity var(--pos-t2) ease-out, filter var(--pos-t1) ease-out,
     transform var(--pos-t1) var(--pos-curva);
 }
 .pos-root :where(.pos-caja, .pos-tecla, .pos-chip, .pos-chips-mas, .pos-vistas button, .pos-cant button, .pos-forma,
-  .pos-billete, .pos-conteo-fila, .pos-sel):not(:disabled):active {
+  .pos-billete, .pos-conteo-fila, .pos-sel, .pos-linea-lista):not(:disabled):active {
   transform: translateY(1px) scale(.97);
   transition-duration: 40ms;
 }
@@ -926,7 +961,7 @@
 /* ---- Hover y foco (con mouse / teclado) --------------------------------------- */
 @media (hover: hover) and (pointer: fine) {
   .pos-root :where(.pos-tecla:not(.secundaria):not(.pos-tecla-limpiar), .pos-billete:not(.on):not(.usado),
-    .pos-forma:not(.on), .pos-caja, .pos-conteo-fila:not(.on), .pos-cant button):not(:disabled):hover {
+    .pos-forma:not(.on), .pos-caja, .pos-conteo-fila:not(.on), .pos-cant button, .pos-linea-lista):not(:disabled):hover {
     background-color: var(--surface-hover); border-color: var(--text-3);
   }
   .pos-root .pos-chip:not(.on):hover { background-color: var(--surface-hover); border-color: var(--text-3); }
@@ -939,7 +974,8 @@
   .pos-root .pos-producto-quitar:hover { filter: brightness(.92); }
 }
 .pos-root :where(.pos-tecla, .pos-chip, .pos-chips-mas, .pos-forma, .pos-billete, .pos-caja, .pos-producto, .pos-cant button,
-  .pos-vistas button, .pos-conteo-fila, .pos-producto-menos, .pos-producto-quitar, .pos-billete-menos):focus-visible {
+  .pos-vistas button, .pos-conteo-fila, .pos-producto-menos, .pos-producto-quitar, .pos-billete-menos,
+  .pos-linea-lista):focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .pos-root :where(.pos-buscador input, .pos-campo input, .pos-nota) {

@@ -16,6 +16,7 @@ import { posApi, PosApiError, type ClientePos, type FormaPago, type VentaCuerpo,
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nuevaClave, useCarritoStore } from './carrito'
+import { lineasParaCobro } from './listas'
 import { BILLETES, centavosATexto, formatoCentavos, MONEDAS, montoACentavos, totalesCarrito } from './montos'
 import { Overlay } from './PosModales'
 import { TecladoMonto } from './TecladoMonto'
@@ -25,7 +26,7 @@ import { pagoVenta, resumenVenta, textoPago, type ResumenVenta } from './resumen
 /** Códigos con los que el servidor NO emitió nada: se puede corregir y cobrar con otra clave. */
 const SIN_VENTA = new Set([
   'CLAVE_INVALIDA', 'VENTA_VACIA', 'LINEA_INVALIDA', 'PRODUCTO_NO_DISPONIBLE', 'CANTIDAD_INVALIDA', 'PRECIO_CERO',
-  'TOTAL_DISTINTO', 'COMPRADOR_REQUERIDO', 'FORMA_PAGO_INVALIDA', 'RECIBIDO_INSUFICIENTE', 'TURNO_REQUERIDO',
+  'PRECIO_NO_DISPONIBLE', 'TOTAL_DISTINTO', 'COMPRADOR_REQUERIDO', 'FORMA_PAGO_INVALIDA', 'RECIBIDO_INSUFICIENTE', 'TURNO_REQUERIDO',
   'TURNO_AJENO', 'EQUIPO_SIN_RESPONSABLE', 'DESCUADRE', 'EMISION_FALLIDA', 'DGII_RECHAZO', 'CUERPO_INVALIDO',
   'CAJA_INACTIVA', 'POS_INACTIVO', 'SESION_REQUERIDA', 'EQUIPO_NO_HABILITADO',
   'TIPO_INVALIDO', 'CLIENTE_REQUERIDO', 'CLIENTE_NO_EXISTE', 'CLIENTE_SIN_RNC', 'AUTOFACTURA',
@@ -39,7 +40,7 @@ const DEL_COMPRADOR = new Set(['CLIENTE_REQUERIDO', 'CLIENTE_NO_EXISTE', 'CLIENT
 /** Desde RD$250,000 la factura de consumo tiene que identificar al comprador (igual que el servidor). */
 const TOPE_CONSUMO_CENTAVOS = 25_000_000
 /** Errores del catálogo: hay que refrescarlo para que el carrito tome los precios nuevos. */
-const REFRESCAR_CATALOGO = new Set(['TOTAL_DISTINTO', 'PRODUCTO_NO_DISPONIBLE', 'PRECIO_CERO'])
+const REFRESCAR_CATALOGO = new Set(['TOTAL_DISTINTO', 'PRODUCTO_NO_DISPONIBLE', 'PRECIO_CERO', 'PRECIO_NO_DISPONIBLE'])
 
 const FORMAS: { forma: FormaPago; nombre: string; tecla: string; icono: 'banknote' | 'wallet' | 'landmark' }[] = [
   { forma: 1, nombre: 'Efectivo', tecla: 'F9', icono: 'banknote' },
@@ -200,7 +201,8 @@ export function CobroModal({
       tipo_ecf: estado.cliente ? '31' : '32',
       client_id: estado.cliente?.id ?? null,
       clave: nuevaClave(),
-      lineas: estado.lineas.map((l) => ({ product_id: l.productoId, cantidad: l.cantidad })),
+      // La lista de cada línea (solo si es mayor que 1): el navegador manda cuál lista, nunca un monto.
+      lineas: lineasParaCobro(estado.lineas),
       total_centavos: total,
       forma_pago: forma,
       recibido_centavos: forma === 1 ? recibidoCentavos : null,

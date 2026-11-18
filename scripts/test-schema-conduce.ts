@@ -39,7 +39,7 @@ const esquema = conduceFormSchema({
 
 const cliente: Cliente = {
   id: '7', nombre: 'HOSPITAL DOCENTE', contacto: '', empresa: '', tipo: 'RNC', doc: '401515131', email: '', tel: '',
-  ciudad: '', balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false,
+  ciudad: '', balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false, listaPrecio: null,
 }
 const linea = (id: number, cambio: Partial<LineaFerreteriaForm> = {}): LineaFerreteriaForm => ({
   id, prodId: '', descripcion: `ARTICULO ${id}`, cantidad: 1, precio: 100, indFact: 1, unidadMedida: 43, tipoItem: 'Bien',

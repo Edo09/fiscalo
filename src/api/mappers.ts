@@ -2,7 +2,7 @@
 import type { ClientRow, EstadoDgii, FacturaRow, ProductRow, ProveedorRow, UserRow } from './types'
 import type { Cliente, Factura, Producto, Proveedor, UsuarioRow } from '@/types/domain'
 import { aNumero, colorFor } from '@/lib/format'
-import { otrosPreciosDeFila } from '@/lib/listasPrecio'
+import { listaDeCliente, otrosPreciosDeFila } from '@/lib/listasPrecio'
 import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
 import { estadoExistencia } from '@/features/inventory/existencia'
 import { dgiiLabel } from './estadosDgii'
@@ -171,5 +171,6 @@ export function mapClientRow(r: ClientRow): Cliente {
     // que el formulario lo use directo como % de descuento.
     descuento: Number(r.descuento ?? 0) || 0,
     permiteCredito: Number(r.permitir_credito ?? 0) === 1,
+    listaPrecio: listaDeCliente(r.lista_precio),
   }
 }

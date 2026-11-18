@@ -68,7 +68,7 @@ export function clienteDeFila(row: { client_id?: number | null; client_name?: st
   return {
     id: String(row.client_id), nombre: row.client_name || `Cliente #${row.client_id}`,
     contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
-    balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false,
+    balance: 0, facturas: 0, estado: '', desde: '', descuento: 0, permiteCredito: false, listaPrecio: null,
   }
 }
 

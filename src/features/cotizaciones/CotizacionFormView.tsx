@@ -14,7 +14,7 @@ import { r2, redondear } from '@/features/invoices/montosLinea'
 import { presentDocument } from '@/lib/file'
 import { ahoraLocal } from '@/lib/date'
 import { aNumero } from '@/lib/format'
-import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { eleccionDePrecio, precioParaMostrar } from '@/lib/listasPrecio'
 import { ElegirPrecio } from '@/features/products/ElegirPrecio'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
@@ -122,6 +122,22 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     setCliente(mapClientRow(clienteDetalle.data))
   }, [clienteDetalle.data])
 
+  // --- Cliente ---
+  // Su lista de precio por defecto: los productos que la ofrecen se agregan a ese precio sin preguntar.
+  const listaCliente = cliente?.listaPrecio ?? null
+  /**
+   * Elegir el cliente a mano (buscador o cliente nuevo). Su lista de precio rige los productos que se
+   * agreguen después; las líneas que ya están conservan su precio y solo se avisa. Cargar una
+   * cotización guardada no pasa por aquí: ahí no se avisa.
+   */
+  const seleccionarCliente = (c: Cliente | null) => {
+    setCliente(c)
+    setErrorCliente(null)
+    if (c?.listaPrecio && lineas.some((l) => l.amount > 0)) {
+      toast.info(`Este cliente compra al Precio ${c.listaPrecio}. Los productos que ya agregaste conservan su precio unitario.`)
+    }
+  }
+
   // --- Catálogo ---
   const productos = useApiQuery(['products', 'list'], () => listProducts({ pageSize: 100 }))
   const catalogo = useMemo(() => (productos.data?.items ?? []).map(mapProductRow), [productos.data])
@@ -137,10 +153,10 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
     setPorElegir(null)
     setErrorForm(null)
   }
-  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
-  // agrega ya, como siempre.
+  // Con la lista del cliente, el producto que la ofrece se agrega a ese precio sin preguntar. Si no, con
+  // varias listas de precio no se agrega hasta elegir una; con una sola (o ninguna) se agrega ya.
   const elegirProducto = (p: Producto) => {
-    const e = eleccionDePrecio(p)
+    const e = eleccionDePrecio(p, listaCliente)
     if (e.tipo === 'directo') addProducto(p, e.precio)
     else setPorElegir(p)
   }
@@ -314,7 +330,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
               <div className="fx-cliente">
                 <ClientCombobox
                   value={cliente}
-                  onChange={(c) => { setCliente(c); setErrorCliente(null) }}
+                  onChange={seleccionarCliente}
                   onBusquedaChange={(t) => { setBusquedaCliente(t); setErrorCliente(null) }}
                   invalido={errorCliente != null}
                 />
@@ -330,6 +346,11 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
               </button>
             </div>
             {errorCliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errorCliente}</span>}
+            {listaCliente && (
+              <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
+                Lista de precio del cliente: Precio {listaCliente}
+              </span>
+            )}
           </section>
 
           {/* --- Condiciones --- */}
@@ -476,7 +497,7 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
           // Lo que ya escribió en el buscador no se vuelve a teclear.
           nombreInicial={cliente ? '' : busquedaCliente}
           onClose={() => setNuevoCliente(false)}
-          onCreated={(c) => { setCliente(c); setErrorCliente(null); setNuevoCliente(false) }}
+          onCreated={(c) => { seleccionarCliente(c); setNuevoCliente(false) }}
         />
       )}
 
@@ -510,7 +531,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
               {catalogoFiltrado.map((p) => {
-                const etiqueta = etiquetaPrecios(p)
+                // Lo que se agregaría con un toque: el precio de la lista del cliente o, si no, el de siempre.
+                const fila = precioParaMostrar(p, listaCliente)
                 return (
                   <div key={p.id} className="menu-item" style={{ padding: '9px 8px' }} onClick={() => elegirProducto(p)}>
                     <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 32, height: 32 }}>
@@ -521,8 +543,8 @@ export function CotizacionFormView({ nav, cotizacionId = null }: {
                       <div className="text-xs muted mono">{p.sku || '—'} · {p.cat}</div>
                     </div>
                     <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
-                      <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
-                      {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                      <span className="fw6 text-sm"><Money value={fila.precio} cur={false} /></span>
+                      {fila.etiqueta && <span className="text-xs muted">{fila.etiqueta}</span>}
                     </span>
                   </div>
                 )

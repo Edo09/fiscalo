@@ -26,7 +26,7 @@ import {
 import { presentDocument } from '@/lib/file'
 import { isoLocal } from '@/lib/date'
 import { fmtCantidad } from '@/lib/format'
-import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { eleccionDePrecio, precioParaMostrar } from '@/lib/listasPrecio'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAvisoSalida } from '@/hooks/useAvisoSalida'
@@ -205,8 +205,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           contacto: '', empresa: '', tipo: '—', doc: '', email: '', tel: '', ciudad: '',
           balance: 0, facturas: 0, estado: '', desde: '',
           // Placeholder: el efecto de abajo trae el cliente completo por id y
-          // con el sus condiciones reales (descuento y credito).
-          descuento: 0, permiteCredito: false,
+          // con el sus condiciones reales (descuento, lista de precio y credito).
+          descuento: 0, permiteCredito: false, listaPrecio: null,
         }
       : null,
   )
@@ -358,6 +358,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
   // Descuento por defecto de las líneas: el que tenga el cliente elegido. El
   // usuario puede cambiarlo línea por línea después; esto solo lo precarga.
   const descuentoCliente = cliente?.descuento ?? 0
+  // Su lista de precio por defecto: los productos que la ofrecen se agregan a ese precio sin preguntar.
+  const listaCliente = cliente?.listaPrecio ?? null
 
   // Factura de un conduce (Facturar en Conduces): cambia los textos de la
   // conversión y no deja emitir una línea sin precio (ver validateForm).
@@ -386,6 +388,8 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
    * Elegir cliente arrastra sus condiciones comerciales al documento: su % de
    * descuento pasa a todas las líneas, y si no tiene crédito habilitado el
    * método de pago vuelve a contado (el backend rechazaría la factura con 422).
+   * Su lista de precio rige los productos que se agreguen después; las líneas
+   * que ya están conservan su precio y solo se avisa.
    */
   const seleccionarCliente = (c: Cliente | null) => {
     // La factura que modifica una nota es de ESTE cliente: con otro, deja de valer.
@@ -404,6 +408,9 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
       setMetodo('Efectivo')
       toast.info(`${c.nombre} no tiene crédito habilitado: el pago queda de contado.`)
     }
+    if (c?.listaPrecio && lineas.some((l) => l.precio > 0)) {
+      toast.info(`Este cliente compra al Precio ${c.listaPrecio}. Los productos que ya agregaste conservan su precio unitario.`)
+    }
   }
 
   const addLinea = (p: Producto, precio: number = p.precio) => {
@@ -420,10 +427,10 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
     setProdQuery('')
     setPrecioDe(null)
   }
-  // Con varias listas de precio el producto no se agrega hasta elegir una; con una sola (o ninguna) se
-  // agrega ya, como siempre.
+  // Con la lista del cliente, el producto que la ofrece se agrega a ese precio sin preguntar. Si no, con
+  // varias listas de precio no se agrega hasta elegir una; con una sola (o ninguna) se agrega ya.
   const elegirProducto = (p: Producto) => {
-    const e = eleccionDePrecio(p)
+    const e = eleccionDePrecio(p, listaCliente)
     if (e.tipo === 'directo') addLinea(p, e.precio)
     else setPrecioDe(p)
   }
@@ -889,6 +896,11 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
             </button>
           </div>
           {errors.cliente && <span className="fx-err"><Icon name="alert-circle" size={12} />{errors.cliente}</span>}
+          {listaCliente && (
+            <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
+              Lista de precio del cliente: Precio {listaCliente}
+            </span>
+          )}
           {!cliente && !busquedaCliente && !requiereCliente && !errors.cliente && (
             <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
               Sin cliente, la factura sale a nombre de Consumidor final.
@@ -1299,11 +1311,12 @@ export function InvoiceFormView({ nav, prefill = null }: { nav: Nav; prefill?: F
           ) : (
             <div className="col" style={{ maxHeight: 340, overflowY: 'auto', margin: '0 -8px' }}>
               {catalogo.map((p) => {
-                const etiqueta = etiquetaPrecios(p)
+                // Lo que se agregaría con un toque: el precio de la lista del cliente o, si no, el de siempre.
+                const fila = precioParaMostrar(p, listaCliente)
                 const precio = (
                   <span className="col" style={{ alignItems: 'flex-end', gap: 3 }}>
-                    <span className="fw6 text-sm"><Money value={p.precio} cur={false} /></span>
-                    {etiqueta && <span className="text-xs muted">{etiqueta}</span>}
+                    <span className="fw6 text-sm"><Money value={fila.precio} cur={false} /></span>
+                    {fila.etiqueta && <span className="text-xs muted">{fila.etiqueta}</span>}
                   </span>
                 )
                 return (

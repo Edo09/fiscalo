@@ -8,7 +8,7 @@ import { Icon, Money, Spinner } from '@/components/ui'
 import { listProducts, mapProductRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { fmtCantidad, fmtPrecio } from '@/lib/format'
-import { eleccionDePrecio, etiquetaPrecios } from '@/lib/listasPrecio'
+import { eleccionDePrecio, precioParaMostrar, type NumeroLista } from '@/lib/listasPrecio'
 import type { Producto } from '@/types/domain'
 import { ElegirPrecio } from './ElegirPrecio'
 
@@ -28,6 +28,11 @@ interface ProductoComboboxProps {
    */
   mostrarPrecio?: boolean
   /**
+   * Lista de precio por defecto del cliente del documento (solo con `mostrarPrecio`): un producto que
+   * la ofrece se agrega a ese precio sin preguntar, y su fila lo dice. Sin ella, la regla de siempre.
+   */
+  listaCliente?: NumeroLista | null
+  /**
    * No muestra ningún monto (ni costo ni precio): para un documento sin
    * precios, como el conduce. La línea de abajo (SKU, categoría, existencia)
    * se queda: es lo que una entrega necesita ver.
@@ -40,6 +45,7 @@ export function ProductoCombobox({
   placeholder = 'Buscar producto por nombre, SKU o categoría…',
   debounceMs = 250,
   mostrarPrecio = false,
+  listaCliente,
   ocultarMonto = false,
 }: ProductoComboboxProps) {
   const [input, setInput] = useState('')
@@ -78,9 +84,16 @@ export function ProductoCombobox({
   }
   const select = (p: Producto) => {
     if (!mostrarPrecio) { terminar(p); return }
-    const e = eleccionDePrecio(p)
+    const e = eleccionDePrecio(p, listaCliente)
     if (e.tipo === 'directo') terminar(p, e.precio)
     else setElegir(p)
+  }
+  // Lo que dice la fila con precios: el precio con sus decimales (hasta 4: es el que se copia a la
+  // línea) y, debajo, "3 precios" (al elegirlo se pregunta cuál usar) o "Precio 2 · cliente" (se
+  // agrega a la lista del cliente sin preguntar).
+  const precioDeFila = (p: Producto) => {
+    const { precio, etiqueta } = precioParaMostrar(p, listaCliente)
+    return <>Precio <span className="num">{fmtPrecio(precio)}</span>{etiqueta && <><br />{etiqueta}</>}</>
   }
 
   return (
@@ -126,12 +139,7 @@ export function ProductoCombobox({
                 </div>
                 {!ocultarMonto && (
                   <span className="text-xs muted" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                    {/* El precio con sus decimales (hasta 4): es el que se copia a la línea. */}
-                    {mostrarPrecio
-                      ? <>Precio <span className="num">{fmtPrecio(p.precio)}</span></>
-                      : <>Costo <Money value={p.costo} cur={false} /></>}
-                    {/* "3 precios": avisa que al elegirlo se pregunta cuál usar. */}
-                    {mostrarPrecio && etiquetaPrecios(p) && <><br />{etiquetaPrecios(p)}</>}
+                    {mostrarPrecio ? precioDeFila(p) : <>Costo <Money value={p.costo} cur={false} /></>}
                   </span>
                 )}
               </div>

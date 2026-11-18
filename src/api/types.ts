@@ -588,6 +588,8 @@ export interface ClientRow {
   descuento?: number | string | null
   /** 1 = se le puede facturar a crédito; 0 = solo contado. */
   permitir_credito?: number | string | boolean | null
+  /** Lista de precio por defecto, 1 a 4 (puede llegar como texto: "2"); NULL = sin lista, se pregunta cada vez. */
+  lista_precio?: number | string | null
 }
 
 // ---------------------------------------------------------------------------

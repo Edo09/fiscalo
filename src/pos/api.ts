@@ -8,6 +8,7 @@
 // EQUIPO_NO_HABILITADO lleva a habilitar el equipo, SESION_REQUERIDA al PIN.
 import { API_BASE_URL } from '@/api/config'
 import type { ReciboDatos } from '@/api/types'
+import type { NumeroLista } from './listas'
 
 const TIMEOUT_MS = 30_000
 
@@ -137,6 +138,12 @@ export interface SesionPos {
   turno_caja: TurnoCaja | null
 }
 
+/** Precio de una lista 2 a 4 de un producto: final con ITBIS, en centavos, como `precio_centavos`. */
+export interface ListaPos {
+  lista: 2 | 3 | 4
+  precio_centavos: number
+}
+
 /** Producto del catálogo de la caja (GET /api/pos/catalogo, C1-C4). */
 export interface ProductoPos {
   id: number
@@ -144,8 +151,13 @@ export interface ProductoPos {
   sku: string | null
   /** null: sin categoría, o su categoría está inactiva (sale solo en "Todos"). */
   category_id: number | null
-  /** Precio final con ITBIS, en centavos. Lo calcula el servidor (C2). */
+  /** Precio final con ITBIS, en centavos. Lo calcula el servidor (C2). Es la lista 1. */
   precio_centavos: number
+  /**
+   * Las listas de precio 2 a 4 que el producto ofrece, en orden; [] si no tiene ninguna.
+   * Ausente con un API viejo: entonces solo hay la lista 1 y nunca se pregunta cuál usar.
+   */
+  listas?: ListaPos[]
   /** ITBIS en %: 18, 16 o 0. */
   tasa: number
   indicador_facturacion: number
@@ -184,16 +196,19 @@ export interface ClientePos {
   rnc: string
   /** % de descuento del cliente (V5); 0 = sin descuento. */
   descuento: number
+  /** Su lista de precio por defecto (1 a 4); null = ninguna. Ausente con un API viejo. */
+  lista_precio?: NumeroLista | null
 }
 
-/** Cuerpo de POST /api/pos/ventas. El POS no manda precios: solo producto y cantidad. */
+/** Cuerpo de POST /api/pos/ventas. El POS no manda precios: solo producto, cantidad y la lista de precio de cada línea. */
 export interface VentaCuerpo {
   /** '32' consumo (sin cliente) o '31' crédito fiscal (con client_id). */
   tipo_ecf: '32' | '31'
   client_id: number | null
   /** Una por intento de venta: repetirla nunca saca otro e-NCF (F5). */
   clave: string
-  lineas: { product_id: number; cantidad: number }[]
+  /** `lista` (1 a 4) solo cuando es mayor que 1: sin ella el servidor cobra la lista 1. */
+  lineas: { product_id: number; cantidad: number; lista?: NumeroLista }[]
   /** El total que vio el cajero; si el servidor calcula otro, responde TOTAL_DISTINTO. */
   total_centavos: number
   forma_pago: FormaPago

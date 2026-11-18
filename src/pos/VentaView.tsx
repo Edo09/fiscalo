@@ -22,16 +22,25 @@
 // - Ventas en espera: hasta 5 ventas abiertas por empleado, en pestañas al pie
 //   de los productos (VentasTabs), guardadas en el equipo. Cobrar o cancelar la activa
 //   cierra su pestaña si hay otras; cerrar una con productos es cancelarla (V4).
+// - Listas de precio: tocar un producto con varios precios pregunta con cuál entra
+//   a la venta (ElegirPrecioModal; las decisiones viven en listas.ts); uno que ya
+//   está en la venta suma una unidad en su lista, sin preguntar. Si el cliente de
+//   la venta tiene lista y el producto la ofrece, entra directo en ella. Al elegir
+//   un cliente con lista sobre una venta con productos se pregunta UNA vez si pasar
+//   a ella los que la ofrecen (quitar el cliente no devuelve los precios). Cada
+//   línea con dos o más precios tiene su botón "Precio N", que reabre el selector.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Btn, Icon } from '@/components/ui'
-import { posApi, PosApiError, type EstadoPos, type FormaPago, type TurnoCaja } from './api'
+import { posApi, PosApiError, type ClientePos, type EstadoPos, type FormaPago, type ProductoPos, type TurnoCaja } from './api'
 import type { EquipoGuardado } from './store'
 import type { Empleado } from './api'
 import { nombreVenta, useCarritoStore, type LineaCarrito, type VentaAbierta } from './carrito'
+import { decisionPos, lineasCambiables, opcionesPos, type NumeroLista } from './listas'
 import { CatalogoPanel } from './CatalogoPanel'
 import { CarritoPanel } from './CarritoPanel'
 import { VentasTabs } from './VentasTabs'
 import { CantidadModal, ConfirmarModal } from './PosModales'
+import { ElegirPrecioModal } from './ElegirPrecioModal'
 import { CobroModal } from './CobroModal'
 import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } from './CajaModales'
 import { CierreModal } from './CierreModal'
@@ -58,6 +67,10 @@ interface Props {
 
 type Modal =
   | { tipo: 'cantidad'; linea: LineaCarrito }
+  /** Un producto con varios precios (listas): el cajero elige con cuál entra a la venta (`cambiando`: a cuál pasa el precio de su línea). */
+  | { tipo: 'precio'; producto: ProductoPos; cambiando?: boolean }
+  /** Se eligió un cliente con lista de precio en una venta con productos: se pregunta si pasar a ella los `n` que la ofrecen. */
+  | { tipo: 'listaCliente'; lista: NumeroLista; n: number }
   | { tipo: 'cancelar' }
   /** Cerrar la pestaña de una venta con productos: es cancelarla. */
   | { tipo: 'cerrarVenta'; venta: VentaAbierta }
@@ -97,7 +110,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const alternarTema = useTemaPos((s) => s.alternar)
   const { tamano, achicar, agrandar, normal: tamanoNormal } = useTamanoPos()
   const {
-    lineas, catalogo, cliente, cobroEnDuda, agregar, cambiarCantidad, quitar, ponerCliente, guardarCatalogo,
+    lineas, catalogo, cliente, cobroEnDuda, agregar, aplicarLista, cambiarLista, cambiarCantidad, quitar, ponerCliente, guardarCatalogo,
     ventas, activaId, nuevaVenta, cambiarA, cerrarVenta, terminarActiva,
   } = useCarritoStore()
   const ventaActiva = ventas.find((v) => v.id === activaId) ?? ventas[0]
@@ -270,6 +283,30 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
       .catch(() => { /* sin red: se pierde este registro, la venta sigue */ })
   }, [equipo.token, sesion.token, cliente])
 
+  // Tocar un producto del catálogo (la tarjeta, o Enter con un solo resultado en la búsqueda). Uno que ya
+  // está en la venta suma una unidad en SU lista, sin preguntar: un solo precio por producto. Uno nuevo
+  // lo decide decisionPos (listas.ts): si el cliente de la venta tiene lista y el producto la ofrece, entra
+  // directo en ella; si no, con un precio entra directo en esa lista y con dos o más se pregunta.
+  // Con un cobro sin confirmar, o con un diálogo abierto (el Enter del buscador llega hasta aquí por
+  // debajo del diálogo y no puede reemplazarlo), no se toca la venta.
+  const agregarProducto = useCallback((p: ProductoPos) => {
+    if (cobroEnDuda || modal !== null) return
+    if (lineas.some((l) => l.productoId === p.id)) { agregar(p); return }
+    const d = decisionPos(p, cliente?.lista_precio ?? null)
+    if (d.tipo === 'directo') agregar(p, d.lista)
+    else setModal({ tipo: 'precio', producto: p })
+  }, [cobroEnDuda, modal, lineas, cliente, agregar])
+
+  // Un cliente con lista de precio entra a una venta que ya tiene productos: se pregunta UNA vez si pasar a esa
+  // lista los que la ofrecen (el conteo es justo lo que aplicarLista va a cambiar). No se pregunta sin lista en
+  // el cliente, sin nada que cambiar ni con un cobro sin confirmar (esa venta no cambia, ni su cliente).
+  const elegirCliente = (c: ClientePos) => {
+    ponerCliente(c)
+    const lista = c.lista_precio
+    const n = lista && catalogo && !cobroEnDuda ? lineasCambiables(lineas, catalogo.productos, lista).length : 0
+    setModal(lista && n > 0 ? { tipo: 'listaCliente', lista, n } : null)
+  }
+
   // Botones de la tarjeta del catálogo. El −: una unidad menos; con una sola (o
   // menos, si es fraccionaria) sale de la venta. Quitar: fuera con todas sus
   // unidades. Las dos salidas quedan registradas como la papelera del carrito (V4).
@@ -352,6 +389,19 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   const enCarrito = useMemo(() => new Map(lineas.map((l) => [l.productoId, l.cantidad])), [lineas])
   const empresa = estado?.empresa.nombre ?? equipo.empresa ?? ''
 
+  // "Precio N" de una línea (CarritoPanel): es un botón solo si su producto, en el catálogo de ahora, ofrece dos o
+  // más precios; sin catálogo cargado o con el producto ya fuera de él, no hay a qué cambiar. Abre el mismo selector
+  // que el toque en el catálogo, que en vez de agregar cambia el precio de esa línea (`cambiando`).
+  const productosPorId = useMemo(() => new Map((catalogo?.productos ?? []).map((p) => [p.id, p])), [catalogo])
+  const puedeCambiarPrecio = (l: LineaCarrito) => {
+    const p = productosPorId.get(l.productoId)
+    return p !== undefined && opcionesPos(p).length >= 2
+  }
+  const cambiarPrecio = (l: LineaCarrito) => {
+    const p = productosPorId.get(l.productoId)
+    if (p) setModal({ tipo: 'precio', producto: p, cambiando: true })
+  }
+
   return (
     <>
       <header className="pos-barra">
@@ -425,7 +475,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
             onCategoria={setCategoria}
             buscadorRef={buscadorRef}
             enCarrito={enCarrito}
-            onAgregar={agregar}
+            onAgregar={agregarProducto}
             onQuitarUno={quitarUno}
             onQuitar={quitarDeVenta}
             bloqueado={cobroEnDuda !== null}
@@ -452,6 +502,8 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           onMas={(l) => cambiarCantidad(l.productoId, Math.min(l.cantidad + 1, 99999))}
           onMenos={(l) => { if (l.cantidad > 1) cambiarCantidad(l.productoId, Math.round((l.cantidad - 1) * 100) / 100) }}
           onCantidad={(l) => setModal({ tipo: 'cantidad', linea: l })}
+          puedeCambiarPrecio={puedeCambiarPrecio}
+          onCambiarPrecio={cambiarPrecio}
           onQuitar={(l) => { registrarEvento('quitada', [l]); quitar(l.productoId) }}
           onCancelar={() => setModal({ tipo: 'cancelar' })}
           onCliente={() => setModal({ tipo: 'cliente' })}
@@ -465,6 +517,28 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           linea={modal.linea}
           onCerrar={() => setModal(null)}
           onAceptar={(cantidad) => { cambiarCantidad(modal.linea.productoId, cantidad); setModal(null) }}
+        />
+      )}
+      {modal?.tipo === 'precio' && (
+        <ElegirPrecioModal
+          producto={modal.producto}
+          onCerrar={() => setModal(null)}
+          onElegir={(lista) => {
+            if (modal.cambiando) cambiarLista(modal.producto.id, lista)
+            else agregar(modal.producto, lista)
+            setModal(null)
+          }}
+        />
+      )}
+      {modal?.tipo === 'listaCliente' && (
+        <ConfirmarModal
+          titulo="Lista de precio del cliente"
+          texto={`Este cliente compra al Precio ${modal.lista}. ¿Cambiar a ese precio ${modal.n === 1 ? 'el producto de la venta que lo tiene' : `los ${modal.n} productos de la venta que lo tienen`}?`}
+          confirmar="Cambiar"
+          cancelar={modal.n === 1 ? 'Dejarlo como está' : 'Dejarlos como están'}
+          peligro={false}
+          onCerrar={() => setModal(null)}
+          onConfirmar={() => { aplicarLista(modal.lista); setModal(null) }}
         />
       )}
       {modal?.tipo === 'cancelar' && (
@@ -528,7 +602,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
           sesion={sesion}
           errorDeSesion={errorDeSesion}
           onCerrar={() => setModal(null)}
-          onElegido={(c) => { ponerCliente(c); setModal(null) }}
+          onElegido={elegirCliente}
         />
       )}
       {modal?.tipo === 'ventasDia' && (

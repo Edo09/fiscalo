@@ -1,7 +1,9 @@
 // Carrito de la venta en curso (api-gratex docs/specs/pos.md V1-V5, F2): líneas
-// con − / cantidad / +, aviso de existencia, cliente de crédito fiscal (E31) con
-// su descuento, totales al centavo e ITBIS incluido. El cobro va en CobroModal;
-// aquí se decide si se puede cobrar (turno, cobro sin confirmar).
+// con − / cantidad / +, la lista de precio de la línea (si no es la 1; con dos o
+// más precios en el producto, es un botón que la cambia), aviso de existencia,
+// cliente de crédito fiscal (E31) con su descuento y su lista de precio, totales
+// al centavo e ITBIS incluido. El cobro va en CobroModal; aquí se decide si se
+// puede cobrar (turno, cobro sin confirmar).
 import { Btn, Icon } from '@/components/ui'
 import { fmtCantidad } from '@/lib/format'
 import type { ClientePos } from './api'
@@ -24,6 +26,10 @@ interface Props {
   onMas: (l: LineaCarrito) => void
   onMenos: (l: LineaCarrito) => void
   onCantidad: (l: LineaCarrito) => void
+  /** ¿El producto de la línea ofrece dos o más precios? Entonces su "Precio N" es un botón. */
+  puedeCambiarPrecio: (l: LineaCarrito) => boolean
+  /** Reabre el selector de precio de la línea. */
+  onCambiarPrecio: (l: LineaCarrito) => void
   onQuitar: (l: LineaCarrito) => void
   onCancelar: () => void
   onCliente: () => void
@@ -41,8 +47,8 @@ function avisoExistencia(l: LineaCarrito): string | null {
 }
 
 export function CarritoPanel({
-  lineas, cliente, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, onQuitar, onCancelar,
-  onCliente, onQuitarCliente, titulo = 'Venta',
+  lineas, cliente, enDuda, puedeCobrar, motivoNoCobrar, sinTurno, onCobrar, onAbrirTurno, onMas, onMenos, onCantidad, puedeCambiarPrecio,
+  onCambiarPrecio, onQuitar, onCancelar, onCliente, onQuitarCliente, titulo = 'Venta',
 }: Props) {
   const t = totalesCarrito(lineas, cliente?.descuento ?? 0)
   const unidades = lineas.reduce((s, l) => s + l.cantidad, 0)
@@ -72,11 +78,25 @@ export function CarritoPanel({
           </div>
         ) : lineas.map((l, i) => {
           const aviso = avisoExistencia(l)
+          // Con dos o más precios, "Precio N" es el botón que los reabre y reemplaza al texto; si no, sigue como texto (solo si no es el 1).
+          const cambiable = puedeCambiarPrecio(l)
           return (
             <div key={l.productoId} className="pos-linea">
               <div className="pos-linea-info">
                 <b>{l.nombre}</b>
-                <small>RD$ {formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{l.tasa === 0 ? ' · Exento' : ''}</small>
+                <div className="pos-linea-precio">
+                  <small>RD$ {formatoCentavos(l.precioCentavos)} × {fmtCantidad(l.cantidad)}{!cambiable && l.lista > 1 ? ` · Precio ${l.lista}` : ''}{l.tasa === 0 ? ' · Exento' : ''}</small>
+                  {cambiable && (
+                    <button type="button" className="pos-linea-lista" onClick={() => onCambiarPrecio(l)} disabled={enDuda}
+                      aria-label={`Cambiar el precio de ${l.nombre}: ahora Precio ${l.lista}`}>
+                      Precio {l.lista}<Icon name="chevron-down" size={14} />
+                    </button>
+                  )}
+                </div>
+                {/* La lista que tenía ya no se ofrece: la línea volvió al precio 1 y se dice, no se cambia en silencio. */}
+                {l.listaPerdida && (
+                  <small className="pos-linea-aviso"><Icon name="alert-triangle" size={13} />El precio {l.listaPerdida} ya no está disponible: se cobra el precio 1</small>
+                )}
                 {aviso && <small className="pos-linea-aviso"><Icon name="alert-triangle" size={13} />{aviso}</small>}
               </div>
               <b key={t.lineas[i].bruto} className="pos-linea-importe pos-num"><span className="pos-moneda">RD$</span>{formatoCentavos(t.lineas[i].bruto)}</b>
@@ -113,6 +133,8 @@ export function CarritoPanel({
                   Descuento {cliente.descuento}%{t.descuento > 0 ? ` · −RD$ ${formatoCentavos(t.descuento)}` : ''}
                 </small>
               )}
+              {/* Su lista de precio por defecto: la que usa un toque en un producto de la venta que la ofrece. */}
+              {cliente.lista_precio && <small className="pos-cliente-lista">Lista: Precio {cliente.lista_precio}</small>}
             </div>
             <Btn variant="ghost" className="pos-cliente-quitar" onClick={onQuitarCliente} disabled={enDuda} aria-label="Quitar el cliente: la venta vuelve a consumo">Quitar</Btn>
           </div>

@@ -1,6 +1,7 @@
 // Servicio: clientes.
 import { ApiError, CODIGO_CLIENTE_SIN_ELEGIR } from './errores'
 import { getJson, getList, request, requestEnvelope, qs } from './http'
+import type { NumeroLista } from '@/lib/listasPrecio'
 import type { ClientRow, ListParams, ListResult } from './types'
 
 export function listClients(params: ListParams = {}): Promise<ListResult<ClientRow>> {
@@ -26,6 +27,8 @@ export interface NewClientInput {
   descuento?: number
   /** 1 = se le puede facturar a crédito; 0 = solo contado. */
   permitir_credito?: 0 | 1
+  /** Lista de precio por defecto (1 a 4). Sin la clave, el cliente queda sin lista y se pregunta cada vez. */
+  lista_precio?: NumeroLista
 }
 
 const MSG_CREADO_SIN_ELEGIR = 'Se creó el cliente, pero no pudimos elegirlo aquí. Búscalo en la lista para elegirlo.'

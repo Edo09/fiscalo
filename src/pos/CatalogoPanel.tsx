@@ -1,5 +1,7 @@
 // Catálogo táctil de la caja (api-gratex docs/specs/pos.md C3 y C4): buscador,
-// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad.
+// chips de categoría y grilla de productos. Tocar una tarjeta agrega 1 unidad;
+// con dos o más precios (listas de precio), el pie de la tarjeta dice "N precios"
+// y tocarla pregunta con cuál entra (VentaView decide, con listas.ts).
 // La foto (o las iniciales) va grande y centrada; con el producto en la venta,
 // sobre el borde de la tarjeta: arriba a la derecha el − y el contador, arriba a
 // la izquierda el botón que lo quita de la venta.
@@ -16,6 +18,7 @@ import { colorDeCategoria } from '@/features/categories/colores'
 import { API_BASE_URL } from '@/api/config'
 import { urlFoto } from '@/lib/fotoProducto'
 import type { CatalogoPos, ProductoPos } from './api'
+import { opcionesPos } from './listas'
 import { coincide, formatoCentavos, iniciales, semaforo } from './montos'
 import {
   cargarPreferencias, favoritosPrimero, guardarPreferencias, limitar, LIMITES, ordenar, ORDENES, PREFERENCIAS_POR_DEFECTO,
@@ -42,6 +45,7 @@ interface Props {
   buscadorRef: RefObject<HTMLInputElement>
   /** Cantidad de cada producto que ya está en el carrito. */
   enCarrito: Map<number, number>
+  /** Tocar la tarjeta, o Enter con un solo resultado: entra a la venta o, con varios precios, pregunta cuál. */
   onAgregar: (p: ProductoPos) => void
   /** Una unidad menos; con una sola, sale de la venta (queda registrada, V4). */
   onQuitarUno: (p: ProductoPos) => void
@@ -143,7 +147,8 @@ export function CatalogoPanel({
             value={busqueda}
             onChange={(e) => onBusqueda(e.target.value)}
             onKeyDown={(e) => {
-              // Enter con un solo resultado lo agrega: búsqueda + Enter sin tocar la pantalla.
+              // Enter con un solo resultado lo agrega (o, con varios precios, abre la elección):
+              // búsqueda + Enter sin tocar la pantalla.
               if (e.key === 'Enter' && productos.length === 1 && !bloqueado) {
                 e.preventDefault()
                 onAgregar(productos[0])
@@ -262,13 +267,16 @@ export function CatalogoPanel({
                 const cant = enCarrito.get(p.id) ?? 0
                 const agotado = p.stock !== null && p.stock <= 0
                 const fav = favoritos.has(p.id)
+                // Dos o más precios: la tarjeta lo avisa y tocarla pregunta con cuál entra.
+                const precios = opcionesPos(p).length
                 // Los botones van fuera de la tarjeta (un botón no puede ir dentro de
                 // otro), montados sobre su borde en las esquinas de arriba; la grilla
                 // deja aire alrededor para que no se monten sobre la vecina.
                 return (
                   <div key={p.id} className="pos-producto-celda">
                     <button type="button" className={'pos-producto' + (agotado ? ' agotado' : '') + (cant > 0 ? ' en-carrito' : '')}
-                      onClick={() => onAgregar(p)} disabled={bloqueado} aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos`}>
+                      onClick={() => onAgregar(p)} disabled={bloqueado}
+                      aria-label={`Agregar ${p.nombre}, ${formatoCentavos(p.precio_centavos)} pesos${precios >= 2 ? `, ${precios} precios` : ''}`}>
                       <span className="pos-producto-top">
                         <Marca key={p.imagen ?? ''} p={p} color={p.category_id !== null ? colores.get(p.category_id) ?? SIN_CATEGORIA : SIN_CATEGORIA} />
                       </span>
@@ -277,6 +285,7 @@ export function CatalogoPanel({
                       <span className="pos-producto-pie">
                         <b className="pos-producto-precio"><span className="pos-moneda">RD$</span>{formatoCentavos(p.precio_centavos)}</b>
                         <Existencia p={p} />
+                        {precios >= 2 && <span className="pos-producto-listas">{precios} precios</span>}
                       </span>
                     </button>
                     {/* Estrella en la esquina de arriba a la izquierda, sobre el borde. Esa

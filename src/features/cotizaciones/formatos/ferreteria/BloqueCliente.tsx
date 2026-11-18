@@ -8,7 +8,8 @@ import { formatearRnc } from './lineas'
 
    El rótulo de la hoja impresa ("Nombre o razón social"), el buscador de
    clientes con su botón + para uno nuevo, el nombre libre que se guarda como
-   cliente, el RNC o la cédula del elegido y el error del campo. Salió tal
+   cliente, el RNC o la cédula del elegido, su lista de precio (solo si el
+   documento tiene precios: la cotización) y el error del campo. Salió tal
    cual de FerreteriaCotizacionForm (spec conduces 5.5).
 
    El estado es de quien lo usa: lo necesita para validar y para el aviso de
@@ -42,11 +43,16 @@ export interface BloqueClienteProps {
    * líneas dejando la mitad de la fila en blanco.
    */
   anchoCompleto?: boolean
+  /**
+   * Dice la lista de precio por defecto del cliente elegido, si tiene una. Solo la cotización: sus
+   * productos se agregan a ese precio. El conduce no muestra precios y no la dice.
+   */
+  mostrarListaPrecio?: boolean
 }
 
 export function BloqueCliente({
   cliente, clienteCompleto, clienteLibre, error, avisoSinDoc, onSeleccionar, onBusquedaChange, onLibreChange, onNuevoCliente,
-  anchoCompleto = false,
+  anchoCompleto = false, mostrarListaPrecio = false,
 }: BloqueClienteProps) {
   return (
     <section className={'fx-a-quien' + (anchoCompleto ? ' fx-a-quien--completo' : '')}>
@@ -84,6 +90,11 @@ export function BloqueCliente({
           {cliente.doc
             ? `${cliente.doc.replace(/\D/g, '').length === 11 ? 'Cédula' : 'RNC'} ${formatearRnc(cliente.doc)}`
             : avisoSinDoc}
+        </span>
+      )}
+      {mostrarListaPrecio && cliente?.listaPrecio && (
+        <span className="text-xs muted-3" style={{ display: 'block', marginTop: 4 }}>
+          Lista de precio del cliente: Precio {cliente.listaPrecio}
         </span>
       )}
       {error && <span className="fx-err"><Icon name="alert-circle" size={12} />{error}</span>}

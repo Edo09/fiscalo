@@ -1,5 +1,5 @@
 import type { IconName } from '@/components/ui/Icon'
-import type { OtrosPrecios } from '@/lib/listasPrecio'
+import type { NumeroLista, OtrosPrecios } from '@/lib/listasPrecio'
 // Tipos de dominio para la UI (datos de ejemplo del prototipo).
 // Independientes del esquema de base de datos en `@/types/database`.
 
@@ -50,6 +50,8 @@ export interface Cliente {
   descuento: number
   /** Si se le puede facturar a crédito. Con `false`, el pago debe ser de contado. */
   permiteCredito: boolean
+  /** Su lista de precio por defecto (1 a 4); null = sin lista, se pregunta cada vez. */
+  listaPrecio: NumeroLista | null
 }
 
 export interface Producto {
