@@ -16,7 +16,7 @@ import { EcfTypeView } from '@/features/ecf/EcfTypeView'
 import { ApproveEcfView } from '@/features/ecf/ApproveEcfView'
 import { DgiiInboxView } from '@/features/ecf/DgiiInboxView'
 import { ClientsView } from '@/features/clients/ClientsView'
-import { CobrosView } from '@/features/cobros/CobrosView'
+import { CobrosTenantsView, CobrosView } from '@/features/cobros/CobrosView'
 import { CotizacionesView } from '@/features/cotizaciones/CotizacionesView'
 import { CotizacionEditor } from '@/features/cotizaciones/formatos/CotizacionEditor'
 import { ConducesView } from '@/features/conduces/ConducesView'
@@ -235,6 +235,9 @@ function AppShell() {
       // senalNuevo = el objeto mismo del payload (no un booleano): el menú manda uno nuevo en cada clic y así el alta se
       // abre cada vez, no solo la primera.
       case 'cobros': return <CobrosView senalNuevo={isNuevoSignal(payload) ? payload : null} clienteInicial={isClienteCobrosRef(payload) ? payload.clientId : null} />
+      // Cobros de tenants: lo que la plataforma le cobra a sus empresas. Solo cuentas de soporte (acceso global): el item
+      // del menú no se muestra a otros, debeSalirDeVista saca a quien llegue por otro camino, y el servidor responde 403.
+      case 'cobros-tenants': return <CobrosTenantsView />
       case 'productos': return <ProductsView nav={nav} />
       case 'categorias': return <CategoriesView />
       case 'almacenes': return <WarehousesView />

@@ -25,6 +25,7 @@ export type ViewId =
   | 'conduce-editar'
   | 'clientes'
   | 'cobros'
+  | 'cobros-tenants'
   | 'productos'
   | 'categorias'
   | 'almacenes'
@@ -261,6 +262,12 @@ export interface NavItem {
   /** Solo para el rol admin (por nombre de rol, no por módulo). Ver esRolAdmin(). */
   soloAdmin?: boolean
   /**
+   * Solo para las cuentas de soporte (users.acceso_global, ver features/auth/accesoGlobal). No es fail-open: sin
+   * `acceso_global: true` en la sesión no se muestra, ni con rol admin ni con todos los módulos. El servidor lo exige
+   * igual (api-gratex: /api/cobros-tenants responde 403 a quien no lo tiene).
+   */
+  soloAccesoGlobal?: boolean
+  /**
    * Solo para los tenants con este formato de cotización (los conduces son de
    * Ferretería). Además de `module`, no en vez de él. Ver puedeVerItem().
    */
@@ -343,6 +350,10 @@ export const NAV: NavGroup[] = [
     items: [
       { id: 'usuarios', label: 'Usuarios y roles', icon: 'shield', module: 'users' },
       { id: 'bitacora', label: 'Bitácora', icon: 'history', soloAdmin: true },
+      // Lo que LA PLATAFORMA le cobra a las empresas que la usan (api-gratex docs/modules/cobros.md, "Cobros de tenants"):
+      // solo cuentas de soporte. No es el módulo Cobros de la empresa (que cobra a sus clientes), ni depende de la empresa
+      // en la que esté la sesión.
+      { id: 'cobros-tenants', label: 'Cobros de tenants', icon: 'wallet', soloAccesoGlobal: true },
       // 'configuracion' sin módulo RBAC propio → siempre visible.
       { id: 'configuracion', label: 'Configuración', icon: 'settings' },
     ],
@@ -383,6 +394,12 @@ export function navSoloAdmin(view: ViewId): boolean {
   return NAV.some((g) => g.items.some((i) => i.id === top && i.soloAdmin))
 }
 
+/** ¿La vista (o su item del menú) es solo para las cuentas de soporte (acceso global)? */
+export function navSoloAccesoGlobal(view: ViewId): boolean {
+  const top = navTopFor(view)
+  return NAV.some((g) => g.items.some((i) => i.id === top && i.soloAccesoGlobal))
+}
+
 /** Módulo RBAC asociado a una vista (resolviendo subvistas a su item del menú).
     undefined => la vista no está gateada (siempre accesible). */
 export function navModuleFor(view: ViewId): string | undefined {
@@ -415,6 +432,8 @@ export function navRequierePos(view: ViewId): boolean {
 export interface SesionNav {
   role?: string
   permissions?: string[]
+  /** Cuenta de soporte (master.users.acceso_global): solo ella ve lo `soloAccesoGlobal`. */
+  acceso_global?: boolean
 }
 
 /**
@@ -430,10 +449,12 @@ export interface SesionNav {
  */
 export function puedeVerItem(
   user: SesionNav | null | undefined,
-  it: { module?: string; soloAdmin?: boolean; formato?: FormatoId; requierePos?: boolean },
+  it: { module?: string; soloAdmin?: boolean; soloAccesoGlobal?: boolean; formato?: FormatoId; requierePos?: boolean },
   formato?: FormatoId | null,
   posActivo?: boolean | null,
 ): boolean {
+  // Lo de soporte tampoco es fail-open: sin el acceso global en la sesión no se muestra (ni a un admin).
+  if (it.soloAccesoGlobal && user?.acceso_global !== true) return false
   if (it.formato !== undefined && formato !== it.formato) return false
   // Como el formato: un item del POS solo se ve cuando se SABE que la empresa lo tiene.
   if (it.requierePos && posActivo !== true) return false
@@ -448,7 +469,10 @@ export function puedeVerVista(
 ): boolean {
   return puedeVerItem(
     user,
-    { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), formato: navFormatoFor(view), requierePos: navRequierePos(view) },
+    {
+      module: navModuleFor(view), soloAdmin: navSoloAdmin(view), soloAccesoGlobal: navSoloAccesoGlobal(view),
+      formato: navFormatoFor(view), requierePos: navRequierePos(view),
+    },
     formato,
     posActivo,
   )
@@ -464,7 +488,7 @@ export function puedeVerVista(
 export function debeSalirDeVista(
   user: SesionNav | null | undefined, view: ViewId, formato: FormatoId | null, posActivo: boolean | null = null,
 ): boolean {
-  if (!puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view) })) return true
+  if (!puedeVerItem(user, { module: navModuleFor(view), soloAdmin: navSoloAdmin(view), soloAccesoGlobal: navSoloAccesoGlobal(view) })) return true
   // POS: igual que el formato, solo se saca cuando se SABE que la empresa no lo tiene.
   if (navRequierePos(view) && posActivo === false) return true
   const exigido = navFormatoFor(view)
@@ -487,6 +511,7 @@ export const TITLES: Record<ViewId, string> = {
   'conduce-editar': 'Conduce',
   clientes: 'Clientes',
   cobros: 'Cobros',
+  'cobros-tenants': 'Cobros de tenants',
   productos: 'Productos',
   categorias: 'Categorías',
   almacenes: 'Almacenes',

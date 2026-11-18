@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
 import { ESTADOS_COBRO, esFechaReal, esPeriodo } from '@/api/schemas/cobros'
+import { useAmbitoCobros } from '../ambito'
 import { hayFiltros, useCobrosUi } from '../store'
 
 const BUSQUEDA_MS = 350
@@ -36,6 +37,7 @@ function useCampoFiltro(valor: string, valido: (s: string) => boolean, fijar: (s
 }
 
 export function FiltrosCobros({ buscando }: { buscando: boolean }) {
+  const { textos } = useAmbitoCobros()
   const filtros = useCobrosUi((s) => s.filtros)
   const setFiltros = useCobrosUi((s) => s.setFiltros)
   const limpiarFiltros = useCobrosUi((s) => s.limpiarFiltros)
@@ -88,7 +90,7 @@ export function FiltrosCobros({ buscando }: { buscando: boolean }) {
         >
           <Icon name={buscando ? 'loader' : 'search'} className={buscando ? 'spin' : undefined} />
           <input
-            placeholder="Buscar por nombre del cliente…" value={texto} onChange={(e) => setTexto(e.target.value)}
+            placeholder={textos.placeholderFiltro} value={texto} onChange={(e) => setTexto(e.target.value)}
             aria-label="Buscar cobros por nombre del cliente"
           />
         </form>
@@ -114,11 +116,11 @@ export function FiltrosCobros({ buscando }: { buscando: boolean }) {
             type="button" className="filter-chip active" title="Quitar el filtro de cliente"
             onClick={() => setFiltros({ clientId: null, clienteNombre: '' })}
           >
-            <Icon name="user" />{filtros.clienteNombre || `Cliente ${filtros.clientId}`}<Icon name="x" />
+            <Icon name="user" />{filtros.clienteNombre || textos.filtroSinNombre(filtros.clientId)}<Icon name="x" />
           </button>
         ) : (
           <button type="button" className="filter-chip" onClick={() => abrirModal({ tipo: 'filtrar-cliente' })}>
-            <Icon name="user" />Cliente
+            <Icon name="user" />{textos.chipCliente}
           </button>
         )}
         <label className="row gap-sm text-sm muted">

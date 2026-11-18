@@ -1,0 +1,115 @@
+{
+    "status": true,
+    "data": {
+        "pago": {
+            "id": 2,
+            "cobro_id": 1,
+            "monto": 3000,
+            "fecha_pago": "2026-11-10",
+            "metodo": "efectivo",
+            "observaciones": null,
+            "anulado": false,
+            "anulado_at": null,
+            "motivo_anulacion": null,
+            "created_at": "2026-11-16 10:00:00"
+        },
+        "cobro": {
+            "id": 1,
+            "client_id": 1,
+            "cliente": {
+                "id": 1,
+                "nombre": "Alfa Comercial SRL",
+                "contacto": "Alfa Comercial SRL",
+                "empresa": "Alfa Comercial SRL",
+                "rnc": "101000011",
+                "email": "admin@alfa.test",
+                "telefono": ""
+            },
+            "periodo": "2026-10",
+            "descripcion": "Mensualidad Fiscalpoint",
+            "monto": 5000,
+            "monto_pagado": 5000,
+            "saldo": 0,
+            "fecha_vencimiento": "2026-10-31",
+            "estado": "Pagado",
+            "dias_atraso": 0,
+            "dias_para_vencer": null,
+            "con_abonos": false,
+            "cancelado_at": null,
+            "motivo_cancelacion": null,
+            "generado_de_cobro_id": null,
+            "ultimo_pago": "2026-11-10",
+            "ultimo_recordatorio": null,
+            "recordatorios": 0,
+            "created_at": "2026-11-16 10:00:00",
+            "updated_at": "2026-11-16 10:00:00",
+            "pagos": [
+                {
+                    "id": 2,
+                    "cobro_id": 1,
+                    "monto": 3000,
+                    "fecha_pago": "2026-11-10",
+                    "metodo": "efectivo",
+                    "observaciones": null,
+                    "anulado": false,
+                    "anulado_at": null,
+                    "motivo_anulacion": null,
+                    "created_at": "2026-11-16 10:00:00"
+                },
+                {
+                    "id": 1,
+                    "cobro_id": 1,
+                    "monto": 2000,
+                    "fecha_pago": "2026-10-20",
+                    "metodo": "transferencia",
+                    "observaciones": "Abono",
+                    "anulado": false,
+                    "anulado_at": null,
+                    "motivo_anulacion": null,
+                    "created_at": "2026-11-16 10:00:00"
+                }
+            ],
+            "recordatorios_lista": [],
+            "genero": [
+                {
+                    "id": 2,
+                    "periodo": "2026-11"
+                }
+            ]
+        },
+        "siguiente": {
+            "id": 2,
+            "client_id": 1,
+            "cliente": {
+                "id": 1,
+                "nombre": "Alfa Comercial SRL",
+                "contacto": "Alfa Comercial SRL",
+                "empresa": "Alfa Comercial SRL",
+                "rnc": "101000011",
+                "email": "admin@alfa.test",
+                "telefono": ""
+            },
+            "periodo": "2026-11",
+            "descripcion": "Mensualidad Fiscalpoint",
+            "monto": 6000,
+            "monto_pagado": 0,
+            "saldo": 6000,
+            "fecha_vencimiento": "2026-11-30",
+            "estado": "Pendiente",
+            "dias_atraso": 0,
+            "dias_para_vencer": 14,
+            "con_abonos": false,
+            "cancelado_at": null,
+            "motivo_cancelacion": null,
+            "generado_de_cobro_id": 1,
+            "ultimo_pago": null,
+            "ultimo_recordatorio": null,
+            "recordatorios": 0,
+            "created_at": "2026-11-16 10:00:00",
+            "updated_at": null
+        },
+        "siguiente_nuevo": false,
+        "siguiente_motivo": null,
+        "repetido": true
+    }
+}

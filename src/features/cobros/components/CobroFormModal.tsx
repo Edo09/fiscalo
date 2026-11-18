@@ -5,17 +5,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Avatar, Btn, ErrorState, LoadingState, Modal } from '@/components/ui'
-import { ApiError, getClienteCobros, type CambiosCobroInput, type CobroDetalle, type NuevoCobroInput } from '@/api'
+import { ApiError, type CambiosCobroInput, type CobroDetalle, type NuevoCobroInput } from '@/api'
 import {
   aCentavos, centavosDeTexto, cobroFormSchema, deCentavos, erroresPorCampo, esPeriodo, textoDinero, textoMontoCampo,
 } from '@/api/schemas/cobros'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
-import { ClientCombobox } from '@/features/clients/ClientCombobox'
+import { useAmbitoCobros } from '../ambito'
 import { periodoLargo, textoSiguiente, vencimientoDe } from '../format'
-import { cobrosKeys, useActualizarCobro, useCrearCobro, useDetalleParaFormulario } from '../hooks'
+import { useActualizarCobro, useCrearCobro, useDetalleParaFormulario } from '../hooks'
 import { useCobrosUi } from '../store'
 import { Aviso } from './Aviso'
+import { SelectorCliente } from './SelectorCliente'
 
 interface Props {
   /** null = crear. */
@@ -53,6 +54,7 @@ function FormCobro({ cobro, errorActualizar, clientIdInicial, onClose }: {
   cobro: CobroDetalle | null; errorActualizar: string | null; clientIdInicial: number | null; onClose: () => void
 }) {
   const editando = cobro !== null
+  const { api, keys } = useAmbitoCobros()
   const abrirPanel = useCobrosUi((s) => s.abrirPanel)
   const crear = useCrearCobro()
   const actualizar = useActualizarCobro()
@@ -69,7 +71,7 @@ function FormCobro({ cobro, errorActualizar, clientIdInicial, onClose }: {
 
   // Solo al crear: el panel del cliente trae su configuración y lo sugerido. Sin cliente elegido, la consulta no corre.
   const panel = useApiQuery(
-    cobrosKeys.cliente(clientId ?? 0), () => getClienteCobros(clientId as number), { enabled: !editando && clientId !== null },
+    keys.cliente(clientId ?? 0), () => api.getClienteCobros(clientId as number), { enabled: !editando && clientId !== null },
   )
   const sugerido = !editando && clientId !== null ? panel.data?.sugerido : undefined
   const config = panel.data?.config ?? null
@@ -190,9 +192,8 @@ function FormCobro({ cobro, errorActualizar, clientIdInicial, onClose }: {
           <label className="label">Cliente <span className="req">*</span></label>
           {clientId === null ? (
             <>
-              <ClientCombobox
-                value={null}
-                onChange={(c) => { if (c) { tocados.current.clear(); setClientId(Number(c.id)) } }}
+              <SelectorCliente
+                onElegir={(id) => { tocados.current.clear(); setClientId(id) }}
                 invalido={!!errores.clientId}
               />
               {errores.clientId && <div className="err-msg">{errores.clientId}</div>}

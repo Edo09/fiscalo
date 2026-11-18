@@ -1,8 +1,9 @@
 // Textos y tonos de Cobros. Sin React: se prueba con scripts/test-cobros.ts.
 // Los nombres de mes van escritos a mano (no Intl): la salida no cambia entre navegadores ni con Node.
-import type { Cobro, EstadoCobro } from '@/api'
+import type { Cobro, EstadoCobro, TenantBuscado } from '@/api'
 // Valores por ruta relativa con .ts: scripts/test-cobros.ts carga este archivo con `node` tal cual ('@/…' no existe allí).
 import { aCentavos, textoDinero, type MotivoSiguiente } from '../../api/schemas/cobros.ts'
+import { etiquetaAmbiente } from '../auth/accesoGlobal.ts'
 
 type BadgeTono = 'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'
 
@@ -149,4 +150,19 @@ export const COLOR_TRAMO: Record<string, string> = {
   '31-60': 'var(--warning)',
   '61-90': 'var(--danger)',
   '90+': 'var(--danger)',
+}
+
+/**
+ * La línea de detalle de un tenant en el buscador de la plataforma: lo que ayuda a distinguirlo y a saber qué esperar de él.
+ * Lo normal no se rotula (una empresa de producción con base propia): solo el RNC. Lo que sale de lo normal sí: de
+ * integración (sin base propia), en certificación o pruebas, dada de baja, y si ya tiene su cobro mensual configurado.
+ */
+export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config'>): string {
+  return [
+    t.rnc ? `RNC ${t.rnc}` : 'sin RNC',
+    t.tipo === 'integracion' ? 'Integración' : null,
+    etiquetaAmbiente(t.ambiente),
+    t.activo ? null : 'Inactiva',
+    t.con_config ? 'Cobro mensual configurado' : null,
+  ].filter(Boolean).join(' · ')
 }

@@ -1,31 +1,22 @@
-// Datos de Cobros con TanStack Query: consultas (con su caché) y mutaciones. Toda mutación invalida
-// ['cobros'] entera: un pago cambia a la vez la lista, el dashboard, el panel del cliente, los
-// recordatorios y el siguiente cobro generado, y es más barato volver a pedirlos que acertar cuáles.
+// Datos de Cobros con TanStack Query: consultas (con su caché) y mutaciones. Toda mutación invalida la raíz del
+// ámbito entera (['cobros'] o ['cobros-tenants']): un pago cambia a la vez la lista, el dashboard, el panel del cliente,
+// los recordatorios y el siguiente cobro generado, y es más barato volver a pedirlos que acertar cuáles.
+// El servicio y las claves salen del ÁMBITO de la pantalla (ambito.ts): los mismos hooks sirven a los cobros de una
+// empresa a sus clientes y a los de la plataforma a sus tenants.
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  anularPagoCobro, cancelarCobro, createCobro, getClienteCobros, getCobro, getRecordatoriosCobros, getResumenCobros,
-  guardarConfigCobro, listCobros, reabrirCobro, registrarPagoCobro, registrarRecordatorioCobro, updateCobro,
-  type CambiosCobroInput, type ConfigCobroInput, type ListarCobrosParams, type NuevoCobroInput, type PagoInput,
-  type RecordatorioInput, type ResumenCobros,
+import type {
+  ApiCobros, CambiosCobroInput, ConfigCobroInput, ListarCobrosParams, NuevoCobroInput, PagoInput, RecordatorioInput, ResumenCobros,
 } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ahoraLocal, hoyLocal } from '@/lib/date'
+import { useAmbitoCobros } from './ambito'
 import { relojDeServidor, type RelojRD } from './reloj'
 import type { FiltrosCobros } from './store'
 
 /** Ventana (días) de "vence pronto" y cada cuántos días se vuelve a recordar: los valores del servidor. */
 export const DIAS_PROXIMOS = 7
 export const DIAS_RECORDAR = 7
-
-export const cobrosKeys = {
-  todo: ['cobros'] as const,
-  lista: (p: ListarCobrosParams) => ['cobros', 'lista', p] as const,
-  resumen: (dias: number) => ['cobros', 'resumen', dias] as const,
-  recordatorios: (dias: number, cada: number) => ['cobros', 'recordatorios', dias, cada] as const,
-  cliente: (id: number) => ['cobros', 'cliente', id] as const,
-  detalle: (id: number) => ['cobros', 'detalle', id] as const,
-}
 
 /** Los filtros de la pantalla como parámetros de la API (lo vacío no se manda). */
 export function paramsDeFiltros(f: FiltrosCobros, page: number, pageSize: number): ListarCobrosParams {
@@ -44,21 +35,34 @@ export function paramsDeFiltros(f: FiltrosCobros, page: number, pageSize: number
 // --- Consultas --------------------------------------------------------------
 
 export function useListaCobros(f: FiltrosCobros, page: number, pageSize: number) {
+  const { api, keys } = useAmbitoCobros()
   const params = paramsDeFiltros(f, page, pageSize)
-  return useApiQuery(cobrosKeys.lista(params), () => listCobros(params), { keepPrevious: true })
+  return useApiQuery(keys.lista(params), () => api.listCobros(params), { keepPrevious: true })
 }
 
 export function useResumenCobros(dias = DIAS_PROXIMOS) {
-  return useApiQuery(cobrosKeys.resumen(dias), () => getResumenCobros(dias))
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.resumen(dias), () => api.getResumenCobros(dias))
 }
 
 export function useRecordatoriosCobros(dias = DIAS_PROXIMOS, cada = DIAS_RECORDAR) {
-  return useApiQuery(cobrosKeys.recordatorios(dias, cada), () => getRecordatoriosCobros({ dias, cada }), { keepPrevious: true })
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.recordatorios(dias, cada), () => api.getRecordatoriosCobros({ dias, cada }), { keepPrevious: true })
 }
 
 /** El panel de un cliente: configuración, resumen, cobros con sus pagos y recordatorios. */
 export function usePanelCliente(clientId: number) {
-  return useApiQuery(cobrosKeys.cliente(clientId), () => getClienteCobros(clientId))
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.cliente(clientId), () => api.getClienteCobros(clientId))
+}
+
+/**
+ * Los tenants del buscador de la plataforma (solo en ese ámbito), por nombre o RNC. `texto` ya viene sin la demora de
+ * teclear (el buscador la maneja); vacío = los primeros de la lista, los activos primero.
+ */
+export function useBuscarTenants(texto: string) {
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.buscar(texto), () => api.buscarTenants(texto, 20), { keepPrevious: true })
 }
 
 /**
@@ -79,7 +83,8 @@ export function useDetalleParaFormulario(id: number) {
 
 /** Un cobro con todo su historial. Los formularios lo leen aquí para mostrar el saldo de AHORA. */
 export function useDetalleCobro(id: number) {
-  return useApiQuery(cobrosKeys.detalle(id), () => getCobro(id))
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.detalle(id), () => api.getCobro(id))
 }
 
 /**
@@ -90,8 +95,9 @@ export function useDetalleCobro(id: number) {
  */
 export function useRelojServidor(): () => RelojRD {
   const qc = useQueryClient()
+  const { keys } = useAmbitoCobros()
   return () => {
-    const estado = qc.getQueryState<ResumenCobros>(cobrosKeys.resumen(DIAS_PROXIMOS))
+    const estado = qc.getQueryState<ResumenCobros>(keys.resumen(DIAS_PROXIMOS))
     const r = estado?.data ? relojDeServidor(estado.data.ahora, estado.dataUpdatedAt, Date.now()) : null
     return r ?? { hoy: hoyLocal(), ahora: ahoraLocal() }
   }
@@ -99,29 +105,30 @@ export function useRelojServidor(): () => RelojRD {
 
 // --- Mutaciones -------------------------------------------------------------
 
-function useMutacion<V, R>(fn: (v: V) => Promise<R>) {
+function useMutacion<V, R>(fn: (api: ApiCobros, v: V) => Promise<R>) {
   const qc = useQueryClient()
+  const { api, keys } = useAmbitoCobros()
   return useMutation({
-    mutationFn: fn,
+    mutationFn: (v: V) => fn(api, v),
     // onSettled y no onSuccess: un 409 ("ya está pagado", "otro monto"), un 422 o un tiempo agotado ("puede que sí se
     // haya guardado") también dejan la pantalla con datos viejos, y la persona tiene que ver lo que hay AHORA para
     // decidir. Sin esperar el refetch: el resultado ya trae lo que la pantalla necesita para avisar.
-    onSettled: () => { void qc.invalidateQueries({ queryKey: cobrosKeys.todo }) },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: keys.todo }) },
   })
 }
 
-export const useCrearCobro = () => useMutacion((cobro: NuevoCobroInput) => createCobro(cobro))
+export const useCrearCobro = () => useMutacion((api, cobro: NuevoCobroInput) => api.createCobro(cobro))
 export const useActualizarCobro = () =>
-  useMutacion(({ id, cambios }: { id: number; cambios: CambiosCobroInput }) => updateCobro(id, cambios))
+  useMutacion((api, { id, cambios }: { id: number; cambios: CambiosCobroInput }) => api.updateCobro(id, cambios))
 export const useRegistrarPago = () =>
-  useMutacion(({ cobroId, pago }: { cobroId: number; pago: PagoInput }) => registrarPagoCobro(cobroId, pago))
+  useMutacion((api, { cobroId, pago }: { cobroId: number; pago: PagoInput }) => api.registrarPagoCobro(cobroId, pago))
 export const useCancelarCobro = () =>
-  useMutacion(({ id, motivo }: { id: number; motivo?: string }) => cancelarCobro(id, motivo))
-export const useReabrirCobro = () => useMutacion((id: number) => reabrirCobro(id))
+  useMutacion((api, { id, motivo }: { id: number; motivo?: string }) => api.cancelarCobro(id, motivo))
+export const useReabrirCobro = () => useMutacion((api, id: number) => api.reabrirCobro(id))
 export const useAnularPago = () =>
-  useMutacion(({ pagoId, motivo }: { pagoId: number; motivo?: string }) => anularPagoCobro(pagoId, motivo))
+  useMutacion((api, { pagoId, motivo }: { pagoId: number; motivo?: string }) => api.anularPagoCobro(pagoId, motivo))
 export const useGuardarConfig = () =>
-  useMutacion(({ clientId, config }: { clientId: number; config: ConfigCobroInput }) => guardarConfigCobro(clientId, config))
+  useMutacion((api, { clientId, config }: { clientId: number; config: ConfigCobroInput }) => api.guardarConfigCobro(clientId, config))
 export const useRegistrarRecordatorio = () =>
-  useMutacion(({ cobroId, recordatorio }: { cobroId: number; recordatorio: RecordatorioInput }) =>
-    registrarRecordatorioCobro(cobroId, recordatorio))
+  useMutacion((api, { cobroId, recordatorio }: { cobroId: number; recordatorio: RecordatorioInput }) =>
+    api.registrarRecordatorioCobro(cobroId, recordatorio))

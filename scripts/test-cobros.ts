@@ -247,7 +247,8 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: { getItem: (k: string) => memoria.get(k) ?? null, setItem: (k: string, v: string) => void memoria.set(k, v), removeItem: (k: string) => void memoria.delete(k) },
 })
-const { useCobrosUi, FILTROS_VACIOS, hayFiltros, PAGE_SIZES, VENTANAS_RECORDATORIO } = await import('../src/features/cobros/store.ts')
+// Hay un store de interfaz por ámbito (empresa y tenants); esta parte prueba el de las empresas (el de la plataforma, test-cobros-tenants.ts).
+const { cobrosUiEmpresa: useCobrosUi, FILTROS_VACIOS, hayFiltros, PAGE_SIZES, VENTANAS_RECORDATORIO } = await import('../src/features/cobros/store.ts')
 const { useAuthStore } = await import('../src/stores/auth.ts')
 const u = () => useCobrosUi.getState()
 igual('estado inicial: pestaña cobros, sin filtros, página 1, tamaño 10, sin panel ni modal, ventana de recordatorios de 7 días, panel en el historial',

@@ -1,17 +1,22 @@
-// Servicio: Cobros (cuentas por cobrar por cliente) — /api/cobros.
+// Servicio: Cobros (cuentas por cobrar por cliente) — /api/cobros y /api/cobros-tenants.
 // Contrato y reglas: api-gratex docs/modules/cobros.md. Cada respuesta se valida con su esquema Zod
 // (src/api/schemas/cobros.ts): si el servidor cambia de forma, falla aquí con un texto claro y no
 // más adelante con un "undefined" en pantalla.
+//
+// DOS ámbitos, el mismo servicio: `apiCobros` (cada empresa cobra a sus clientes, /api/cobros) y `apiCobrosTenants` (la
+// plataforma cobra a sus tenants, /api/cobros-tenants, solo cuentas de soporte). Las rutas salen de rutas-cobros.ts.
+// Las funciones sueltas de siempre (`listCobros`…) son las del ámbito de empresa.
 import type { z } from 'zod'
 import { ApiError } from './errores'
-import { getJson, getList, qs, request } from './http'
+import { getJson, getList, request } from './http'
+import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from './rutas-cobros'
 import type { ListResult } from './types'
 import {
   cobroActualizadoSchema, cobroDetalleSchema, cobroSchema, configCobroSchema, pagoAnuladoSchema, pagoResultadoSchema,
-  panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema,
+  panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantsBuscadosSchema,
   type Cobro, type CobroActualizado, type CobroDetalle, type ConfigCobro, type EstadoCobro, type MetodoPago,
   type PagoAnulado, type PagoResultado, type PanelCliente, type RecordatorioResultado, type RecordatoriosCobros,
-  type ResumenCobros, type CanalRecordatorio,
+  type ResumenCobros, type CanalRecordatorio, type TenantBuscado,
 } from './schemas/cobros'
 
 const MSG_RESPUESTA = 'Recibimos del servidor una respuesta que no entendemos. Actualiza la página e inténtalo de nuevo; si sigue pasando, avisa a soporte.'
@@ -30,7 +35,7 @@ const enviar = (path: string, method: 'POST' | 'PUT', cuerpo: unknown) =>
   request<unknown>(path, { method, headers: JSON_HEADERS, body: JSON.stringify(cuerpo ?? {}) })
 
 // ---------------------------------------------------------------------------
-// Lecturas
+// Entradas
 // ---------------------------------------------------------------------------
 
 export interface ListarCobrosParams {
@@ -47,47 +52,12 @@ export interface ListarCobrosParams {
   orden?: 'urgencia' | 'vencimiento_asc' | 'vencimiento_desc' | 'saldo_desc'
 }
 
-/** Cobros paginados, con filtros. El orden por defecto es el de urgencia (lo más atrasado primero). */
-export async function listCobros(params: ListarCobrosParams = {}): Promise<ListResult<Cobro>> {
-  const res = await getList<unknown>(`/api/cobros${qs({ ...params })}`)
-  return { ...res, items: res.items.map((i) => parsear(cobroSchema, i, 'GET /api/cobros')) }
-}
-
-/** El dashboard: totales, antigüedad, próximos vencimientos y clientes con atraso. `dias` = ventana de "vence pronto". */
-export async function getResumenCobros(dias?: number): Promise<ResumenCobros> {
-  return parsear(resumenCobrosSchema, await getJson<unknown>(`/api/cobros/resumen${qs({ dias })}`), 'GET /api/cobros/resumen')
-}
-
-/** A quién recordarle: cobros vencidos o que vencen en `dias` días, con su último recordatorio. */
-export async function getRecordatoriosCobros(params: { dias?: number; cada?: number } = {}): Promise<RecordatoriosCobros> {
-  return parsear(recordatoriosCobrosSchema, await getJson<unknown>(`/api/cobros/recordatorios${qs({ ...params })}`), 'GET /api/cobros/recordatorios')
-}
-
-/** El panel de un cliente: configuración mensual, resumen, todos sus cobros con sus pagos y sus recordatorios. */
-export async function getClienteCobros(clientId: number): Promise<PanelCliente> {
-  return parsear(panelClienteSchema, await getJson<unknown>(`/api/cobros/clientes/${clientId}`), `GET /api/cobros/clientes/${clientId}`)
-}
-
-/** Un cobro con sus pagos (vigentes y anulados) y sus recordatorios. */
-export async function getCobro(id: number): Promise<CobroDetalle> {
-  return parsear(cobroDetalleSchema, await getJson<unknown>(`/api/cobros/${id}`), `GET /api/cobros/${id}`)
-}
-
-// ---------------------------------------------------------------------------
-// Escrituras
-// ---------------------------------------------------------------------------
-
 export interface ConfigCobroInput {
   monto_mensual: number
   /** 1 a 31; en un mes más corto vence el último día. */
   dia_vencimiento: number
   descripcion?: string
   activo: boolean
-}
-
-/** Monto mensual y día de vencimiento de un cliente. No toca los cobros que ya existen. */
-export async function guardarConfigCobro(clientId: number, input: ConfigCobroInput): Promise<ConfigCobro> {
-  return parsear(configCobroSchema, await enviar(`/api/cobros/clientes/${clientId}/config`, 'PUT', input), 'PUT config')
 }
 
 export interface NuevoCobroInput {
@@ -98,21 +68,11 @@ export interface NuevoCobroInput {
   descripcion?: string
 }
 
-/** Crea un cobro a mano. Un cobro del mismo cliente y periodo ya existente da 409 (codigo COBRO_DUPLICADO). */
-export async function createCobro(input: NuevoCobroInput): Promise<CobroDetalle> {
-  return parsear(cobroDetalleSchema, await enviar('/api/cobros', 'POST', input), 'POST /api/cobros')
-}
-
 export interface CambiosCobroInput {
   monto?: number
   fecha_vencimiento?: string
   /** '' vacía la descripción. */
   descripcion?: string
-}
-
-/** Cambia el monto, el vencimiento o la descripción. Si el cambio lo deja pagado completo, trae el cobro que se generó. */
-export async function updateCobro(id: number, cambios: CambiosCobroInput): Promise<CobroActualizado> {
-  return parsear(cobroActualizadoSchema, await enviar(`/api/cobros/${id}`, 'PUT', cambios), `PUT /api/cobros/${id}`)
 }
 
 export interface PagoInput {
@@ -125,21 +85,6 @@ export interface PagoInput {
   idempotency_key: string
 }
 
-/** Registra un pago, completo o parcial. Si completa el cobro, el servidor genera el del mes siguiente. */
-export async function registrarPagoCobro(cobroId: number, input: PagoInput): Promise<PagoResultado> {
-  return parsear(pagoResultadoSchema, await enviar(`/api/cobros/${cobroId}/pagos`, 'POST', input), 'POST pagos')
-}
-
-/** Cancela un cobro (nunca se borra). Uno con pagos vigentes da 409: hay que anular el pago antes. */
-export async function cancelarCobro(id: number, motivo?: string): Promise<CobroDetalle> {
-  return parsear(cobroDetalleSchema, await enviar(`/api/cobros/${id}/cancelar`, 'POST', { motivo }), 'POST cancelar')
-}
-
-/** Reabre un cobro cancelado. */
-export async function reabrirCobro(id: number): Promise<CobroDetalle> {
-  return parsear(cobroDetalleSchema, await enviar(`/api/cobros/${id}/reabrir`, 'POST', {}), 'POST reabrir')
-}
-
 export interface RecordatorioInput {
   /** AAAA-MM-DD HH:MM:SS (hora de RD); sin ella, ahora. */
   fecha_hora?: string
@@ -147,12 +92,102 @@ export interface RecordatorioInput {
   nota?: string
 }
 
-/** Anota un recordatorio que alguien hizo a mano. La app no envía nada. */
-export async function registrarRecordatorioCobro(cobroId: number, input: RecordatorioInput): Promise<RecordatorioResultado> {
-  return parsear(recordatorioResultadoSchema, await enviar(`/api/cobros/${cobroId}/recordatorios`, 'POST', input), 'POST recordatorios')
+// ---------------------------------------------------------------------------
+// El servicio de un ámbito
+// ---------------------------------------------------------------------------
+
+/** Todo lo que se le pide a la API de Cobros, para un ámbito (una base de rutas). */
+export interface ApiCobros {
+  /** Cobros paginados, con filtros. El orden por defecto es el de urgencia (lo más atrasado primero). */
+  listCobros(params?: ListarCobrosParams): Promise<ListResult<Cobro>>
+  /** El dashboard: totales, antigüedad, próximos vencimientos y clientes con atraso. `dias` = ventana de "vence pronto". */
+  getResumenCobros(dias?: number): Promise<ResumenCobros>
+  /** A quién recordarle: cobros vencidos o que vencen en `dias` días, con su último recordatorio. */
+  getRecordatoriosCobros(params?: { dias?: number; cada?: number }): Promise<RecordatoriosCobros>
+  /** El panel de un cliente: configuración mensual, resumen, todos sus cobros con sus pagos y sus recordatorios. */
+  getClienteCobros(clientId: number): Promise<PanelCliente>
+  /** Un cobro con sus pagos (vigentes y anulados) y sus recordatorios. */
+  getCobro(id: number): Promise<CobroDetalle>
+  /**
+   * Los tenants entre los que se elige, por nombre o RNC (los activos primero). SOLO existe en la plataforma
+   * (/api/cobros-tenants): en el ámbito de una empresa el buscador es el de Clientes y esta ruta da 404.
+   */
+  buscarTenants(query?: string, limite?: number): Promise<TenantBuscado[]>
+  /** Monto mensual y día de vencimiento de un cliente. No toca los cobros que ya existen. */
+  guardarConfigCobro(clientId: number, input: ConfigCobroInput): Promise<ConfigCobro>
+  /** Crea un cobro a mano. Un cobro del mismo cliente y periodo ya existente da 409 (codigo COBRO_DUPLICADO). */
+  createCobro(input: NuevoCobroInput): Promise<CobroDetalle>
+  /** Cambia el monto, el vencimiento o la descripción. Si el cambio lo deja pagado completo, trae el cobro que se generó. */
+  updateCobro(id: number, cambios: CambiosCobroInput): Promise<CobroActualizado>
+  /** Registra un pago, completo o parcial. Si completa el cobro, el servidor genera el del mes siguiente. */
+  registrarPagoCobro(cobroId: number, input: PagoInput): Promise<PagoResultado>
+  /** Cancela un cobro (nunca se borra). Uno con pagos vigentes da 409: hay que anular el pago antes. */
+  cancelarCobro(id: number, motivo?: string): Promise<CobroDetalle>
+  /** Reabre un cobro cancelado. */
+  reabrirCobro(id: number): Promise<CobroDetalle>
+  /** Anota un recordatorio que alguien hizo a mano. La app no envía nada. */
+  registrarRecordatorioCobro(cobroId: number, input: RecordatorioInput): Promise<RecordatorioResultado>
+  /** Anula un pago: deja de contar en el saldo, pero se queda a la vista con su motivo. */
+  anularPagoCobro(pagoId: number, motivo?: string): Promise<PagoAnulado>
 }
 
-/** Anula un pago: deja de contar en el saldo, pero se queda a la vista con su motivo. */
-export async function anularPagoCobro(pagoId: number, motivo?: string): Promise<PagoAnulado> {
-  return parsear(pagoAnuladoSchema, await enviar(`/api/cobros/pagos/${pagoId}/anular`, 'POST', { motivo }), 'POST anular')
+/** El servicio de Cobros para una base de rutas: '/api/cobros' (empresa) o '/api/cobros-tenants' (plataforma). */
+export function crearApiCobros(base: string): ApiCobros {
+  const r = rutasCobros(base)
+  return {
+    async listCobros(params = {}) {
+      const res = await getList<unknown>(r.lista({ ...params }))
+      return { ...res, items: res.items.map((i) => parsear(cobroSchema, i, `GET ${base}`)) }
+    },
+    async getResumenCobros(dias) {
+      return parsear(resumenCobrosSchema, await getJson<unknown>(r.resumen(dias)), `GET ${base}/resumen`)
+    },
+    async getRecordatoriosCobros(params = {}) {
+      return parsear(recordatoriosCobrosSchema, await getJson<unknown>(r.recordatorios(params)), `GET ${base}/recordatorios`)
+    },
+    async getClienteCobros(clientId) {
+      return parsear(panelClienteSchema, await getJson<unknown>(r.cliente(clientId)), `GET ${base}/clientes/${clientId}`)
+    },
+    async getCobro(id) {
+      return parsear(cobroDetalleSchema, await getJson<unknown>(r.cobro(id)), `GET ${base}/${id}`)
+    },
+    async buscarTenants(query, limite) {
+      return parsear(tenantsBuscadosSchema, await getJson<unknown>(r.buscar(query, limite)), `GET ${base}/clientes`)
+    },
+    async guardarConfigCobro(clientId, input) {
+      return parsear(configCobroSchema, await enviar(r.config(clientId), 'PUT', input), 'PUT config')
+    },
+    async createCobro(input) {
+      return parsear(cobroDetalleSchema, await enviar(base, 'POST', input), `POST ${base}`)
+    },
+    async updateCobro(id, cambios) {
+      return parsear(cobroActualizadoSchema, await enviar(r.cobro(id), 'PUT', cambios), `PUT ${base}/${id}`)
+    },
+    async registrarPagoCobro(cobroId, input) {
+      return parsear(pagoResultadoSchema, await enviar(r.pagos(cobroId), 'POST', input), 'POST pagos')
+    },
+    async cancelarCobro(id, motivo) {
+      return parsear(cobroDetalleSchema, await enviar(r.cancelar(id), 'POST', { motivo }), 'POST cancelar')
+    },
+    async reabrirCobro(id) {
+      return parsear(cobroDetalleSchema, await enviar(r.reabrir(id), 'POST', {}), 'POST reabrir')
+    },
+    async registrarRecordatorioCobro(cobroId, input) {
+      return parsear(recordatorioResultadoSchema, await enviar(r.recordatorio(cobroId), 'POST', input), 'POST recordatorios')
+    },
+    async anularPagoCobro(pagoId, motivo) {
+      return parsear(pagoAnuladoSchema, await enviar(r.anularPago(pagoId), 'POST', { motivo }), 'POST anular')
+    },
+  }
 }
+
+/** Cobros de cada empresa a SUS clientes (/api/cobros). */
+export const apiCobros = crearApiCobros(BASE_COBROS)
+/** Cobros de la plataforma a sus tenants (/api/cobros-tenants): solo cuentas de soporte (acceso global). */
+export const apiCobrosTenants = crearApiCobros(BASE_COBROS_TENANTS)
+
+// Las funciones de siempre: las del ámbito de empresa.
+export const {
+  listCobros, getResumenCobros, getRecordatoriosCobros, getClienteCobros, getCobro, guardarConfigCobro, createCobro,
+  updateCobro, registrarPagoCobro, cancelarCobro, reabrirCobro, registrarRecordatorioCobro, anularPagoCobro,
+} = apiCobros

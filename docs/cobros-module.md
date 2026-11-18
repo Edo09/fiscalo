@@ -7,21 +7,25 @@ reglas de negocio y los valores por defecto están en el repo de la API:
 Vista `cobros` (`ViewId`), item **Cobros** en el grupo *Ventas* (módulo RBAC `cobros`), acceso
 **Nueva › Cobro** en el navbar y botón **Cobros** en la ficha del cliente (abre el panel de ese cliente).
 
+Hay una **segunda pantalla con el mismo cuerpo**, **Cobros de tenants** (vista `cobros-tenants`, solo cuentas de soporte): lo que
+la *plataforma* le cobra a las empresas que usan Fiscalpoint. Ver "Cobros de tenants" más abajo.
+
 ## Mapa de archivos
 
 | Capa | Archivo | Qué hace |
 |---|---|---|
 | Tipos y esquemas | `src/api/schemas/cobros.ts` | Esquemas **Zod** de las respuestas (los tipos se infieren de ellos), reglas de los formularios (monto, fecha, saldo, hora) y el dinero en centavos |
-| Servicio | `src/api/cobros.ts` | Una función por endpoint de `/api/cobros`; cada respuesta se valida con su esquema (si no encaja, un `ApiError` claro) |
-| Datos | `src/features/cobros/hooks.ts` | **TanStack Query**: consultas con caché (`cobrosKeys`) y mutaciones; toda mutación invalida `['cobros']` **al terminar, salga bien o mal** (`onSettled`); `useRelojServidor` |
-| Interfaz | `src/features/cobros/store.ts` | **Zustand, solo estado de interfaz**: pestaña, filtros, página, panel del cliente abierto (y con qué pestaña), ventana de los recordatorios y modal abierto. Los modales guardan ids, nunca copias de un cobro. Se reinicia al cambiar de sesión (los ids son de una empresa) |
-| Pantalla | `src/features/cobros/CobrosView.tsx` | Compone dashboard, pestañas (Cobros / Recordatorios), panel y modales; al salir de la vista cierra el modal y el panel |
-| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `EstadoCobroBadge`, `ModalesCobros` |
+| Servicio | `src/api/cobros.ts`, `src/api/rutas-cobros.ts`, `src/api/qs.ts` | `crearApiCobros(base)` devuelve una función por endpoint; hay dos instancias, `apiCobros` (`/api/cobros`) y `apiCobrosTenants` (`/api/cobros-tenants`), y las funciones sueltas de siempre (`listCobros`…) son las del ámbito de empresa. Cada respuesta se valida con su esquema (si no encaja, un `ApiError` claro). Las rutas salen de `rutas-cobros.ts` (sin dependencias: se prueba con Node) |
+| Datos | `src/features/cobros/hooks.ts`, `claves.ts` | **TanStack Query**: consultas con caché y mutaciones. Leen el servicio y las claves del **ámbito** de la pantalla (`useAmbitoCobros`): las claves cuelgan de una raíz por ámbito (`['cobros']` o `['cobros-tenants']`) y toda mutación invalida la raíz de **su** ámbito **al terminar, salga bien o mal** (`onSettled`). También `useRelojServidor` y `useBuscarTenants` |
+| Interfaz | `src/features/cobros/store.ts` | **Zustand, solo estado de interfaz**: pestaña, filtros, página, panel del cliente abierto (y con qué pestaña), ventana de los recordatorios y modal abierto. **Un store por ámbito** (`cobrosUiEmpresa` y `cobrosUiTenants`, de `crearCobrosUi()`); `useCobrosUi(selector)` lee el del ámbito en que se pinta. Los modales guardan ids, nunca copias de un cobro. Los dos se reinician al cambiar de sesión (los ids son de una empresa) |
+| Ámbito | `src/features/cobros/ambito.ts`, `ambitos.ts` | El contexto (`AmbitoCobrosContext`, `useAmbitoCobros`) y los dos ámbitos armados (`AMBITO_EMPRESA`, `AMBITO_TENANTS`): servicio, claves, store de interfaz y los pocos textos que cambian (`TextosAmbito`) |
+| Pantalla | `src/features/cobros/CobrosView.tsx` | `CobrosView` (empresa) y `CobrosTenantsView` (plataforma) ponen su ámbito en el contexto y pintan el mismo cuerpo: dashboard, pestañas (Cobros / Recordatorios), panel y modales; al salir de la vista cierra el modal y el panel |
+| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `SelectorCliente` y `TenantCombobox` (el buscador del ámbito), `EstadoCobroBadge`, `ModalesCobros` |
 | Utilidades | `format.ts`, `clave.ts`, `reloj.ts` | Textos, tonos y la regla del vencimiento (sin React); clave de idempotencia (UUID); la hora de RD a partir de la que manda el servidor |
 | Estilos | `src/styles/cobros.css` | Lo que `styles.css` no trae (barras de antigüedad, listas, método de pago, avisos, capa de los modales sobre el panel) |
 
-Los **clientes** se reutilizan: `ClientCombobox` (el buscador de siempre) elige el cliente en el formulario de
-cobro, en el filtro de la tabla y en "Cobro mensual de un cliente". No hay un módulo de clientes nuevo.
+Los **clientes** se reutilizan: en una empresa, `ClientCombobox` (el buscador de siempre, a través de `SelectorCliente`) elige el
+cliente en el formulario de cobro, en el filtro de la tabla y en "Cobro mensual de un cliente". No hay un módulo de clientes nuevo.
 
 Se tocaron tres componentes compartidos, siempre con una prop opcional que no cambia nada para quien no la pasa:
 `Modal` (`bloqueado`: no se cierra mientras se guarda; la X lleva `aria-label`), `Drawer` (`cerrarConEscape`) y
@@ -78,10 +82,32 @@ Se tocaron tres componentes compartidos, siempre con una prop opcional que no ca
   un cobro se abren con un botón (`aria-expanded`), las pestañas se operan con el teclado y los avisos llevan el
   texto en el color del tema (el color semántico solo en el fondo, el filo y el ícono: 4.5:1 de contraste o más).
 
+## Cobros de tenants (la pantalla de soporte)
+
+Segunda pantalla con el **mismo cuerpo** que Cobros, para lo que **la plataforma** le cobra a las empresas que usan Fiscalpoint
+(`api-gratex/docs/modules/cobros.md`, "Cobros de tenants"). Vista `cobros-tenants`, item **Cobros de tenants** en *Administración*
+(justo después de la Bitácora), solo para cuentas de soporte (`acceso_global`).
+
+- **Un ámbito, no dos copias.** `CobrosView` y `CobrosTenantsView` ponen su ámbito (`AMBITO_EMPRESA` / `AMBITO_TENANTS`) en un contexto y
+  todo lo de abajo (hooks, filtros, panel, formularios) lo lee. Cambia el servicio (`/api/cobros` o `/api/cobros-tenants`), la raíz de las
+  claves de caché, el store de interfaz y unos pocos textos (`TextosAmbito`); el resto de la pantalla habla de "cliente" en las dos.
+- **Nada se mezcla.** El id de un cliente de una empresa y el de un tenant son ids de tablas distintas: por eso cada ámbito tiene su store
+  (filtros, panel, modal), sus claves de caché y su frescura (`'cobros-tenants'` es volátil, como `'cobros'`). Los dos stores se reinician al
+  cambiar de sesión.
+- **El buscador de tenants** (`TenantCombobox`, vía `SelectorCliente`) reemplaza al de Clientes en el formulario de cobro, en el filtro de la
+  tabla y en "Cobro mensual de una empresa": consulta `GET /api/cobros-tenants/clientes?query=&limite=`, trae a todas (las activas primero) con una
+  línea de detalle (`detalleTenant`: RNC, si es de integración, el ambiente si no es producción, si está inactiva y si ya tiene cobro mensual).
+- **Solo soporte, sin fail-open.** `NavItem.soloAccesoGlobal` (`navSoloAccesoGlobal`, `puedeVerItem`, `debeSalirDeVista`): sin
+  `acceso_global: true` en la sesión no se muestra el item (ni a un admin, ni con todos los módulos), y quien llegue por otro camino (la vista
+  guardada en el navegador) es sacado al dashboard. Es solo comodidad: el servidor responde 403 a quien no tiene el acceso global. El acceso
+  global **no** da el módulo `cobros` de las empresas (son cuentas por cobrar distintas).
+- **Orden de despliegue**: la migración master 021 y la API van antes que la web; sin ellas la pantalla muestra el error de la API.
+
 ## Pruebas
 
 ```bash
 node scripts/test-cobros.ts          # contrato, formularios, formato, reloj, store y navegación (sin navegador)
+node scripts/test-cobros-tenants.ts  # el ámbito de tenants: contrato, rutas, claves, un store por ámbito y navegación solo para soporte
 node_modules/.bin/tsc --noEmit
 node_modules/.bin/eslint src scripts
 npm run build
@@ -93,7 +119,10 @@ contra los esquemas Zod: si la API cambia de forma y el esquema no, falla ahí. 
 
 ```bash
 php -d extension=php_pdo_sqlite.dll tools/test_cobros.php --fixtures=<ruta de fiscalo-react>/scripts/fixtures/cobros
+php -d extension=php_pdo_sqlite.dll tools/test_cobros_tenants.php --fixtures=<ruta de fiscalo-react>/scripts/fixtures/cobros-tenants
 ```
+
+Los tenants de `scripts/fixtures/cobros-tenants/` son inventados (nombres y RNC de mentira): el repo es público.
 
 > `npm run lint` (`eslint .`) también revisa `ds-bundle/` (el bundle del sistema de diseño), que ya fallaba antes
 > de Cobros; `eslint src scripts` es lo que cubre el código de la app.

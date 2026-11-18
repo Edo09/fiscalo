@@ -93,6 +93,9 @@ export {
   createGasto,
 } from './gastos'
 export {
+  crearApiCobros,
+  apiCobros,
+  apiCobrosTenants,
   listCobros,
   getResumenCobros,
   getRecordatoriosCobros,
@@ -108,11 +111,11 @@ export {
   anularPagoCobro,
 } from './cobros'
 export type {
-  ListarCobrosParams, ConfigCobroInput, NuevoCobroInput, CambiosCobroInput, PagoInput, RecordatorioInput,
+  ApiCobros, ListarCobrosParams, ConfigCobroInput, NuevoCobroInput, CambiosCobroInput, PagoInput, RecordatorioInput,
 } from './cobros'
 export type {
   Cobro, CobroConPagos, CobroDetalle, ClienteCobro, PagoCobro, RecordatorioCobro, ConfigCobro, ResumenCobros,
   PanelCliente, RecordatoriosCobros, ItemRecordatorio, PagoResultado, CobroActualizado, RecordatorioResultado,
-  PagoAnulado, EstadoCobro, MetodoPago, CanalRecordatorio, ClienteRecordatorio, MotivoSiguiente,
+  PagoAnulado, EstadoCobro, MetodoPago, CanalRecordatorio, ClienteRecordatorio, MotivoSiguiente, TenantBuscado,
 } from './schemas/cobros'
 export { formatApiDate, dgiiLabel, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProductRowConRegla, mapProveedorRow, mapUserRow } from './mappers'

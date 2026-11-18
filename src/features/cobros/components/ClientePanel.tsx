@@ -5,7 +5,7 @@ import { Avatar, Btn, Drawer, EmptyState, ErrorState, LoadingState, Money, Tabs 
 import { ETIQUETA_CANAL, type CanalRecordatorio } from '@/api/schemas/cobros'
 import { fechaCorta, fechaHoraCorta, periodoCorto } from '../format'
 import { usePanelCliente } from '../hooks'
-import { useCobrosUi, type PestanaPanel } from '../store'
+import { useCobrosUi, useCobrosUiStore, type PestanaPanel } from '../store'
 import { Aviso } from './Aviso'
 import { ConfigClienteForm } from './ConfigClienteForm'
 import { HistorialCobros } from './HistorialCobros'
@@ -16,7 +16,8 @@ export function ClientePanel({ clientId }: { clientId: number }) {
   const modalAbierto = useCobrosUi((s) => s.modal !== null)
   const { data, error, loading, reload } = usePanelCliente(clientId)
   // La pestaña con que se abre: la de configuración si se llegó por "Cobro mensual de un cliente".
-  const [tab, setTab] = useState<PestanaPanel>(() => useCobrosUi.getState().panelPestana)
+  const ui = useCobrosUiStore()
+  const [tab, setTab] = useState<PestanaPanel>(() => ui.getState().panelPestana)
 
   const cliente = data?.cliente
   const sub = cliente

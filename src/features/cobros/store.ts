@@ -4,9 +4,10 @@
 // que muestra el formulario de pago se quedaría viejo mientras otro usuario cobra.
 // Imports de valor por ruta relativa con .ts: scripts/test-cobros.ts carga este archivo con `node` tal cual.
 // Lo de '@/…' va solo como `import type`, que Node borra.
-import { create } from 'zustand'
+import { create, useStore, type StateCreator } from 'zustand'
 import type { EstadoCobro } from '@/api'
 import { useAuthStore } from '../../stores/auth.ts'
+import { useAmbitoCobros } from './ambito.ts'
 
 export type TabCobros = 'cobros' | 'recordatorios'
 /** Las pestañas del panel del cliente. */
@@ -44,7 +45,7 @@ export const PAGE_SIZES = [10, 25, 50]
 /** Ventanas de "vence pronto" (días) que ofrece la sección Recordatorios; la primera es la de siempre. */
 export const VENTANAS_RECORDATORIO = [7, 15, 30]
 
-interface CobrosUi {
+export interface CobrosUi {
   tab: TabCobros
   filtros: FiltrosCobros
   page: number
@@ -85,7 +86,7 @@ const INICIAL = {
   modal: null as ModalCobros | null,
 }
 
-export const useCobrosUi = create<CobrosUi>()((set) => ({
+const definirUi: StateCreator<CobrosUi> = (set) => ({
   ...INICIAL,
   setTab: (tab) => set({ tab }),
   setFiltros: (cambios) => set((s) => ({ filtros: { ...s.filtros, ...cambios }, page: 1 })),
@@ -98,13 +99,36 @@ export const useCobrosUi = create<CobrosUi>()((set) => ({
   abrirModal: (modal) => set({ modal }),
   cerrarModal: (modal) => set((s) => (modal === undefined || s.modal === modal ? { modal: null } : {})),
   reset: () => set({ ...INICIAL }),
-}))
+})
+
+/**
+ * Un store de interfaz nuevo, en su estado inicial. Hay UNO POR ÁMBITO (ver ambito.ts): los filtros, el cliente del panel
+ * y el modal de las empresas no pueden mezclarse con los de la plataforma, que usa ids de otra tabla.
+ */
+export const crearCobrosUi = () => create<CobrosUi>()(definirUi)
+/** El de las empresas (/api/cobros). */
+export const cobrosUiEmpresa = crearCobrosUi()
+/** El de la plataforma (/api/cobros-tenants). */
+export const cobrosUiTenants = crearCobrosUi()
 
 // Los ids de cliente son de UNA empresa: al cambiar de sesión (otra empresa de soporte, otro usuario, cerrar
-// sesión) se vuelve al principio, o el panel abriría un cliente de la empresa anterior.
+// sesión) se vuelve al principio, o el panel abriría un cliente de la empresa anterior. Los dos ámbitos.
 useAuthStore.subscribe((estado, previo) => {
-  if (estado.token !== previo.token) useCobrosUi.getState().reset()
+  if (estado.token !== previo.token) {
+    cobrosUiEmpresa.getState().reset()
+    cobrosUiTenants.getState().reset()
+  }
 })
+
+/** El store de interfaz del ámbito en que se pinta (para leer su estado fuera del render: `.getState()`). */
+export function useCobrosUiStore() {
+  return useAmbitoCobros().ui
+}
+
+/** Lee del store del ámbito en que se pinta, como un hook de Zustand: `useCobrosUi((s) => s.filtros)`. */
+export function useCobrosUi<T>(selector: (s: CobrosUi) => T): T {
+  return useStore(useAmbitoCobros().ui, selector)
+}
 
 /** ¿Hay algún filtro puesto (además del orden por defecto)? */
 export function hayFiltros(f: FiltrosCobros): boolean {
