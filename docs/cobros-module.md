@@ -20,8 +20,8 @@ la *plataforma* le cobra a las empresas que usan Fiscalpoint. Ver "Cobros de ten
 | Interfaz | `src/features/cobros/store.ts` | **Zustand, solo estado de interfaz**: pestaña, filtros, página, panel del cliente abierto (y con qué pestaña), ventana de los recordatorios y modal abierto. **Un store por ámbito** (`cobrosUiEmpresa` y `cobrosUiTenants`, de `crearCobrosUi()`); `useCobrosUi(selector)` lee el del ámbito en que se pinta. Los modales guardan ids, nunca copias de un cobro. Los dos se reinician al cambiar de sesión (los ids son de una empresa) |
 | Ámbito | `src/features/cobros/ambito.ts`, `ambitos.ts` | El contexto (`AmbitoCobrosContext`, `useAmbitoCobros`) y los dos ámbitos armados (`AMBITO_EMPRESA`, `AMBITO_TENANTS`): servicio, claves, store de interfaz y los pocos textos que cambian (`TextosAmbito`) |
 | Pantalla | `src/features/cobros/CobrosView.tsx` | `CobrosView` (empresa) y `CobrosTenantsView` (plataforma) ponen su ámbito en el contexto y pintan el mismo cuerpo: dashboard, pestañas (Cobros / Recordatorios), panel y modales; al salir de la vista cierra el modal y el panel |
-| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `SelectorCliente` y `TenantCombobox` (el buscador del ámbito), `EstadoCobroBadge`, `ModalesCobros` |
-| Utilidades | `format.ts`, `clave.ts`, `reloj.ts` | Textos, tonos y la regla del vencimiento (sin React); clave de idempotencia (UUID); la hora de RD a partir de la que manda el servidor |
+| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `DirectorioTenants` (la pestaña Clientes de la plataforma), `SelectorCliente` y `TenantCombobox` (el buscador del ámbito), `EstadoCobroBadge`, `ModalesCobros` |
+| Utilidades | `format.ts`, `directorio.ts`, `clave.ts`, `reloj.ts` | Textos, tonos y la regla del vencimiento (sin React); los filtros y contadores del directorio de tenants; clave de idempotencia (UUID); la hora de RD a partir de la que manda el servidor |
 | Estilos | `src/styles/cobros.css` | Lo que `styles.css` no trae (barras de antigüedad, listas, método de pago, avisos, capa de los modales sobre el panel) |
 
 Los **clientes** se reutilizan: en una empresa, `ClientCombobox` (el buscador de siempre, a través de `SelectorCliente`) elige el
@@ -97,6 +97,15 @@ Segunda pantalla con el **mismo cuerpo** que Cobros, para lo que **la plataforma
 - **El buscador de tenants** (`TenantCombobox`, vía `SelectorCliente`) reemplaza al de Clientes en el formulario de cobro, en el filtro de la
   tabla y en "Cobro mensual de una empresa": consulta `GET /api/cobros-tenants/clientes?query=&limite=`, trae a todas (las activas primero) con una
   línea de detalle (`detalleTenant`: RNC, si es de integración, el ambiente si no es producción, si está inactiva y si ya tiene cobro mensual).
+- **La pestaña Clientes es el directorio de tenants y es lo que se ve al entrar** (`DirectorioTenants`; `AmbitoCobros.directorio` solo es
+  `true` en la plataforma, y su store abre en esa pestaña). Sin ella, quien cobra no veía a sus tenants hasta que tuvieran un cobro: la tabla de
+  cobros empieza vacía. Cada fila trae la empresa (nombre, RNC y lo que sale de lo normal: integración, certificación, inactiva), su cobro mensual
+  (monto, día, activo; o "Sin configurar"), lo que debe (pendiente y vencido, con los días de atraso), su próximo vencimiento, y los botones
+  **Configurar** (abre su panel en *Cobro mensual*) o **Nuevo cobro**, más un menú; un clic en la fila abre su historial. La búsqueda por nombre o
+  RNC la hace el servidor (`useDirectorioTenants`, con demora al teclear, hasta 500 empresas por respuesta: con más, un aviso pide afinar la
+  búsqueda); los filtros rápidos (**Con saldo**, **Vencidos**, **Sin cobro mensual**, con su contador) y el tipo de empresa (**Con base propia** /
+  **De integración**: la mayoría de las de integración se crearon solo para certificar) se aplican aquí (`directorio.ts`, sin React). El pie suma
+  lo que deben las empresas de la lista, en centavos. Los contadores y la lista salen de la misma consulta que el contador de la pestaña.
 - **Solo soporte, sin fail-open.** `NavItem.soloAccesoGlobal` (`navSoloAccesoGlobal`, `puedeVerItem`, `debeSalirDeVista`): sin
   `acceso_global: true` en la sesión no se muestra el item (ni a un admin, ni con todos los módulos), y quien llegue por otro camino (la vista
   guardada en el navegador) es sacado al dashboard. Es solo comodidad: el servidor responde 403 a quien no tiene el acceso global. El acceso
@@ -107,7 +116,7 @@ Segunda pantalla con el **mismo cuerpo** que Cobros, para lo que **la plataforma
 
 ```bash
 node scripts/test-cobros.ts          # contrato, formularios, formato, reloj, store y navegación (sin navegador)
-node scripts/test-cobros-tenants.ts  # el ámbito de tenants: contrato, rutas, claves, un store por ámbito y navegación solo para soporte
+node scripts/test-cobros-tenants.ts  # el ámbito de tenants: contrato (con el directorio), rutas, claves, un store por ámbito, navegación solo para soporte y filtros del directorio
 node_modules/.bin/tsc --noEmit
 node_modules/.bin/eslint src scripts
 npm run build

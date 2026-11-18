@@ -9,7 +9,7 @@ import type { EstadoCobro } from '@/api'
 import { useAuthStore } from '../../stores/auth.ts'
 import { useAmbitoCobros } from './ambito.ts'
 
-export type TabCobros = 'cobros' | 'recordatorios'
+export type TabCobros = 'clientes' | 'cobros' | 'recordatorios'
 /** Las pestañas del panel del cliente. */
 export type PestanaPanel = 'historial' | 'config' | 'recordatorios'
 
@@ -86,8 +86,11 @@ const INICIAL = {
   modal: null as ModalCobros | null,
 }
 
-const definirUi: StateCreator<CobrosUi> = (set) => ({
-  ...INICIAL,
+/** El estado de arranque de un store: el de siempre, con la pestaña con que abre su pantalla. */
+const estadoInicial = (tab: TabCobros) => ({ ...INICIAL, tab })
+
+const definirUi = (tabInicial: TabCobros): StateCreator<CobrosUi> => (set) => ({
+  ...estadoInicial(tabInicial),
   setTab: (tab) => set({ tab }),
   setFiltros: (cambios) => set((s) => ({ filtros: { ...s.filtros, ...cambios }, page: 1 })),
   limpiarFiltros: () => set({ filtros: FILTROS_VACIOS, page: 1 }),
@@ -98,18 +101,19 @@ const definirUi: StateCreator<CobrosUi> = (set) => ({
   cerrarPanel: () => set({ panelClienteId: null }),
   abrirModal: (modal) => set({ modal }),
   cerrarModal: (modal) => set((s) => (modal === undefined || s.modal === modal ? { modal: null } : {})),
-  reset: () => set({ ...INICIAL }),
+  reset: () => set({ ...estadoInicial(tabInicial) }),
 })
 
 /**
  * Un store de interfaz nuevo, en su estado inicial. Hay UNO POR ÁMBITO (ver ambito.ts): los filtros, el cliente del panel
- * y el modal de las empresas no pueden mezclarse con los de la plataforma, que usa ids de otra tabla.
+ * y el modal de las empresas no pueden mezclarse con los de la plataforma, que usa ids de otra tabla. `tabInicial` es la
+ * pestaña con que abre la pantalla (y a la que vuelve al reiniciarse).
  */
-export const crearCobrosUi = () => create<CobrosUi>()(definirUi)
-/** El de las empresas (/api/cobros). */
+export const crearCobrosUi = (tabInicial: TabCobros = 'cobros') => create<CobrosUi>()(definirUi(tabInicial))
+/** El de las empresas (/api/cobros): abre en la pestaña Cobros. */
 export const cobrosUiEmpresa = crearCobrosUi()
-/** El de la plataforma (/api/cobros-tenants). */
-export const cobrosUiTenants = crearCobrosUi()
+/** El de la plataforma (/api/cobros-tenants): abre en la pestaña Clientes (el directorio de tenants). */
+export const cobrosUiTenants = crearCobrosUi('clientes')
 
 // Los ids de cliente son de UNA empresa: al cambiar de sesión (otra empresa de soporte, otro usuario, cerrar
 // sesión) se vuelve al principio, o el panel abriría un cliente de la empresa anterior. Los dos ámbitos.

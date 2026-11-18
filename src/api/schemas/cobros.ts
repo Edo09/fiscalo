@@ -51,22 +51,6 @@ export const clienteCobroSchema = z.object({
 })
 export type ClienteCobro = z.infer<typeof clienteCobroSchema>
 
-/**
- * Un tenant del buscador de la plataforma (GET /api/cobros-tenants/clientes): lo de un cliente (el nombre del tenant
- * hace de nombre, contacto y empresa; el correo es el de su primer admin) y además qué es y si ya se le cobra.
- */
-export const tenantBuscadoSchema = clienteCobroSchema.extend({
-  /** 'app' (con base propia) o 'integracion' (sin ella). */
-  tipo: z.string(),
-  /** Ambiente DGII: ecf (producción), certecf (certificación), testecf. */
-  ambiente: z.string(),
-  activo: z.boolean(),
-  /** Ya tiene su cobro mensual configurado. */
-  con_config: z.boolean(),
-})
-export type TenantBuscado = z.infer<typeof tenantBuscadoSchema>
-export const tenantsBuscadosSchema = z.array(tenantBuscadoSchema)
-
 export const pagoCobroSchema = z.object({
   id: z.number(),
   cobro_id: z.number(),
@@ -144,6 +128,35 @@ export const configCobroSchema = z.object({
   updated_at: z.string().nullable(),
 })
 export type ConfigCobro = z.infer<typeof configCobroSchema>
+
+/**
+ * Un tenant del DIRECTORIO de la plataforma (GET /api/cobros-tenants/clientes): lo de un cliente (el nombre del tenant
+ * hace de nombre, contacto y empresa; el correo es el de su primer admin), qué es, su cobro mensual y lo que debe.
+ * Lo usan el buscador de los formularios y la pestaña Clientes de Cobros de tenants.
+ */
+export const tenantBuscadoSchema = clienteCobroSchema.extend({
+  /** 'app' (con base propia) o 'integracion' (sin ella). */
+  tipo: z.string(),
+  /** Ambiente DGII: ecf (producción), certecf (certificación), testecf. */
+  ambiente: z.string(),
+  activo: z.boolean(),
+  /** Ya tiene su cobro mensual configurado (resume `config`). */
+  con_config: z.boolean(),
+  /** Su cobro mensual; null si no tiene. */
+  config: configCobroSchema.nullable(),
+  /** Todo lo abierto que debe (un cobro pagado o cancelado no suma). */
+  saldo_pendiente: z.number(),
+  /** Lo que ya pasó su vencimiento. */
+  saldo_vencido: z.number(),
+  cobros_abiertos: z.number(),
+  cobros_vencidos: z.number(),
+  /** Días de atraso del cobro vencido más viejo (0 si nada está vencido). */
+  dias_atraso: z.number(),
+  /** El primer vencimiento que aún no pasó (hoy cuenta como "aún no"); null si no hay. */
+  proximo_vencimiento: z.string().nullable(),
+})
+export type TenantBuscado = z.infer<typeof tenantBuscadoSchema>
+export const tenantsBuscadosSchema = z.array(tenantBuscadoSchema)
 
 export const resumenCobrosSchema = z.object({
   /** La fecha de RD del servidor, AAAA-MM-DD. */

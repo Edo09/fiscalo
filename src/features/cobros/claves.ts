@@ -19,6 +19,8 @@ export function crearCobrosKeys(raiz: RaizCobros) {
     detalle: (id: number) => [raiz, 'detalle', id] as const,
     /** El buscador de tenants (solo en la plataforma). */
     buscar: (texto: string) => [raiz, 'buscar', texto] as const,
+    /** El directorio de tenants, con su cobro mensual y lo que deben, para lo que se busca ('' = todos). Solo en la plataforma. */
+    directorio: (texto: string) => [raiz, 'directorio', texto] as const,
   }
 }
 

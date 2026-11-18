@@ -6,11 +6,12 @@ import { AmbitoCobrosContext, useAmbitoCobros } from './ambito'
 import { AMBITO_EMPRESA, AMBITO_TENANTS } from './ambitos'
 import { ClientePanel } from './components/ClientePanel'
 import { DashboardCobros } from './components/DashboardCobros'
+import { DirectorioTenants } from './components/DirectorioTenants'
 import { ListadoCobros } from './components/ListadoCobros'
 import { ModalesCobros } from './components/ModalesCobros'
 import { RecordatoriosSection } from './components/RecordatoriosSection'
-import { useRecordatoriosCobros } from './hooks'
-import { useCobrosUi, useCobrosUiStore } from './store'
+import { useDirectorioTenants, useRecordatoriosCobros } from './hooks'
+import { useCobrosUi, useCobrosUiStore, type TabCobros } from './store'
 
 /* FISCALO — Cobros (cuentas por cobrar por cliente): /api/cobros y /api/cobros-tenants.
    Dashboard compacto, tabla con filtros, panel del cliente (historial, pagos y cobro mensual),
@@ -51,7 +52,7 @@ export function CobrosTenantsView() {
 }
 
 function PantallaCobros({ senalNuevo = null, clienteInicial = null }: PropsPantalla) {
-  const { keys, textos } = useAmbitoCobros()
+  const { keys, textos, directorio: conDirectorio } = useAmbitoCobros()
   const ui = useCobrosUiStore()
   const queryClient = useQueryClient()
   const tab = useCobrosUi((s) => s.tab)
@@ -62,6 +63,10 @@ function PantallaCobros({ senalNuevo = null, clienteInicial = null }: PropsPanta
   const recordatoriosDias = useCobrosUi((s) => s.recordatoriosDias)
   // El mismo pedido (misma ventana de días) que la sección Recordatorios: una sola consulta compartida.
   const recordatorios = useRecordatoriosCobros(recordatoriosDias)
+  // El contador de la pestaña Clientes (solo la plataforma tiene directorio): la misma consulta que la pestaña, sin búsqueda.
+  const directorio = useDirectorioTenants('', conDirectorio)
+  // Una pantalla sin directorio no tiene la pestaña Clientes: si el store dijera otra cosa, se muestra Cobros.
+  const tabActiva: TabCobros = !conDirectorio && tab === 'clientes' ? 'cobros' : tab
 
   // Al llegar con una señal (Nueva > Cobro, o "Cobros" desde un cliente), se actúa una vez por señal.
   useEffect(() => {
@@ -98,14 +103,15 @@ function PantallaCobros({ senalNuevo = null, clienteInicial = null }: PropsPanta
 
       <Tabs
         tabs={[
+          ...(conDirectorio ? [{ id: 'clientes', label: 'Clientes', count: directorio.data?.length }] : []),
           { id: 'cobros', label: 'Cobros' },
           { id: 'recordatorios', label: 'Recordatorios', count: recordatorios.data?.resumen.clientes_por_recordar },
         ]}
-        active={tab}
-        onChange={(id) => setTab(id as 'cobros' | 'recordatorios')}
+        active={tabActiva}
+        onChange={(id) => setTab(id as TabCobros)}
       />
 
-      {tab === 'cobros' ? <ListadoCobros /> : <RecordatoriosSection />}
+      {tabActiva === 'clientes' ? <DirectorioTenants /> : tabActiva === 'cobros' ? <ListadoCobros /> : <RecordatoriosSection />}
 
       {panelClienteId !== null && <ClientePanel key={panelClienteId} clientId={panelClienteId} />}
       <ModalesCobros />

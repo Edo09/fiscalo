@@ -40,6 +40,8 @@ export interface TextosAmbito {
 
 export interface AmbitoCobros {
   id: IdAmbitoCobros
+  /** Tiene la pestaña Clientes (el directorio de tenants con su cobro mensual y lo que deben): solo la plataforma. */
+  directorio: boolean
   api: ApiCobros
   keys: CobrosKeys
   /** El store de interfaz de ESTE ámbito (filtros, panel, modal). */

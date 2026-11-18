@@ -12,7 +12,21 @@
             "tipo": "app",
             "ambiente": "ecf",
             "activo": true,
-            "con_config": true
+            "con_config": true,
+            "config": {
+                "client_id": 1,
+                "monto_mensual": 5000,
+                "dia_vencimiento": 31,
+                "descripcion": "Mensualidad Fiscalpoint",
+                "activo": true,
+                "updated_at": "2026-11-16 10:00:00"
+            },
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null
         },
         {
             "id": 2,
@@ -25,7 +39,14 @@
             "tipo": "app",
             "ambiente": "ecf",
             "activo": true,
-            "con_config": false
+            "con_config": false,
+            "config": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null
         },
         {
             "id": 4,
@@ -38,7 +59,14 @@
             "tipo": "app",
             "ambiente": "certecf",
             "activo": true,
-            "con_config": false
+            "con_config": false,
+            "config": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null
         },
         {
             "id": 3,
@@ -51,7 +79,14 @@
             "tipo": "integracion",
             "ambiente": "ecf",
             "activo": true,
-            "con_config": false
+            "con_config": false,
+            "config": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null
         },
         {
             "id": 5,
@@ -64,7 +99,14 @@
             "tipo": "app",
             "ambiente": "ecf",
             "activo": false,
-            "con_config": false
+            "con_config": false,
+            "config": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null
         }
     ]
 }

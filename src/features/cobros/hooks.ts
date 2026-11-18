@@ -11,6 +11,7 @@ import type {
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { ahoraLocal, hoyLocal } from '@/lib/date'
 import { useAmbitoCobros } from './ambito'
+import { MAX_DIRECTORIO } from './directorio'
 import { relojDeServidor, type RelojRD } from './reloj'
 import type { FiltrosCobros } from './store'
 
@@ -63,6 +64,16 @@ export function usePanelCliente(clientId: number) {
 export function useBuscarTenants(texto: string) {
   const { api, keys } = useAmbitoCobros()
   return useApiQuery(keys.buscar(texto), () => api.buscarTenants(texto, 20), { keepPrevious: true })
+}
+
+/**
+ * El directorio de tenants (solo en la plataforma): todos, con su cobro mensual y lo que deben, para lo que se busca. `habilitado`
+ * false apaga la consulta (la pantalla de una empresa no tiene directorio, y esa ruta no existe allí). El tope de una respuesta
+ * es MAX_DIRECTORIO; con más empresas que eso, la búsqueda las alcanza.
+ */
+export function useDirectorioTenants(texto = '', habilitado = true) {
+  const { api, keys } = useAmbitoCobros()
+  return useApiQuery(keys.directorio(texto), () => api.buscarTenants(texto, MAX_DIRECTORIO), { keepPrevious: true, enabled: habilitado })
 }
 
 /**

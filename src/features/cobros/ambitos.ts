@@ -8,6 +8,7 @@ import { cobrosUiEmpresa, cobrosUiTenants } from './store'
 /** Cada empresa le cobra a SUS clientes (/api/cobros): los clientes son los de la sección Clientes. */
 export const AMBITO_EMPRESA: AmbitoCobros = {
   id: 'empresa',
+  directorio: false,
   api: apiCobros,
   keys: cobrosKeys,
   ui: cobrosUiEmpresa,
@@ -30,6 +31,7 @@ export const AMBITO_EMPRESA: AmbitoCobros = {
 /** La plataforma le cobra a sus tenants, las empresas que usan Fiscalpoint (/api/cobros-tenants): solo cuentas de soporte. */
 export const AMBITO_TENANTS: AmbitoCobros = {
   id: 'tenants',
+  directorio: true,
   api: apiCobrosTenants,
   keys: cobrosTenantsKeys,
   ui: cobrosUiTenants,

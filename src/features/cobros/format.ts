@@ -1,6 +1,6 @@
 // Textos y tonos de Cobros. Sin React: se prueba con scripts/test-cobros.ts.
 // Los nombres de mes van escritos a mano (no Intl): la salida no cambia entre navegadores ni con Node.
-import type { Cobro, EstadoCobro, TenantBuscado } from '@/api'
+import type { Cobro, ConfigCobro, EstadoCobro, TenantBuscado } from '@/api'
 // Valores por ruta relativa con .ts: scripts/test-cobros.ts carga este archivo con `node` tal cual ('@/…' no existe allí).
 import { aCentavos, textoDinero, type MotivoSiguiente } from '../../api/schemas/cobros.ts'
 import { etiquetaAmbiente } from '../auth/accesoGlobal.ts'
@@ -153,16 +153,25 @@ export const COLOR_TRAMO: Record<string, string> = {
 }
 
 /**
- * La línea de detalle de un tenant en el buscador de la plataforma: lo que ayuda a distinguirlo y a saber qué esperar de él.
- * Lo normal no se rotula (una empresa de producción con base propia): solo el RNC. Lo que sale de lo normal sí: de
- * integración (sin base propia), en certificación o pruebas, dada de baja, y si ya tiene su cobro mensual configurado.
+ * Lo que distingue a un tenant en una lista (sin su cobro): el RNC y, solo si sale de lo normal, que es de integración
+ * (sin base propia), que está en certificación o pruebas, o que está dada de baja. Una empresa de producción con base propia
+ * lleva solo el RNC.
  */
-export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config'>): string {
+export function subtituloTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo'>): string {
   return [
     t.rnc ? `RNC ${t.rnc}` : 'sin RNC',
     t.tipo === 'integracion' ? 'Integración' : null,
     etiquetaAmbiente(t.ambiente),
     t.activo ? null : 'Inactiva',
-    t.con_config ? 'Cobro mensual configurado' : null,
   ].filter(Boolean).join(' · ')
+}
+
+/** La línea de detalle de un tenant en el buscador de los formularios: su subtítulo y si ya tiene su cobro mensual configurado. */
+export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config'>): string {
+  return [subtituloTenant(t), t.con_config ? 'Cobro mensual configurado' : null].filter(Boolean).join(' · ')
+}
+
+/** La segunda línea del cobro mensual de un tenant en la lista: "día 31 · activo" o "día 10 · inactivo". */
+export function detalleCobroMensual(c: Pick<ConfigCobro, 'dia_vencimiento' | 'activo'>): string {
+  return `día ${c.dia_vencimiento} · ${c.activo ? 'activo' : 'inactivo'}`
 }

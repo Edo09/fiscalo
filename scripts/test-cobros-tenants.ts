@@ -9,6 +9,7 @@
 //   4. STORES de interfaz: uno por ámbito, independientes, y los dos se reinician al cambiar de sesión.
 //   5. NAVEGACIÓN: la vista y su item del menú son solo para cuentas de soporte (acceso global), sin fail-open.
 //   6. El texto del buscador de tenants.
+//   7. El directorio de tenants (la pestaña Clientes): contrato con lo que debe cada uno, filtros, conteos y rótulos.
 //
 // Para regenerar los fixtures (en api-gratex, con pdo_sqlite):
 //   php -d extension=php_pdo_sqlite.dll tools/test_cobros_tenants.php --fixtures=<ruta de fiscalo-react>/scripts/fixtures/cobros-tenants
@@ -22,7 +23,10 @@ import {
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
-import { detalleTenant } from '../src/features/cobros/format.ts'
+import { detalleCobroMensual, detalleTenant, subtituloTenant } from '../src/features/cobros/format.ts'
+import {
+  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, conteoDeFiltro, cumpleFiltro, filtrarDirectorio, resumenDirectorio,
+} from '../src/features/cobros/directorio.ts'
 import {
   NAV, TITLES, debeSalirDeVista, navModuleFor, navSoloAccesoGlobal, navSoloAdmin, navTopFor, puedeVerItem, puedeVerVista,
 } from '../src/config/navigation.ts'
@@ -94,6 +98,24 @@ igual('...los activos primero, por nombre, y el inactivo al final', tenants.map(
 chk('...cada uno dice qué es: integración, certificación, inactiva', tenants.find((t) => t.id === 3)?.tipo === 'integracion' && tenants.find((t) => t.id === 4)?.ambiente === 'certecf'
   && tenants.find((t) => t.id === 5)?.activo === false && tenants.find((t) => t.id === 1)?.activo === true)
 igual('...y si ya tiene su cobro mensual configurado (solo Alfa en ese momento)', tenants.map((t) => t.con_config), [true, false, false, false, false])
+const dirResp = tenantsBuscadosSchema.safeParse(fixture('directorio').data)
+chk('el directorio (con su cobro mensual y lo que debe cada uno) pasa por tenantsBuscadosSchema: 5 tenants', dirResp.success && dirResp.data.length === 5, !dirResp.success && dirResp.error.issues[0])
+const dir = dirResp.success ? dirResp.data : []
+const dirDe = (id: number) => dir.find((t) => t.id === id)
+igual('...los activos primero y por nombre (Alfa, Beta, Delta, Gamma) y la inactiva al final', dir.map((t) => t.id), [1, 2, 4, 3, 5])
+igual('...con lo que debe cada uno, calculado a mano por el servidor: [id, pendiente, vencido, abiertos, vencidos, días de atraso, próximo vencimiento]',
+  dir.map((t) => [t.id, t.saldo_pendiente, t.saldo_vencido, t.cobros_abiertos, t.cobros_vencidos, t.dias_atraso, t.proximo_vencimiento]),
+  [[1, 6000, 0, 1, 0, 0, '2026-11-30'], [2, 0, 0, 0, 0, 0, null], [4, 3500, 2000, 2, 1, 1, '2026-12-15'], [3, 300, 300, 1, 1, 15, null], [5, 1200, 0, 1, 0, 0, '2026-11-16']])
+chk('...y su cobro mensual: el de Alfa (6,000, día 31, activo), el de Beta inactivo (1,000, día 10) y null en el que no tiene (Gamma y Epsilon)',
+  dirDe(1)?.config?.monto_mensual === 6000 && dirDe(1)?.config?.dia_vencimiento === 31 && dirDe(1)?.config?.activo === true
+  && dirDe(2)?.config?.monto_mensual === 1000 && dirDe(2)?.config?.activo === false && dirDe(3)?.config === null && dirDe(5)?.config === null
+  && dir.every((t) => t.con_config === (t.config !== null)))
+chk('...y lo que suma el directorio cuadra con el dashboard (pendiente 11,000 y vencido 2,300)',
+  resumenDirectorio(dir).saldoPendiente === 11000 && resumenDirectorio(dir).saldoVencido === 2300
+  && resumen.success && resumen.data.totales.pendiente === 11000 && resumen.data.totales.vencido === 2300)
+const sinSaldo = { ...(fixture('directorio').data as Record<string, unknown>[])[0] }
+delete sinSaldo.saldo_pendiente
+chk('...y un tenant al que le falta un campo nuevo del contrato (saldo_pendiente) NO pasa por el esquema', !tenantBuscadoSchema.safeParse(sinSaldo).success)
 const sinTipo = { ...(fixture('buscar').data as Record<string, unknown>[])[0] }
 delete sinTipo.tipo
 chk('un tenant al que le falta un campo del contrato NO pasa por tenantBuscadoSchema (el esquema no es de adorno)', !tenantBuscadoSchema.safeParse(sinTipo).success)
@@ -133,7 +155,7 @@ chk('las bases son las del servidor y ninguna es prefijo de la ruta de la otra (
 // ---------------------------------------------------------------------------
 console.log('\n3. Claves de caché y frescura por ámbito')
 const unaDeCada = (k: ReturnType<typeof crearCobrosKeys>) => [
-  k.lista({ page: 1 }), k.resumen(7), k.recordatorios(7, 7), k.cliente(5), k.detalle(5), k.buscar('alfa'),
+  k.lista({ page: 1 }), k.resumen(7), k.recordatorios(7, 7), k.cliente(5), k.detalle(5), k.buscar('alfa'), k.directorio('alfa'),
 ]
 chk('las claves de cada ámbito cuelgan de su raíz (invalidar ["cobros"] no toca ["cobros-tenants"] ni al revés)',
   cobrosKeys.todo[0] === 'cobros' && cobrosTenantsKeys.todo[0] === 'cobros-tenants'
@@ -141,7 +163,7 @@ chk('las claves de cada ámbito cuelgan de su raíz (invalidar ["cobros"] no toc
 chk('el cliente 5 de una empresa y el tenant 5 son claves distintas (ids de tablas distintas)', JSON.stringify(cobrosKeys.cliente(5)) !== JSON.stringify(cobrosTenantsKeys.cliente(5))
   && JSON.stringify(cobrosKeys.detalle(5)) !== JSON.stringify(cobrosTenantsKeys.detalle(5)))
 igual('las claves del ámbito de tenants, una por una', unaDeCada(cobrosTenantsKeys),
-  [['cobros-tenants', 'lista', { page: 1 }], ['cobros-tenants', 'resumen', 7], ['cobros-tenants', 'recordatorios', 7, 7], ['cobros-tenants', 'cliente', 5], ['cobros-tenants', 'detalle', 5], ['cobros-tenants', 'buscar', 'alfa']])
+  [['cobros-tenants', 'lista', { page: 1 }], ['cobros-tenants', 'resumen', 7], ['cobros-tenants', 'recordatorios', 7, 7], ['cobros-tenants', 'cliente', 5], ['cobros-tenants', 'detalle', 5], ['cobros-tenants', 'buscar', 'alfa'], ['cobros-tenants', 'directorio', 'alfa']])
 chk('la caché de cobros de tenants es volátil, como la de las empresas (otro usuario cobra; el estado cambia con la fecha)',
   staleTimeFor(['cobros-tenants', 'lista', {}]) === FRESCURA.VOLATIL && staleTimeFor(['cobros', 'lista', {}]) === FRESCURA.VOLATIL)
 
@@ -157,8 +179,10 @@ const { cobrosUiEmpresa, cobrosUiTenants, crearCobrosUi, FILTROS_VACIOS } = awai
 const { useAuthStore } = await import('../src/stores/auth.ts')
 const empresa = () => cobrosUiEmpresa.getState()
 const tenantsUi = () => cobrosUiTenants.getState()
-chk('son dos stores distintos, los dos en su estado inicial', cobrosUiEmpresa !== cobrosUiTenants
-  && [empresa(), tenantsUi()].every((s) => s.tab === 'cobros' && s.page === 1 && s.pageSize === 10 && s.panelClienteId === null && s.modal === null && s.recordatoriosDias === 7))
+chk('son dos stores distintos, los dos en su estado inicial; cada pantalla abre en su pestaña (empresas: Cobros; plataforma: Clientes, el directorio)',
+  cobrosUiEmpresa !== cobrosUiTenants
+  && [empresa(), tenantsUi()].every((s) => s.page === 1 && s.pageSize === 10 && s.panelClienteId === null && s.modal === null && s.recordatoriosDias === 7)
+  && empresa().tab === 'cobros' && tenantsUi().tab === 'clientes')
 tenantsUi().abrirPanel(5, 'config')
 tenantsUi().setFiltros({ clientId: 5, clienteNombre: 'Alfa Comercial SRL', estado: 'Vencido' })
 tenantsUi().abrirModal({ tipo: 'pago', cobroId: 3 })
@@ -172,10 +196,15 @@ chk('...ni al revés', tenantsUi().panelClienteId === 5 && tenantsUi().pageSize 
 const nuevoStore = crearCobrosUi()
 chk('crearCobrosUi() da un store nuevo, en su estado inicial, que no comparte nada con los otros', nuevoStore !== cobrosUiTenants
   && nuevoStore.getState().panelClienteId === null && nuevoStore.getState().filtros.clientId === null && nuevoStore.getState().page === 1)
+const conClientes = crearCobrosUi('clientes')
+conClientes.getState().setTab('recordatorios')
+conClientes.getState().reset()
+chk('crearCobrosUi: sin argumento abre en Cobros; con una pestaña, en esa, y al reiniciarse vuelve a ella (no a Cobros)',
+  nuevoStore.getState().tab === 'cobros' && conClientes.getState().tab === 'clientes')
 useAuthStore.getState().setSession('token-de-otra-empresa', { id: 1, email: 'a@x.do', username: 'a', name: 'A', role: 'admin', permissions: ['*'] })
-igual('al cambiar de sesión (otra empresa de soporte, otro usuario) los DOS stores vuelven al principio', [
+igual('al cambiar de sesión (otra empresa de soporte, otro usuario) los DOS stores vuelven al principio, cada uno a su pestaña', [
   empresa().panelClienteId, empresa().pageSize, tenantsUi().panelClienteId, tenantsUi().modal, tenantsUi().tab, tenantsUi().filtros,
-], [null, 10, null, null, 'cobros', FILTROS_VACIOS])
+], [null, 10, null, null, 'clientes', FILTROS_VACIOS])
 tenantsUi().abrirPanel(33)
 empresa().abrirPanel(34)
 useAuthStore.getState().clearSession()
@@ -212,6 +241,35 @@ igual('de integración, en certificación, inactivo y con cobro mensual: todo lo
   detalleTenant({ rnc: '101000033', tipo: 'integracion', ambiente: 'certecf', activo: false, con_config: true }),
   'RNC 101000033 · Integración · Certificación · Inactiva · Cobro mensual configurado')
 igual('sin RNC lo dice, y un ambiente de pruebas también', detalleTenant({ rnc: '', tipo: 'app', ambiente: 'testecf', activo: true, con_config: false }), 'sin RNC · Pruebas')
+
+// ---------------------------------------------------------------------------
+console.log('\n7. El directorio de tenants (la pestaña Clientes): filtros, conteos y rótulos')
+const ids = (xs: { id: number }[]) => xs.map((x) => x.id)
+chk('el tope del directorio es el del servidor (500) y hay un filtro rápido por cada cosa que se quiere ver',
+  MAX_DIRECTORIO === 500 && FILTROS_DIRECTORIO.map((f) => f.id).join() === 'todos,con-saldo,vencidos,sin-cobro' && TIPOS_DIRECTORIO.map((f) => f.id).join() === 'todas,app,integracion')
+igual('sin filtros salen todos, en el orden que mandó el servidor', ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'todas' })), [1, 2, 4, 3, 5])
+igual('con saldo: los que deben algo (Alfa, Delta, Gamma y Epsilon; Beta no)', ids(filtrarDirectorio(dir, { filtro: 'con-saldo', tipo: 'todas' })), [1, 4, 3, 5])
+igual('vencidos: los que ya pasaron su vencimiento (Delta y Gamma; Epsilon vence HOY, no está vencida)', ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'todas' })), [4, 3])
+igual('sin cobro mensual: los que no lo tienen configurado (Gamma y Epsilon)', ids(filtrarDirectorio(dir, { filtro: 'sin-cobro', tipo: 'todas' })), [3, 5])
+igual('por tipo: con base propia (Alfa, Beta, Delta, Epsilon) y de integración (Gamma)', [
+  ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'app' })), ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'integracion' })),
+], [[1, 2, 4, 5], [3]])
+igual('el filtro rápido y el tipo se combinan: con saldo y con base propia; vencidos y de integración; vencidos y con base propia',
+  [ids(filtrarDirectorio(dir, { filtro: 'con-saldo', tipo: 'app' })), ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'integracion' })), ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'app' }))],
+  [[1, 4, 5], [3], [4]])
+const resumenFx = resumenDirectorio(dir)
+igual('los contadores de los filtros y lo que deben todos (sumado en centavos)', resumenFx, { total: 5, conSaldo: 4, vencidos: 2, sinCobro: 2, saldoPendiente: 11000, saldoVencido: 2300 })
+igual('conteoDeFiltro da el contador de cada filtro rápido', FILTROS_DIRECTORIO.map((f) => conteoDeFiltro(resumenFx, f.id)), [5, 4, 2, 2])
+const dosCobros = (a: number, b: number) => [a, b].map((m) => ({ saldo_pendiente: m, saldo_vencido: 0, config: null, tipo: 'app' }))
+chk('sumar en centavos: 0.10 + 0.20 da exactamente 0.30 (en flotante daría 0.30000000000000004)', resumenDirectorio(dosCobros(0.1, 0.2)).saldoPendiente === 0.3 && 0.1 + 0.2 !== 0.3)
+chk('un saldo de cero no cuenta como "con saldo" ni como "vencido", y config null es "sin cobro mensual"',
+  !cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'con-saldo') && !cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'vencidos')
+  && cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'sin-cobro'))
+igual('un directorio vacío da todo en cero', resumenDirectorio([]), { total: 0, conSaldo: 0, vencidos: 0, sinCobro: 0, saldoPendiente: 0, saldoVencido: 0 })
+igual('subtituloTenant: el RNC y solo lo que sale de lo normal (integración, certificación, inactiva), sin hablar del cobro',
+  [subtituloTenant({ rnc: '101000011', tipo: 'app', ambiente: 'ecf', activo: true }), subtituloTenant({ rnc: '101000033', tipo: 'integracion', ambiente: 'certecf', activo: false }), subtituloTenant({ rnc: '', tipo: 'app', ambiente: 'testecf', activo: true })],
+  ['RNC 101000011', 'RNC 101000033 · Integración · Certificación · Inactiva', 'sin RNC · Pruebas'])
+igual('detalleCobroMensual: el día y si está activo', [detalleCobroMensual({ dia_vencimiento: 31, activo: true }), detalleCobroMensual({ dia_vencimiento: 10, activo: false })], ['día 31 · activo', 'día 10 · inactivo'])
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)
