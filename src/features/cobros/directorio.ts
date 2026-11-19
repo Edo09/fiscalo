@@ -18,7 +18,7 @@ export const FILTROS_DIRECTORIO = [
 ] as const
 export type FiltroDirectorio = (typeof FILTROS_DIRECTORIO)[number]['id']
 
-/** Por qué clase de empresa: la mayoría de las de integración se crearon solo para certificar y no son clientes. */
+/** Por qué clase de empresa (en un grupo, la de su cabeza). */
 export const TIPOS_DIRECTORIO = [
   { id: 'todas', label: 'Todas' },
   { id: 'app', label: 'Con base propia' },
@@ -26,7 +26,7 @@ export const TIPOS_DIRECTORIO = [
 ] as const
 export type TipoDirectorio = (typeof TIPOS_DIRECTORIO)[number]['id']
 
-type ParaFiltrar = Pick<TenantBuscado, 'saldo_pendiente' | 'saldo_vencido' | 'config' | 'tipo' | 'excluido'>
+type ParaFiltrar = Pick<TenantBuscado, 'saldo_pendiente' | 'saldo_vencido' | 'config' | 'tipo' | 'facturable'>
 
 /** ¿Cumple el filtro rápido? Con saldo = debe algo; vencidos = algo ya pasó su vencimiento; sin cobro = no tiene cobro mensual. */
 export function cumpleFiltro(t: ParaFiltrar, filtro: FiltroDirectorio): boolean {
@@ -39,23 +39,23 @@ export function cumpleFiltro(t: ParaFiltrar, filtro: FiltroDirectorio): boolean 
 }
 
 /**
- * Los que se ven en la lista ANTES de los filtros rápidos: los clientes, y las empresas marcadas como "no es un cliente" solo si se
- * pidió verlas. Con esto se calculan los contadores y el pie, para que no cuenten lo que no se ve.
+ * Los que se ven en la lista ANTES de los filtros rápidos: las unidades que se cobran, y las que no (marcadas "no es un cliente" o
+ * que solo certificaron) solo si se pidió verlas. Con esto se calculan los contadores y el pie, para que no cuenten lo que no se ve.
  */
-export function clientesDelDirectorio<T extends Pick<TenantBuscado, 'excluido'>>(items: readonly T[], conExcluidos: boolean): T[] {
-  return items.filter((t) => conExcluidos || !t.excluido)
+export function clientesDelDirectorio<T extends Pick<TenantBuscado, 'facturable'>>(items: readonly T[], conOcultas: boolean): T[] {
+  return items.filter((t) => conOcultas || t.facturable)
 }
 
-/** Cuántas empresas están marcadas como "no es un cliente". */
-export function contarExcluidos(items: readonly Pick<TenantBuscado, 'excluido'>[]): number {
-  return items.filter((t) => t.excluido).length
+/** Cuántas unidades no se cobran (marcadas "no es un cliente" o solo de certificación). */
+export function contarOcultas(items: readonly Pick<TenantBuscado, 'facturable'>[]): number {
+  return items.filter((t) => !t.facturable).length
 }
 
 /** Los de la lista que cumplen el filtro rápido y el tipo de empresa, en el mismo orden que mandó el servidor. */
 export function filtrarDirectorio<T extends ParaFiltrar>(
-  items: readonly T[], f: { filtro: FiltroDirectorio; tipo: TipoDirectorio; conExcluidos: boolean },
+  items: readonly T[], f: { filtro: FiltroDirectorio; tipo: TipoDirectorio; conOcultas: boolean },
 ): T[] {
-  return clientesDelDirectorio(items, f.conExcluidos).filter((t) => cumpleFiltro(t, f.filtro) && (f.tipo === 'todas' || t.tipo === f.tipo))
+  return clientesDelDirectorio(items, f.conOcultas).filter((t) => cumpleFiltro(t, f.filtro) && (f.tipo === 'todas' || t.tipo === f.tipo))
 }
 
 export interface ResumenDirectorio {

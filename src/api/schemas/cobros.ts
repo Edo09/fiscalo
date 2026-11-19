@@ -129,10 +129,25 @@ export const configCobroSchema = z.object({
 })
 export type ConfigCobro = z.infer<typeof configCobroSchema>
 
+/** Un grupo de empresas de un mismo cliente (tenants.grupo_id): se cobra UNA vez, en su cabeza; sus hermanas viajan aquí. */
+export const grupoTenantSchema = z.object({
+  /** La empresa que cobra por el grupo: la fila del directorio que trae este grupo. */
+  cabeza_id: z.number(),
+  /** Las demás empresas del grupo, por id (vacío en un grupo de una sola empresa). */
+  miembros: z.array(z.object({
+    id: z.number(),
+    nombre: z.string(),
+    rnc: z.string(),
+    tipo: z.string(),
+    ambiente: z.string(),
+  })),
+})
+export type GrupoTenant = z.infer<typeof grupoTenantSchema>
+
 /**
- * Un tenant del DIRECTORIO de la plataforma (GET /api/cobros-tenants/clientes): lo de un cliente (el nombre del tenant
- * hace de nombre, contacto y empresa; el correo es el de su primer admin), qué es, su cobro mensual y lo que debe.
- * Lo usan el buscador de los formularios y la pestaña Clientes de Cobros de tenants.
+ * Una UNIDAD de cobro del DIRECTORIO de la plataforma (GET /api/cobros-tenants/clientes): un tenant, o un grupo de empresas
+ * (la fila es la de su cabeza). Lo de un cliente (el nombre del tenant hace de nombre, contacto y empresa; el correo es el de su
+ * primer admin), qué es, su cobro mensual y lo que debe. Lo usan el buscador de los formularios y la pestaña Clientes de Cobros de tenants.
  */
 export const tenantBuscadoSchema = clienteCobroSchema.extend({
   /** 'app' (con base propia) o 'integracion' (sin ella). */
@@ -144,10 +159,16 @@ export const tenantBuscadoSchema = clienteCobroSchema.extend({
   con_config: z.boolean(),
   /** Su cobro mensual; null si no tiene. */
   config: configCobroSchema.nullable(),
-  /** La plataforma la marcó como "no es un cliente" (se creó solo para certificar, es de prueba): no sale de la lista a menos que se pida. */
+  /** La plataforma la marcó como "no es un cliente" (es de prueba, es interna): solo la marca; ver `facturable` para saber si se cobra. */
   excluido: z.boolean(),
   /** Por qué no es un cliente (solo si está excluida). */
   motivo_exclusion: z.string().nullable(),
+  /** Se le cobra: no sale de la lista a menos que se pida (`?excluidos=1`) si es false. */
+  facturable: z.boolean(),
+  /** Por qué no se cobra: la marca "no es un cliente" (`excluido`) o que solo certificó (`solo_certificacion`); null si se cobra. */
+  motivo_oculto: z.enum(['excluido', 'solo_certificacion']).nullable(),
+  /** El grupo al que pertenece (esta fila es su cabeza); null si no tiene. */
+  grupo: grupoTenantSchema.nullable(),
   /** Todo lo abierto que debe (un cobro pagado o cancelado no suma). */
   saldo_pendiente: z.number(),
   /** Lo que ya pasó su vencimiento. */

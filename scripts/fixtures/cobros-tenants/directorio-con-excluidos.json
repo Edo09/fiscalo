@@ -28,7 +28,10 @@
             "cobros_abiertos": 1,
             "cobros_vencidos": 0,
             "dias_atraso": 0,
-            "proximo_vencimiento": "2026-11-30"
+            "proximo_vencimiento": "2026-11-30",
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": null
         },
         {
             "id": 2,
@@ -57,7 +60,10 @@
             "cobros_abiertos": 0,
             "cobros_vencidos": 0,
             "dias_atraso": 0,
-            "proximo_vencimiento": null
+            "proximo_vencimiento": null,
+            "facturable": false,
+            "motivo_oculto": "excluido",
+            "grupo": null
         },
         {
             "id": 4,
@@ -86,7 +92,10 @@
             "cobros_abiertos": 2,
             "cobros_vencidos": 1,
             "dias_atraso": 1,
-            "proximo_vencimiento": "2026-12-15"
+            "proximo_vencimiento": "2026-12-15",
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": null
         },
         {
             "id": 3,
@@ -108,7 +117,10 @@
             "cobros_abiertos": 1,
             "cobros_vencidos": 1,
             "dias_atraso": 15,
-            "proximo_vencimiento": null
+            "proximo_vencimiento": null,
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": null
         },
         {
             "id": 5,
@@ -130,7 +142,10 @@
             "cobros_abiertos": 1,
             "cobros_vencidos": 0,
             "dias_atraso": 0,
-            "proximo_vencimiento": "2026-11-16"
+            "proximo_vencimiento": "2026-11-16",
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": null
         }
     ]
 }

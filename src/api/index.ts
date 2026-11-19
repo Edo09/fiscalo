@@ -117,6 +117,6 @@ export type {
   Cobro, CobroConPagos, CobroDetalle, ClienteCobro, PagoCobro, RecordatorioCobro, ConfigCobro, ResumenCobros,
   PanelCliente, RecordatoriosCobros, ItemRecordatorio, PagoResultado, CobroActualizado, RecordatorioResultado,
   PagoAnulado, EstadoCobro, MetodoPago, CanalRecordatorio, ClienteRecordatorio, MotivoSiguiente, TenantBuscado,
-  ExclusionResultado,
+  ExclusionResultado, GrupoTenant,
 } from './schemas/cobros'
 export { formatApiDate, dgiiLabel, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProductRowConRegla, mapProveedorRow, mapUserRow } from './mappers'

@@ -166,6 +166,20 @@ export function subtituloTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambient
   ].filter(Boolean).join(' · ')
 }
 
+/** Por qué una unidad no se cobra, en una frase corta; null si se cobra. La marca lleva su motivo ("No es cliente · Es de prueba"). */
+export function etiquetaOculta(t: Pick<TenantBuscado, 'motivo_oculto' | 'motivo_exclusion'>): string | null {
+  if (t.motivo_oculto === 'solo_certificacion') return 'Solo certificación'
+  if (t.motivo_oculto === 'excluido') return t.motivo_exclusion ? `No es cliente · ${t.motivo_exclusion}` : 'No es cliente'
+  return null
+}
+
+/** El rótulo de un grupo de empresas ("Grupo · 3 empresas": la cabeza y sus hermanas); null si la unidad no tiene grupo. */
+export function textoGrupo(t: Pick<TenantBuscado, 'grupo'>): string | null {
+  if (t.grupo === null) return null
+  const n = t.grupo.miembros.length + 1
+  return `Grupo · ${n} ${n === 1 ? 'empresa' : 'empresas'}`
+}
+
 /** La línea de detalle de un tenant en el buscador de los formularios: su subtítulo y si ya tiene su cobro mensual configurado. */
 export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config'>): string {
   return [subtituloTenant(t), t.con_config ? 'Cobro mensual configurado' : null].filter(Boolean).join(' · ')

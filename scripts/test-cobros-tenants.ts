@@ -24,9 +24,9 @@ import {
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
-import { detalleCobroMensual, detalleTenant, subtituloTenant } from '../src/features/cobros/format.ts'
+import { detalleCobroMensual, detalleTenant, etiquetaOculta, subtituloTenant, textoGrupo } from '../src/features/cobros/format.ts'
 import {
-  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarExcluidos, cumpleFiltro, filtrarDirectorio,
+  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, cumpleFiltro, filtrarDirectorio,
   resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
 } from '../src/features/cobros/directorio.ts'
 import {
@@ -276,8 +276,8 @@ console.log('\n7. El directorio de tenants (la pestaña Clientes): filtros, cont
 const ids = (xs: { id: number }[]) => xs.map((x) => x.id)
 chk('el tope del directorio es el del servidor (500) y hay un filtro rápido por cada cosa que se quiere ver',
   MAX_DIRECTORIO === 500 && FILTROS_DIRECTORIO.map((f) => f.id).join() === 'todos,con-saldo,vencidos,sin-cobro' && TIPOS_DIRECTORIO.map((f) => f.id).join() === 'todas,app,integracion')
-// Los ids que quedan al filtrar (por defecto sin las empresas marcadas "no es cliente", como la pantalla).
-const filtra = (items: typeof dir, filtro: FiltroDirectorio, tipo: TipoDirectorio, conExcluidos = false) => ids(filtrarDirectorio(items, { filtro, tipo, conExcluidos }))
+// Los ids que quedan al filtrar (por defecto sin las unidades que no se cobran, como la pantalla).
+const filtra = (items: typeof dir, filtro: FiltroDirectorio, tipo: TipoDirectorio, conOcultas = false) => ids(filtrarDirectorio(items, { filtro, tipo, conOcultas }))
 igual('sin filtros salen todos, en el orden que mandó el servidor', filtra(dir, 'todos', 'todas'), [1, 2, 4, 3, 5])
 igual('con saldo: los que deben algo (Alfa, Delta, Gamma y Epsilon; Beta no)', filtra(dir, 'con-saldo', 'todas'), [1, 4, 3, 5])
 igual('vencidos: los que ya pasaron su vencimiento (Delta y Gamma; Epsilon vence HOY, no está vencida)', filtra(dir, 'vencidos', 'todas'), [4, 3])
@@ -288,9 +288,9 @@ igual('el filtro rápido y el tipo se combinan: con saldo y con base propia; ven
 const resumenFx = resumenDirectorio(dir)
 igual('los contadores de los filtros y lo que deben todos (sumado en centavos)', resumenFx, { total: 5, conSaldo: 4, vencidos: 2, sinCobro: 2, saldoPendiente: 11000, saldoVencido: 2300 })
 igual('conteoDeFiltro da el contador de cada filtro rápido', FILTROS_DIRECTORIO.map((f) => conteoDeFiltro(resumenFx, f.id)), [5, 4, 2, 2])
-const dosCobros = (a: number, b: number) => [a, b].map((m) => ({ saldo_pendiente: m, saldo_vencido: 0, config: null, tipo: 'app', excluido: false }))
+const dosCobros = (a: number, b: number) => [a, b].map((m) => ({ saldo_pendiente: m, saldo_vencido: 0, config: null, tipo: 'app', excluido: false, facturable: true }))
 chk('sumar en centavos: 0.10 + 0.20 da exactamente 0.30 (en flotante daría 0.30000000000000004)', resumenDirectorio(dosCobros(0.1, 0.2)).saldoPendiente === 0.3 && 0.1 + 0.2 !== 0.3)
-const sinNada = { saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app', excluido: false }
+const sinNada = { saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app', excluido: false, facturable: true }
 chk('un saldo de cero no cuenta como "con saldo" ni como "vencido", y config null es "sin cobro mensual"',
   !cumpleFiltro(sinNada, 'con-saldo') && !cumpleFiltro(sinNada, 'vencidos') && cumpleFiltro(sinNada, 'sin-cobro'))
 igual('un directorio vacío da todo en cero', resumenDirectorio([]), { total: 0, conSaldo: 0, vencidos: 0, sinCobro: 0, saldoPendiente: 0, saldoVencido: 0 })
@@ -303,19 +303,43 @@ igual('detalleCobroMensual: el día y si está activo', [detalleCobroMensual({ d
 console.log('\n8. "No es cliente": lo que se quita de la lista no se ve ni se cuenta, salvo que se pida')
 igual('sin pedirlas, la lista no trae a Beta (marcada "no es cliente"); pidiéndolas, salen todas y en su orden',
   [ids(clientesDelDirectorio(dirEx, false)), ids(clientesDelDirectorio(dirEx, true))], [[1, 4, 3, 5], [1, 2, 4, 3, 5]])
-igual('contarExcluidos: una en ese directorio, ninguna en el de siempre ni en uno vacío', [contarExcluidos(dirEx), contarExcluidos(dir), contarExcluidos([])], [1, 0, 0])
-igual('filtrarDirectorio respeta conExcluidos: sin ellas, sin Beta; con ellas, todas', [filtra(dirEx, 'todos', 'todas'), filtra(dirEx, 'todos', 'todas', true)], [[1, 4, 3, 5], [1, 2, 4, 3, 5]])
+igual('contarOcultas: una en ese directorio, ninguna en el de siempre ni en uno vacío', [contarOcultas(dirEx), contarOcultas(dir), contarOcultas([])], [1, 0, 0])
+igual('filtrarDirectorio respeta conOcultas: sin ellas, sin Beta; con ellas, todas', [filtra(dirEx, 'todos', 'todas'), filtra(dirEx, 'todos', 'todas', true)], [[1, 4, 3, 5], [1, 2, 4, 3, 5]])
 igual('...y se combina con el tipo: con base propia sin la excluida, con ella y de integración (no cambia)',
   [filtra(dirEx, 'todos', 'app'), filtra(dirEx, 'todos', 'app', true), filtra(dirEx, 'todos', 'integracion'), filtra(dirEx, 'todos', 'integracion', true)], [[1, 4, 5], [1, 2, 4, 5], [3], [3]])
 igual('...y con el filtro rápido: Beta no debe nada y tiene cobro mensual (inactivo), así que ni con saldo ni vencidos ni sin cobro la traen aunque se pida',
   [filtra(dirEx, 'con-saldo', 'todas', true), filtra(dirEx, 'vencidos', 'todas', true), filtra(dirEx, 'sin-cobro', 'todas', true)], [[1, 4, 3, 5], [4, 3], [3, 5]])
-const alfaExcluida = dir.map((t) => (t.id === 1 ? { ...t, excluido: true, motivo_exclusion: 'Es de prueba' } : t))
+const alfaExcluida = dir.map((t) => (t.id === 1 ? { ...t, excluido: true, motivo_exclusion: 'Es de prueba', facturable: false, motivo_oculto: 'excluido' as const } : t))
 igual('los contadores y el pie cuentan lo que se ve: con Alfa (debe 6,000) marcada, sin pedirla son 4 empresas y 5,000; pidiéndola, 5 y 11,000',
   [resumenDirectorio(clientesDelDirectorio(alfaExcluida, false)), resumenDirectorio(clientesDelDirectorio(alfaExcluida, true))].map((r) => [r.total, r.saldoPendiente, r.saldoVencido]),
   [[4, 5000, 2300], [5, 11000, 2300]])
 igual('...y con ella marcada, el filtro "con saldo" (sin pedirla) no la trae, y con la lista de siempre no cambia nada',
   [filtra(alfaExcluida, 'con-saldo', 'todas'), filtra(dir, 'con-saldo', 'todas'), ids(clientesDelDirectorio(dir, false))], [[4, 3, 5], [1, 4, 3, 5], [1, 2, 4, 3, 5]])
 chk('no modifica lo que recibe: el arreglo original sigue con sus 5 empresas y en su orden', dirEx.length === 5 && ids(dirEx).join() === '1,2,4,3,5' && alfaExcluida.length === 5)
+
+// ---------------------------------------------------------------------------
+console.log('\n9. Quién se cobra y los grupos: una fila por grupo, y lo que no se cobra con su razón')
+const grupResp = tenantsBuscadosSchema.safeParse(fixture('directorio-grupos').data)
+chk('el directorio con grupos pasa por tenantsBuscadosSchema: 8 unidades', grupResp.success && grupResp.data.length === 8, !grupResp.success && grupResp.error.issues[0])
+const dirG = grupResp.success ? grupResp.data : []
+const deG = (id: number) => dirG.find((t) => t.id === id)!
+igual('...en el orden del servidor, y son cabezas: nunca una hermana (11, 12, 15, 20, 23)', ids(dirG), [14, 16, 17, 10, 18, 19, 13, 22])
+igual('...cada una dice si se cobra y por qué no: [id, facturable, motivo_oculto]', dirG.map((t) => [t.id, t.facturable, t.motivo_oculto]),
+  [[14, true, null], [16, true, null], [17, false, 'solo_certificacion'], [10, true, null], [18, false, 'excluido'], [19, true, null], [13, false, 'solo_certificacion'], [22, true, null]])
+igual('...el grupo 10 trae su cabeza y sus dos hermanas (11 en producción, 12 en certificación); una empresa sin grupo trae null',
+  [deG(10).grupo?.cabeza_id, deG(10).grupo?.miembros.map((m) => [m.id, m.ambiente]), deG(16).grupo], [10, [[11, 'ecf'], [12, 'certecf']], null])
+const sinFacturable = { ...(fixture('directorio-grupos').data as Record<string, unknown>[])[0] }
+delete sinFacturable.facturable
+chk('...y una unidad a la que le falta "facturable" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinFacturable).success)
+igual('textoGrupo: "Grupo · N empresas" con la cabeza y sus hermanas, y nada sin grupo', [10, 14, 16].map((id) => textoGrupo(deG(id))), ['Grupo · 3 empresas', 'Grupo · 2 empresas', null])
+igual('textoGrupo: un grupo de una sola empresa (sin hermanas) dice "1 empresa"', textoGrupo({ grupo: { cabeza_id: 18, miembros: [] } }), 'Grupo · 1 empresa')
+igual('etiquetaOculta: "Solo certificación", "No es cliente · <motivo>" y nada para la que se cobra', [17, 18, 14].map((id) => etiquetaOculta(deG(id))), ['Solo certificación', 'No es cliente · Interna', null])
+igual('etiquetaOculta: una marca sin motivo dice solo "No es cliente"', etiquetaOculta({ motivo_oculto: 'excluido', motivo_exclusion: null }), 'No es cliente')
+igual('lo que se ve: sin pedir las que no se cobran, 5 unidades; pidiéndolas, las 8', [ids(clientesDelDirectorio(dirG, false)), ids(clientesDelDirectorio(dirG, true))],
+  [[14, 16, 10, 19, 22], [14, 16, 17, 10, 18, 19, 13, 22]])
+igual('contarOcultas: 3 en ese directorio (17, 18 y 13)', contarOcultas(dirG), 3)
+igual('por tipo (la unidad es de integración si su cabeza lo es): de integración, con base propia, y de integración pidiendo las ocultas',
+  [filtra(dirG, 'todos', 'integracion'), filtra(dirG, 'todos', 'app'), filtra(dirG, 'todos', 'integracion', true)], [[14, 10, 19, 22], [16], [14, 17, 10, 19, 13, 22]])
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)
