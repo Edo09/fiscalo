@@ -9,15 +9,17 @@ import {
   aCentavos, centavosDeTexto, configFormSchema, deCentavos, erroresPorCampo, textoDinero, textoMontoCampo,
 } from '@/api/schemas/cobros'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
-import { diasDelMes, fechaCorta, fechaHoraCorta, periodoCorto, periodoSiguiente, vencimientoDe } from '../format'
+import { diasDelMes, fechaCorta, fechaHoraCorta, periodoCorto, periodoSiguiente, totalMensual, vencimientoDe } from '../format'
 import { useGuardarConfig } from '../hooks'
 import { Aviso } from './Aviso'
 
-export function ConfigClienteForm({ clientId, config, periodoInicial }: {
+export function ConfigClienteForm({ clientId, config, periodoInicial, empresasQuePagan = 1 }: {
   clientId: number
   config: ConfigCobro | null
   /** Periodo desde el que se muestra cuándo vencerían los próximos cobros. */
   periodoInicial: string
+  /** Cuántas empresas de la unidad pagan: el monto de esta configuración es POR CADA UNA (1 si es una sola). */
+  empresasQuePagan?: number
 }) {
   const guardarConfig = useGuardarConfig()
   const [monto, setMonto] = useState(config ? textoMontoCampo(aCentavos(config.monto_mensual)) : '')
@@ -72,7 +74,7 @@ export function ConfigClienteForm({ clientId, config, periodoInicial }: {
       {error && <Aviso tono="error">{error}</Aviso>}
       <div className="form-grid">
         <div className={campo('monto')}>
-          <label className="label" htmlFor="cfg-monto">Monto mensual <span className="req">*</span></label>
+          <label className="label" htmlFor="cfg-monto">{empresasQuePagan > 1 ? 'Monto mensual por empresa que paga' : 'Monto mensual'} <span className="req">*</span></label>
           <div className="input-group">
             <span className="input-prefix">RD$</span>
             <input
@@ -81,6 +83,9 @@ export function ConfigClienteForm({ clientId, config, periodoInicial }: {
             />
           </div>
           {errores.monto && <div className="err-msg">{errores.monto}</div>}
+          {empresasQuePagan > 1 && centavosDeTexto(monto) !== null && (
+            <div className="hint">Hoy pagan {empresasQuePagan} empresas: {textoDinero((centavosDeTexto(monto) as number) * empresasQuePagan)} al mes.</div>
+          )}
         </div>
         <div className={campo('dia')}>
           <label className="label" htmlFor="cfg-dia">Día de vencimiento <span className="req">*</span></label>
@@ -129,7 +134,7 @@ export function ConfigClienteForm({ clientId, config, periodoInicial }: {
       <div className="row between" style={{ flexWrap: 'wrap', gap: 8 }}>
         <span className="text-xs muted-3">
           {config
-            ? `Monto actual: ${textoDinero(aCentavos(config.monto_mensual))} · día ${config.dia_vencimiento}${config.updated_at ? ` · modificado ${fechaHoraCorta(config.updated_at)}` : ''}`
+            ? `Monto actual: ${textoDinero(aCentavos(config.monto_mensual))}${empresasQuePagan > 1 ? ` por empresa (${textoDinero(aCentavos(totalMensual(config, empresasQuePagan)))} al mes con ${empresasQuePagan} que pagan)` : ''} · día ${config.dia_vencimiento}${config.updated_at ? ` · modificado ${fechaHoraCorta(config.updated_at)}` : ''}`
             : 'Sin configurar'}
         </span>
         <Btn variant="primary" icon="save" onClick={() => void guardar()} disabled={saving}>

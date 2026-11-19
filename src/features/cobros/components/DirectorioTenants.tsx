@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { Avatar, Btn, Card, Dropdown, EmptyState, ErrorState, Icon, LoadingState, MenuItem, Money } from '@/components/ui'
 import { ApiError, type TenantBuscado } from '@/api'
 import {
-  cobrosTexto, detalleCobroMensual, diasTexto, empresasDelGrupo, etiquetaOculta, fechaCorta, subtituloTenant, textoGrupo, type EmpresaDeGrupo,
+  cobrosTexto, detalleCobroMensual, diasTexto, empresasDelGrupo, etiquetaOculta, fechaCorta, subtituloTenant, textoGrupo, totalMensual, type EmpresaDeGrupo,
 } from '../format'
 import { useDirectorioTenants, useExcluirTenant, usePagaTenant } from '../hooks'
 import {
@@ -213,8 +213,8 @@ export function DirectorioTenants() {
                     <td>
                       {t.config ? (
                         <>
-                          <span className="fw6"><Money value={t.config.monto_mensual} /></span>
-                          <div className="cell-sub">{detalleCobroMensual(t.config)}</div>
+                          <span className="fw6"><Money value={totalMensual(t.config, t.empresas_que_pagan)} /></span>
+                          <div className="cell-sub">{detalleCobroMensual(t.config, t.empresas_que_pagan)}</div>
                         </>
                       ) : (
                         <span className="muted-3">Sin configurar</span>

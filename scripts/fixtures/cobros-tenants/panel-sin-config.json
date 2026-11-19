@@ -11,6 +11,7 @@
             "telefono": ""
         },
         "config": null,
+        "empresas_que_pagan": 1,
         "resumen": {
             "saldo_pendiente": 300,
             "saldo_vencido": 300,

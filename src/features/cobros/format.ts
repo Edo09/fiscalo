@@ -2,7 +2,7 @@
 // Los nombres de mes van escritos a mano (no Intl): la salida no cambia entre navegadores ni con Node.
 import type { Cobro, ConfigCobro, EstadoCobro, TenantBuscado } from '@/api'
 // Valores por ruta relativa con .ts: scripts/test-cobros.ts carga este archivo con `node` tal cual ('@/…' no existe allí).
-import { aCentavos, textoDinero, type MotivoSiguiente } from '../../api/schemas/cobros.ts'
+import { aCentavos, deCentavos, textoDinero, type MotivoSiguiente } from '../../api/schemas/cobros.ts'
 import { etiquetaAmbiente } from '../auth/accesoGlobal.ts'
 
 type BadgeTono = 'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'
@@ -116,6 +116,8 @@ export function textoSiguiente(
       return siguiente
         ? `El cobro de ${periodoLargo(siguiente.periodo)} ya existía, así que no se creó otro.`
         : 'El cobro del mes siguiente ya existía, así que no se creó otro.'
+    case 'monto_excedido':
+      return 'No se generó el cobro del mes siguiente: con las empresas que pagan hoy, su total pasa del máximo de un cobro. El pago sí quedó registrado; avisa a soporte.'
     default:
       return null
   }
@@ -222,7 +224,19 @@ export function textoQuitarGrupo(empresas: number): string | null {
   return empresas > 1 ? `Es la cabeza de un grupo de ${empresas} empresas: sale todo el grupo de la lista de clientes.` : null
 }
 
-/** La segunda línea del cobro mensual de un tenant en la lista: "día 31 · activo" o "día 10 · inactivo". */
-export function detalleCobroMensual(c: Pick<ConfigCobro, 'dia_vencimiento' | 'activo'>): string {
-  return `día ${c.dia_vencimiento} · ${c.activo ? 'activo' : 'inactivo'}`
+/**
+ * El total mensual de una unidad: el monto por empresa por las que pagan (en centavos: nada de multiplicar floats). Una empresa sola
+ * es su monto tal cual.
+ */
+export function totalMensual(c: Pick<ConfigCobro, 'monto_mensual'>, empresas: number): number {
+  return deCentavos(aCentavos(c.monto_mensual) * Math.max(1, empresas))
+}
+
+/**
+ * La segunda línea del cobro mensual de un tenant en la lista: "día 31 · activo" o "día 10 · inactivo"; si pagan varias empresas, antes
+ * va el monto por empresa ("RD$ 500.00 × 3 empresas · día 15 · activo").
+ */
+export function detalleCobroMensual(c: Pick<ConfigCobro, 'dia_vencimiento' | 'activo'> & { monto_mensual?: number }, empresas = 1): string {
+  const dia = `día ${c.dia_vencimiento} · ${c.activo ? 'activo' : 'inactivo'}`
+  return empresas > 1 && c.monto_mensual !== undefined ? `${textoDinero(aCentavos(c.monto_mensual))} × ${empresas} empresas · ${dia}` : dia
 }

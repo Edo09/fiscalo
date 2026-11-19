@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Avatar, Btn, Drawer, EmptyState, ErrorState, LoadingState, Money, Tabs } from '@/components/ui'
 import { ETIQUETA_CANAL, type CanalRecordatorio } from '@/api/schemas/cobros'
-import { fechaCorta, fechaHoraCorta, periodoCorto } from '../format'
+import { detalleCobroMensual, fechaCorta, fechaHoraCorta, periodoCorto, totalMensual } from '../format'
 import { usePanelCliente } from '../hooks'
 import { useCobrosUi, useCobrosUiStore, type PestanaPanel } from '../store'
 import { Aviso } from './Aviso'
@@ -79,8 +79,8 @@ export function ClientePanel({ clientId }: { clientId: number }) {
             </div>
             <div className="cobros-cifra">
               <div className="lbl">Cobro mensual actual</div>
-              <div className="val">{data.config ? <Money value={data.config.monto_mensual} /> : <span className="muted-3">Sin configurar</span>}</div>
-              <div className="sub">{data.config ? `día ${data.config.dia_vencimiento} · ${data.config.activo ? 'activo' : 'inactivo'}` : 'ver la pestaña Cobro mensual'}</div>
+              <div className="val">{data.config ? <Money value={totalMensual(data.config, data.empresas_que_pagan)} /> : <span className="muted-3">Sin configurar</span>}</div>
+              <div className="sub">{data.config ? detalleCobroMensual(data.config, data.empresas_que_pagan) : 'ver la pestaña Cobro mensual'}</div>
             </div>
             <div className="cobros-cifra">
               <div className="lbl">Cobrado en total</div>
@@ -100,7 +100,7 @@ export function ClientePanel({ clientId }: { clientId: number }) {
 
           {tab === 'historial' && <HistorialCobros cobros={data.cobros} clientId={clientId} />}
           {tab === 'config' && (
-            <ConfigClienteForm clientId={clientId} config={data.config} periodoInicial={data.sugerido.periodo} />
+            <ConfigClienteForm clientId={clientId} config={data.config} periodoInicial={data.sugerido.periodo} empresasQuePagan={data.empresas_que_pagan} />
           )}
           {tab === 'recordatorios' && (
             data.recordatorios.length === 0 ? (

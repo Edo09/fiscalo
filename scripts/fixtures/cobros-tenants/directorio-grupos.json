@@ -48,7 +48,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         },
         {
             "id": 16,
@@ -73,7 +74,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 17,
@@ -105,7 +107,8 @@
             "proximo_vencimiento": null,
             "facturable": false,
             "motivo_oculto": "solo_certificacion",
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 10,
@@ -156,7 +159,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 3
         },
         {
             "id": 18,
@@ -181,7 +185,8 @@
             "proximo_vencimiento": null,
             "facturable": false,
             "motivo_oculto": "excluido",
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 19,
@@ -223,7 +228,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         },
         {
             "id": 13,
@@ -248,7 +254,8 @@
             "proximo_vencimiento": null,
             "facturable": false,
             "motivo_oculto": "solo_certificacion",
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 22,
@@ -290,7 +297,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         }
     ]
 }

@@ -41,7 +41,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 1
         },
         {
             "id": 30,
@@ -101,7 +102,8 @@
                         "motivo_sin_pago": "Solo certifico"
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         },
         {
             "id": 40,
@@ -152,7 +154,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         },
         {
             "id": 50,
@@ -177,7 +180,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 60,
@@ -219,7 +223,8 @@
                         "motivo_sin_pago": null
                     }
                 ]
-            }
+            },
+            "empresas_que_pagan": 2
         }
     ]
 }

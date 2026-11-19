@@ -19,12 +19,14 @@
 //   node scripts/test-cobros-tenants.ts
 import { readFileSync } from 'node:fs'
 import {
-  ESTADOS_COBRO, cobroDetalleSchema, cobroSchema, configCobroSchema, exclusionResultadoSchema, pagaResultadoSchema, pagoAnuladoSchema, pagoResultadoSchema,
+  ESTADOS_COBRO, MOTIVOS_SIGUIENTE, cobroDetalleSchema, cobroSchema, configCobroSchema, exclusionResultadoSchema, pagaResultadoSchema, pagoAnuladoSchema, pagoResultadoSchema,
   panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantBuscadoSchema, tenantsBuscadosSchema,
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
-import { detalleCobroMensual, detalleTenant, empresasDelGrupo, etiquetaOculta, subtituloTenant, textoGrupo, textoQuitarGrupo } from '../src/features/cobros/format.ts'
+import {
+  detalleCobroMensual, detalleTenant, empresasDelGrupo, etiquetaOculta, subtituloTenant, textoGrupo, textoQuitarGrupo, textoSiguiente, totalMensual,
+} from '../src/features/cobros/format.ts'
 import {
   FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, cumpleFiltro, filtrarDirectorio, totalCobroMensual,
   resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
@@ -351,15 +353,15 @@ igual('por tipo (la unidad es de integración si su cabeza lo es): de integraci�
 
 // ---------------------------------------------------------------------------
 console.log('\n10. La tarjeta del cobro mensual total: lo que la plataforma cobra cada mes a lo que se cobra')
-const mensual = (monto: number, activo = true, facturable = true) => ({ facturable, config: { client_id: 1, monto_mensual: monto, dia_vencimiento: 15, descripcion: null, activo, updated_at: null } })
+const mensual = (monto: number, activo = true, facturable = true, empresas = 1) => ({ facturable, empresas_que_pagan: empresas, config: { client_id: 1, monto_mensual: monto, dia_vencimiento: 15, descripcion: null, activo, updated_at: null } })
 igual('totalCobroMensual suma los cobros mensuales ACTIVOS de lo que se cobra: los seis de la pantalla (1,500 + 1,500 + 2,000 + 600 + 500 + 1,500) dan 7,600 en 6 empresas',
   totalCobroMensual([1500, 1500, 2000, 600, 500, 1500].map((m) => mensual(m))), { total: 7600, empresas: 6 })
 igual('...no suma un cobro mensual apagado, ni una empresa que no se cobra aunque tenga uno activo, ni a quien no tiene cobro mensual',
-  totalCobroMensual([mensual(1500), mensual(900, false), mensual(700, true, false), { facturable: true, config: null }]), { total: 1500, empresas: 1 })
+  totalCobroMensual([mensual(1500), mensual(900, false), mensual(700, true, false), { facturable: true, config: null, empresas_que_pagan: 1 }]), { total: 1500, empresas: 1 })
 igual('...suma en centavos: 0.10 + 0.20 da exactamente 0.30', totalCobroMensual([mensual(0.1), mensual(0.2)]), { total: 0.3, empresas: 2 })
-igual('...y un directorio sin ningún cobro mensual (o vacío) da cero', [totalCobroMensual([]), totalCobroMensual([{ facturable: true, config: null }])], [{ total: 0, empresas: 0 }, { total: 0, empresas: 0 }])
+igual('...y un directorio sin ningún cobro mensual (o vacío) da cero', [totalCobroMensual([]), totalCobroMensual([{ facturable: true, config: null, empresas_que_pagan: 1 }])], [{ total: 0, empresas: 0 }, { total: 0, empresas: 0 }])
 igual('con el directorio de siempre: Alfa 6,000 y Delta 2,000 activos (el de Beta está inactivo) dan 8,000 en 2 empresas', totalCobroMensual(dir), { total: 8000, empresas: 2 })
-igual('con el directorio de grupos: solo cuenta Agro (1,500); el cobro mensual apagado de la que solo certificó (1,000) no suma', totalCobroMensual(dirG), { total: 1500, empresas: 1 })
+igual('con el directorio de grupos: solo cuenta Agro, que ahora son 2 empresas a 1,500 cada una (3,000); el cobro mensual apagado de la que solo certificó (1,000) no suma', totalCobroMensual(dirG), { total: 3000, empresas: 1 })
 
 // ---------------------------------------------------------------------------
 console.log('\n11. Quién paga dentro de un grupo: la fila se nombra por quien paga, y cada empresa dice si paga')
@@ -391,6 +393,33 @@ chk('marcar que una empresa no paga pasa por pagaResultadoSchema: la 30, no paga
 chk('...y una respuesta sin lo que había antes NO pasa por pagaResultadoSchema',
   !pagaResultadoSchema.safeParse({ client_id: 30, paga: false, motivo: null, repetido: false }).success)
 igual('la ruta de marcar quién paga cuelga del cliente en la plataforma', rutasCobros(BASE_COBROS_TENANTS).paga(7), '/api/cobros-tenants/clientes/7/paga')
+
+// ---------------------------------------------------------------------------
+console.log('\n12. El cobro mensual es por empresa que paga: el total de cada unidad y la tarjeta')
+const mxResp = tenantsBuscadosSchema.safeParse(fixture('directorio-monto-por-empresa').data)
+chk('el directorio con montos por empresa pasa por tenantsBuscadosSchema: 5 unidades', mxResp.success && mxResp.data.length === 5, !mxResp.success && mxResp.error.issues[0])
+const dirX = mxResp.success ? mxResp.data : []
+igual('cada unidad dice cuántas empresas pagan: [id, empresas_que_pagan] (30: 2, 40: 3, 50: 1, 60: 2, 70: 1)',
+  dirX.map((t) => [t.id, t.empresas_que_pagan]).sort((a, b) => a[0] - b[0]), [[30, 2], [40, 3], [50, 1], [60, 2], [70, 1]])
+igual('la tarjeta suma monto × empresas que pagan: 500 × 2 + 300 × 3 + 700 × 1 = 2,600 en 3 empresas', totalCobroMensual(dirX), { total: 2600, empresas: 3 })
+igual('...sintético: 500 por empresa con 3 que pagan da 1,500; una unidad que no se cobra no suma; 0.10 × 3 da exactamente 0.30',
+  [totalCobroMensual([mensual(500, true, true, 3)]), totalCobroMensual([mensual(500, true, false, 3)]), totalCobroMensual([mensual(0.1, true, true, 3)])],
+  [{ total: 1500, empresas: 1 }, { total: 0, empresas: 0 }, { total: 0.3, empresas: 1 }])
+igual('totalMensual: el monto por empresa por las que pagan (en centavos)',
+  [totalMensual({ monto_mensual: 500 }, 3), totalMensual({ monto_mensual: 500 }, 1), totalMensual({ monto_mensual: 0.1 }, 3)], [1500, 500, 0.3])
+const detalle3 = detalleCobroMensual({ dia_vencimiento: 15, activo: true, monto_mensual: 500 }, 3)
+chk('detalleCobroMensual con una sola empresa queda como siempre, y con varias dice el monto por empresa y cuántas',
+  detalleCobroMensual({ dia_vencimiento: 15, activo: true, monto_mensual: 500 }, 1) === 'día 15 · activo' && detalle3.includes('× 3 empresas') && detalle3.endsWith('día 15 · activo'), detalle3)
+const panelG = panelClienteSchema.safeParse(fixture('panel-grupo').data)
+chk('el panel del grupo 30 pasa por panelClienteSchema: pagan 2, el monto configurado es por empresa (500) y lo sugerido es el total (1,000)',
+  panelG.success && panelG.data.empresas_que_pagan === 2 && panelG.data.config?.monto_mensual === 500 && panelG.data.sugerido.monto === 1000, !panelG.success && panelG.error.issues[0])
+const sinN = JSON.parse(JSON.stringify((fixture('directorio-monto-por-empresa').data as Record<string, unknown>[])[0]))
+delete sinN.empresas_que_pagan
+const sinNPanel = JSON.parse(JSON.stringify(fixture('panel-grupo').data))
+delete sinNPanel.empresas_que_pagan
+chk('...y una unidad o un panel al que le falta "empresas_que_pagan" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinN).success && !panelClienteSchema.safeParse(sinNPanel).success)
+chk('el motivo monto_excedido del cobro siguiente es válido y tiene su texto: avisa que no se generó y que el máximo se pasó',
+  (MOTIVOS_SIGUIENTE as readonly string[]).includes('monto_excedido') && (textoSiguiente('monto_excedido', null) ?? '').includes('máximo') && (textoSiguiente('monto_excedido', null) ?? '').includes('No se generó'))
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

@@ -12,7 +12,7 @@ import {
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useAccionUnica } from '@/hooks/useAccionUnica'
 import { useAmbitoCobros } from '../ambito'
-import { periodoLargo, textoSiguiente, vencimientoDe } from '../format'
+import { periodoLargo, textoSiguiente, totalMensual, vencimientoDe } from '../format'
 import { useActualizarCobro, useCrearCobro, useDetalleParaFormulario } from '../hooks'
 import { useCobrosUi } from '../store'
 import { Aviso } from './Aviso'
@@ -75,6 +75,8 @@ function FormCobro({ cobro, errorActualizar, clientIdInicial, onClose }: {
   )
   const sugerido = !editando && clientId !== null ? panel.data?.sugerido : undefined
   const config = panel.data?.config ?? null
+  // El monto de la configuración es por empresa que paga: lo que se cobra al mes es ese monto por las que pagan.
+  const empresasQuePagan = panel.data?.empresas_que_pagan ?? 1
   const nombreCliente = editando ? cobro.cliente.nombre : panel.data?.cliente.nombre
 
   useEffect(() => {
@@ -210,7 +212,7 @@ function FormCobro({ cobro, errorActualizar, clientIdInicial, onClose }: {
           {!editando && clientId !== null && !panel.loading && !panel.error && (
             <div className="hint">
               {config
-                ? `Cobro mensual ${config.activo ? 'activo' : 'inactivo'}: ${textoDinero(aCentavos(config.monto_mensual))} al mes, vence el día ${config.dia_vencimiento} (si el mes es más corto, el último día).`
+                ? `Cobro mensual ${config.activo ? 'activo' : 'inactivo'}: ${textoDinero(aCentavos(totalMensual(config, empresasQuePagan)))} al mes${empresasQuePagan > 1 ? ` (${empresasQuePagan} empresas pagan)` : ''}, vence el día ${config.dia_vencimiento} (si el mes es más corto, el último día).`
                 : 'Este cliente no tiene cobro mensual configurado: escribe el monto y el vencimiento. Puedes configurarlo en su panel.'}
             </div>
           )}

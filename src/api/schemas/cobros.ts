@@ -28,7 +28,7 @@ export const ETIQUETA_CANAL: Record<CanalRecordatorio, string> = {
 }
 
 /** Por qué el pago (o el cambio) que completó un cobro generó, o no, el del mes siguiente. */
-export const MOTIVOS_SIGUIENTE = ['generado', 'sin_config', 'inactivo', 'ya_existia'] as const
+export const MOTIVOS_SIGUIENTE = ['generado', 'sin_config', 'inactivo', 'ya_existia', 'monto_excedido'] as const
 export type MotivoSiguiente = (typeof MOTIVOS_SIGUIENTE)[number]
 
 /** Lo que cabe en DECIMAL(12,2): 9,999,999,999.99 en centavos. */
@@ -182,6 +182,11 @@ export const tenantBuscadoSchema = clienteCobroSchema.extend({
   motivo_oculto: z.enum(['excluido', 'solo_certificacion']).nullable(),
   /** El grupo al que pertenece (esta fila es su cabeza); null si no tiene. */
   grupo: grupoTenantSchema.nullable(),
+  /**
+   * Cuántas empresas de la unidad pagan la mensualidad (1 si es una sola): el monto mensual es POR EMPRESA que paga, así que el total
+   * de la unidad es `config.monto_mensual` por este número.
+   */
+  empresas_que_pagan: z.number(),
   /** Todo lo abierto que debe (un cobro pagado o cancelado no suma). */
   saldo_pendiente: z.number(),
   /** Lo que ya pasó su vencimiento. */
@@ -255,6 +260,8 @@ export type ResumenCobros = z.infer<typeof resumenCobrosSchema>
 export const panelClienteSchema = z.object({
   cliente: clienteCobroSchema,
   config: configCobroSchema.nullable(),
+  /** Cuántas empresas de la unidad pagan (1 en una empresa y en el ámbito de una empresa): el monto de `config` es por cada una. */
+  empresas_que_pagan: z.number(),
   resumen: z.object({
     saldo_pendiente: z.number(),
     saldo_vencido: z.number(),

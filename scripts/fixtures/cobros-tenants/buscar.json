@@ -31,7 +31,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 2,
@@ -56,7 +57,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 4,
@@ -81,7 +83,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 3,
@@ -106,7 +109,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         },
         {
             "id": 5,
@@ -131,7 +135,8 @@
             "proximo_vencimiento": null,
             "facturable": true,
             "motivo_oculto": null,
-            "grupo": null
+            "grupo": null,
+            "empresas_que_pagan": 1
         }
     ]
 }

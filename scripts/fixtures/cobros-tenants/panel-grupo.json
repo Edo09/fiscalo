@@ -1,0 +1,41 @@
+{
+    "status": true,
+    "data": {
+        "cliente": {
+            "id": 30,
+            "nombre": "Pago Hermana Uno",
+            "contacto": "Pago Hermana Uno",
+            "empresa": "Pago Hermana Uno",
+            "rnc": "103000031",
+            "email": "admin@cabeza.test",
+            "telefono": ""
+        },
+        "config": {
+            "client_id": 30,
+            "monto_mensual": 500,
+            "dia_vencimiento": 15,
+            "descripcion": null,
+            "activo": true,
+            "updated_at": "2026-11-16 10:00:00"
+        },
+        "empresas_que_pagan": 2,
+        "resumen": {
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "total_cobrado": 0,
+            "total_facturado": 0,
+            "proximo_vencimiento": null,
+            "vencido_desde": null
+        },
+        "sugerido": {
+            "periodo": "2026-11",
+            "monto": 1000,
+            "fecha_vencimiento": "2026-11-15",
+            "descripcion": null
+        },
+        "cobros": [],
+        "recordatorios": []
+    }
+}

@@ -55,7 +55,7 @@ export function DashboardCobros({ cobroMensual }: { cobroMensual?: { total: numb
         {cobroMensual && (
           <KPI
             label="Cobro mensual total" value={cobroMensual.total} money icon="trending-up"
-            foot={`${cobroMensual.empresas} ${cobroMensual.empresas === 1 ? 'empresa' : 'empresas'} con cobro mensual activo`}
+            foot={`${cobroMensual.empresas} ${cobroMensual.empresas === 1 ? 'cliente' : 'clientes'} con cobro mensual activo`}
           />
         )}
       </div>

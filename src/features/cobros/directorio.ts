@@ -47,15 +47,18 @@ export function clientesDelDirectorio<T extends Pick<TenantBuscado, 'facturable'
 }
 
 /**
- * Lo que la plataforma cobra cada mes: la suma de los cobros mensuales ACTIVOS de las unidades que se cobran (en centavos: nada
- * de sumar floats) y cuántas empresas son. Un cobro mensual apagado, una unidad que no se cobra o una sin cobro mensual no suman.
+ * Lo que la plataforma cobra cada mes: la suma, en centavos (nada de sumar floats), del total de cada unidad que se cobra con su cobro
+ * mensual ACTIVO: el monto por empresa por las empresas que pagan (un grupo de 3 que pagan a 500 son 1,500). `empresas` cuenta las
+ * unidades. Un cobro mensual apagado, una unidad que no se cobra o una sin cobro mensual no suman.
  */
-export function totalCobroMensual(items: readonly Pick<TenantBuscado, 'facturable' | 'config'>[]): { total: number; empresas: number } {
+export function totalCobroMensual(
+  items: readonly Pick<TenantBuscado, 'facturable' | 'config' | 'empresas_que_pagan'>[],
+): { total: number; empresas: number } {
   let centavos = 0
   let empresas = 0
   for (const t of items) {
     if (t.facturable && t.config !== null && t.config.activo) {
-      centavos += aCentavos(t.config.monto_mensual)
+      centavos += aCentavos(t.config.monto_mensual) * Math.max(1, t.empresas_que_pagan)
       empresas++
     }
   }

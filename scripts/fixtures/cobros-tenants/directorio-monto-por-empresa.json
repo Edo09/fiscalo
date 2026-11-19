@@ -1,0 +1,251 @@
+{
+    "status": true,
+    "data": [
+        {
+            "id": 70,
+            "nombre": "Dist Pagadora",
+            "contacto": "Dist Pagadora",
+            "empresa": "Dist Pagadora",
+            "rnc": "103000071",
+            "email": "",
+            "telefono": "",
+            "tipo": "integracion",
+            "ambiente": "certecf",
+            "activo": true,
+            "con_config": false,
+            "config": null,
+            "excluido": false,
+            "motivo_exclusion": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null,
+            "facturable": false,
+            "motivo_oculto": "solo_certificacion",
+            "grupo": {
+                "cabeza_id": 70,
+                "cabeza_nombre": "Dist Cabeza",
+                "cabeza_rnc": "103000070",
+                "cabeza_paga": false,
+                "cabeza_motivo_sin_pago": null,
+                "miembros": [
+                    {
+                        "id": 71,
+                        "nombre": "Dist Pagadora",
+                        "rnc": "103000071",
+                        "tipo": "integracion",
+                        "ambiente": "certecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    }
+                ]
+            },
+            "empresas_que_pagan": 1
+        },
+        {
+            "id": 30,
+            "nombre": "Pago Hermana Uno",
+            "contacto": "Pago Hermana Uno",
+            "empresa": "Pago Hermana Uno",
+            "rnc": "103000031",
+            "email": "admin@cabeza.test",
+            "telefono": "",
+            "tipo": "integracion",
+            "ambiente": "ecf",
+            "activo": true,
+            "con_config": true,
+            "config": {
+                "client_id": 30,
+                "monto_mensual": 500,
+                "dia_vencimiento": 15,
+                "descripcion": null,
+                "activo": true,
+                "updated_at": "2026-11-16 10:00:00"
+            },
+            "excluido": false,
+            "motivo_exclusion": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null,
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": {
+                "cabeza_id": 30,
+                "cabeza_nombre": "Pago Cabeza",
+                "cabeza_rnc": "103000030",
+                "cabeza_paga": false,
+                "cabeza_motivo_sin_pago": "Cabeza no paga",
+                "miembros": [
+                    {
+                        "id": 31,
+                        "nombre": "Pago Hermana Uno",
+                        "rnc": "103000031",
+                        "tipo": "integracion",
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    },
+                    {
+                        "id": 32,
+                        "nombre": "Pago Hermana Dos",
+                        "rnc": "103000032",
+                        "tipo": "integracion",
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    },
+                    {
+                        "id": 33,
+                        "nombre": "Pago Hermana Cert",
+                        "rnc": "103000033",
+                        "tipo": "integracion",
+                        "ambiente": "certecf",
+                        "paga": false,
+                        "motivo_sin_pago": "Solo certifico"
+                    }
+                ]
+            },
+            "empresas_que_pagan": 2
+        },
+        {
+            "id": 40,
+            "nombre": "Prod Cabeza",
+            "contacto": "Prod Cabeza",
+            "empresa": "Prod Cabeza",
+            "rnc": "103000040",
+            "email": "",
+            "telefono": "",
+            "tipo": "integracion",
+            "ambiente": "certecf",
+            "activo": true,
+            "con_config": true,
+            "config": {
+                "client_id": 40,
+                "monto_mensual": 300,
+                "dia_vencimiento": 15,
+                "descripcion": null,
+                "activo": true,
+                "updated_at": "2026-11-16 10:00:00"
+            },
+            "excluido": false,
+            "motivo_exclusion": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null,
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": {
+                "cabeza_id": 40,
+                "cabeza_nombre": "Prod Cabeza",
+                "cabeza_rnc": "103000040",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
+                "miembros": [
+                    {
+                        "id": 41,
+                        "nombre": "Prod Hermana",
+                        "rnc": "103000041",
+                        "tipo": "integracion",
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    },
+                    {
+                        "id": 42,
+                        "nombre": "Prod Otra",
+                        "rnc": "103000042",
+                        "tipo": "integracion",
+                        "ambiente": "certecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    }
+                ]
+            },
+            "empresas_que_pagan": 3
+        },
+        {
+            "id": 50,
+            "nombre": "Sola Marcada",
+            "contacto": "Sola Marcada",
+            "empresa": "Sola Marcada",
+            "rnc": "103000050",
+            "email": "",
+            "telefono": "",
+            "tipo": "integracion",
+            "ambiente": "ecf",
+            "activo": true,
+            "con_config": true,
+            "config": {
+                "client_id": 50,
+                "monto_mensual": 700,
+                "dia_vencimiento": 15,
+                "descripcion": null,
+                "activo": true,
+                "updated_at": "2026-11-16 10:00:00"
+            },
+            "excluido": false,
+            "motivo_exclusion": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null,
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": null,
+            "empresas_que_pagan": 1
+        },
+        {
+            "id": 60,
+            "nombre": "Todas Marcadas A",
+            "contacto": "Todas Marcadas A",
+            "empresa": "Todas Marcadas A",
+            "rnc": "103000060",
+            "email": "",
+            "telefono": "",
+            "tipo": "integracion",
+            "ambiente": "ecf",
+            "activo": true,
+            "con_config": false,
+            "config": null,
+            "excluido": false,
+            "motivo_exclusion": null,
+            "saldo_pendiente": 0,
+            "saldo_vencido": 0,
+            "cobros_abiertos": 0,
+            "cobros_vencidos": 0,
+            "dias_atraso": 0,
+            "proximo_vencimiento": null,
+            "facturable": true,
+            "motivo_oculto": null,
+            "grupo": {
+                "cabeza_id": 60,
+                "cabeza_nombre": "Todas Marcadas A",
+                "cabeza_rnc": "103000060",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
+                "miembros": [
+                    {
+                        "id": 61,
+                        "nombre": "Todas Marcadas B",
+                        "rnc": "103000061",
+                        "tipo": "integracion",
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
+                    }
+                ]
+            },
+            "empresas_que_pagan": 2
+        }
+    ]
+}
