@@ -1,12 +1,13 @@
-// El dashboard compacto de Cobros: cinco cifras arriba y, debajo, la antigüedad de lo pendiente, los
-// próximos vencimientos y los clientes con pagos atrasados. Un clic en un cliente abre su historial.
+// El dashboard compacto de Cobros: cinco cifras arriba (y una sexta en la plataforma: lo que cobra cada mes en total) y, debajo, la
+// antigüedad de lo pendiente, los próximos vencimientos y los clientes con pagos atrasados. Un clic en un cliente abre su historial.
 import { Avatar, Card, ErrorState, KPI, LoadingState, Money } from '@/components/ui'
 import { fmt } from '@/lib/format'
 import { COLOR_TRAMO, diasTexto, fechaCorta, periodoLargo, textoVencimiento } from '../format'
 import { DIAS_PROXIMOS, useResumenCobros } from '../hooks'
 import { useCobrosUi } from '../store'
 
-export function DashboardCobros() {
+/** `cobroMensual`: solo la plataforma lo manda (sale del directorio de tenants: ver totalCobroMensual); sin él no hay sexta tarjeta. */
+export function DashboardCobros({ cobroMensual }: { cobroMensual?: { total: number; empresas: number } }) {
   const abrirPanel = useCobrosUi((s) => s.abrirPanel)
   const { data, error, loading, reload } = useResumenCobros(DIAS_PROXIMOS)
 
@@ -51,6 +52,12 @@ export function DashboardCobros() {
           label="Por cobrar en el mes" value={t.por_cobrar_mes} money icon="calendar"
           foot={`de RD$ ${fmt(t.facturado_mes)} que vencen en ${mes}`}
         />
+        {cobroMensual && (
+          <KPI
+            label="Cobro mensual total" value={cobroMensual.total} money icon="trending-up"
+            foot={`${cobroMensual.empresas} ${cobroMensual.empresas === 1 ? 'empresa' : 'empresas'} con cobro mensual activo`}
+          />
+        )}
       </div>
 
       <div className="cobros-panel-grid">

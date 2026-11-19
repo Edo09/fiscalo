@@ -24,9 +24,9 @@ import {
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
-import { detalleCobroMensual, detalleTenant, etiquetaOculta, subtituloTenant, textoGrupo } from '../src/features/cobros/format.ts'
+import { detalleCobroMensual, detalleTenant, etiquetaOculta, lineasGrupo, subtituloTenant, textoGrupo, textoQuitarGrupo } from '../src/features/cobros/format.ts'
 import {
-  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, cumpleFiltro, filtrarDirectorio,
+  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, cumpleFiltro, filtrarDirectorio, totalCobroMensual,
   resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
 } from '../src/features/cobros/directorio.ts'
 import {
@@ -265,11 +265,11 @@ chk('el acceso global NO da el módulo Cobros de las empresas: sin él, esa vist
 
 // ---------------------------------------------------------------------------
 console.log('\n6. El buscador de tenants: la línea de detalle')
-igual('un tenant normal (producción, con base propia): solo el RNC', detalleTenant({ rnc: '101000011', tipo: 'app', ambiente: 'ecf', activo: true, con_config: false }), 'RNC 101000011')
+igual('un tenant normal (producción, con base propia): solo el RNC', detalleTenant({ rnc: '101000011', tipo: 'app', ambiente: 'ecf', activo: true, con_config: false, grupo: null }), 'RNC 101000011')
 igual('de integración, en certificación, inactivo y con cobro mensual: todo lo que sale de lo normal',
-  detalleTenant({ rnc: '101000033', tipo: 'integracion', ambiente: 'certecf', activo: false, con_config: true }),
+  detalleTenant({ rnc: '101000033', tipo: 'integracion', ambiente: 'certecf', activo: false, con_config: true, grupo: null }),
   'RNC 101000033 · Integración · Certificación · Inactiva · Cobro mensual configurado')
-igual('sin RNC lo dice, y un ambiente de pruebas también', detalleTenant({ rnc: '', tipo: 'app', ambiente: 'testecf', activo: true, con_config: false }), 'sin RNC · Pruebas')
+igual('sin RNC lo dice, y un ambiente de pruebas también', detalleTenant({ rnc: '', tipo: 'app', ambiente: 'testecf', activo: true, con_config: false, grupo: null }), 'sin RNC · Pruebas')
 
 // ---------------------------------------------------------------------------
 console.log('\n7. El directorio de tenants (la pestaña Clientes): filtros, conteos y rótulos')
@@ -338,8 +338,28 @@ igual('etiquetaOculta: una marca sin motivo dice solo "No es cliente"', etiqueta
 igual('lo que se ve: sin pedir las que no se cobran, 5 unidades; pidiéndolas, las 8', [ids(clientesDelDirectorio(dirG, false)), ids(clientesDelDirectorio(dirG, true))],
   [[14, 16, 10, 19, 22], [14, 16, 17, 10, 18, 19, 13, 22]])
 igual('contarOcultas: 3 en ese directorio (17, 18 y 13)', contarOcultas(dirG), 3)
+igual('lineasGrupo: la cabeza primero (con "(cabeza)") y sus hermanas por id; nada sin grupo',
+  [lineasGrupo(deG(10)), lineasGrupo(deG(16))],
+  [['Holding Cabeza SRL · RNC 102000010 (cabeza)', 'Holding Hermana Uno · RNC 102000011', 'Holding Hermana Dos · RNC 102000012'], []])
+igual('detalleTenant (buscador de los formularios) dice a qué grupo pertenece una unidad: sin él, escribir una hermana mostraría solo a la cabeza sin explicar por qué',
+  [detalleTenant(deG(10)), detalleTenant(deG(14))],
+  ['RNC 102000010 · Integración · Grupo · 3 empresas', 'RNC 102000014 · Integración · Certificación · Grupo · 2 empresas · Cobro mensual configurado'])
+igual('textoQuitarGrupo: avisa que quitar a la cabeza de un grupo saca a todo el grupo; nada si es una sola empresa',
+  [textoQuitarGrupo(1), textoQuitarGrupo(3)], [null, 'Es la cabeza de un grupo de 3 empresas: sale todo el grupo de la lista de clientes.'])
 igual('por tipo (la unidad es de integración si su cabeza lo es): de integración, con base propia, y de integración pidiendo las ocultas',
   [filtra(dirG, 'todos', 'integracion'), filtra(dirG, 'todos', 'app'), filtra(dirG, 'todos', 'integracion', true)], [[14, 10, 19, 22], [16], [14, 17, 10, 19, 13, 22]])
+
+// ---------------------------------------------------------------------------
+console.log('\n10. La tarjeta del cobro mensual total: lo que la plataforma cobra cada mes a lo que se cobra')
+const mensual = (monto: number, activo = true, facturable = true) => ({ facturable, config: { client_id: 1, monto_mensual: monto, dia_vencimiento: 15, descripcion: null, activo, updated_at: null } })
+igual('totalCobroMensual suma los cobros mensuales ACTIVOS de lo que se cobra: los seis de la pantalla (1,500 + 1,500 + 2,000 + 600 + 500 + 1,500) dan 7,600 en 6 empresas',
+  totalCobroMensual([1500, 1500, 2000, 600, 500, 1500].map((m) => mensual(m))), { total: 7600, empresas: 6 })
+igual('...no suma un cobro mensual apagado, ni una empresa que no se cobra aunque tenga uno activo, ni a quien no tiene cobro mensual',
+  totalCobroMensual([mensual(1500), mensual(900, false), mensual(700, true, false), { facturable: true, config: null }]), { total: 1500, empresas: 1 })
+igual('...suma en centavos: 0.10 + 0.20 da exactamente 0.30', totalCobroMensual([mensual(0.1), mensual(0.2)]), { total: 0.3, empresas: 2 })
+igual('...y un directorio sin ningún cobro mensual (o vacío) da cero', [totalCobroMensual([]), totalCobroMensual([{ facturable: true, config: null }])], [{ total: 0, empresas: 0 }, { total: 0, empresas: 0 }])
+igual('con el directorio de siempre: Alfa 6,000 y Delta 2,000 activos (el de Beta está inactivo) dan 8,000 en 2 empresas', totalCobroMensual(dir), { total: 8000, empresas: 2 })
+igual('con el directorio de grupos: solo cuenta Agro (1,500); el cobro mensual apagado de la que solo certificó (1,000) no suma', totalCobroMensual(dirG), { total: 1500, empresas: 1 })
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

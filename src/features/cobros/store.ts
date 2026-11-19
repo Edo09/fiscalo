@@ -39,8 +39,8 @@ export type ModalCobros =
   | { tipo: 'recordatorio'; cobroId: number }
   | { tipo: 'elegir-cliente' }
   | { tipo: 'filtrar-cliente' }
-  /** Quitar a una empresa de la lista de clientes (solo la plataforma). El nombre es solo para mostrarlo. */
-  | { tipo: 'excluir'; clientId: number; nombre: string }
+  /** Quitar a una empresa de la lista de clientes (solo la plataforma). El nombre y las empresas de su grupo (ella incluida) son solo para mostrarlos. */
+  | { tipo: 'excluir'; clientId: number; nombre: string; empresas?: number }
 
 export const PAGE_SIZES = [10, 25, 50]
 

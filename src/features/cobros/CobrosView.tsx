@@ -4,7 +4,7 @@ import { Btn, PageHead, RefreshButton, Tabs } from '@/components/ui'
 import '@/styles/cobros.css'
 import { AmbitoCobrosContext, useAmbitoCobros } from './ambito'
 import { AMBITO_EMPRESA, AMBITO_TENANTS } from './ambitos'
-import { clientesDelDirectorio } from './directorio'
+import { clientesDelDirectorio, totalCobroMensual } from './directorio'
 import { ClientePanel } from './components/ClientePanel'
 import { DashboardCobros } from './components/DashboardCobros'
 import { DirectorioTenants } from './components/DirectorioTenants'
@@ -100,7 +100,7 @@ function PantallaCobros({ senalNuevo = null, clienteInicial = null }: PropsPanta
         }
       />
 
-      <DashboardCobros />
+      <DashboardCobros cobroMensual={conDirectorio && directorio.data ? totalCobroMensual(directorio.data) : undefined} />
 
       <Tabs
         tabs={[

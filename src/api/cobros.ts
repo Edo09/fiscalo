@@ -109,9 +109,10 @@ export interface ApiCobros {
   /** Un cobro con sus pagos (vigentes y anulados) y sus recordatorios. */
   getCobro(id: number): Promise<CobroDetalle>
   /**
-   * El directorio de tenants, por nombre o RNC (los activos primero), con su cobro mensual y lo que deben. Los que la plataforma
-   * marcó como "no es un cliente" no salen, salvo con `conExcluidos`. SOLO existe en la plataforma (/api/cobros-tenants): en el
-   * ámbito de una empresa el buscador es el de Clientes y esta ruta da 404.
+   * El directorio de tenants, por nombre o RNC (los activos primero), con su cobro mensual y lo que deben: una fila por unidad
+   * de cobro (un grupo de empresas es la fila de su cabeza). Solo salen las que se cobran (`facturable`); con `conExcluidos`
+   * salen también las que no (marcadas "no es un cliente" o que solo certificaron, cada una con su `motivo_oculto`). SOLO existe
+   * en la plataforma (/api/cobros-tenants): en el ámbito de una empresa el buscador es el de Clientes y esta ruta da 404.
    */
   buscarTenants(query?: string, limite?: number, conExcluidos?: boolean): Promise<TenantBuscado[]>
   /**

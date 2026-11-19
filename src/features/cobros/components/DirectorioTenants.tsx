@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Avatar, Btn, Card, Dropdown, EmptyState, ErrorState, Icon, LoadingState, MenuItem, Money } from '@/components/ui'
 import { ApiError, type TenantBuscado } from '@/api'
-import { cobrosTexto, detalleCobroMensual, diasTexto, etiquetaOculta, fechaCorta, subtituloTenant, textoGrupo } from '../format'
+import { cobrosTexto, detalleCobroMensual, diasTexto, etiquetaOculta, fechaCorta, lineasGrupo, subtituloTenant, textoGrupo } from '../format'
 import { useDirectorioTenants, useExcluirTenant } from '../hooks'
 import {
   FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, filtrarDirectorio,
@@ -30,6 +30,14 @@ export function DirectorioTenants() {
   const [filtro, setFiltro] = useState<FiltroDirectorio>('todos')
   const [tipo, setTipo] = useState<TipoDirectorio>('todas')
   const [conOcultas, setConOcultas] = useState(false)
+  // Los grupos con su lista de empresas a la vista (un botón por grupo: sirve con teclado y en pantallas táctiles).
+  const [gruposAbiertos, setGruposAbiertos] = useState<ReadonlySet<number>>(new Set())
+  const alternarGrupo = (id: number) => setGruposAbiertos((s) => {
+    const n = new Set(s)
+    if (n.has(id)) n.delete(id)
+    else n.add(id)
+    return n
+  })
 
   // La consulta real se actualiza tras BUSQUEDA_MS sin teclear.
   useEffect(() => {
@@ -53,7 +61,8 @@ export function DirectorioTenants() {
   const devolver = async (t: TenantBuscado) => {
     try {
       await excluir.mutateAsync({ clientId: t.id, excluido: false })
-      toast.success(`${t.nombre} volvió a la lista de clientes.`)
+      // Solo se sabe que se quitó la marca: si además solo certificó y no tiene cobro mensual activo, sigue oculta con su razón.
+      toast.success(`Se quitó la marca "No es cliente" de ${t.nombre}.`)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo devolver la empresa a la lista de clientes.')
     }
@@ -143,12 +152,24 @@ export function DirectorioTenants() {
                           <span className="cell-main">{t.nombre}</span>
                           <div className="cell-sub">{subtituloTenant(t)}</div>
                           {t.grupo && (
-                            <div
-                              className="cell-sub"
-                              title={[`${t.nombre} · RNC ${t.rnc} (cabeza)`, ...t.grupo.miembros.map((m) => `${m.nombre} · RNC ${m.rnc}`)].join('\n')}
-                            >
-                              {textoGrupo(t)}
-                            </div>
+                            <>
+                              <button
+                                type="button" className="cell-sub" aria-expanded={gruposAbiertos.has(t.id)}
+                                aria-label={`${textoGrupo(t)} de ${t.nombre}: ${gruposAbiertos.has(t.id) ? 'ocultar' : 'ver'} las empresas`}
+                                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+                                onClick={(e) => { e.stopPropagation(); alternarGrupo(t.id) }}
+                              >
+                                {textoGrupo(t)}{' '}
+                                <span style={{ display: 'inline-block', transform: gruposAbiertos.has(t.id) ? 'rotate(180deg)' : undefined }}>
+                                  <Icon name="chevron-down" size={12} />
+                                </span>
+                              </button>
+                              {gruposAbiertos.has(t.id) && (
+                                <ul className="cell-sub" style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+                                  {lineasGrupo(t).map((l) => <li key={l}>{l}</li>)}
+                                </ul>
+                              )}
+                            </>
                           )}
                           {!t.facturable && (
                             <div className="cell-sub fw6" title={t.motivo_exclusion ?? undefined}>{etiquetaOculta(t)}</div>
@@ -220,7 +241,10 @@ export function DirectorioTenants() {
                             <>
                               <MenuItem icon="settings" onClick={() => abrirPanel(t.id, 'config')}>Cobro mensual</MenuItem>
                               <MenuItem icon="plus" onClick={() => abrirModal({ tipo: 'cobro', cobroId: null, clientId: t.id })}>Nuevo cobro</MenuItem>
-                              <MenuItem icon="user-x" danger onClick={() => abrirModal({ tipo: 'excluir', clientId: t.id, nombre: t.nombre })}>
+                              <MenuItem
+                                icon="user-x" danger
+                                onClick={() => abrirModal({ tipo: 'excluir', clientId: t.id, nombre: t.nombre, empresas: t.grupo ? t.grupo.miembros.length + 1 : 1 })}
+                              >
                                 No es cliente (quitar de la lista)
                               </MenuItem>
                             </>

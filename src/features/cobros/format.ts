@@ -181,8 +181,19 @@ export function textoGrupo(t: Pick<TenantBuscado, 'grupo'>): string | null {
 }
 
 /** La línea de detalle de un tenant en el buscador de los formularios: su subtítulo y si ya tiene su cobro mensual configurado. */
-export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config'>): string {
-  return [subtituloTenant(t), t.con_config ? 'Cobro mensual configurado' : null].filter(Boolean).join(' · ')
+export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente' | 'activo' | 'con_config' | 'grupo'>): string {
+  return [subtituloTenant(t), textoGrupo(t), t.con_config ? 'Cobro mensual configurado' : null].filter(Boolean).join(' · ')
+}
+
+/** Las líneas de un grupo para mostrarlas: la cabeza primero y luego sus hermanas ("Nombre · RNC …"); vacío si la unidad no tiene grupo. */
+export function lineasGrupo(t: Pick<TenantBuscado, 'nombre' | 'rnc' | 'grupo'>): string[] {
+  if (t.grupo === null) return []
+  return [`${t.nombre} · RNC ${t.rnc} (cabeza)`, ...t.grupo.miembros.map((m) => `${m.nombre} · RNC ${m.rnc}`)]
+}
+
+/** El aviso al quitar a una empresa de la lista de clientes: si es la cabeza de un grupo, sale todo el grupo; null si es una sola empresa. */
+export function textoQuitarGrupo(empresas: number): string | null {
+  return empresas > 1 ? `Es la cabeza de un grupo de ${empresas} empresas: sale todo el grupo de la lista de clientes.` : null
 }
 
 /** La segunda línea del cobro mensual de un tenant en la lista: "día 31 · activo" o "día 10 · inactivo". */

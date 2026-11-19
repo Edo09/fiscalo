@@ -67,8 +67,9 @@ export function useBuscarTenants(texto: string) {
 }
 
 /**
- * El directorio de tenants (solo en la plataforma): todos, con su cobro mensual y lo que deben, para lo que se busca. Trae TAMBIÉN
- * a los marcados como "no es un cliente" (cada uno dice `excluido`): la pantalla decide si los muestra. `habilitado` false apaga la
+ * El directorio de tenants (solo en la plataforma): una fila por unidad de cobro (un grupo es la fila de su cabeza), con su cobro
+ * mensual y lo que deben, para lo que se busca. Trae TAMBIÉN las que no se cobran (marcadas "no es un cliente" o que solo
+ * certificaron: cada una dice `facturable` y `motivo_oculto`): la pantalla decide si las muestra. `habilitado` false apaga la
  * consulta (la pantalla de una empresa no tiene directorio, y esa ruta no existe allí). El tope de una respuesta es MAX_DIRECTORIO;
  * con más empresas que eso, la búsqueda las alcanza.
  */
