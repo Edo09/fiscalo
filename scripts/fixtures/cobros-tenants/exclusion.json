@@ -1,0 +1,13 @@
+{
+    "status": true,
+    "data": {
+        "client_id": 2,
+        "excluido": true,
+        "motivo": "Solo certificacion",
+        "repetido": false,
+        "anterior": {
+            "excluido": false,
+            "motivo": null
+        }
+    }
+}

@@ -10,6 +10,7 @@
 //   5. NAVEGACIÓN: la vista y su item del menú son solo para cuentas de soporte (acceso global), sin fail-open.
 //   6. El texto del buscador de tenants.
 //   7. El directorio de tenants (la pestaña Clientes): contrato con lo que debe cada uno, filtros, conteos y rótulos.
+//   8. "No es cliente": quitar a un tenant de la lista (contrato de la respuesta, ruta, modal y lo que se ve y se cuenta).
 //
 // Para regenerar los fixtures (en api-gratex, con pdo_sqlite):
 //   php -d extension=php_pdo_sqlite.dll tools/test_cobros_tenants.php --fixtures=<ruta de fiscalo-react>/scripts/fixtures/cobros-tenants
@@ -18,14 +19,15 @@
 //   node scripts/test-cobros-tenants.ts
 import { readFileSync } from 'node:fs'
 import {
-  ESTADOS_COBRO, cobroDetalleSchema, cobroSchema, configCobroSchema, pagoAnuladoSchema, pagoResultadoSchema, panelClienteSchema,
-  recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantBuscadoSchema, tenantsBuscadosSchema,
+  ESTADOS_COBRO, cobroDetalleSchema, cobroSchema, configCobroSchema, exclusionResultadoSchema, pagoAnuladoSchema, pagoResultadoSchema,
+  panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantBuscadoSchema, tenantsBuscadosSchema,
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
 import { detalleCobroMensual, detalleTenant, subtituloTenant } from '../src/features/cobros/format.ts'
 import {
-  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, conteoDeFiltro, cumpleFiltro, filtrarDirectorio, resumenDirectorio,
+  FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarExcluidos, cumpleFiltro, filtrarDirectorio,
+  resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
 } from '../src/features/cobros/directorio.ts'
 import {
   NAV, TITLES, debeSalirDeVista, navModuleFor, navSoloAccesoGlobal, navSoloAdmin, navTopFor, puedeVerItem, puedeVerVista,
@@ -121,34 +123,53 @@ delete sinTipo.tipo
 chk('un tenant al que le falta un campo del contrato NO pasa por tenantBuscadoSchema (el esquema no es de adorno)', !tenantBuscadoSchema.safeParse(sinTipo).success)
 chk('un cobro de un tenant con el cliente mal formado tampoco pasa por cobroSchema',
   !cobroSchema.safeParse({ ...(lista.data as Record<string, unknown>[])[0], cliente: { id: 1, nombre: 'X' } }).success)
+const dirExResp = tenantsBuscadosSchema.safeParse(fixture('directorio-con-excluidos').data)
+chk('el directorio con una empresa marcada "no es cliente" pasa por tenantsBuscadosSchema: 5 tenants', dirExResp.success && dirExResp.data.length === 5, !dirExResp.success && dirExResp.error.issues[0])
+const dirEx = dirExResp.success ? dirExResp.data : []
+igual('...cada tenant dice si es cliente: solo Beta (2) está marcada, con su motivo; las demás excluido false y sin motivo',
+  dirEx.map((t) => [t.id, t.excluido, t.motivo_exclusion]), [[1, false, null], [2, true, 'Solo certificacion'], [4, false, null], [3, false, null], [5, false, null]])
+chk('...y el directorio y el buscador de siempre (sin pedir las excluidas) traen a todos con excluido false y motivo null',
+  dir.length === 5 && tenants.length === 5 && [...dir, ...tenants].every((t) => t.excluido === false && t.motivo_exclusion === null))
+const sinExcluido = { ...(fixture('directorio').data as Record<string, unknown>[])[0] }
+delete sinExcluido.excluido
+chk('...y un tenant al que le falta "excluido" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinExcluido).success)
+const exclusion = exclusionResultadoSchema.safeParse(fixture('exclusion').data)
+chk('quitar a un tenant de la lista pasa por exclusionResultadoSchema: Beta (2), excluida con su motivo, no repetido, y lo que había antes (cliente, sin motivo)',
+  exclusion.success && exclusion.data.client_id === 2 && exclusion.data.excluido === true && exclusion.data.motivo === 'Solo certificacion' && exclusion.data.repetido === false
+  && exclusion.data.anterior.excluido === false && exclusion.data.anterior.motivo === null, !exclusion.success && exclusion.error.issues[0])
+chk('...y una respuesta sin lo que había antes NO pasa por exclusionResultadoSchema',
+  !exclusionResultadoSchema.safeParse({ client_id: 2, excluido: true, motivo: null, repetido: false }).success)
 
 // ---------------------------------------------------------------------------
 console.log('\n2. Rutas: cada ámbito pide la suya')
 // Las formas que reconoce el servidor (api-gratex CobroReglas::ruta), sin el query string.
 const formaServidor = (base: string) =>
-  new RegExp(`^${base}(/(resumen|recordatorios|clientes|clientes/\\d+|clientes/\\d+/config|\\d+|\\d+/(pagos|cancelar|reabrir|recordatorios)|pagos/\\d+/anular))?$`)
+  new RegExp(`^${base}(/(resumen|recordatorios|clientes|clientes/\\d+|clientes/\\d+/config|clientes/\\d+/excluido|\\d+|\\d+/(pagos|cancelar|reabrir|recordatorios)|pagos/\\d+/anular))?$`)
 for (const [base, nombre] of [[BASE_COBROS, 'empresa'], [BASE_COBROS_TENANTS, 'tenants']] as const) {
   const r = rutasCobros(base)
   const todas = [
     r.lista(), r.lista({ page: 2, pageSize: 25, query: 'alfa', client_id: 4, estado: 'Vencido' }), r.resumen(), r.resumen(30), r.recordatorios(),
-    r.recordatorios({ dias: 15, cada: 7 }), r.buscar(), r.buscar('Alfa', 20), r.cliente(7), r.config(7), r.cobro(12), r.pagos(12), r.cancelar(12),
-    r.reabrir(12), r.recordatorio(12), r.anularPago(9),
+    r.recordatorios({ dias: 15, cada: 7 }), r.buscar(), r.buscar('Alfa', 20), r.buscar('Alfa', 500, true), r.cliente(7), r.config(7), r.excluido(7), r.cobro(12),
+    r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
   ]
-  chk(`ámbito ${nombre}: las 16 rutas empiezan por ${base} y tienen una forma que el servidor reconoce`,
+  chk(`ámbito ${nombre}: las ${todas.length} rutas empiezan por ${base} y tienen una forma que el servidor reconoce`,
     todas.every((p) => formaServidor(base).test(p.split('?')[0])), todas.filter((p) => !formaServidor(base).test(p.split('?')[0])))
   igual(`ámbito ${nombre}: los ids y los filtros van donde el servidor los espera`, [
     r.lista(), r.lista({ page: 2, pageSize: 25, query: 'alfa', client_id: 4, estado: 'Vencido' }), r.resumen(), r.resumen(30), r.recordatorios({ dias: 15, cada: 7 }),
-    r.cliente(7), r.config(7), r.cobro(12), r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
+    r.cliente(7), r.config(7), r.excluido(7), r.cobro(12), r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
   ], [
     base, `${base}?page=2&pageSize=25&query=alfa&client_id=4&estado=Vencido`, `${base}/resumen`, `${base}/resumen?dias=30`, `${base}/recordatorios?dias=15&cada=7`,
-    `${base}/clientes/7`, `${base}/clientes/7/config`, `${base}/12`, `${base}/12/pagos`, `${base}/12/cancelar`, `${base}/12/reabrir`, `${base}/12/recordatorios`,
-    `${base}/pagos/9/anular`,
+    `${base}/clientes/7`, `${base}/clientes/7/config`, `${base}/clientes/7/excluido`, `${base}/12`, `${base}/12/pagos`, `${base}/12/cancelar`, `${base}/12/reabrir`,
+    `${base}/12/recordatorios`, `${base}/pagos/9/anular`,
   ])
 }
 const rt = rutasCobros(BASE_COBROS_TENANTS)
 igual('el buscador de tenants: sin texto no manda query; con texto y límite, ambos; un % y un espacio van codificados',
   [rt.buscar(), rt.buscar(''), rt.buscar('Alfa', 20), rt.buscar('Delta 100%'), rt.buscar(undefined, 5)],
   ['/api/cobros-tenants/clientes', '/api/cobros-tenants/clientes', '/api/cobros-tenants/clientes?query=Alfa&limite=20', '/api/cobros-tenants/clientes?query=Delta+100%25', '/api/cobros-tenants/clientes?limite=5'])
+igual('con las empresas "no es cliente" manda excluidos=1, y solo entonces: ni false ni sin decir nada lo mandan',
+  [rt.buscar(undefined, undefined, true), rt.buscar('Alfa', 500, true), rt.buscar('Alfa', 500, false), rt.buscar('Alfa', 500)],
+  ['/api/cobros-tenants/clientes?excluidos=1', '/api/cobros-tenants/clientes?query=Alfa&limite=500&excluidos=1', '/api/cobros-tenants/clientes?query=Alfa&limite=500', '/api/cobros-tenants/clientes?query=Alfa&limite=500'])
 chk('las bases son las del servidor y ninguna es prefijo de la ruta de la otra (/api/cobros-tenants no empieza por /api/cobros/)',
   BASE_COBROS === '/api/cobros' && BASE_COBROS_TENANTS === '/api/cobros-tenants' && !`${BASE_COBROS_TENANTS}/resumen`.startsWith(`${BASE_COBROS}/`) && !formaServidor(BASE_COBROS).test(`${BASE_COBROS_TENANTS}/resumen`))
 
@@ -201,6 +222,14 @@ conClientes.getState().setTab('recordatorios')
 conClientes.getState().reset()
 chk('crearCobrosUi: sin argumento abre en Cobros; con una pestaña, en esa, y al reiniciarse vuelve a ella (no a Cobros)',
   nuevoStore.getState().tab === 'cobros' && conClientes.getState().tab === 'clientes')
+const paraExcluir = crearCobrosUi('clientes')
+paraExcluir.getState().abrirModal({ tipo: 'excluir', clientId: 2, nombre: 'Beta Servicios SA' })
+const modalExcluir = paraExcluir.getState().modal
+paraExcluir.getState().cerrarModal({ tipo: 'excluir', clientId: 2, nombre: 'Beta Servicios SA' })
+const sigueAbierto = paraExcluir.getState().modal === modalExcluir
+paraExcluir.getState().cerrarModal(modalExcluir ?? undefined)
+chk('el modal "quitar de la lista de clientes" lleva el id y el nombre de la empresa; cerrar otro modal no lo cierra, cerrarlo a él sí',
+  JSON.stringify(modalExcluir) === JSON.stringify({ tipo: 'excluir', clientId: 2, nombre: 'Beta Servicios SA' }) && sigueAbierto && paraExcluir.getState().modal === null)
 useAuthStore.getState().setSession('token-de-otra-empresa', { id: 1, email: 'a@x.do', username: 'a', name: 'A', role: 'admin', permissions: ['*'] })
 igual('al cambiar de sesión (otra empresa de soporte, otro usuario) los DOS stores vuelven al principio, cada uno a su pestaña', [
   empresa().panelClienteId, empresa().pageSize, tenantsUi().panelClienteId, tenantsUi().modal, tenantsUi().tab, tenantsUi().filtros,
@@ -247,29 +276,46 @@ console.log('\n7. El directorio de tenants (la pestaña Clientes): filtros, cont
 const ids = (xs: { id: number }[]) => xs.map((x) => x.id)
 chk('el tope del directorio es el del servidor (500) y hay un filtro rápido por cada cosa que se quiere ver',
   MAX_DIRECTORIO === 500 && FILTROS_DIRECTORIO.map((f) => f.id).join() === 'todos,con-saldo,vencidos,sin-cobro' && TIPOS_DIRECTORIO.map((f) => f.id).join() === 'todas,app,integracion')
-igual('sin filtros salen todos, en el orden que mandó el servidor', ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'todas' })), [1, 2, 4, 3, 5])
-igual('con saldo: los que deben algo (Alfa, Delta, Gamma y Epsilon; Beta no)', ids(filtrarDirectorio(dir, { filtro: 'con-saldo', tipo: 'todas' })), [1, 4, 3, 5])
-igual('vencidos: los que ya pasaron su vencimiento (Delta y Gamma; Epsilon vence HOY, no está vencida)', ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'todas' })), [4, 3])
-igual('sin cobro mensual: los que no lo tienen configurado (Gamma y Epsilon)', ids(filtrarDirectorio(dir, { filtro: 'sin-cobro', tipo: 'todas' })), [3, 5])
-igual('por tipo: con base propia (Alfa, Beta, Delta, Epsilon) y de integración (Gamma)', [
-  ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'app' })), ids(filtrarDirectorio(dir, { filtro: 'todos', tipo: 'integracion' })),
-], [[1, 2, 4, 5], [3]])
+// Los ids que quedan al filtrar (por defecto sin las empresas marcadas "no es cliente", como la pantalla).
+const filtra = (items: typeof dir, filtro: FiltroDirectorio, tipo: TipoDirectorio, conExcluidos = false) => ids(filtrarDirectorio(items, { filtro, tipo, conExcluidos }))
+igual('sin filtros salen todos, en el orden que mandó el servidor', filtra(dir, 'todos', 'todas'), [1, 2, 4, 3, 5])
+igual('con saldo: los que deben algo (Alfa, Delta, Gamma y Epsilon; Beta no)', filtra(dir, 'con-saldo', 'todas'), [1, 4, 3, 5])
+igual('vencidos: los que ya pasaron su vencimiento (Delta y Gamma; Epsilon vence HOY, no está vencida)', filtra(dir, 'vencidos', 'todas'), [4, 3])
+igual('sin cobro mensual: los que no lo tienen configurado (Gamma y Epsilon)', filtra(dir, 'sin-cobro', 'todas'), [3, 5])
+igual('por tipo: con base propia (Alfa, Beta, Delta, Epsilon) y de integración (Gamma)', [filtra(dir, 'todos', 'app'), filtra(dir, 'todos', 'integracion')], [[1, 2, 4, 5], [3]])
 igual('el filtro rápido y el tipo se combinan: con saldo y con base propia; vencidos y de integración; vencidos y con base propia',
-  [ids(filtrarDirectorio(dir, { filtro: 'con-saldo', tipo: 'app' })), ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'integracion' })), ids(filtrarDirectorio(dir, { filtro: 'vencidos', tipo: 'app' }))],
-  [[1, 4, 5], [3], [4]])
+  [filtra(dir, 'con-saldo', 'app'), filtra(dir, 'vencidos', 'integracion'), filtra(dir, 'vencidos', 'app')], [[1, 4, 5], [3], [4]])
 const resumenFx = resumenDirectorio(dir)
 igual('los contadores de los filtros y lo que deben todos (sumado en centavos)', resumenFx, { total: 5, conSaldo: 4, vencidos: 2, sinCobro: 2, saldoPendiente: 11000, saldoVencido: 2300 })
 igual('conteoDeFiltro da el contador de cada filtro rápido', FILTROS_DIRECTORIO.map((f) => conteoDeFiltro(resumenFx, f.id)), [5, 4, 2, 2])
-const dosCobros = (a: number, b: number) => [a, b].map((m) => ({ saldo_pendiente: m, saldo_vencido: 0, config: null, tipo: 'app' }))
+const dosCobros = (a: number, b: number) => [a, b].map((m) => ({ saldo_pendiente: m, saldo_vencido: 0, config: null, tipo: 'app', excluido: false }))
 chk('sumar en centavos: 0.10 + 0.20 da exactamente 0.30 (en flotante daría 0.30000000000000004)', resumenDirectorio(dosCobros(0.1, 0.2)).saldoPendiente === 0.3 && 0.1 + 0.2 !== 0.3)
+const sinNada = { saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app', excluido: false }
 chk('un saldo de cero no cuenta como "con saldo" ni como "vencido", y config null es "sin cobro mensual"',
-  !cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'con-saldo') && !cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'vencidos')
-  && cumpleFiltro({ saldo_pendiente: 0, saldo_vencido: 0, config: null, tipo: 'app' }, 'sin-cobro'))
+  !cumpleFiltro(sinNada, 'con-saldo') && !cumpleFiltro(sinNada, 'vencidos') && cumpleFiltro(sinNada, 'sin-cobro'))
 igual('un directorio vacío da todo en cero', resumenDirectorio([]), { total: 0, conSaldo: 0, vencidos: 0, sinCobro: 0, saldoPendiente: 0, saldoVencido: 0 })
 igual('subtituloTenant: el RNC y solo lo que sale de lo normal (integración, certificación, inactiva), sin hablar del cobro',
   [subtituloTenant({ rnc: '101000011', tipo: 'app', ambiente: 'ecf', activo: true }), subtituloTenant({ rnc: '101000033', tipo: 'integracion', ambiente: 'certecf', activo: false }), subtituloTenant({ rnc: '', tipo: 'app', ambiente: 'testecf', activo: true })],
   ['RNC 101000011', 'RNC 101000033 · Integración · Certificación · Inactiva', 'sin RNC · Pruebas'])
 igual('detalleCobroMensual: el día y si está activo', [detalleCobroMensual({ dia_vencimiento: 31, activo: true }), detalleCobroMensual({ dia_vencimiento: 10, activo: false })], ['día 31 · activo', 'día 10 · inactivo'])
+
+// ---------------------------------------------------------------------------
+console.log('\n8. "No es cliente": lo que se quita de la lista no se ve ni se cuenta, salvo que se pida')
+igual('sin pedirlas, la lista no trae a Beta (marcada "no es cliente"); pidiéndolas, salen todas y en su orden',
+  [ids(clientesDelDirectorio(dirEx, false)), ids(clientesDelDirectorio(dirEx, true))], [[1, 4, 3, 5], [1, 2, 4, 3, 5]])
+igual('contarExcluidos: una en ese directorio, ninguna en el de siempre ni en uno vacío', [contarExcluidos(dirEx), contarExcluidos(dir), contarExcluidos([])], [1, 0, 0])
+igual('filtrarDirectorio respeta conExcluidos: sin ellas, sin Beta; con ellas, todas', [filtra(dirEx, 'todos', 'todas'), filtra(dirEx, 'todos', 'todas', true)], [[1, 4, 3, 5], [1, 2, 4, 3, 5]])
+igual('...y se combina con el tipo: con base propia sin la excluida, con ella y de integración (no cambia)',
+  [filtra(dirEx, 'todos', 'app'), filtra(dirEx, 'todos', 'app', true), filtra(dirEx, 'todos', 'integracion'), filtra(dirEx, 'todos', 'integracion', true)], [[1, 4, 5], [1, 2, 4, 5], [3], [3]])
+igual('...y con el filtro rápido: Beta no debe nada y tiene cobro mensual (inactivo), así que ni con saldo ni vencidos ni sin cobro la traen aunque se pida',
+  [filtra(dirEx, 'con-saldo', 'todas', true), filtra(dirEx, 'vencidos', 'todas', true), filtra(dirEx, 'sin-cobro', 'todas', true)], [[1, 4, 3, 5], [4, 3], [3, 5]])
+const alfaExcluida = dir.map((t) => (t.id === 1 ? { ...t, excluido: true, motivo_exclusion: 'Es de prueba' } : t))
+igual('los contadores y el pie cuentan lo que se ve: con Alfa (debe 6,000) marcada, sin pedirla son 4 empresas y 5,000; pidiéndola, 5 y 11,000',
+  [resumenDirectorio(clientesDelDirectorio(alfaExcluida, false)), resumenDirectorio(clientesDelDirectorio(alfaExcluida, true))].map((r) => [r.total, r.saldoPendiente, r.saldoVencido]),
+  [[4, 5000, 2300], [5, 11000, 2300]])
+igual('...y con ella marcada, el filtro "con saldo" (sin pedirla) no la trae, y con la lista de siempre no cambia nada',
+  [filtra(alfaExcluida, 'con-saldo', 'todas'), filtra(dir, 'con-saldo', 'todas'), ids(clientesDelDirectorio(dir, false))], [[4, 3, 5], [1, 4, 3, 5], [1, 2, 4, 3, 5]])
+chk('no modifica lo que recibe: el arreglo original sigue con sus 5 empresas y en su orden', dirEx.length === 5 && ids(dirEx).join() === '1,2,4,3,5' && alfaExcluida.length === 5)
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

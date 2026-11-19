@@ -20,7 +20,7 @@ la *plataforma* le cobra a las empresas que usan Fiscalpoint. Ver "Cobros de ten
 | Interfaz | `src/features/cobros/store.ts` | **Zustand, solo estado de interfaz**: pestaña, filtros, página, panel del cliente abierto (y con qué pestaña), ventana de los recordatorios y modal abierto. **Un store por ámbito** (`cobrosUiEmpresa` y `cobrosUiTenants`, de `crearCobrosUi()`); `useCobrosUi(selector)` lee el del ámbito en que se pinta. Los modales guardan ids, nunca copias de un cobro. Los dos se reinician al cambiar de sesión (los ids son de una empresa) |
 | Ámbito | `src/features/cobros/ambito.ts`, `ambitos.ts` | El contexto (`AmbitoCobrosContext`, `useAmbitoCobros`) y los dos ámbitos armados (`AMBITO_EMPRESA`, `AMBITO_TENANTS`): servicio, claves, store de interfaz y los pocos textos que cambian (`TextosAmbito`) |
 | Pantalla | `src/features/cobros/CobrosView.tsx` | `CobrosView` (empresa) y `CobrosTenantsView` (plataforma) ponen su ámbito en el contexto y pintan el mismo cuerpo: dashboard, pestañas (Cobros / Recordatorios), panel y modales; al salir de la vista cierra el modal y el panel |
-| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `DirectorioTenants` (la pestaña Clientes de la plataforma), `SelectorCliente` y `TenantCombobox` (el buscador del ámbito), `EstadoCobroBadge`, `ModalesCobros` |
+| Componentes | `src/features/cobros/components/` | `DashboardCobros`, `ListadoCobros` (`FiltrosCobros` + `TablaCobros`), `ClientePanel` (`HistorialCobros`, `ConfigClienteForm`), `RecordatoriosSection`, `CobroFormModal`, `PagoFormModal`, `MotivoModals` (cancelar y anular pago), `RecordatorioFormModal`, `ElegirClienteModal`, `DirectorioTenants` (la pestaña Clientes de la plataforma), `QuitarClienteModal` ("No es cliente"), `SelectorCliente` y `TenantCombobox` (el buscador del ámbito), `EstadoCobroBadge`, `ModalesCobros` |
 | Utilidades | `format.ts`, `directorio.ts`, `clave.ts`, `reloj.ts` | Textos, tonos y la regla del vencimiento (sin React); los filtros y contadores del directorio de tenants; clave de idempotencia (UUID); la hora de RD a partir de la que manda el servidor |
 | Estilos | `src/styles/cobros.css` | Lo que `styles.css` no trae (barras de antigüedad, listas, método de pago, avisos, capa de los modales sobre el panel) |
 
@@ -106,17 +106,29 @@ Segunda pantalla con el **mismo cuerpo** que Cobros, para lo que **la plataforma
   búsqueda); los filtros rápidos (**Con saldo**, **Vencidos**, **Sin cobro mensual**, con su contador) y el tipo de empresa (**Con base propia** /
   **De integración**: la mayoría de las de integración se crearon solo para certificar) se aplican aquí (`directorio.ts`, sin React). El pie suma
   lo que deben las empresas de la lista, en centavos. Los contadores y la lista salen de la misma consulta que el contador de la pestaña.
+- **"No es cliente": quitar de la lista sin borrar.** No todos los tenants son clientes (varios se crearon solo para certificar, o son de
+  prueba), y uno con e-CF emitidos no se puede borrar: las llaves foráneas lo impiden y se perdería su historial fiscal. El menú de cada fila
+  trae **No es cliente (quitar de la lista)** (`QuitarClienteModal`: motivo opcional de hasta 150 caracteres, `PUT
+  /api/cobros-tenants/clientes/{id}/excluido`): la empresa sale de la lista, de los contadores y de los buscadores (el del formulario de cobro
+  y el del filtro), pero **sigue existiendo** con todo lo suyo. Si hay alguna marcada aparece **Mostrar las que no son clientes (N)**: las trae
+  atenuadas, con su motivo, y **Volver a la lista** (botón y menú; `useExcluirTenant`) la devuelve. Con cobros abiertos o con su cobro mensual
+  activo la API responde 409 (`TIENE_COBROS_ABIERTOS` / `CONFIG_ACTIVA`) y el modal muestra su texto: hay que cobrarlos o desactivar el cobro
+  mensual primero. El directorio pide siempre las marcadas (`excluidos=1`, cada una trae `excluido` y `motivo_exclusion`) y la pantalla decide
+  si las muestra (`clientesDelDirectorio`, `contarExcluidos` y `filtrarDirectorio` con `conExcluidos`, en `directorio.ts`); los buscadores
+  no las piden. Quedan en la bitácora de la API como `EXCLUDE` / `INCLUDE`.
 - **Solo soporte, sin fail-open.** `NavItem.soloAccesoGlobal` (`navSoloAccesoGlobal`, `puedeVerItem`, `debeSalirDeVista`): sin
   `acceso_global: true` en la sesión no se muestra el item (ni a un admin, ni con todos los módulos), y quien llegue por otro camino (la vista
   guardada en el navegador) es sacado al dashboard. Es solo comodidad: el servidor responde 403 a quien no tiene el acceso global. El acceso
   global **no** da el módulo `cobros` de las empresas (son cuentas por cobrar distintas).
-- **Orden de despliegue**: la migración master 021 y la API van antes que la web; sin ellas la pantalla muestra el error de la API.
+- **Orden de despliegue**: las migraciones master 021 (cobros de tenants) y 022 (`cobro_excluidos`, de "No es cliente") y la API van antes que la
+  web; sin ellas la pantalla muestra el error de la API (y con la API vieja el directorio falla: `excluido` y `motivo_exclusion` son parte
+  obligatoria del contrato de cada tenant).
 
 ## Pruebas
 
 ```bash
 node scripts/test-cobros.ts          # contrato, formularios, formato, reloj, store y navegación (sin navegador)
-node scripts/test-cobros-tenants.ts  # el ámbito de tenants: contrato (con el directorio), rutas, claves, un store por ámbito, navegación solo para soporte y filtros del directorio
+node scripts/test-cobros-tenants.ts  # el ámbito de tenants: contrato (con el directorio y "No es cliente"), rutas, claves, un store por ámbito, navegación solo para soporte y filtros del directorio
 node_modules/.bin/tsc --noEmit
 node_modules/.bin/eslint src scripts
 npm run build

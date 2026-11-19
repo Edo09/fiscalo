@@ -67,13 +67,14 @@ export function useBuscarTenants(texto: string) {
 }
 
 /**
- * El directorio de tenants (solo en la plataforma): todos, con su cobro mensual y lo que deben, para lo que se busca. `habilitado`
- * false apaga la consulta (la pantalla de una empresa no tiene directorio, y esa ruta no existe allí). El tope de una respuesta
- * es MAX_DIRECTORIO; con más empresas que eso, la búsqueda las alcanza.
+ * El directorio de tenants (solo en la plataforma): todos, con su cobro mensual y lo que deben, para lo que se busca. Trae TAMBIÉN
+ * a los marcados como "no es un cliente" (cada uno dice `excluido`): la pantalla decide si los muestra. `habilitado` false apaga la
+ * consulta (la pantalla de una empresa no tiene directorio, y esa ruta no existe allí). El tope de una respuesta es MAX_DIRECTORIO;
+ * con más empresas que eso, la búsqueda las alcanza.
  */
 export function useDirectorioTenants(texto = '', habilitado = true) {
   const { api, keys } = useAmbitoCobros()
-  return useApiQuery(keys.directorio(texto), () => api.buscarTenants(texto, MAX_DIRECTORIO), { keepPrevious: true, enabled: habilitado })
+  return useApiQuery(keys.directorio(texto), () => api.buscarTenants(texto, MAX_DIRECTORIO, true), { keepPrevious: true, enabled: habilitado })
 }
 
 /**
@@ -140,6 +141,10 @@ export const useAnularPago = () =>
   useMutacion((api, { pagoId, motivo }: { pagoId: number; motivo?: string }) => api.anularPagoCobro(pagoId, motivo))
 export const useGuardarConfig = () =>
   useMutacion((api, { clientId, config }: { clientId: number; config: ConfigCobroInput }) => api.guardarConfigCobro(clientId, config))
+/** Quitar a un tenant de la lista de clientes (o devolverlo): invalida todo el ámbito, y con él el directorio y el buscador. */
+export const useExcluirTenant = () =>
+  useMutacion((api, { clientId, excluido, motivo }: { clientId: number; excluido: boolean; motivo?: string }) =>
+    api.excluirTenant(clientId, excluido, motivo))
 export const useRegistrarRecordatorio = () =>
   useMutacion((api, { cobroId, recordatorio }: { cobroId: number; recordatorio: RecordatorioInput }) =>
     api.registrarRecordatorioCobro(cobroId, recordatorio))

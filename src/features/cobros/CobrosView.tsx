@@ -4,6 +4,7 @@ import { Btn, PageHead, RefreshButton, Tabs } from '@/components/ui'
 import '@/styles/cobros.css'
 import { AmbitoCobrosContext, useAmbitoCobros } from './ambito'
 import { AMBITO_EMPRESA, AMBITO_TENANTS } from './ambitos'
+import { clientesDelDirectorio } from './directorio'
 import { ClientePanel } from './components/ClientePanel'
 import { DashboardCobros } from './components/DashboardCobros'
 import { DirectorioTenants } from './components/DirectorioTenants'
@@ -103,7 +104,7 @@ function PantallaCobros({ senalNuevo = null, clienteInicial = null }: PropsPanta
 
       <Tabs
         tabs={[
-          ...(conDirectorio ? [{ id: 'clientes', label: 'Clientes', count: directorio.data?.length }] : []),
+          ...(conDirectorio ? [{ id: 'clientes', label: 'Clientes', count: directorio.data ? clientesDelDirectorio(directorio.data, false).length : undefined }] : []),
           { id: 'cobros', label: 'Cobros' },
           { id: 'recordatorios', label: 'Recordatorios', count: recordatorios.data?.resumen.clientes_por_recordar },
         ]}

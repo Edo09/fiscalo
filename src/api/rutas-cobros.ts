@@ -16,8 +16,10 @@ export function rutasCobros(base: string) {
     lista: (params: Record<string, string | number | undefined> = {}) => `${base}${qs(params)}`,
     resumen: (dias?: number) => `${base}/resumen${qs({ dias })}`,
     recordatorios: (params: { dias?: number; cada?: number } = {}) => `${base}/recordatorios${qs({ ...params })}`,
-    /** Solo existe en la plataforma: el buscador de tenants (GET .../clientes?query=&limite=). */
-    buscar: (query?: string, limite?: number) => `${base}/clientes${qs({ query, limite })}`,
+    /** Solo existe en la plataforma: el directorio de tenants (GET .../clientes?query=&limite=&excluidos=1). */
+    buscar: (query?: string, limite?: number, conExcluidos?: boolean) => `${base}/clientes${qs({ query, limite, excluidos: conExcluidos ? 1 : undefined })}`,
+    /** Solo en la plataforma: quitar a un tenant de la lista de clientes, o devolverlo (PUT). */
+    excluido: (clientId: number) => `${base}/clientes/${clientId}/excluido`,
     cliente: (clientId: number) => `${base}/clientes/${clientId}`,
     config: (clientId: number) => `${base}/clientes/${clientId}/config`,
     cobro: (id: number) => `${base}/${id}`,

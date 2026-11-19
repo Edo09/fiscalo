@@ -13,10 +13,10 @@ import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from './rutas-cobros'
 import type { ListResult } from './types'
 import {
   cobroActualizadoSchema, cobroDetalleSchema, cobroSchema, configCobroSchema, pagoAnuladoSchema, pagoResultadoSchema,
-  panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantsBuscadosSchema,
+  exclusionResultadoSchema, panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantsBuscadosSchema,
   type Cobro, type CobroActualizado, type CobroDetalle, type ConfigCobro, type EstadoCobro, type MetodoPago,
   type PagoAnulado, type PagoResultado, type PanelCliente, type RecordatorioResultado, type RecordatoriosCobros,
-  type ResumenCobros, type CanalRecordatorio, type TenantBuscado,
+  type ResumenCobros, type CanalRecordatorio, type ExclusionResultado, type TenantBuscado,
 } from './schemas/cobros'
 
 const MSG_RESPUESTA = 'Recibimos del servidor una respuesta que no entendemos. Actualiza la página e inténtalo de nuevo; si sigue pasando, avisa a soporte.'
@@ -109,10 +109,16 @@ export interface ApiCobros {
   /** Un cobro con sus pagos (vigentes y anulados) y sus recordatorios. */
   getCobro(id: number): Promise<CobroDetalle>
   /**
-   * Los tenants entre los que se elige, por nombre o RNC (los activos primero). SOLO existe en la plataforma
-   * (/api/cobros-tenants): en el ámbito de una empresa el buscador es el de Clientes y esta ruta da 404.
+   * El directorio de tenants, por nombre o RNC (los activos primero), con su cobro mensual y lo que deben. Los que la plataforma
+   * marcó como "no es un cliente" no salen, salvo con `conExcluidos`. SOLO existe en la plataforma (/api/cobros-tenants): en el
+   * ámbito de una empresa el buscador es el de Clientes y esta ruta da 404.
    */
-  buscarTenants(query?: string, limite?: number): Promise<TenantBuscado[]>
+  buscarTenants(query?: string, limite?: number, conExcluidos?: boolean): Promise<TenantBuscado[]>
+  /**
+   * Quita a un tenant de la lista de clientes (`excluido: true`, con su motivo si se quiere) o lo devuelve (`false`). No borra nada.
+   * Con cobros abiertos o su cobro mensual activo da 409 (codigo TIENE_COBROS_ABIERTOS / CONFIG_ACTIVA). Solo en la plataforma.
+   */
+  excluirTenant(clientId: number, excluido: boolean, motivo?: string): Promise<ExclusionResultado>
   /** Monto mensual y día de vencimiento de un cliente. No toca los cobros que ya existen. */
   guardarConfigCobro(clientId: number, input: ConfigCobroInput): Promise<ConfigCobro>
   /** Crea un cobro a mano. Un cobro del mismo cliente y periodo ya existente da 409 (codigo COBRO_DUPLICADO). */
@@ -151,8 +157,11 @@ export function crearApiCobros(base: string): ApiCobros {
     async getCobro(id) {
       return parsear(cobroDetalleSchema, await getJson<unknown>(r.cobro(id)), `GET ${base}/${id}`)
     },
-    async buscarTenants(query, limite) {
-      return parsear(tenantsBuscadosSchema, await getJson<unknown>(r.buscar(query, limite)), `GET ${base}/clientes`)
+    async buscarTenants(query, limite, conExcluidos) {
+      return parsear(tenantsBuscadosSchema, await getJson<unknown>(r.buscar(query, limite, conExcluidos)), `GET ${base}/clientes`)
+    },
+    async excluirTenant(clientId, excluido, motivo) {
+      return parsear(exclusionResultadoSchema, await enviar(r.excluido(clientId), 'PUT', { excluido, motivo }), 'PUT excluido')
     },
     async guardarConfigCobro(clientId, input) {
       return parsear(configCobroSchema, await enviar(r.config(clientId), 'PUT', input), 'PUT config')

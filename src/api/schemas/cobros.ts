@@ -144,6 +144,10 @@ export const tenantBuscadoSchema = clienteCobroSchema.extend({
   con_config: z.boolean(),
   /** Su cobro mensual; null si no tiene. */
   config: configCobroSchema.nullable(),
+  /** La plataforma la marcó como "no es un cliente" (se creó solo para certificar, es de prueba): no sale de la lista a menos que se pida. */
+  excluido: z.boolean(),
+  /** Por qué no es un cliente (solo si está excluida). */
+  motivo_exclusion: z.string().nullable(),
   /** Todo lo abierto que debe (un cobro pagado o cancelado no suma). */
   saldo_pendiente: z.number(),
   /** Lo que ya pasó su vencimiento. */
@@ -157,6 +161,18 @@ export const tenantBuscadoSchema = clienteCobroSchema.extend({
 })
 export type TenantBuscado = z.infer<typeof tenantBuscadoSchema>
 export const tenantsBuscadosSchema = z.array(tenantBuscadoSchema)
+
+/** Lo que responde PUT /api/cobros-tenants/clientes/{id}/excluido: marcar a un tenant como "no es un cliente", o devolverlo. */
+export const exclusionResultadoSchema = z.object({
+  client_id: z.number(),
+  excluido: z.boolean(),
+  motivo: z.string().nullable(),
+  /** Ya estaba así: no se cambió nada. */
+  repetido: z.boolean(),
+  /** Lo que había antes (para la bitácora). */
+  anterior: z.object({ excluido: z.boolean(), motivo: z.string().nullable() }),
+})
+export type ExclusionResultado = z.infer<typeof exclusionResultadoSchema>
 
 export const resumenCobrosSchema = z.object({
   /** La fecha de RD del servidor, AAAA-MM-DD. */

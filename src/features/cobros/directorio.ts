@@ -26,7 +26,7 @@ export const TIPOS_DIRECTORIO = [
 ] as const
 export type TipoDirectorio = (typeof TIPOS_DIRECTORIO)[number]['id']
 
-type ParaFiltrar = Pick<TenantBuscado, 'saldo_pendiente' | 'saldo_vencido' | 'config' | 'tipo'>
+type ParaFiltrar = Pick<TenantBuscado, 'saldo_pendiente' | 'saldo_vencido' | 'config' | 'tipo' | 'excluido'>
 
 /** ¿Cumple el filtro rápido? Con saldo = debe algo; vencidos = algo ya pasó su vencimiento; sin cobro = no tiene cobro mensual. */
 export function cumpleFiltro(t: ParaFiltrar, filtro: FiltroDirectorio): boolean {
@@ -38,9 +38,24 @@ export function cumpleFiltro(t: ParaFiltrar, filtro: FiltroDirectorio): boolean 
   }
 }
 
+/**
+ * Los que se ven en la lista ANTES de los filtros rápidos: los clientes, y las empresas marcadas como "no es un cliente" solo si se
+ * pidió verlas. Con esto se calculan los contadores y el pie, para que no cuenten lo que no se ve.
+ */
+export function clientesDelDirectorio<T extends Pick<TenantBuscado, 'excluido'>>(items: readonly T[], conExcluidos: boolean): T[] {
+  return items.filter((t) => conExcluidos || !t.excluido)
+}
+
+/** Cuántas empresas están marcadas como "no es un cliente". */
+export function contarExcluidos(items: readonly Pick<TenantBuscado, 'excluido'>[]): number {
+  return items.filter((t) => t.excluido).length
+}
+
 /** Los de la lista que cumplen el filtro rápido y el tipo de empresa, en el mismo orden que mandó el servidor. */
-export function filtrarDirectorio<T extends ParaFiltrar>(items: readonly T[], f: { filtro: FiltroDirectorio; tipo: TipoDirectorio }): T[] {
-  return items.filter((t) => cumpleFiltro(t, f.filtro) && (f.tipo === 'todas' || t.tipo === f.tipo))
+export function filtrarDirectorio<T extends ParaFiltrar>(
+  items: readonly T[], f: { filtro: FiltroDirectorio; tipo: TipoDirectorio; conExcluidos: boolean },
+): T[] {
+  return clientesDelDirectorio(items, f.conExcluidos).filter((t) => cumpleFiltro(t, f.filtro) && (f.tipo === 'todas' || t.tipo === f.tipo))
 }
 
 export interface ResumenDirectorio {
