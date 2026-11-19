@@ -260,8 +260,12 @@ export type ResumenCobros = z.infer<typeof resumenCobrosSchema>
 export const panelClienteSchema = z.object({
   cliente: clienteCobroSchema,
   config: configCobroSchema.nullable(),
-  /** Cuántas empresas de la unidad pagan (1 en una empresa y en el ámbito de una empresa): el monto de `config` es por cada una. */
-  empresas_que_pagan: z.number(),
+  /**
+   * Cuántas empresas de la unidad pagan (1 en una empresa y en el ámbito de una empresa): el monto de `config` es por cada una. Este
+   * esquema lo comparten Cobros de tenants Y el de las empresas: si la web llega antes que la API (la web se publica sola y la API se
+   * sube a mano), el campo falta y vale 1, para no romper el panel de ninguna empresa.
+   */
+  empresas_que_pagan: z.number().default(1),
   resumen: z.object({
     saldo_pendiente: z.number(),
     saldo_vencido: z.number(),

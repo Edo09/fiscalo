@@ -417,7 +417,10 @@ const sinN = JSON.parse(JSON.stringify((fixture('directorio-monto-por-empresa').
 delete sinN.empresas_que_pagan
 const sinNPanel = JSON.parse(JSON.stringify(fixture('panel-grupo').data))
 delete sinNPanel.empresas_que_pagan
-chk('...y una unidad o un panel al que le falta "empresas_que_pagan" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinN).success && !panelClienteSchema.safeParse(sinNPanel).success)
+chk('...una unidad a la que le falta "empresas_que_pagan" NO pasa por el esquema (la plataforma exige la API nueva)', !tenantBuscadoSchema.safeParse(sinN).success)
+const panelAntiguo = panelClienteSchema.safeParse(sinNPanel)
+chk('...pero el panel (que comparte esquema con el ámbito de una empresa) de una API que aún no manda el campo pasa con 1 empresa: así la web nueva nunca rompe el panel de las empresas si llega antes que la API',
+  panelAntiguo.success && panelAntiguo.data.empresas_que_pagan === 1, !panelAntiguo.success && panelAntiguo.error.issues[0])
 chk('el motivo monto_excedido del cobro siguiente es válido y tiene su texto: avisa que no se generó y que el máximo se pasó',
   (MOTIVOS_SIGUIENTE as readonly string[]).includes('monto_excedido') && (textoSiguiente('monto_excedido', null) ?? '').includes('máximo') && (textoSiguiente('monto_excedido', null) ?? '').includes('No se generó'))
 
