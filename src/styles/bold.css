@@ -35,7 +35,7 @@ h1, h2, h3,
   font-family: var(--font-display);
   letter-spacing: -0.025em;
 }
-.page-title { font-size: 25px; font-weight: 600; }
+.page-title { font-size: var(--title-fs); font-weight: 600; }
 .kpi-value { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
 .brand-name { font-weight: 600; }
 
@@ -271,7 +271,7 @@ h1, h2, h3,
 }
 .kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); border-color: var(--border-strong); }
 .kpi:hover::after { opacity: 1; }
-.kpi-value { font-size: 23px; }
+.kpi-value { font-size: var(--kpi-fs); }
 .kpi-ic { border-radius: 9px; }
 
 /* ============================================================

@@ -23,7 +23,7 @@
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--sh-lg);
-  padding: clamp(24px, 4vw, 48px);
+  padding: var(--fx-sheet-py) var(--fx-sheet-px);
   overflow: hidden;
   animation: fx-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -117,7 +117,7 @@
 .fx-rule {
   height: 1px;
   background: var(--border);
-  margin: 26px 0 22px;
+  margin: var(--fx-sec) 0 var(--fx-sec-sm);
 }
 
 /* ---------- Campos sin caja --------------------------------- */
@@ -467,7 +467,7 @@
 }
 
 .fx-row {
-  padding: 9px 0;
+  padding: var(--fx-row-py) 0;
   border-bottom: 1px solid var(--border);
   animation: fx-fade 220ms ease both;
 }
@@ -607,7 +607,7 @@
 
 /* ---------- Totales ----------------------------------------- */
 .fx-totales {
-  margin-top: 26px;
+  margin-top: var(--fx-sec);
   display: flex;
   justify-content: flex-end;
 }
@@ -656,7 +656,7 @@
 }
 
 .fx-nota {
-  margin-top: 30px;
+  margin-top: var(--fx-sec-lg);
   padding-top: 16px;
   border-top: 1px solid var(--border);
   font-size: 12px;
@@ -669,13 +669,13 @@
   position: sticky;
   bottom: 0;
   z-index: 5;
-  margin: 20px auto 0;
+  margin: var(--fx-bar-mt) auto 0;
   max-width: 880px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 11px 16px;
+  padding: var(--fx-bar-py) 16px;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border);
@@ -758,6 +758,8 @@
 
   .fx-gutter { opacity: 1; justify-self: end; }
   .fx-bar { flex-direction: column; align-items: stretch; }
+  /* Los botones de la barra pasan a otra línea en vez de salirse de la pantalla. */
+  .fx-bar > .row { flex-wrap: wrap; }
 
   /* Factura simple: en un teléfono las acciones no caben lado a lado. Cada una
      va en su renglón y la principal queda abajo, a mano del pulgar. */
@@ -815,7 +817,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 18px;
-  margin-top: 20px;
+  margin-top: calc(var(--fx-sec) - 6px);
   padding: 12px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1103,7 +1105,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px;
   align-items: start;
-  margin-top: 26px;
+  margin-top: var(--fx-sec);
 }
 
 .fx-obs {
@@ -1176,7 +1178,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 20px;
-  margin-top: 18px;
+  margin-top: calc(var(--fx-sec-sm) - 4px);
   padding: 10px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1212,7 +1214,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 24px;
-  margin-top: 22px;
+  margin-top: var(--fx-sec-sm);
 }
 
 .fx-parte-nombre { font-size: 14.5px; font-weight: 600; color: var(--text); margin-top: 4px; }
@@ -1359,7 +1361,7 @@
 /* Franja propia entre la cabecera y las lineas: en una nota, a que factura
    corrige es tan parte del documento como a quien va dirigida. */
 .fx-nota-ref {
-  margin-top: 22px;
+  margin-top: var(--fx-sec-sm);
   padding: 14px 16px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);

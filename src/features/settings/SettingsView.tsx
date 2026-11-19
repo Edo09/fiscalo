@@ -170,37 +170,40 @@ export function SettingsView() {
               ) : stats.error ? (
                 <ErrorState title="No se pudieron cargar las secuencias" onRetry={stats.reload}>{stats.error}</ErrorState>
               ) : (
-                <table className="tbl">
-                  <thead><tr><th>Tipo</th><th>Próximo e-NCF</th><th className="num">Emitidos</th><th className="num">Restantes</th><th>Vence</th></tr></thead>
-                  <tbody>
-                    {(stats.data?.secuencias ?? []).map((s) => {
-                      const restantes = s.restantes != null ? Number(s.restantes) : null
-                      return (
-                        <tr key={s.type} style={{ cursor: 'pointer' }} onClick={() => setRangosOpen(true)}>
-                          <td><span className="ecf-tag">{s.type}</span> <span className="text-sm">{s.nombre}</span></td>
-                          {/* secuencia_actual es el último número asignado; el próximo es +1 (10 dígitos). */}
-                          <td className="mono text-sm muted">{s.type}{String((s.secuencia_actual ?? 0) + 1).padStart(10, '0')}</td>
-                          <td className="num fw6">{s.total_emitidos}</td>
-                          <td className="num">
-                            {restantes != null ? (
-                              <Badge tone={restantes === 0 ? 'danger' : restantes <= 10 ? 'danger' : restantes <= 25 ? 'warning' : 'success'}>
-                                {restantes === 0 ? 'Agotado' : restantes}
-                              </Badge>
-                            ) : (
-                              <Badge tone="warning">Sin rango</Badge>
-                            )}
-                          </td>
-                          <td className="text-sm muted">{s.vencimiento ? formatApiDate(s.vencimiento) : '—'}</td>
+                /* tbl-wrap: en un teléfono la tabla hace scroll dentro de su tarjeta, no empuja la página. */
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead><tr><th>Tipo</th><th>Próximo e-NCF</th><th className="num">Emitidos</th><th className="num">Restantes</th><th>Vence</th></tr></thead>
+                    <tbody>
+                      {(stats.data?.secuencias ?? []).map((s) => {
+                        const restantes = s.restantes != null ? Number(s.restantes) : null
+                        return (
+                          <tr key={s.type} style={{ cursor: 'pointer' }} onClick={() => setRangosOpen(true)}>
+                            <td><span className="ecf-tag">{s.type}</span> <span className="text-sm">{s.nombre}</span></td>
+                            {/* secuencia_actual es el último número asignado; el próximo es +1 (10 dígitos). */}
+                            <td className="mono text-sm muted">{s.type}{String((s.secuencia_actual ?? 0) + 1).padStart(10, '0')}</td>
+                            <td className="num fw6">{s.total_emitidos}</td>
+                            <td className="num">
+                              {restantes != null ? (
+                                <Badge tone={restantes === 0 ? 'danger' : restantes <= 10 ? 'danger' : restantes <= 25 ? 'warning' : 'success'}>
+                                  {restantes === 0 ? 'Agotado' : restantes}
+                                </Badge>
+                              ) : (
+                                <Badge tone="warning">Sin rango</Badge>
+                              )}
+                            </td>
+                            <td className="text-sm muted">{s.vencimiento ? formatApiDate(s.vencimiento) : '—'}</td>
+                          </tr>
+                        )
+                      })}
+                      {(stats.data?.secuencias ?? []).length === 0 && (
+                        <tr style={{ cursor: 'default' }}>
+                          <td colSpan={5}><div className="text-sm muted" style={{ padding: 20, textAlign: 'center' }}>Sin secuencias registradas.</div></td>
                         </tr>
-                      )
-                    })}
-                    {(stats.data?.secuencias ?? []).length === 0 && (
-                      <tr style={{ cursor: 'default' }}>
-                        <td colSpan={5}><div className="text-sm muted" style={{ padding: 20, textAlign: 'center' }}>Sin secuencias registradas.</div></td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </Card>
           )}

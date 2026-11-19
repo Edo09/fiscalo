@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Barrido responsive</title>
+<style>body{margin:0;font:12px/1.3 monospace;background:#fff}#st{position:fixed;left:0;top:0;right:0;padding:4px 8px;background:#111;color:#9f9;z-index:9}</style>
+</head><body><div id="st">listo</div>
+<script>
+'use strict'
+// Arnes del barrido responsive (ver README.md en esta carpeta).
+// Abre cada pantalla de la app en un iframe del mismo origen, le pone cada tamano de SIZES y mide:
+// scroll vertical, desbordes, recortes, controles y dialogos. Una @media dentro de un iframe se evalua
+// contra el iframe, asi que el CSS responde igual que en una ventana real.
+//
+// Desde la consola de esta pagina (dejala a la vista: en segundo plano los temporizadores se frenan):
+//   sweep.start({ label: 'despues' })                    todo: 55 pantallas y estados + 6 del POS
+//   sweep.start({ label: 'x', only: ['facturas'] })      solo esas (por id)
+//   sweep.start({ label: 'x', sizes: ['1366x720'], theme: 'dark', screens: [...] })
+//   sweep.status()                                       avance y errores
+//   sweep.peek({ id: 'x', view: 'clientes' }, '1366x720')   mide una sola y la devuelve (para depurar)
+const AUTH = { state: { token: 't', user: { id: 1, email: 'demo@fiscalo.test', username: 'demo', name: 'Usuario Demo', role: 'admin', permissions: ['*'] } }, version: 0 }
+const SIZES = {
+  '1920x1080': [1920, 1080], '1536x864': [1536, 864], '1440x900': [1440, 900], '1366x720': [1366, 720],
+  '1366x620': [1366, 620], '1280x720': [1280, 720], '1024x768': [1024, 768], '768x1024': [768, 1024], '390x844': [390, 844],
+}
+// En estos tamanos se guarda cada rect: sirve para probar que "no cambio nada" donde la altura es comoda
+// (1920x1080 escritorio, 768x1024 tableta vertical, 390x844 telefono vertical).
+const FULL_SIZES = new Set(['1920x1080', '768x1024', '390x844'])
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const stEl = document.getElementById('st')
+const state = { running: false, done: 0, total: 0, current: '', errors: [], t0: 0, label: '' }
+const say = (t) => { stEl.textContent = t }
+const r1 = (n) => Math.round(n * 10) / 10
+
+async function waitFor(pred, ms = 10000, step = 50) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < ms) { try { if (pred()) return true } catch (e) { /* aun no */ } await sleep(step) }
+  return false
+}
+
+async function openFrame(url) {
+  const f = document.createElement('iframe')
+  f.style.cssText = 'position:absolute;left:0;top:30px;border:0;visibility:hidden;width:1366px;height:720px'
+  document.body.appendChild(f)
+  await new Promise((res) => { f.addEventListener('load', res, { once: true }); f.src = url })
+  const doc = f.contentDocument
+  const st = doc.createElement('style')
+  st.textContent = '*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}'
+  doc.head.appendChild(st)
+  return f
+}
+
+function describe(el) {
+  const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''
+  const txt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 22)
+  return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (cls ? '.' + cls : '') + (txt ? ' "' + txt + '"' : '')
+}
+
+const NO_PROTEGE = (el) => el.tagName === 'HTML' || el.tagName === 'BODY' || el.id === 'root' ||
+  el.classList.contains('app') || el.classList.contains('main-col') || el.classList.contains('content')
+
+function protegido(el, win) {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    if (NO_PROTEGE(p)) continue
+    const o = win.getComputedStyle(p).overflowX
+    if (o !== 'visible') return true
+  }
+  return false
+}
+
+function measure(f, full) {
+  const win = f.contentWindow, doc = f.contentDocument
+  const vw = win.innerWidth, vh = win.innerHeight
+  const R = (el) => el.getBoundingClientRect()
+  const q = (s) => doc.querySelector(s)
+  const cs = (el) => win.getComputedStyle(el)
+  const m = { vw, vh }
+  const content = q('.content')
+  m.crashed = /La pantalla no se pudo mostrar/.test(doc.body.textContent || '')
+  const limitShell = content ? R(content).right : vw
+  if (content) {
+    m.shell = true
+    m.contentH = content.clientHeight
+    m.contentScrollH = content.scrollHeight
+    m.vScroll = Math.max(0, content.scrollHeight - content.clientHeight)
+    m.contentW = content.clientWidth
+    m.hScroll = Math.max(0, content.scrollWidth - content.clientWidth)
+    const nb = q('.navbar'); m.navbarH = nb ? r1(R(nb).height) : null
+    const sb = q('.sidebar'); if (sb) { const r = R(sb); m.sidebarW = r.right > 1 ? r1(r.width) : 0 }
+    const pg = q('.page'); if (pg) m.pagePad = [cs(pg).paddingTop, cs(pg).paddingRight, cs(pg).paddingBottom, cs(pg).paddingLeft].map(parseFloat)
+    const ph = q('.page-head'); if (ph) m.pageHeadH = r1(R(ph).height)
+    const pt = q('.page-title'); if (pt) m.pageTitleFs = parseFloat(cs(pt).fontSize)
+  } else {
+    m.shell = false
+    m.vScroll = Math.max(0, doc.documentElement.scrollHeight - vh)
+  }
+  m.docHScroll = Math.max(0, doc.documentElement.scrollWidth - vw)
+
+  // Desbordes: lo visible que se sale por la derecha y no lo contiene un hijo con scroll/recorte.
+  const over = [], clipped = [], trunc = []
+  let minFs = 99, smallFs = 0
+  const all = doc.querySelectorAll('#root *')
+  for (const el of all) {
+    const r = R(el)
+    if (r.width < 2 || r.height < 2) continue
+    const c = cs(el)
+    if (c.visibility === 'hidden') continue
+    if (el.closest('.sidebar') || el.closest('[data-sonner-toaster]')) { /* fuera del barrido de desborde */ }
+    else {
+      const enOverlay = el.closest('.overlay, .drawer, .drawer-overlay, .menu')
+      const limit = enOverlay ? vw : limitShell
+      if (r.right > limit + 1 && !protegido(el, win)) over.push(describe(el) + ' r=' + r1(r.right) + '>' + r1(limit))
+    }
+    const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length)
+    if (hasText) {
+      const fs = parseFloat(c.fontSize)
+      if (fs < minFs) minFs = fs
+      if (fs < 12) smallFs++
+      if ((c.overflowX === 'hidden' || c.overflowX === 'clip') && el.scrollWidth - el.clientWidth > 1) {
+        ;(c.textOverflow === 'ellipsis' ? trunc : clipped).push(describe(el) + ' +' + (el.scrollWidth - el.clientWidth))
+      }
+    }
+  }
+  m.overflowN = over.length; m.overflow = over.slice(0, 8)
+  m.clippedN = clipped.length; m.clipped = clipped.slice(0, 8)
+  m.truncN = trunc.length
+  m.minFont = minFs === 99 ? null : minFs; m.smallFontN = smallFs
+
+  // Pantallas sin .content (POS, login): lo que queda recortado por un ancestro con overflow hidden/clip
+  // sin un contenedor con scroll en medio, y lo que se sale por debajo de la ventana.
+  if (!content) {
+    const cut = []
+    for (const el of all) {
+      const r = R(el); if (r.width < 2 || r.height < 2) continue
+      const c0 = cs(el); if (c0.visibility === 'hidden') continue
+      // Adornos (brillos, cuadriculas de fondo): sin texto y sin clics, se salen del recuadro a proposito.
+      if (c0.pointerEvents === 'none' && !(el.textContent || '').trim()) continue
+      let scrollY = false, scrollX = false, hit = null
+      for (let p = el.parentElement; p && p.id !== 'root'; p = p.parentElement) {
+        const c = cs(p), pr = R(p)
+        if (c.overflowY === 'auto' || c.overflowY === 'scroll') scrollY = true
+        if (c.overflowX === 'auto' || c.overflowX === 'scroll') scrollX = true
+        if ((c.overflowY === 'hidden' || c.overflowY === 'clip') && !scrollY && r.bottom > pr.bottom + 1.5) { hit = 'abajo en ' + describe(p).split(' ')[0]; break }
+        if ((c.overflowX === 'hidden' || c.overflowX === 'clip') && !scrollX && r.right > pr.right + 1.5) { hit = 'derecha en ' + describe(p).split(' ')[0]; break }
+      }
+      if (!hit && r.bottom > vh + 1.5 && !scrollY && c0.position !== 'fixed') hit = 'bajo la ventana ' + r1(r.bottom) + '>' + vh
+      if (hit) cut.push(describe(el) + ' [' + hit + ']')
+    }
+    m.cutN = cut.length; m.cut = cut.slice(0, 12)
+  }
+
+  // Controles: el mas bajo de cada familia (y cuantos quedan bajo 24px, el minimo de WCAG 2.2).
+  let minH = 999, under24 = 0
+  for (const el of doc.querySelectorAll('#root .btn, #root .input, #root .select, #root .icon-btn, #root .tab, #root .nav-item, #root .filter-chip, #root .seg button')) {
+    const r = R(el); if (r.width < 2 || r.height < 2) continue
+    if (el.closest('.sidebar') && m.sidebarW === 0) continue
+    if (r.height < minH) minH = r.height
+    if (r.height < 24) under24++
+  }
+  m.minCtlH = minH === 999 ? null : r1(minH); m.under24 = under24
+
+  // Muestras de tamanos para la tabla de antes/despues.
+  const smp = {}
+  const pick = (k, sel, prop) => { const el = q(sel); if (el) smp[k] = r1(R(el)[prop || 'height']) }
+  pick('tr', '.tbl tbody tr'); pick('th', '.tbl thead th'); pick('input', '.input, .select'); pick('btn', '.btn:not(.btn-sm):not(.navbar-pos)')
+  pick('cardHead', '.card-head'); pick('kpi', '.kpi'); pick('navItem', '.sidebar .nav-item')
+  m.smp = smp
+
+  // Modal / drawer abiertos.
+  const md = q('.modal'), dr = q('.drawer')
+  const box = md || dr
+  if (box) {
+    const r = R(box); const body = box.querySelector('.modal-body, .drawer-body'); const foot = box.querySelector('.modal-foot, .drawer-foot')
+    m.modal = {
+      kind: md ? 'modal' : 'drawer', w: r1(r.width), h: r1(r.height), top: r1(r.top), bottom: r1(r.bottom),
+      fitsV: r.top >= -0.5 && r.bottom <= vh + 0.5, fitsH: r.left >= -0.5 && r.right <= vw + 0.5,
+      bodyScroll: body ? Math.max(0, body.scrollHeight - body.clientHeight) : null,
+      bodyH: body ? body.clientHeight : null,
+      footVisible: foot ? R(foot).bottom <= vh + 0.5 && R(foot).top >= 0 : null,
+    }
+  }
+
+  if (full) {
+    const arr = []
+    for (const el of all) {
+      const r = R(el)
+      const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''
+      arr.push(el.tagName.toLowerCase() + (cls ? '.' + cls : '') + '|' + r1(r.x) + ',' + r1(r.y) + ',' + r1(r.width) + ',' + r1(r.height))
+    }
+    m.rects = arr
+  }
+  return m
+}
+
+// Espera a que la pantalla deje de cambiar (datos que llegan tarde, listas que se pintan): mismo alto y mismo
+// numero de elementos dos lecturas seguidas. Sin esto, la primera pantalla de cada tamano se medía a medio cargar.
+async function settleLayout(f) {
+  const doc = f.contentDocument
+  let last = '', same = 0
+  for (let i = 0; i < 20; i++) {
+    const c = doc.querySelector('.content')
+    const h = (c ? c.scrollHeight : doc.documentElement.scrollHeight) + '|' + doc.querySelectorAll('*').length
+    if (h === last) { if (++same >= 2) return } else same = 0
+    last = h
+    await sleep(100)
+  }
+}
+
+async function runSteps(f, steps) {
+  const doc = f.contentDocument
+  for (const s of steps || []) {
+    const re = s.text ? new RegExp(s.text, 'i') : null
+    const ok = await waitFor(() => [...doc.querySelectorAll(s.click)].some((e) => !re || re.test(e.textContent || '')), 4000)
+    if (!ok) throw new Error('paso sin elemento: ' + s.click + ' ' + (s.text || ''))
+    const el = [...doc.querySelectorAll(s.click)].find((e) => !re || re.test(e.textContent || ''))
+    el.click()
+    await sleep(s.wait || 350)
+  }
+}
+
+async function save(name, data) {
+  const r = await fetch('/api/__sweep/save?name=' + encodeURIComponent(name), { method: 'POST', body: JSON.stringify(data) })
+  if (!r.ok) throw new Error('save ' + r.status)
+}
+
+async function openScreen(sc, theme) {
+  if (sc.noAuth) localStorage.removeItem('fiscalo.auth')
+  else localStorage.setItem('fiscalo.auth', JSON.stringify(AUTH))
+  localStorage.setItem('fiscalo.view', sc.view || 'dashboard')
+  localStorage.setItem('fiscalo.theme', theme || 'light')
+  for (const [k, v] of Object.entries(sc.ls || {})) localStorage.setItem(k, v)
+  const f = await openFrame(sc.url || '/')
+  const ready = sc.ready || (sc.noAuth ? '.login-wrap' : '.content .page, .content .state, .content .card')
+  // __listo = false si la pantalla (o lo que debia abrir un paso) nunca aparecio: queda en el resultado como
+  // "no termino de cargar", en vez de medir una pagina vacia y darla por buena.
+  f.__listo = await waitFor(() => f.contentDocument.querySelector(ready), 12000)
+  await sleep(sc.settle || 700)
+  await runSteps(f, sc.steps)
+  if (sc.after) {
+    const ok = await waitFor(() => f.contentDocument.querySelector(sc.after), 8000)
+    f.__listo = f.__listo && ok
+    await sleep(400)
+  }
+  return f
+}
+
+async function runScreen(label, sc, sizeNames, theme) {
+  const f = await openScreen(sc, theme)
+  try {
+    for (const sn of sizeNames) {
+      const [w, h] = SIZES[sn]
+      f.style.width = w + 'px'; f.style.height = h + 'px'
+      await sleep(sc.resizeWait || 160)
+      await settleLayout(f)
+      const m = measure(f, FULL_SIZES.has(sn))
+      m.screen = sc.id; m.size = sn; m.theme = theme || 'light'; m.listo = f.__listo !== false
+      await save(label + '/' + sc.id + '@' + sn + '.json', m)
+      state.done++
+    }
+  } finally { f.remove() }
+}
+
+async function run(opts) {
+  Object.assign(state, { running: true, done: 0, errors: [], t0: Date.now(), label: opts.label })
+  const sizes = opts.sizes || Object.keys(SIZES)
+  state.total = opts.screens.length * sizes.length
+  for (const sc of opts.screens) {
+    state.current = sc.id; say(state.label + ' ' + state.done + '/' + state.total + ' ' + sc.id)
+    try { await runScreen(opts.label, sc, sizes, opts.theme) } catch (e) { state.errors.push(sc.id + ': ' + e.message); state.done += sizes.length }
+  }
+  state.running = false; say('fin ' + state.label + ' ' + state.done + '/' + state.total + ' errores=' + state.errors.length)
+}
+
+// Pantallas y estados (modales, cajones) que se miden en cada barrido. Los pasos son datos: {click: selector, text: regex}.
+function standard() {
+  const views = ['dashboard', 'notificaciones', 'facturas', 'factura-nueva', 'facturas-simples', 'factura-simple-nueva', 'recurrentes', 'cotizaciones', 'punto-venta', 'clientes', 'cobros', 'productos', 'categorias', 'almacenes', 'inventario-valor', 'ajustes', 'ajuste-nuevo', 'ecf', 'aprobar-ecf', 'bandeja-dgii', 'gastos', 'compras', 'proveedores', 'tesoreria', 'reportes', 'reportes-fiscales', 'reportes-ventas', 'reportes-606', 'reportes-607', 'usuarios', 'bitacora', 'configuracion']
+  const screens = views.map((v) => ({ id: v, view: v }))
+  screens.push({ id: 'login', view: 'dashboard', noAuth: true })
+  const nueva = (item) => [{ click: '.btn', text: '^\\s*Nueva\\s*$' }, { click: '.menu-item', text: item }]
+  const cfg = (t) => [{ click: '.settings-nav .nav-item', text: t }]
+  screens.push(
+    { id: 'm-cliente', view: 'clientes', steps: [{ click: 'button', text: 'Nuevo cliente' }] },
+    { id: 'm-producto', view: 'productos', steps: [{ click: 'button', text: 'Nuevo producto' }] },
+    { id: 'm-usuario', view: 'usuarios', steps: [{ click: 'button', text: 'Nuevo usuario' }] },
+    { id: 'm-proveedor', view: 'proveedores', steps: [{ click: 'button', text: 'Nuevo proveedor' }] },
+    { id: 'm-categoria', view: 'categorias', steps: [{ click: 'button', text: 'Nueva categoría' }] },
+    { id: 'm-almacen', view: 'almacenes', steps: [{ click: 'button', text: 'Nuevo almacén' }] },
+    { id: 'd-bitacora', view: 'bitacora', steps: [{ click: '.tbl tbody tr' }] },
+    { id: 'd-cliente', view: 'clientes', steps: [{ click: '.tbl tbody tr' }] },
+    { id: 'm-gasto', view: 'dashboard', steps: nueva('Gasto menor') },
+    { id: 'm-cobro', view: 'dashboard', steps: nueva('Cobro') },
+    { id: 'v-cotizacion-nueva', view: 'dashboard', steps: nueva('Cotización') },
+    { id: 'v-factura-detalle', view: 'facturas', steps: [{ click: '.tbl tbody tr', wait: 900 }] },
+    { id: 'm-rangos', view: 'ecf', steps: [{ click: 'button', text: 'rango' }] },
+    { id: 's-buscar', view: 'dashboard', steps: [{ click: '.navbar-search' }] },
+    { id: 'cfg-fiscal', view: 'configuracion', steps: cfg('Configuración DGII') },
+    { id: 'cfg-numeracion', view: 'configuracion', steps: cfg('Numeraciones') },
+    { id: 'cfg-plantillas', view: 'configuracion', steps: cfg('Plantillas') },
+    { id: 'cfg-inventario', view: 'configuracion', steps: cfg('Inventario') },
+    { id: 'cfg-impresora', view: 'configuracion', steps: cfg('Impresora') },
+  )
+  return [...screens, ...lineas3()]
+}
+
+// Formularios tipo papel con 3 lineas escritas a mano: la altura que de verdad tiene una factura corta.
+function lineas3() {
+  const mas = (n) => Array.from({ length: n }, () => ({ click: 'button', text: '^\\s*Descripci[oó]n', wait: 250 }))
+  return [
+    { id: 'f3-factura', view: 'factura-nueva', steps: mas(3) },
+    { id: 'f3-simple', view: 'factura-simple-nueva', steps: mas(3) },
+    { id: 'f3-cotizacion', view: 'dashboard', steps: [{ click: '.btn', text: '^\\s*Nueva\\s*$' }, { click: '.menu-item', text: 'Cotización' }, ...mas(3)] },
+  ]
+}
+
+// POS (pos.html): equipo ya habilitado en localStorage; el PIN 1234 entra a la venta con el turno abierto.
+function posScreens() {
+  const ls = { 'fiscalpoint.pos.equipo': JSON.stringify({ state: { equipo: { token: 'equipo-demo', caja: { id: 1, nombre: 'Caja 1', activa: true }, empresa: 'Empresa Demo SRL' } }, version: 0 }) }
+  const pin = ['1', '2', '3', '4'].map((d, i) => ({ click: '.pos-tecla', text: '^' + d + '$', wait: i === 3 ? 1200 : 120 }))
+  const base = { url: '/pos.html', ls, ready: '.pos-teclado' }
+  const add = (n) => Array.from({ length: n }, (_, i) => ({ click: '.pos-producto-celda button', text: i % 2 ? 'Pizza|Papas' : 'Agua|Refresco', wait: 200 }))
+  return [
+    { id: 'pos-pin', ...base },
+    { id: 'pos-venta', ...base, steps: pin, after: '.pos-producto-celda' },
+    { id: 'pos-venta-carrito', ...base, steps: [...pin, ...add(4)], after: '.pos-producto-celda' },
+    { id: 'pos-cobro', ...base, steps: [...pin, ...add(3), { click: 'button', text: 'Cobrar', wait: 600 }], after: '.modal, .pos-modal, .overlay' },
+    { id: 'pos-ventas-dia', ...base, steps: [...pin, { click: 'button', text: 'Ventas del día', wait: 700 }], after: '.modal, .overlay' },
+    { id: 'pos-turno', ...base, steps: [...pin, { click: 'button', text: '^\\s*Turno', wait: 700 }], after: '.modal, .overlay' },
+  ]
+}
+
+window.sweep = {
+  standard, posScreens, lineas3,
+  start(opts) {
+    if (!opts.screens) opts.screens = [...standard(), ...posScreens()]
+    if (opts.only) opts.screens = opts.screens.filter((s) => opts.only.includes(s.id))
+    run(opts)
+    return 'iniciado ' + opts.screens.length + ' pantallas'
+  },
+  status() { return Object.assign({}, state, { secs: Math.round((Date.now() - state.t0) / 1000) }) },
+  async peek(sc, sizeName, theme) {
+    const f = await openScreen(sc, theme)
+    try { const [w, h] = SIZES[sizeName]; f.style.width = w + 'px'; f.style.height = h + 'px'; await sleep(200); const m = measure(f, false); return m } finally { f.remove() }
+  },
+  SIZES,
+}
+</script></body></html>

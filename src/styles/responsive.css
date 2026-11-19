@@ -35,6 +35,34 @@
 }
 
 /* ============================================================
+   DENSIDAD POR ANCHO — portátil ≤1440px · angosto ≤1180px
+   Reasigna las variables HORIZONTALES de styles.css (sidebar, relleno lateral de la
+   página, de las tarjetas, de las tablas y de los diálogos). Va ANTES de los tramos de
+   tableta y teléfono, así esos siguen mandando cuando la ventana es más angosta.
+   Las verticales (alto) están al final del archivo, en "DENSIDAD POR ALTO".
+   ============================================================ */
+@media (max-width: 1440px) {
+  :root {
+    --sidebar-w: 228px;
+    --page-px: 24px;
+    --card-px: 16px;
+    --tbl-px: 12px;
+    --modal-px: 18px;
+    --fx-sheet-px: clamp(24px, 3vw, 40px);
+  }
+}
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-w: 212px;
+    --page-px: 22px;
+    --card-px: 15px;
+    --tbl-px: 10px;
+    --modal-px: 16px;
+    --fx-sheet-px: clamp(20px, 2.6vw, 32px);
+  }
+}
+
+/* ============================================================
    TABLET — ≤1024px
    ============================================================ */
 @media (max-width: 1024px) {
@@ -48,7 +76,8 @@
   /* Refuerzo: los ítems de rejilla/flex pueden encogerse (min-width:auto -> 0). */
   .dash-grid > *, .dash-grid-3 > *, .dash-grid .col { min-width: 0; }
 
-  .page { padding: 22px 22px 56px; }
+  /* Relleno de la página: variables (ver "DENSIDAD"); aquí solo los valores de tableta. */
+  :root { --page-pt-w: 22px; --page-px: 22px; --page-pb-w: 56px; }
 
   /* Una columna sticky pierde sentido apilada: que fluya con el contenido. */
   .dash-grid > .col[style*="sticky"] { position: static !important; }
@@ -58,6 +87,10 @@
    MÓVIL / TABLET-VERTICAL — ≤860px
    ============================================================ */
 @media (max-width: 860px) {
+  /* El drawer conserva su ancho de siempre: el sidebar más angosto de arriba es para
+     cuando está fijo junto al contenido, no para el panel que se desliza. */
+  :root { --sidebar-w: 248px; }
+
   /* ---- Sidebar como drawer deslizable ----
      App.tsx alterna .mobile-open (panel) y .sidebar-backdrop.show (fondo). */
   .sidebar {
@@ -81,11 +114,11 @@
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   .grid-2 > *, .grid-3 > * { min-width: 0; }
 
-  .page { padding: 16px 14px 56px; }
+  :root { --page-pt-w: 16px; --page-px: 14px; --page-pb-w: 56px; }
   .user-chip { padding: 4px; }
 
   /* Configuración: el nav lateral pasa a una fila de pestañas scrollable arriba. */
-  .settings-layout { grid-template-columns: 1fr; gap: 14px; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .settings-nav { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; }
   .settings-nav .nav-item { white-space: nowrap; flex-shrink: 0; }
 }
@@ -95,7 +128,7 @@
    ============================================================ */
 @media (max-width: 560px) {
   /* ---- Espaciado y encabezados de página ---- */
-  .page { padding: 14px 12px 48px; }
+  :root { --page-pt-w: 14px; --page-px: 12px; --page-pb-w: 48px; }
   .page-head { gap: 12px; margin-bottom: 18px; }
   .page-title { font-size: 20px; }
   .page-sub { font-size: 13px; }
@@ -146,6 +179,12 @@
   .drawer-foot { flex-wrap: wrap; }
   .drawer-foot .btn { flex: 1 1 auto; justify-content: center; }
 
+  /* ---- Filas de botones: pasan a otra línea en vez de salirse de la pantalla
+     (paginación, acciones de un formulario...). Solo en teléfono: más ancho no hace falta.
+     Dentro de una tabla no: ahí la fila ya hace scroll dentro de su .tbl-wrap, y envolver los
+     iconos de cada fila (ver, imprimir, editar...) la dejaría el doble de alta. ---- */
+  .row:has(> .btn):not(td .row, th .row) { flex-wrap: wrap; }
+
   /* ---- Control segmentado: a todo el ancho, repartido ---- */
   .seg { display: flex; width: 100%; }
   .seg button { flex: 1; }
@@ -157,4 +196,68 @@
 
   /* ---- Dropdown: no más ancho que la pantalla ---- */
   .menu { max-width: calc(100vw - 24px); }
+}
+
+/* ============================================================
+   DENSIDAD POR ALTO — portátil ≤840px · compacto ≤760px
+   Reasigna las variables VERTICALES de styles.css. Es la causa real del scroll en un
+   portátil de 1366×768: la ventana mide ~620–720px de alto y el diseño de escritorio
+   gasta ~190px solo en barra, relleno y cabecera. Va AL FINAL: aplica en cualquier
+   ancho (también una tableta apaisada o un teléfono), y las medidas de arriba/abajo de
+   la página usan min() con las de ancho, así que nunca agrandan nada.
+   Los tramos se escriben de mayor a menor: cada uno pisa al anterior.
+   ============================================================ */
+@media (max-height: 840px) {
+  :root {
+    --navbar-h: 50px; --brand-icon: 38px;
+    --page-pt: 18px; --page-pb: 44px;
+    --head-mb: 16px; --title-fs: 23px;
+    --card-py: 15px; --card-head-py: 12px;
+    --kpi-py: 11px; --kpi-fs: 22px; --kpi-gap: 10px;
+    --grid-gap: 14px; --grid-gap-sm: 12px;
+    --tbl-th-py: 8px; --tbl-td-py: 9px;
+    --field-mb: 12px; --toolbar-mb: 12px; --tabs-mb: 16px;
+    --modal-hy: 15px; --modal-by: 16px; --modal-fy: 12px;
+    --overlay-p: 18px; --modal-maxh: 92vh;
+    --state-py: 40px; --chart-h: 164px;
+    --sp-sm: 7px; --sp-md: 14px; --sp-lg: 18px;
+    /* la hoja del documento */
+    --fx-sheet-py: clamp(20px, 3vw, 32px);
+    --fx-sec: 20px; --fx-sec-sm: 17px; --fx-sec-lg: 22px;
+    --fx-row-py: 8px; --fx-bar-mt: 14px; --fx-bar-py: 9px;
+  }
+}
+/* Controles: solo con puntero fino. Con el dedo el blanco de toque se queda como estaba. */
+@media (max-height: 840px) and (pointer: fine) {
+  :root {
+    --btn-py: 7px; --ctl-py: 7px; --chip-py: 5px; --tab-py: 9px; --search-py: 6px;
+    --icon-btn: 32px; --line-h: 32px;
+    --nav-item-py: 6px; --nav-label-pt: 10px;
+  }
+}
+@media (max-height: 760px) {
+  :root {
+    --navbar-h: 46px; --brand-icon: 34px;
+    --page-pt: 14px; --page-pb: 32px;
+    --head-mb: 12px; --title-fs: 22px;
+    --card-py: 13px; --card-head-py: 10px;
+    --kpi-py: 9px; --kpi-fs: 20px; --kpi-gap: 8px;
+    --grid-gap: 12px; --grid-gap-sm: 10px;
+    --tbl-th-py: 7px; --tbl-td-py: 7px;
+    --field-mb: 10px; --toolbar-mb: 10px; --tabs-mb: 12px;
+    --modal-hy: 12px; --modal-by: 13px; --modal-fy: 10px;
+    --overlay-p: 12px; --modal-maxh: 96vh;
+    --state-py: 28px; --chart-h: 148px;
+    --sp-sm: 6px; --sp-md: 12px; --sp-lg: 14px;
+    --fx-sheet-py: clamp(16px, 2.4vw, 24px);
+    --fx-sec: 15px; --fx-sec-sm: 13px; --fx-sec-lg: 17px;
+    --fx-row-py: 6px; --fx-bar-mt: 10px; --fx-bar-py: 7px;
+  }
+}
+@media (max-height: 760px) and (pointer: fine) {
+  :root {
+    --btn-py: 6px; --ctl-py: 6px; --chip-py: 5px; --tab-py: 8px; --search-py: 5px;
+    --icon-btn: 30px; --line-h: 30px;
+    --nav-item-py: 5px; --nav-label-pt: 8px;
+  }
 }

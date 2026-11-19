@@ -168,6 +168,20 @@
 .pos-mensaje-pin.error { color: var(--danger); }
 .pos-cuenta { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); text-align: center; }
 
+/* Poca altura (portátil de 1366×768 con la barra del navegador: ~620px): el PIN, con su teclado de cuatro
+   filas, pedía ~640px y la página se desplazaba. Las teclas siguen siendo grandes (56px). Las pantallas con
+   venta (.en-venta) ocupan la ventana exacta y no pasan por aquí. */
+@media (max-height: 700px) {
+  .pos-centro { padding: 12px 16px; }
+  .pos-panel { padding: 20px 24px; }
+  .pos-titulo { font-size: 22px; margin: 12px 0 4px; }
+  .pos-sub { margin-bottom: 14px; }
+  .pos-puntos { margin: 16px 0 14px; }
+  .pos-teclado { gap: 10px; }
+  .pos-tecla { height: 56px; font-size: 24px; }
+  .pos-mensaje-pin { min-height: 32px; margin-top: 8px; }
+}
+
 /* ---- Barra de la caja (con sesion) -------------------------------------- */
 /* La barra es un contenedor (container query): lo que se oculta depende de SU
    ancho, que ya viene dividido por el zoom de tamano.ts. Con @media, un 120 %

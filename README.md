@@ -122,3 +122,5 @@ import './styles/styles-v2.css'
 - Tesorería, recurrentes y notificaciones aún no tienen endpoint: muestran un
   estado vacío hasta que el backend los exponga.
 - El cambio de tema claro/oscuro está en la barra superior y persiste en `localStorage`.
+- Cómo se adapta la interfaz a pantallas chicas (variables de densidad por alto y
+  ancho de la ventana): [`docs/responsive-densidad.md`](docs/responsive-densidad.md).
