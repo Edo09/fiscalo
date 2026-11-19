@@ -173,11 +173,16 @@ export function etiquetaOculta(t: Pick<TenantBuscado, 'motivo_oculto' | 'motivo_
   return null
 }
 
-/** El rótulo de un grupo de empresas ("Grupo · 3 empresas": la cabeza y sus hermanas); null si la unidad no tiene grupo. */
+/**
+ * El rótulo de un grupo de empresas ("Grupo · 3 empresas": la cabeza y sus hermanas); si alguna no paga la mensualidad (solo certificó),
+ * agrega cuántas pagan ("Grupo · 4 empresas · pagan 2"). null si la unidad no tiene grupo.
+ */
 export function textoGrupo(t: Pick<TenantBuscado, 'grupo'>): string | null {
   if (t.grupo === null) return null
   const n = t.grupo.miembros.length + 1
-  return `Grupo · ${n} ${n === 1 ? 'empresa' : 'empresas'}`
+  const pagan = (t.grupo.cabeza_paga ? 1 : 0) + t.grupo.miembros.filter((m) => m.paga).length
+  const base = `Grupo · ${n} ${n === 1 ? 'empresa' : 'empresas'}`
+  return pagan < n ? `${base} · pagan ${pagan}` : base
 }
 
 /** La línea de detalle de un tenant en el buscador de los formularios: su subtítulo y si ya tiene su cobro mensual configurado. */
@@ -185,10 +190,31 @@ export function detalleTenant(t: Pick<TenantBuscado, 'rnc' | 'tipo' | 'ambiente'
   return [subtituloTenant(t), textoGrupo(t), t.con_config ? 'Cobro mensual configurado' : null].filter(Boolean).join(' · ')
 }
 
-/** Las líneas de un grupo para mostrarlas: la cabeza primero y luego sus hermanas ("Nombre · RNC …"); vacío si la unidad no tiene grupo. */
-export function lineasGrupo(t: Pick<TenantBuscado, 'nombre' | 'rnc' | 'grupo'>): string[] {
-  if (t.grupo === null) return []
-  return [`${t.nombre} · RNC ${t.rnc} (cabeza)`, ...t.grupo.miembros.map((m) => `${m.nombre} · RNC ${m.rnc}`)]
+/** Una empresa de un grupo, con su nombre y RNC PROPIOS, si es la cabeza y si paga la mensualidad (y por qué no, si no). */
+export interface EmpresaDeGrupo {
+  id: number
+  nombre: string
+  rnc: string
+  cabeza: boolean
+  paga: boolean
+  motivo: string | null
+}
+
+/**
+ * Las empresas de un grupo para mostrarlas: primero las que pagan (la cabeza antes, si paga, y las demás por id) y después las que no
+ * pagan (solo certificaron), por id; vacío si la unidad no tiene grupo. Usa el nombre y el RNC de cada empresa: el de la fila del
+ * directorio es el de la que se muestra, que puede no ser la cabeza.
+ */
+export function empresasDelGrupo(t: Pick<TenantBuscado, 'grupo'>): EmpresaDeGrupo[] {
+  const g = t.grupo
+  if (g === null) return []
+  const todas: EmpresaDeGrupo[] = [
+    { id: g.cabeza_id, nombre: g.cabeza_nombre, rnc: g.cabeza_rnc, cabeza: true, paga: g.cabeza_paga, motivo: g.cabeza_motivo_sin_pago },
+    ...g.miembros.map((m) => ({ id: m.id, nombre: m.nombre, rnc: m.rnc, cabeza: false, paga: m.paga, motivo: m.motivo_sin_pago })),
+  ]
+  const pagan = todas.filter((e) => e.paga).sort((a, b) => Number(b.cabeza) - Number(a.cabeza) || a.id - b.id)
+  const noPagan = todas.filter((e) => !e.paga).sort((a, b) => a.id - b.id)
+  return [...pagan, ...noPagan]
 }
 
 /** El aviso al quitar a una empresa de la lista de clientes: si es la cabeza de un grupo, sale todo el grupo; null si es una sola empresa. */

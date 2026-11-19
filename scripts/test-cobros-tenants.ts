@@ -19,12 +19,12 @@
 //   node scripts/test-cobros-tenants.ts
 import { readFileSync } from 'node:fs'
 import {
-  ESTADOS_COBRO, cobroDetalleSchema, cobroSchema, configCobroSchema, exclusionResultadoSchema, pagoAnuladoSchema, pagoResultadoSchema,
+  ESTADOS_COBRO, cobroDetalleSchema, cobroSchema, configCobroSchema, exclusionResultadoSchema, pagaResultadoSchema, pagoAnuladoSchema, pagoResultadoSchema,
   panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantBuscadoSchema, tenantsBuscadosSchema,
 } from '../src/api/schemas/cobros.ts'
 import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from '../src/api/rutas-cobros.ts'
 import { cobrosKeys, cobrosTenantsKeys, crearCobrosKeys } from '../src/features/cobros/claves.ts'
-import { detalleCobroMensual, detalleTenant, etiquetaOculta, lineasGrupo, subtituloTenant, textoGrupo, textoQuitarGrupo } from '../src/features/cobros/format.ts'
+import { detalleCobroMensual, detalleTenant, empresasDelGrupo, etiquetaOculta, subtituloTenant, textoGrupo, textoQuitarGrupo } from '../src/features/cobros/format.ts'
 import {
   FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, cumpleFiltro, filtrarDirectorio, totalCobroMensual,
   resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
@@ -144,22 +144,22 @@ chk('...y una respuesta sin lo que había antes NO pasa por exclusionResultadoSc
 console.log('\n2. Rutas: cada ámbito pide la suya')
 // Las formas que reconoce el servidor (api-gratex CobroReglas::ruta), sin el query string.
 const formaServidor = (base: string) =>
-  new RegExp(`^${base}(/(resumen|recordatorios|clientes|clientes/\\d+|clientes/\\d+/config|clientes/\\d+/excluido|\\d+|\\d+/(pagos|cancelar|reabrir|recordatorios)|pagos/\\d+/anular))?$`)
+  new RegExp(`^${base}(/(resumen|recordatorios|clientes|clientes/\\d+|clientes/\\d+/config|clientes/\\d+/excluido|clientes/\\d+/paga|\\d+|\\d+/(pagos|cancelar|reabrir|recordatorios)|pagos/\\d+/anular))?$`)
 for (const [base, nombre] of [[BASE_COBROS, 'empresa'], [BASE_COBROS_TENANTS, 'tenants']] as const) {
   const r = rutasCobros(base)
   const todas = [
     r.lista(), r.lista({ page: 2, pageSize: 25, query: 'alfa', client_id: 4, estado: 'Vencido' }), r.resumen(), r.resumen(30), r.recordatorios(),
-    r.recordatorios({ dias: 15, cada: 7 }), r.buscar(), r.buscar('Alfa', 20), r.buscar('Alfa', 500, true), r.cliente(7), r.config(7), r.excluido(7), r.cobro(12),
+    r.recordatorios({ dias: 15, cada: 7 }), r.buscar(), r.buscar('Alfa', 20), r.buscar('Alfa', 500, true), r.cliente(7), r.config(7), r.excluido(7), r.paga(7), r.cobro(12),
     r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
   ]
   chk(`ámbito ${nombre}: las ${todas.length} rutas empiezan por ${base} y tienen una forma que el servidor reconoce`,
     todas.every((p) => formaServidor(base).test(p.split('?')[0])), todas.filter((p) => !formaServidor(base).test(p.split('?')[0])))
   igual(`ámbito ${nombre}: los ids y los filtros van donde el servidor los espera`, [
     r.lista(), r.lista({ page: 2, pageSize: 25, query: 'alfa', client_id: 4, estado: 'Vencido' }), r.resumen(), r.resumen(30), r.recordatorios({ dias: 15, cada: 7 }),
-    r.cliente(7), r.config(7), r.excluido(7), r.cobro(12), r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
+    r.cliente(7), r.config(7), r.excluido(7), r.paga(7), r.cobro(12), r.pagos(12), r.cancelar(12), r.reabrir(12), r.recordatorio(12), r.anularPago(9),
   ], [
     base, `${base}?page=2&pageSize=25&query=alfa&client_id=4&estado=Vencido`, `${base}/resumen`, `${base}/resumen?dias=30`, `${base}/recordatorios?dias=15&cada=7`,
-    `${base}/clientes/7`, `${base}/clientes/7/config`, `${base}/clientes/7/excluido`, `${base}/12`, `${base}/12/pagos`, `${base}/12/cancelar`, `${base}/12/reabrir`,
+    `${base}/clientes/7`, `${base}/clientes/7/config`, `${base}/clientes/7/excluido`, `${base}/clientes/7/paga`, `${base}/12`, `${base}/12/pagos`, `${base}/12/cancelar`, `${base}/12/reabrir`,
     `${base}/12/recordatorios`, `${base}/pagos/9/anular`,
   ])
 }
@@ -332,15 +332,15 @@ const sinFacturable = { ...(fixture('directorio-grupos').data as Record<string, 
 delete sinFacturable.facturable
 chk('...y una unidad a la que le falta "facturable" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinFacturable).success)
 igual('textoGrupo: "Grupo · N empresas" con la cabeza y sus hermanas, y nada sin grupo', [10, 14, 16].map((id) => textoGrupo(deG(id))), ['Grupo · 3 empresas', 'Grupo · 2 empresas', null])
-igual('textoGrupo: un grupo de una sola empresa (sin hermanas) dice "1 empresa"', textoGrupo({ grupo: { cabeza_id: 18, miembros: [] } }), 'Grupo · 1 empresa')
+igual('textoGrupo: un grupo de una sola empresa (sin hermanas) dice "1 empresa"', textoGrupo({ grupo: { cabeza_id: 18, cabeza_nombre: 'Marcada Interna', cabeza_rnc: '102000018', cabeza_paga: true, cabeza_motivo_sin_pago: null, miembros: [] } }), 'Grupo · 1 empresa')
 igual('etiquetaOculta: "Solo certificación", "No es cliente · <motivo>" y nada para la que se cobra', [17, 18, 14].map((id) => etiquetaOculta(deG(id))), ['Solo certificación', 'No es cliente · Interna', null])
 igual('etiquetaOculta: una marca sin motivo dice solo "No es cliente"', etiquetaOculta({ motivo_oculto: 'excluido', motivo_exclusion: null }), 'No es cliente')
 igual('lo que se ve: sin pedir las que no se cobran, 5 unidades; pidiéndolas, las 8', [ids(clientesDelDirectorio(dirG, false)), ids(clientesDelDirectorio(dirG, true))],
   [[14, 16, 10, 19, 22], [14, 16, 17, 10, 18, 19, 13, 22]])
 igual('contarOcultas: 3 en ese directorio (17, 18 y 13)', contarOcultas(dirG), 3)
-igual('lineasGrupo: la cabeza primero (con "(cabeza)") y sus hermanas por id; nada sin grupo',
-  [lineasGrupo(deG(10)), lineasGrupo(deG(16))],
-  [['Holding Cabeza SRL · RNC 102000010 (cabeza)', 'Holding Hermana Uno · RNC 102000011', 'Holding Hermana Dos · RNC 102000012'], []])
+igual('empresasDelGrupo sin marcas: todas pagan, la cabeza primero y sus hermanas por id, con su nombre y RNC propios; nada sin grupo',
+  [empresasDelGrupo(deG(10)).map((e) => [e.id, e.nombre, e.rnc, e.cabeza, e.paga, e.motivo]), empresasDelGrupo(deG(16))],
+  [[[10, 'Holding Cabeza SRL', '102000010', true, true, null], [11, 'Holding Hermana Uno', '102000011', false, true, null], [12, 'Holding Hermana Dos', '102000012', false, true, null]], []])
 igual('detalleTenant (buscador de los formularios) dice a qué grupo pertenece una unidad: sin él, escribir una hermana mostraría solo a la cabeza sin explicar por qué',
   [detalleTenant(deG(10)), detalleTenant(deG(14))],
   ['RNC 102000010 · Integración · Grupo · 3 empresas', 'RNC 102000014 · Integración · Certificación · Grupo · 2 empresas · Cobro mensual configurado'])
@@ -360,6 +360,37 @@ igual('...suma en centavos: 0.10 + 0.20 da exactamente 0.30', totalCobroMensual(
 igual('...y un directorio sin ningún cobro mensual (o vacío) da cero', [totalCobroMensual([]), totalCobroMensual([{ facturable: true, config: null }])], [{ total: 0, empresas: 0 }, { total: 0, empresas: 0 }])
 igual('con el directorio de siempre: Alfa 6,000 y Delta 2,000 activos (el de Beta está inactivo) dan 8,000 en 2 empresas', totalCobroMensual(dir), { total: 8000, empresas: 2 })
 igual('con el directorio de grupos: solo cuenta Agro (1,500); el cobro mensual apagado de la que solo certificó (1,000) no suma', totalCobroMensual(dirG), { total: 1500, empresas: 1 })
+
+// ---------------------------------------------------------------------------
+console.log('\n11. Quién paga dentro de un grupo: la fila se nombra por quien paga, y cada empresa dice si paga')
+const qpResp = tenantsBuscadosSchema.safeParse(fixture('directorio-quien-paga').data)
+chk('el directorio con empresas que no pagan pasa por tenantsBuscadosSchema: 5 unidades', qpResp.success && qpResp.data.length === 5, !qpResp.success && qpResp.error.issues[0])
+const dirQ = qpResp.success ? qpResp.data : []
+const deQ = (id: number) => dirQ.find((t) => t.id === id)!
+igual('...una fila por unidad (cabezas, nunca una hermana), por el nombre que se muestra: la del grupo 70 es Dist Pagadora y la del 30 Pago Hermana Uno',
+  [ids(dirQ), dirQ.map((t) => t.nombre)], [[70, 30, 40, 50, 60], ['Dist Pagadora', 'Pago Hermana Uno', 'Prod Cabeza', 'Sola Marcada', 'Todas Marcadas A']])
+chk('el grupo 30 (su cabeza no paga) se nombra por la que paga de menor id, y trae la cabeza, quién paga y quién no',
+  deQ(30).nombre === 'Pago Hermana Uno' && deQ(30).grupo?.cabeza_nombre === 'Pago Cabeza' && deQ(30).grupo?.cabeza_paga === false
+  && deQ(30).grupo?.cabeza_motivo_sin_pago === 'Cabeza no paga' && deQ(30).grupo?.miembros.map((m) => [m.id, m.paga]).join('|') === '31,true|32,true|33,false', deQ(30).grupo)
+igual('empresasDelGrupo del grupo 30: las que pagan primero (por id) y después las que no (por id), cada una con su razón: [id, cabeza, paga, motivo]',
+  empresasDelGrupo(deQ(30)).map((e) => [e.id, e.cabeza, e.paga, e.motivo]),
+  [[31, false, true, null], [32, false, true, null], [30, true, false, 'Cabeza no paga'], [33, false, false, 'Solo certifico']])
+igual('textoGrupo agrega cuántas pagan cuando hay alguna que no: "Grupo · 4 empresas · pagan 2"; sin marcas, igual que siempre',
+  [textoGrupo(deQ(30)), textoGrupo(deG(10)), textoGrupo(deQ(60))], ['Grupo · 4 empresas · pagan 2', 'Grupo · 3 empresas', 'Grupo · 2 empresas'])
+chk('un grupo donde ninguna marca aplica (60 y 61 todas marcadas) llega con todas pagando', deQ(60).grupo?.cabeza_paga === true && deQ(60).grupo?.miembros.every((m) => m.paga) === true)
+const sinPaga = JSON.parse(JSON.stringify((fixture('directorio-quien-paga').data as Record<string, unknown>[]).find((t) => t.id === 30)))
+delete sinPaga.grupo.miembros[0].paga
+chk('...y un miembro al que le falta "paga" NO pasa por el esquema (no es de adorno)', !tenantBuscadoSchema.safeParse(sinPaga).success)
+const sinCabezaPaga = JSON.parse(JSON.stringify((fixture('directorio-quien-paga').data as Record<string, unknown>[]).find((t) => t.id === 30)))
+delete sinCabezaPaga.grupo.cabeza_paga
+chk('...ni un grupo al que le falta "cabeza_paga"', !tenantBuscadoSchema.safeParse(sinCabezaPaga).success)
+const paga = pagaResultadoSchema.safeParse(fixture('paga').data)
+chk('marcar que una empresa no paga pasa por pagaResultadoSchema: la 30, no paga, con su motivo, no repetido, y lo de antes (pagaba, sin motivo)',
+  paga.success && paga.data.client_id === 30 && paga.data.paga === false && paga.data.motivo === 'Cabeza no paga' && paga.data.repetido === false
+  && paga.data.anterior.paga === true && paga.data.anterior.motivo === null, !paga.success && paga.error.issues[0])
+chk('...y una respuesta sin lo que había antes NO pasa por pagaResultadoSchema',
+  !pagaResultadoSchema.safeParse({ client_id: 30, paga: false, motivo: null, repetido: false }).success)
+igual('la ruta de marcar quién paga cuelga del cliente en la plataforma', rutasCobros(BASE_COBROS_TENANTS).paga(7), '/api/cobros-tenants/clientes/7/paga')
 
 console.log(`\n${total - fallos}/${total} OK`)
 if (fallos > 0) process.exit(1)

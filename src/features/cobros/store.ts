@@ -41,6 +41,8 @@ export type ModalCobros =
   | { tipo: 'filtrar-cliente' }
   /** Quitar a una empresa de la lista de clientes (solo la plataforma). El nombre y las empresas de su grupo (ella incluida) son solo para mostrarlos. */
   | { tipo: 'excluir'; clientId: number; nombre: string; empresas?: number }
+  /** Marcar que una empresa de un grupo no paga la mensualidad (solo la plataforma). El nombre es solo para mostrarlo. */
+  | { tipo: 'no-paga'; clientId: number; nombre: string }
 
 export const PAGE_SIZES = [10, 25, 50]
 

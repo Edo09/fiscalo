@@ -146,6 +146,10 @@ export const useGuardarConfig = () =>
 export const useExcluirTenant = () =>
   useMutacion((api, { clientId, excluido, motivo }: { clientId: number; excluido: boolean; motivo?: string }) =>
     api.excluirTenant(clientId, excluido, motivo))
+/** Marcar que una empresa de un grupo paga la mensualidad o que no (solo certificó): invalida todo el ámbito, y con él el directorio y los nombres. */
+export const usePagaTenant = () =>
+  useMutacion((api, { clientId, paga, motivo }: { clientId: number; paga: boolean; motivo?: string }) =>
+    api.marcarPagoTenant(clientId, paga, motivo))
 export const useRegistrarRecordatorio = () =>
   useMutacion((api, { cobroId, recordatorio }: { cobroId: number; recordatorio: RecordatorioInput }) =>
     api.registrarRecordatorioCobro(cobroId, recordatorio))

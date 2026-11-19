@@ -129,10 +129,20 @@ export const configCobroSchema = z.object({
 })
 export type ConfigCobro = z.infer<typeof configCobroSchema>
 
-/** Un grupo de empresas de un mismo cliente (tenants.grupo_id): se cobra UNA vez, en su cabeza; sus hermanas viajan aquí. */
+/**
+ * Un grupo de empresas de un mismo cliente (tenants.grupo_id): se cobra UNA vez, en su cabeza; sus hermanas viajan aquí. No todas las
+ * empresas del grupo pagan la mensualidad (algunas solo certificaron): cada una dice `paga`, y la fila del directorio se nombra por
+ * la que paga (la cabeza, si paga; si no, la de menor id), mientras el cobro sigue en la cabeza.
+ */
 export const grupoTenantSchema = z.object({
-  /** La empresa que cobra por el grupo: la fila del directorio que trae este grupo. */
+  /** La empresa que cobra por el grupo: la fila del directorio que trae este grupo (el cobro vive en su id). */
   cabeza_id: z.number(),
+  /** El nombre y el RNC propios de la cabeza (el de la fila es el de la empresa que se muestra, que puede ser otra). */
+  cabeza_nombre: z.string(),
+  cabeza_rnc: z.string(),
+  /** La cabeza paga la mensualidad (false = solo certificó). */
+  cabeza_paga: z.boolean(),
+  cabeza_motivo_sin_pago: z.string().nullable(),
   /** Las demás empresas del grupo, por id (vacío en un grupo de una sola empresa). */
   miembros: z.array(z.object({
     id: z.number(),
@@ -140,6 +150,9 @@ export const grupoTenantSchema = z.object({
     rnc: z.string(),
     tipo: z.string(),
     ambiente: z.string(),
+    /** Paga la mensualidad (false = solo certificó). */
+    paga: z.boolean(),
+    motivo_sin_pago: z.string().nullable(),
   })),
 })
 export type GrupoTenant = z.infer<typeof grupoTenantSchema>
@@ -194,6 +207,18 @@ export const exclusionResultadoSchema = z.object({
   anterior: z.object({ excluido: z.boolean(), motivo: z.string().nullable() }),
 })
 export type ExclusionResultado = z.infer<typeof exclusionResultadoSchema>
+
+/** Lo que responde PUT /api/cobros-tenants/clientes/{id}/paga: marcar que una empresa de un grupo paga la mensualidad, o que no. */
+export const pagaResultadoSchema = z.object({
+  client_id: z.number(),
+  paga: z.boolean(),
+  motivo: z.string().nullable(),
+  /** Ya estaba así: no se cambió nada. */
+  repetido: z.boolean(),
+  /** Lo que había antes (para la bitácora). */
+  anterior: z.object({ paga: z.boolean(), motivo: z.string().nullable() }),
+})
+export type PagaResultado = z.infer<typeof pagaResultadoSchema>
 
 export const resumenCobrosSchema = z.object({
   /** La fecha de RD del servidor, AAAA-MM-DD. */

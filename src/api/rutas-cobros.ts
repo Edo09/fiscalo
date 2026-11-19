@@ -20,6 +20,8 @@ export function rutasCobros(base: string) {
     buscar: (query?: string, limite?: number, conExcluidos?: boolean) => `${base}/clientes${qs({ query, limite, excluidos: conExcluidos ? 1 : undefined })}`,
     /** Solo en la plataforma: quitar a un tenant de la lista de clientes, o devolverlo (PUT). */
     excluido: (clientId: number) => `${base}/clientes/${clientId}/excluido`,
+    /** Solo en la plataforma: marcar que una empresa de un grupo paga la mensualidad, o que no (PUT). */
+    paga: (clientId: number) => `${base}/clientes/${clientId}/paga`,
     cliente: (clientId: number) => `${base}/clientes/${clientId}`,
     config: (clientId: number) => `${base}/clientes/${clientId}/config`,
     cobro: (id: number) => `${base}/${id}`,

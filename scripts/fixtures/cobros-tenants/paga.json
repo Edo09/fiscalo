@@ -1,0 +1,13 @@
+{
+    "status": true,
+    "data": {
+        "client_id": 30,
+        "paga": false,
+        "motivo": "Cabeza no paga",
+        "repetido": false,
+        "anterior": {
+            "paga": true,
+            "motivo": null
+        }
+    }
+}

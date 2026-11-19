@@ -13,10 +13,10 @@ import { BASE_COBROS, BASE_COBROS_TENANTS, rutasCobros } from './rutas-cobros'
 import type { ListResult } from './types'
 import {
   cobroActualizadoSchema, cobroDetalleSchema, cobroSchema, configCobroSchema, pagoAnuladoSchema, pagoResultadoSchema,
-  exclusionResultadoSchema, panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantsBuscadosSchema,
+  exclusionResultadoSchema, pagaResultadoSchema, panelClienteSchema, recordatorioResultadoSchema, recordatoriosCobrosSchema, resumenCobrosSchema, tenantsBuscadosSchema,
   type Cobro, type CobroActualizado, type CobroDetalle, type ConfigCobro, type EstadoCobro, type MetodoPago,
   type PagoAnulado, type PagoResultado, type PanelCliente, type RecordatorioResultado, type RecordatoriosCobros,
-  type ResumenCobros, type CanalRecordatorio, type ExclusionResultado, type TenantBuscado,
+  type ResumenCobros, type CanalRecordatorio, type ExclusionResultado, type PagaResultado, type TenantBuscado,
 } from './schemas/cobros'
 
 const MSG_RESPUESTA = 'Recibimos del servidor una respuesta que no entendemos. Actualiza la página e inténtalo de nuevo; si sigue pasando, avisa a soporte.'
@@ -120,6 +120,12 @@ export interface ApiCobros {
    * Con cobros abiertos o su cobro mensual activo da 409 (codigo TIENE_COBROS_ABIERTOS / CONFIG_ACTIVA). Solo en la plataforma.
    */
   excluirTenant(clientId: number, excluido: boolean, motivo?: string): Promise<ExclusionResultado>
+  /**
+   * Marca que una empresa de un grupo no paga la mensualidad del grupo (`paga: false`, con su motivo si se quiere: solo certificó) o que sí la
+   * paga (`true`). No borra nada. Marcar exige un grupo de dos o más (409 NO_ES_DE_UN_GRUPO) y que quede otra que pague (409 ULTIMA_QUE_PAGA).
+   * Solo en la plataforma.
+   */
+  marcarPagoTenant(clientId: number, paga: boolean, motivo?: string): Promise<PagaResultado>
   /** Monto mensual y día de vencimiento de un cliente. No toca los cobros que ya existen. */
   guardarConfigCobro(clientId: number, input: ConfigCobroInput): Promise<ConfigCobro>
   /** Crea un cobro a mano. Un cobro del mismo cliente y periodo ya existente da 409 (codigo COBRO_DUPLICADO). */
@@ -163,6 +169,9 @@ export function crearApiCobros(base: string): ApiCobros {
     },
     async excluirTenant(clientId, excluido, motivo) {
       return parsear(exclusionResultadoSchema, await enviar(r.excluido(clientId), 'PUT', { excluido, motivo }), 'PUT excluido')
+    },
+    async marcarPagoTenant(clientId, paga, motivo) {
+      return parsear(pagaResultadoSchema, await enviar(r.paga(clientId), 'PUT', { paga, motivo }), 'PUT paga')
     },
     async guardarConfigCobro(clientId, input) {
       return parsear(configCobroSchema, await enviar(r.config(clientId), 'PUT', input), 'PUT config')

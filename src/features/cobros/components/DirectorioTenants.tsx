@@ -10,8 +10,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Avatar, Btn, Card, Dropdown, EmptyState, ErrorState, Icon, LoadingState, MenuItem, Money } from '@/components/ui'
 import { ApiError, type TenantBuscado } from '@/api'
-import { cobrosTexto, detalleCobroMensual, diasTexto, etiquetaOculta, fechaCorta, lineasGrupo, subtituloTenant, textoGrupo } from '../format'
-import { useDirectorioTenants, useExcluirTenant } from '../hooks'
+import {
+  cobrosTexto, detalleCobroMensual, diasTexto, empresasDelGrupo, etiquetaOculta, fechaCorta, subtituloTenant, textoGrupo, type EmpresaDeGrupo,
+} from '../format'
+import { useDirectorioTenants, useExcluirTenant, usePagaTenant } from '../hooks'
 import {
   FILTROS_DIRECTORIO, MAX_DIRECTORIO, TIPOS_DIRECTORIO, clientesDelDirectorio, conteoDeFiltro, contarOcultas, filtrarDirectorio,
   resumenDirectorio, type FiltroDirectorio, type TipoDirectorio,
@@ -25,6 +27,7 @@ export function DirectorioTenants() {
   const abrirPanel = useCobrosUi((s) => s.abrirPanel)
   const abrirModal = useCobrosUi((s) => s.abrirModal)
   const excluir = useExcluirTenant()
+  const pagaTenant = usePagaTenant()
   const [input, setInput] = useState('')
   const [texto, setTexto] = useState('')
   const [filtro, setFiltro] = useState<FiltroDirectorio>('todos')
@@ -65,6 +68,16 @@ export function DirectorioTenants() {
       toast.success(`Se quitó la marca "No es cliente" de ${t.nombre}.`)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo devolver la empresa a la lista de clientes.')
+    }
+  }
+
+  // "Sí paga": la empresa de un grupo que solo certificó vuelve a contar como la que paga la mensualidad. ("No paga" abre su ventana.)
+  const devolverPaga = async (e: EmpresaDeGrupo) => {
+    try {
+      await pagaTenant.mutateAsync({ clientId: e.id, paga: true })
+      toast.success(`${e.nombre} vuelve a contar como la que paga la mensualidad del grupo.`)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar si la empresa paga la mensualidad.')
     }
   }
 
@@ -165,9 +178,29 @@ export function DirectorioTenants() {
                                 </span>
                               </button>
                               {gruposAbiertos.has(t.id) && (
-                                <ul className="cell-sub" style={{ margin: '2px 0 0', paddingLeft: 16 }}>
-                                  {lineasGrupo(t).map((l) => <li key={l}>{l}</li>)}
-                                </ul>
+                                <div className="cell-sub" style={{ margin: '4px 0 0' }} onClick={(e) => e.stopPropagation()}>
+                                  {[{ titulo: 'Pagan', paga: true }, { titulo: 'Solo certificaron', paga: false }].map(({ titulo, paga }) => {
+                                    const lista = empresasDelGrupo(t).filter((e) => e.paga === paga)
+                                    if (lista.length === 0) return null
+                                    return (
+                                      <div key={titulo} style={{ marginTop: 2 }}>
+                                        <div className="fw6">{titulo}</div>
+                                        <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+                                          {lista.map((e) => (
+                                            <li key={e.id} title={e.motivo ?? undefined}>
+                                              {e.nombre} · RNC {e.rnc}{e.cabeza ? ' (cabeza)' : ''}{' '}
+                                              {!paga ? (
+                                                <Btn variant="ghost" size="sm" onClick={() => void devolverPaga(e)} disabled={pagaTenant.isPending}>Sí paga</Btn>
+                                              ) : lista.length > 1 ? (
+                                                <Btn variant="ghost" size="sm" onClick={() => abrirModal({ tipo: 'no-paga', clientId: e.id, nombre: e.nombre })}>No paga</Btn>
+                                              ) : null}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               )}
                             </>
                           )}

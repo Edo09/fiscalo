@@ -33,13 +33,19 @@
             "motivo_oculto": null,
             "grupo": {
                 "cabeza_id": 14,
+                "cabeza_nombre": "Agro Cabeza",
+                "cabeza_rnc": "102000014",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
                 "miembros": [
                     {
                         "id": 15,
                         "nombre": "Agro Hermana",
                         "rnc": "102000015",
                         "tipo": "integracion",
-                        "ambiente": "certecf"
+                        "ambiente": "certecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
                     }
                 ]
             }
@@ -126,20 +132,28 @@
             "motivo_oculto": null,
             "grupo": {
                 "cabeza_id": 10,
+                "cabeza_nombre": "Holding Cabeza SRL",
+                "cabeza_rnc": "102000010",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
                 "miembros": [
                     {
                         "id": 11,
                         "nombre": "Holding Hermana Uno",
                         "rnc": "102000011",
                         "tipo": "integracion",
-                        "ambiente": "ecf"
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
                     },
                     {
                         "id": 12,
                         "nombre": "Holding Hermana Dos",
                         "rnc": "102000012",
                         "tipo": "integracion",
-                        "ambiente": "certecf"
+                        "ambiente": "certecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
                     }
                 ]
             }
@@ -194,13 +208,19 @@
             "motivo_oculto": null,
             "grupo": {
                 "cabeza_id": 19,
+                "cabeza_nombre": "Sin Cabeza Uno",
+                "cabeza_rnc": "102000019",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
                 "miembros": [
                     {
                         "id": 20,
                         "nombre": "Sin Cabeza Dos",
                         "rnc": "102000020",
                         "tipo": "integracion",
-                        "ambiente": "ecf"
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
                     }
                 ]
             }
@@ -255,13 +275,19 @@
             "motivo_oculto": null,
             "grupo": {
                 "cabeza_id": 22,
+                "cabeza_nombre": "Zeta Cabeza Cert",
+                "cabeza_rnc": "102000022",
+                "cabeza_paga": true,
+                "cabeza_motivo_sin_pago": null,
                 "miembros": [
                     {
                         "id": 23,
                         "nombre": "Zeta Hermana Prod",
                         "rnc": "102000023",
                         "tipo": "integracion",
-                        "ambiente": "ecf"
+                        "ambiente": "ecf",
+                        "paga": true,
+                        "motivo_sin_pago": null
                     }
                 ]
             }

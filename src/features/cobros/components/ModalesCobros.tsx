@@ -6,6 +6,7 @@ import { ElegirClienteModal } from './ElegirClienteModal'
 import { AnularPagoModal, CancelarCobroModal } from './MotivoModals'
 import { PagoFormModal } from './PagoFormModal'
 import { QuitarClienteModal } from './QuitarClienteModal'
+import { SinPagoModal } from './SinPagoModal'
 import { RecordatorioFormModal } from './RecordatorioFormModal'
 
 export function ModalesCobros() {
@@ -27,6 +28,7 @@ export function ModalesCobros() {
       {modal.tipo === 'recordatorio' && <RecordatorioFormModal key={clave} cobroId={modal.cobroId} onClose={cerrar} />}
       {modal.tipo === 'elegir-cliente' && <ElegirClienteModal key={clave} modo="panel" onClose={cerrar} />}
       {modal.tipo === 'filtrar-cliente' && <ElegirClienteModal key={clave} modo="filtro" onClose={cerrar} />}
+      {modal.tipo === 'no-paga' && <SinPagoModal key={clave} clientId={modal.clientId} nombre={modal.nombre} onClose={cerrar} />}
       {modal.tipo === 'excluir' && <QuitarClienteModal key={clave} clientId={modal.clientId} nombre={modal.nombre} empresas={modal.empresas} onClose={cerrar} />}
     </div>
   )
