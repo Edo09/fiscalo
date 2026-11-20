@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, Badge, Card, LoadingState, ErrorState, PageHead, type IconName } from '@/components/ui'
@@ -7,6 +7,8 @@ import { useApiQuery } from '@/hooks/useApiQuery'
 import { esRolAdmin, hasModule } from '@/config/permissions'
 import { useSession } from '@/stores/auth'
 import { BrandingSection } from './BrandingSection'
+import { EmpresaForm } from './EmpresaForm'
+import { claveEmisor } from './emisorValidacion'
 import { ImpresoraSection } from './ImpresoraSection'
 import { InventarioSection } from './InventarioSection'
 import { RangosNcfModal } from '@/features/ecf/RangosNcfModal'
@@ -34,6 +36,9 @@ export function SettingsView() {
   // Bloquear ventas sin existencia lo cambia solo el administrador (por nombre de rol,
   // como la bitácora): el API responde 403 a cualquier otro rol.
   const esAdmin = esRolAdmin(user?.role)
+  // Los datos de la empresa (todo menos el RNC y la razón social) los cambia el administrador, o un rol al que se le dio el
+  // módulo emisor: el mismo requisito que pone el API para PUT /api/emisor (403 a cualquier otro). Los demás roles los ven sin editar.
+  const puedeEditarEmisor = esAdmin || (!!user?.permissions && hasModule(user.permissions, 'emisor'))
   const fileRef = useRef<HTMLInputElement>(null)
   const [sec, setSec] = useState('empresa')
   const [logoBusy, setLogoBusy] = useState(false)
@@ -42,13 +47,6 @@ export function SettingsView() {
   const { data: branding } = useApiQuery(['branding'], getBranding)
   const { data: ubicaciones } = useApiQuery(['ubicaciones'], listUbicaciones)
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
-
-  // Municipio/Provincia se guardan como código DGII; mostramos la descripción.
-  const locByCode = useMemo(
-    () => Object.fromEntries((ubicaciones ?? []).map((u) => [u.codigo, u.descripcion])),
-    [ubicaciones],
-  )
-  const loc = (code?: string | null) => (code ? (locByCode[code] ?? '—') : '—')
 
   const invalidateBranding = () => void queryClient.invalidateQueries({ queryKey: ['branding'] })
 
@@ -102,7 +100,12 @@ export function SettingsView() {
         </div>
         <div className="col gap-md">
           {sec === 'empresa' && (
-            <Card title="Datos de empresa" sub="Datos del emisor registrados en la DGII · solo lectura">
+            <Card
+              title="Datos de empresa"
+              sub={puedeEditarEmisor
+                ? 'Los datos de tu empresa que salen en facturas y comprobantes. El RNC y la razón social solo los cambia soporte.'
+                : 'Datos del emisor registrados en la DGII · solo lectura'}
+            >
               {loading ? (
                 <LoadingState rows={5} />
               ) : error ? (
@@ -128,19 +131,8 @@ export function SettingsView() {
                       )}
                     </div>
                   )}
-                  <div className="form-grid">
-                    <div className="field"><label>Razón social</label><input className="input" readOnly value={emisor.razon_social} /></div>
-                    <div className="field"><label>Nombre comercial</label><input className="input" readOnly value={emisor.nombre_comercial ?? '—'} /></div>
-                    <div className="field"><label>RNC</label><input className="input mono" readOnly value={emisor.rnc} /></div>
-                    <div className="field"><label>Sucursal</label><input className="input" readOnly value={emisor.sucursal ?? '—'} /></div>
-                    <div className="field full"><label>Dirección</label><input className="input" readOnly value={emisor.direccion ?? '—'} /></div>
-                    <div className="field"><label>Municipio</label><input className="input" readOnly value={loc(emisor.municipio)} /></div>
-                    <div className="field"><label>Provincia</label><input className="input" readOnly value={loc(emisor.provincia)} /></div>
-                    <div className="field"><label>Teléfono</label><input className="input" readOnly value={emisor.telefono ?? '—'} /></div>
-                    <div className="field"><label>Correo</label><input className="input" readOnly value={emisor.correo ?? '—'} /></div>
-                    <div className="field"><label>Sitio web</label><input className="input" readOnly value={emisor.website ?? '—'} /></div>
-                    <div className="field"><label>Actividad económica</label><input className="input" readOnly value={emisor.actividad_economica ?? '—'} /></div>
-                  </div>
+                  {/* key: si el servidor cambia algún dato (al guardar, o desde otra sesión) el formulario arranca con los nuevos. */}
+                  <EmpresaForm key={claveEmisor(emisor)} emisor={emisor} ubicaciones={ubicaciones} puedeEditar={puedeEditarEmisor} />
                 </>
               )}
             </Card>

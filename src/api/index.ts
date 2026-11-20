@@ -74,7 +74,7 @@ export {
   getReporteVentas, downloadReporteVentas,
   type VentasParams,
 } from './reportes'
-export { getEmisor } from './emisor'
+export { getEmisor, updateEmisor } from './emisor'
 export {
   getBranding,
   updateBranding,

@@ -35,6 +35,13 @@ Módulos del rol `user` por defecto (operativos): `facturas`, `facturas-simples`
 `unidades`. **Solo admin** (excluidos de `user`): `emisor`, `branding`, `landing`, `users`,
 `roles`. (Si un `user` necesita un módulo admin, crear/ajustar un rol con `/api/roles`.)
 
+> `emisor` es el módulo de **Configuración › Datos de empresa**: el rol `admin` (o un rol al que se
+> le dé `emisor`) edita todo menos el RNC y la razón social, con `PUT /api/emisor`; los demás roles
+> ven esos datos sin poder cambiarlos (`GET /api/emisor` es abierto). El formulario revisa antes de
+> enviar las mismas reglas que el servidor (`src/features/settings/emisorValidacion.ts` y
+> `api-gratex/src/Utils/EmisorEdicion.php`, que son las del XSD de la DGII); ver
+> `api-gratex/docs/modules/emisor.md`.
+
 > `conduces` **no es un módulo**: `/api/conduces` (los conduces de mercancía de Ferretería) usa
 > el módulo `cotizaciones` (`'conduces' => 'cotizaciones'` en `routes` del backend), porque un
 > conduce sale de una cotización (o se crea sin ella, pero es del mismo trabajo). Quien tiene `cotizaciones` ve y usa los conduces; sin él, 403

@@ -1184,8 +1184,27 @@ export interface GastoStatsData {
 }
 
 // ---------------------------------------------------------------------------
-// Emisor — GET /api/emisor (datos fiscales del emisor; solo lectura)
+// Emisor — GET /api/emisor (datos fiscales de la empresa, los lee cualquier rol)
+//          PUT /api/emisor (el administrador cambia todo menos el RNC y la razón social)
 // ---------------------------------------------------------------------------
+
+/**
+ * Lo que se puede cambiar con PUT /api/emisor. Parcial: solo lo que cambió.
+ * `municipio` y `provincia` son el código DGII de 6 dígitos; un opcional en
+ * blanco ('') lo deja vacío. El RNC y la razón social no van: el servidor
+ * rechaza (422) cualquiera distinto del guardado.
+ */
+export interface EmisorInput {
+  nombre_comercial?: string
+  sucursal?: string
+  direccion?: string
+  municipio?: string
+  provincia?: string
+  telefono?: string
+  correo?: string
+  website?: string
+  actividad_economica?: string
+}
 
 export interface EmisorData {
   rnc: string

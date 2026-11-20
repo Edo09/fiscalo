@@ -3,11 +3,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Icon, Btn, RefreshButton, Avatar, Card, KPI, Drawer, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
 import { ApiError, listClients, updateClient, deleteClient, mapClientRow, listUbicaciones } from '@/api'
-import type { ClientRow, Ubicacion } from '@/api'
+import type { ClientRow } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { puedeVerVista, type Nav } from '@/config/navigation'
 import { useSession } from '@/stores/auth'
 import { listaDeCliente } from '@/lib/listasPrecio'
+import { codigoProvincia, opcionesUbicacion } from '@/lib/ubicaciones'
 import type { Cliente } from '@/types/domain'
 import { NewClientModal } from './NewClientModal'
 import {
@@ -163,34 +164,6 @@ export function ClientsView({ nav }: { nav: Nav }) {
   )
 }
 
-/**
- * Municipio y provincia salen del catálogo DGII (`/api/provincias-municipios`),
- * no de texto libre: lo que se persiste es el `codigo` de 6 dígitos, que es lo
- * que viaja en el XML del e-CF. Un nombre escrito a mano no lo resuelve DGII.
- *
- * Los clientes migrados de sistemas anteriores traen nombres sueltos ("SAN
- * FRANCISCO DE MACORIS"). Para no perderlos en silencio, si el valor guardado
- * no es un código conocido se intenta casar por nombre y, si tampoco, se ofrece
- * como una opción más marcada como valor actual.
- */
-function opcionesUbicacion(
-  ubicaciones: Ubicacion[] | null | undefined,
-  tipo: 'PROVINCIA' | 'MUNICIPIO',
-  provinciaCodigo2: string,
-  valorActual: string,
-): Ubicacion[] {
-  const todas = (ubicaciones ?? []).filter((u) => u.tipo === tipo)
-  const lista = tipo === 'MUNICIPIO' && provinciaCodigo2
-    ? todas.filter((u) => (u.provincia_codigo ?? '') === provinciaCodigo2)
-    : todas
-  const v = valorActual.trim()
-  if (!v || lista.some((u) => u.codigo === v)) return lista
-  // Valor heredado: si coincide con un nombre del catálogo se usa ese código.
-  const porNombre = todas.find((u) => u.descripcion.toLowerCase() === v.toLowerCase())
-  if (porNombre) return lista.some((u) => u.codigo === porNombre.codigo) ? lista : [porNombre, ...lista]
-  return [{ tipo, codigo: v, descripcion: `${v} (valor actual)`, provincia_codigo: null }, ...lista]
-}
-
 /* Drawer de cliente: datos editables, guarda con PUT /api/clients. */
 function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Nav; onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -230,9 +203,7 @@ function ClientEditDrawer({ client, nav, onClose }: { client: ClientRow; nav: Na
 
   // Codigo de 2 digitos de la provincia elegida: filtra los municipios. Sale del
   // catalogo, o de los 2 primeros digitos del codigo guardado como respaldo.
-  const provinciaCodigo2 =
-    (ubicaciones ?? []).find((u) => u.tipo === 'PROVINCIA' && u.codigo === form.provincia)?.provincia_codigo
-    ?? form.provincia.slice(0, 2)
+  const provinciaCodigo2 = codigoProvincia(ubicaciones, form.provincia)
 
   /**
    * Solo viaja lo que cambió: el PUT es parcial y el backend conserva el resto.
