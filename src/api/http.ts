@@ -227,6 +227,14 @@ export function postJson<T>(path: string, payload: unknown): Promise<T> {
   })
 }
 
+export function putJson<T>(path: string, payload: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
 // El query string vive en qs.ts (sin dependencias, para probar con Node lo que arma rutas); se re-exporta
 // porque siempre se importó desde este módulo.
 export { qs } from './qs'

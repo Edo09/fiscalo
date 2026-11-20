@@ -1174,6 +1174,19 @@ export interface RegisterRangoInput {
   no_solicitud?: string
   no_autorizacion?: string
 }
+
+/**
+ * Lo que se puede corregir de un rango con PUT /api/ncf/rangos/{id}. Parcial: solo lo que cambió. Un
+ * `no_*` en '' borra el dato. El servidor rechaza (422) el tipo, el ambiente y el contador.
+ */
+export interface UpdateRangoInput {
+  /** YYYY-MM-DD */
+  fecha_vencimiento?: string
+  numero_desde?: number
+  numero_hasta?: number
+  no_solicitud?: string
+  no_autorizacion?: string
+}
 export interface GastoStatsData {
   resumen: GastoStatsResumen
   por_tipo: GastoStatsPorTipo[]

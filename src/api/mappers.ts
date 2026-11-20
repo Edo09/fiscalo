@@ -6,23 +6,16 @@ import { listaDeCliente, otrosPreciosDeFila } from '@/lib/listasPrecio'
 import { modificaDeFila, notasDeFila } from '@/features/invoices/notasVinculadas'
 import { estadoExistencia } from '@/features/inventory/existencia'
 import { dgiiLabel } from './estadosDgii'
+import { formatApiDate } from './fechas'
 
 // Etiquetas y preguntas sobre el estado DGII: viven en estadosDgii.ts (sin
 // imports, para probarlas con node) y se re-exportan aquí, de donde la app
 // siempre las importó.
 export { dgiiLabel, isAceptado, isRechazo, isEnVuelo } from './estadosDgii'
 
-/** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
-export function formatApiDate(value?: string | null): string {
-  if (!value) return '—'
-  const s = value.trim()
-  const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s)
-  const d = ddmmyyyy
-    ? new Date(Number(ddmmyyyy[3]), Number(ddmmyyyy[2]) - 1, Number(ddmmyyyy[1]))
-    : new Date(s.replace(' ', 'T'))
-  if (Number.isNaN(d.getTime())) return s
-  return d.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+// formatApiDate vive en fechas.ts (sin imports, para probarlo con node) y se re-exporta aquí, de donde la
+// app siempre lo importó.
+export { formatApiDate } from './fechas'
 
 /** `2026-05` -> `may` (abreviatura de mes en es-DO). */
 export function formatMonthKey(key: string): string {
