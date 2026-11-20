@@ -1,7 +1,7 @@
 import { Btn, RefreshButton, Money, EstadoBadge, Card, KPI, BarChart, Donut, Progress, Spinner, ErrorState, PageHead, type KpiProps } from '@/components/ui'
 import {
   getStats, getGastoStats, getFacturaSimpleStats, listFacturas, listFacturasSimples, listGastos,
-  mapFacturaRow, formatApiDate, formatMonthKey, dgiiLabel,
+  mapFacturaRow, formatApiDate, formatMonthKey, dgiiLabel, isAceptado,
 } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession } from '@/stores/auth'
@@ -89,7 +89,6 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
   const ultimasGastos = ultimasGastosReq.data?.items ?? []
 
   const d = stats.data
-  const resumen = d?.resumen
 
   // Claves del mes/día en curso y del mes anterior (YYYY-MM / YYYY-MM-DD).
   const now = new Date()
@@ -134,7 +133,10 @@ export function DashboardView({ nav }: { nav: Nav; variant?: 'balanced' | 'focus
     .filter((g) => (g.fecha ?? '').startsWith(mk))
     .reduce((a, g) => a + Number(g.itbis ?? 0), 0)
 
-  const totalEcf = resumen?.total_ecf ?? 0
+  // "Total facturas" cuenta los e-CF que la DGII aprobó (ACEPTADO, ACEPTADO_CONDICIONAL y los RFCE aceptados): la misma
+  // regla del filtro "Aprobados" del listado y del cuadro "Comprobantes" de Facturación. resumen.total_ecf cuenta todas
+  // las filas, también las rechazadas y las que esperan veredicto, así que no sirve para "emitidas".
+  const totalEcf = (d?.por_estado ?? []).filter((e) => isAceptado(e.estado)).reduce((a, e) => a + e.total, 0)
   const totalSimples = s?.resumen?.total ?? 0
 
   const dVentas = deltaPct(ventasMes, ventasMesPrev)
