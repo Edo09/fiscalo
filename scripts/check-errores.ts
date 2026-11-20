@@ -4,7 +4,7 @@
 //
 // Uso (Node 22.18+ quita los tipos solo, sin compilar):
 //   node scripts/check-errores.ts
-import { ESTADOS_EN_VUELO, dgiiLabel, isEnVuelo, isRechazo, puedeReenviarEstado } from '../src/api/estadosDgii.ts'
+import { ESTADOS_EN_VUELO, dgiiLabel, isAceptado, isEnVuelo, isRechazo, puedeReenviarEstado } from '../src/api/estadosDgii.ts'
 import { ApiError, clasificar, codigoDe, errorDeRespuesta, humanizar, networkError } from '../src/api/errores.ts'
 import type { EstadoDgii } from '../src/api/types.ts'
 import {
@@ -56,6 +56,19 @@ igual('isEnVuelo: solo PENDIENTE_ENVIO y ENVIO_INCIERTO',
 igual('isRechazo no cambia: RECHAZADO, RECHAZADO_ARCHIVADO y RFCE_RECHAZADO',
   ['RECHAZADO', 'RECHAZADO_ARCHIVADO', 'RFCE_RECHAZADO', 'ENVIO_INCIERTO', 'NO_ENCONTRADO_ARCHIVADO'].map(isRechazo),
   [true, true, true, false, false])
+
+// "Aprobado" = lo que cuenta el cuadro "Comprobantes" de Facturación y lo que filtra "Aprobados" en el
+// listado (el API: estado_dgii LIKE '%ACEPTADO%'). Un comprobante rechazado, sin confirmar o en espera
+// de veredicto no es un comprobante aprobado.
+igual('isAceptado: ACEPTADO, ACEPTADO_CONDICIONAL y los RFCE aceptados (también cortados), nada más',
+  ESTADOS.filter(isAceptado),
+  ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO', 'RFCE_ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO_CONDIC'])
+chk('isAceptado coincide con las etiquetas: un estado se cuenta si y solo si el usuario lo ve como "Aceptado"',
+  ESTADOS.every((e) => isAceptado(e) === (dgiiLabel(e) === 'Aceptado')))
+chk('un estado nunca es a la vez aprobado y rechazo', ESTADOS.every((e) => !(isAceptado(e) && isRechazo(e))))
+chk('en vuelo, en proceso y sin veredicto no son aprobados',
+  ['PENDIENTE', 'PENDIENTE_ENVIO', 'ENVIO_INCIERTO', 'ENVIADO', 'EN_PROCESO', 'NO_ENCONTRADO', 'ERROR'].every((e) => !isAceptado(e)))
+igual('isAceptado de vacío o nulo es false', [null, undefined, ''].map(isAceptado), [false, false, false])
 
 // Reenviar a la DGII (decisión U7): solo un comprobante RECHAZADO o NO_ENCONTRADO,
 // sin archivar. Uno sin confirmar (en vuelo, ENVIADO, EN_PROCESO) NUNCA se

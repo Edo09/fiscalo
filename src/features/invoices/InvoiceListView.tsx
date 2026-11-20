@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Icon, Btn, RefreshButton, Money, EstadoBadge, Card, KPI, EmptyState, LoadingState, ErrorState, PageHead, Pagination } from '@/components/ui'
-import { listFacturas, mapFacturaRow, getStats, isRechazo } from '@/api'
+import { listFacturas, mapFacturaRow, getStats, isAceptado, isRechazo } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useFacturasList } from '@/stores/facturasList'
 import type { FacturaEstadoUi } from '@/stores/facturasList'
@@ -71,9 +71,11 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
   const stats = useApiQuery(['facturas', 'stats'], () => getStats())
   const resumen = stats.data?.resumen
   const porEstado = stats.data?.por_estado ?? []
-  const aceptados = porEstado
-    .filter((e) => ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RFCE_ACEPTADO'].includes(e.estado))
-    .reduce((a, e) => a + e.total, 0)
+  // Aprobados por la DGII (ACEPTADO, ACEPTADO_CONDICIONAL y los RFCE aceptados): la misma regla
+  // del filtro "Aprobados" del listado. "Comprobantes" cuenta solo estos; resumen.total_ecf
+  // cuenta todas las filas, también las rechazadas y las que esperan veredicto, que ya tienen
+  // su propio cuadro.
+  const aceptados = porEstado.filter((e) => isAceptado(e.estado)).reduce((a, e) => a + e.total, 0)
   const rechazadosBuckets = porEstado.filter((e) => isRechazo(e.estado))
   const rechazados = rechazadosBuckets.reduce((a, e) => a + e.total, 0)
   // El "Monto total" excluye los rechazados (un comprobante rechazado no es
@@ -116,7 +118,7 @@ export function InvoiceListView({ nav }: { nav: Nav }) {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <KPI label="Comprobantes" value={resumen?.total_ecf ?? 0} icon="file-text" />
+        <KPI label="Comprobantes" value={aceptados} icon="file-text" />
         <KPI label="Monto total" value={montoTotal} money icon="trending-up" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Aceptados" value={aceptados} icon="check-circle" iconBg="var(--success-soft)" iconColor="var(--success)" />
         <KPI label="Rechazados" value={rechazados} icon="x-circle" iconBg="var(--danger-soft)" iconColor="var(--danger)" />

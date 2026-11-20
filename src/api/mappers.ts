@@ -10,7 +10,7 @@ import { dgiiLabel } from './estadosDgii'
 // Etiquetas y preguntas sobre el estado DGII: viven en estadosDgii.ts (sin
 // imports, para probarlas con node) y se re-exportan aquí, de donde la app
 // siempre las importó.
-export { dgiiLabel, isRechazo, isEnVuelo } from './estadosDgii'
+export { dgiiLabel, isAceptado, isRechazo, isEnVuelo } from './estadosDgii'
 
 /** Formatea fechas de la API (`dd-mm-yyyy`, `yyyy-mm-dd hh:mm:ss`, ISO). */
 export function formatApiDate(value?: string | null): string {

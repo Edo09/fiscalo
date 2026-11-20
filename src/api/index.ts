@@ -119,4 +119,4 @@ export type {
   PagoAnulado, EstadoCobro, MetodoPago, CanalRecordatorio, ClienteRecordatorio, MotivoSiguiente, TenantBuscado,
   ExclusionResultado, GrupoTenant, PagaResultado,
 } from './schemas/cobros'
-export { formatApiDate, dgiiLabel, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProductRowConRegla, mapProveedorRow, mapUserRow } from './mappers'
+export { formatApiDate, dgiiLabel, isAceptado, isRechazo, isEnVuelo, formatMonthKey, mapFacturaRow, mapClientRow, mapProductRow, mapProductRowConRegla, mapProveedorRow, mapUserRow } from './mappers'

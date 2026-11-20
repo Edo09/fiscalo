@@ -56,6 +56,16 @@ export function isRechazo(raw?: string | null): boolean {
   return raw === 'RECHAZADO' || raw === 'RECHAZADO_ARCHIVADO' || raw === 'RFCE_RECHAZADO'
 }
 
+/**
+ * ¿El estado DGII es un comprobante aprobado (aceptado, con o sin condición, incluido RFCE)?
+ * Es la regla del filtro "Aprobados" del listado (`?estado=aprobado` del API:
+ * `estado_dgii LIKE '%ACEPTADO%'`) y la que cuenta el cuadro "Comprobantes": lo que se
+ * cuenta es lo mismo que sale en esa lista.
+ */
+export function isAceptado(raw?: string | null): boolean {
+  return (raw ?? '').includes('ACEPTADO')
+}
+
 /** ¿La factura está en vuelo (guardada y firmada, sin respuesta de la DGII)? */
 export function isEnVuelo(raw?: string | null): boolean {
   return (ESTADOS_EN_VUELO as readonly string[]).includes(raw ?? '')
