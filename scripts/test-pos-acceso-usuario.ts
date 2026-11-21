@@ -26,7 +26,8 @@ let d: DestinoAcceso = destinoTrasAcceso(acceso({}), true)
 chk('elegible y sin PIN: crea su PIN, y se le saluda con su nombre', d.destino === 'crear-pin' && d.nombre === 'Ana Pérez', d)
 
 d = destinoTrasAcceso(acceso({ tiene_pin: true }), true)
-chk('elegible con PIN: al teclado del PIN, con un saludo', d.destino === 'pin' && d.aviso?.tono === 'info' && d.aviso.texto === 'Hola, Ana Pérez. Escribe tu PIN para entrar.', d)
+chk('elegible con PIN: al teclado del PIN, con un saludo', d.destino === 'pin' && d.aviso?.tono === 'info' && d.aviso.texto.startsWith('Hola, Ana Pérez. Ya tienes PIN: escríbelo para entrar.'), d)
+chk('...y le dice que, si lo olvidó, lo restablece un administrador (no se crea otro por esta vía)', d.destino === 'pin' && /administrador puede restablecerlo/.test(d.aviso?.texto ?? ''), d)
 
 d = destinoTrasAcceso(acceso({ tiene_pin: true }), false)
 chk('el saludo sale aunque no se pida avisar (es un aviso de que entra, no de que no entra)', d.destino === 'pin' && d.aviso?.tono === 'info', d)

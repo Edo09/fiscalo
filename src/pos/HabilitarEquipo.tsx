@@ -8,7 +8,7 @@
 // Un usuario que no administra el POS puede llegar hasta aqui con el boton POS en un
 // equipo que todavia no es una caja: ve que hace falta un administrador y nada mas.
 //
-// PasoLogin tambien es la pantalla "Entra con tu usuario" del teclado del PIN.
+// PasoLogin tambien es la pantalla "Crea tu PIN con tu usuario" del teclado del PIN.
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { posApi, PosApiError, type Caja, type LoginAdmin } from './api'
@@ -54,7 +54,7 @@ function Marca() {
 
 /**
  * Usuario y clave de FiscalPoint. `habilitar` (lo normal): un administrador, para habilitar el equipo.
- * `usuario`: cualquier usuario de la empresa, desde el teclado del PIN, para crear su PIN la primera vez.
+ * `usuario`: cualquier usuario de la empresa, desde el teclado del PIN, para crear su PIN (primera vez o restablecido).
  * `onEntro` puede ser asíncrono: mientras responde, el botón queda en "Entrando…"; si lanza, el error se
  * muestra aquí mismo.
  */
@@ -91,10 +91,10 @@ export function PasoLogin({ modo = 'habilitar', aviso, onEntro, onCancelar }: {
     <div className="pos-centro">
       <form className="pos-panel" onSubmit={enviar} noValidate>
         <Marca />
-        <h1 className="pos-titulo">{modo === 'usuario' ? 'Entra con tu usuario' : 'Habilitar este equipo'}</h1>
+        <h1 className="pos-titulo">{modo === 'usuario' ? 'Crea tu PIN con tu usuario' : 'Habilitar este equipo'}</h1>
         <p className="pos-sub">
           {modo === 'usuario'
-            ? 'Usa tu usuario y contraseña de FiscalPoint. Si es tu primera vez en el POS, aquí mismo creas tu PIN; después entras solo con el PIN.'
+            ? 'Entra con tu usuario y contraseña de FiscalPoint para crear tu PIN: es tu primera vez en el POS o un administrador te lo restableció. Después entras solo con el PIN.'
             : 'Un administrador de la empresa entra una sola vez para convertir esta computadora en una caja. Después, cada persona entra con su PIN.'}
         </p>
         {aviso && <div className="pos-aviso"><Icon name="alert-triangle" size={16} /><span>{aviso}</span></div>}

@@ -7,7 +7,7 @@
 //                                    y se ve que le toca (A5b). Primera vez: crea su PIN ahi mismo
 //                                    y entra. Ya lo tiene: el PIN, con un saludo. Sin acceso: el
 //                                    PIN, con el motivo
-//   "¿Primera vez? Usa tu usuario" (en el PIN)
+//   "Crear mi PIN con mi usuario" (en el PIN)
 //                                    usuario y clave de FiscalPoint: lo mismo que arriba
 //   PIN correcto ................... Venta (con bloqueo de pantalla)
 //   equipo revocado ................ Habilitar, con aviso

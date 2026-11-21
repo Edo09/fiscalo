@@ -119,7 +119,7 @@ function EmpleadosTabla({ q, onAbrir, onNuevo }: {
                   <td><Badge tone={e.rol === 'supervisor' ? 'accent' : 'neutral'}>{ROL_LABEL[e.rol]}</Badge></td>
                   <td className="text-sm muted">
                     {e.pin_pendiente
-                      ? <span title="Lo crea la primera vez que entra al POS"><Badge tone="warning">Pendiente</Badge></span>
+                      ? <span title="Lo crea en el POS con su usuario"><Badge tone="warning">Pendiente</Badge></span>
                       : fmtFecha(e.pin_generado_at)}
                   </td>
                   <td><Badge tone={e.activo ? 'success' : 'neutral'} dot>{e.activo ? 'Activo' : 'Inactivo'}</Badge></td>
@@ -215,8 +215,9 @@ function CajasTabla({ cajas, equipos, equipoDe, onAbrir, onNueva, onRevocar }: {
           <li>Elige la caja. Desde ese momento esa PC es la caja y los empleados entran solo con su PIN.</li>
         </ol>
         <div className="text-sm muted mt-md">
-          Todo usuario de FiscalPoint de la empresa ya es empleado del POS: la primera vez que pulsa el botón <b>POS</b> (o
-          entra con su usuario desde la pantalla del PIN), el POS le pide crear su PIN ahí mismo.
+          Todo usuario de FiscalPoint de la empresa ya es empleado del POS: la primera vez, o cuando un administrador le
+          restablece el PIN, pulsa el botón <b>POS</b> (o «Crear mi PIN con mi usuario» en el teclado del PIN) y el POS le
+          pide crear uno ahí mismo.
         </div>
         <div className="text-sm muted mt-sm">
           Cada caja funciona en un solo equipo: habilitar otra PC en la misma caja revoca la anterior.

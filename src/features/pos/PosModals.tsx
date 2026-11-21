@@ -100,7 +100,7 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
       invalidarPos(qc)
       if (r.pin === null) {
         // Un usuario de FiscalPoint: nadie le genera el PIN, lo crea él al entrar al POS. No hay nada que mostrar.
-        toast.success(`PIN de "${empleado.nombre}" restablecido. Creará otro la próxima vez que entre al POS.`)
+        toast.success(`PIN de "${empleado.nombre}" restablecido. En el POS creará otro con «Crear mi PIN con mi usuario» (o con el botón POS de FiscalPoint).`)
         onClose()
       } else {
         onPin(r.empleado, r.pin, false)
@@ -171,7 +171,7 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
                 {!deUsuario
                   ? `Generado el ${fmtFecha(empleado.pin_generado_at)}. No se puede consultar, solo reemplazar.`
                   : empleado.pin_pendiente
-                    ? 'Todavía no lo creó: lo hace la primera vez que entra al POS.'
+                    ? 'Todavía no lo creó: lo hace en el POS con su usuario (primera vez, o tras restablecerlo).'
                     : `Creado por la propia persona el ${fmtFecha(empleado.pin_generado_at)}. Nadie más lo conoce: no se puede consultar, solo restablecer.`}
               </div>
             </div>
@@ -195,7 +195,7 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
                 {hayCambios
                   ? `Guarda o descarta los cambios antes de ${deUsuario ? 'restablecer el PIN' : 'generar un PIN nuevo'}.`
                   : deUsuario
-                    ? 'Úsalo si lo olvidó o si alguien más lo sabe: su PIN deja de servir en el acto, se le cierra la sesión del POS y crea otro la próxima vez que entre.'
+                    ? 'Úsalo si lo olvidó o si alguien más lo sabe: su PIN deja de servir en el acto y se le cierra la sesión del POS. Dile que cree otro con «Crear mi PIN con mi usuario» en el teclado del PIN, o con el botón POS de FiscalPoint.'
                     : 'Úsalo si lo olvidó o si alguien más lo sabe: el PIN actual deja de servir en el acto y, si está dentro del POS, se le cierra la sesión.'}
               </Nota>
             </div>

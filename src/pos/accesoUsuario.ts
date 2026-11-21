@@ -10,7 +10,7 @@ export interface AvisoPin {
 }
 
 export type DestinoAcceso =
-  /** Primera vez: elige su PIN aquí mismo. */
+  /** Sin PIN (primera vez o restablecido): elige su PIN aquí mismo. */
   | { destino: 'crear-pin'; nombre: string }
   /** Escribe el PIN que ya tiene (o, si no puede entrar, se le dice por qué). */
   | { destino: 'pin'; aviso: AvisoPin | null }
@@ -25,7 +25,7 @@ export type DestinoAcceso =
 export function destinoTrasAcceso(acceso: MiAcceso, avisarSiNoEntra: boolean): DestinoAcceso {
   if (acceso.elegible && acceso.empleado) {
     if (!acceso.tiene_pin) return { destino: 'crear-pin', nombre: acceso.empleado.nombre }
-    return { destino: 'pin', aviso: { tono: 'info', texto: `Hola, ${acceso.empleado.nombre}. Escribe tu PIN para entrar.` } }
+    return { destino: 'pin', aviso: { tono: 'info', texto: `Hola, ${acceso.empleado.nombre}. Ya tienes PIN: escríbelo para entrar. Si lo olvidaste, un administrador puede restablecerlo.` } }
   }
   return {
     destino: 'pin',

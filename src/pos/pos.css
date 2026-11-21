@@ -119,6 +119,14 @@
 }
 /* Varios enlaces seguidos (debajo del teclado del PIN): en una fila y, si no caben, en dos. */
 .pos-enlaces { display: flex; justify-content: center; flex-wrap: wrap; column-gap: 14px; }
+/* El enlace de crear el PIN con el usuario es el camino de quien no tiene PIN (primera vez o restablecido): se nota mas. */
+.pos-enlace.acento { color: var(--accent-text); font-weight: 600; }
+/* La pista que sale tras un PIN incorrecto, dentro del area del mensaje (que ya reserva su alto). */
+.pos-pin-ayuda { margin-top: 4px; font-size: 13px; color: var(--text-2); }
+.pos-enlace-linea {
+  background: none; border: 0; padding: 0; font: inherit; font-weight: 600;
+  color: var(--accent-text); text-decoration: underline; cursor: pointer;
+}
 
 /* ---- Elegir caja --------------------------------------------------------- */
 .pos-cajas { display: grid; gap: 10px; margin-bottom: 16px; }

@@ -26,7 +26,7 @@ interface Props {
   onSinPos: (motivo: string) => void
   /** Un admin quiere habilitar este equipo de nuevo (otra caja, otra empresa). */
   onRehabilitar: () => void
-  /** Entrar con el usuario y la clave de FiscalPoint: la primera vez, para crear el PIN (A5b). */
+  /** Entrar con el usuario y la clave de FiscalPoint para crear el PIN: la primera vez o cuando un administrador lo restableció (A5b). */
   onUsuario: () => void
 }
 
@@ -46,7 +46,8 @@ function horaCorta(fecha: string): string {
 export function PinView({ equipo, aviso = null, onEntro, onEquipoInvalido, onSinPos, onRehabilitar, onUsuario }: Props) {
   const [pin, setPin] = useState('')
   const [estado, setEstado] = useState<EstadoPos | null>(null)
-  const [mensaje, setMensaje] = useState<{ texto: string; error: boolean } | null>(null)
+  // `ayuda`: tras un PIN incorrecto se recuerda el camino de quien no tiene PIN (primera vez o restablecido).
+  const [mensaje, setMensaje] = useState<{ texto: string; error: boolean; ayuda?: boolean } | null>(null)
   const [temblor, setTemblor] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [bloqueoHasta, setBloqueoHasta] = useState<number | null>(null)
@@ -81,6 +82,7 @@ export function PinView({ equipo, aviso = null, onEntro, onEquipoInvalido, onSin
         setMensaje({
           texto: quedan === 1 ? 'PIN incorrecto. Queda 1 intento antes de bloquear el equipo.' : `PIN incorrecto. Quedan ${quedan} intentos.`,
           error: true,
+          ayuda: true,
         })
         setTemblor(true)
         window.setTimeout(() => setTemblor(false), 400)
@@ -234,9 +236,16 @@ export function PinView({ equipo, aviso = null, onEntro, onEquipoInvalido, onSin
 
         <div className={'pos-mensaje-pin' + (mensaje?.error ? ' error' : '')}>
           {enviando ? 'Verificando…' : mensaje?.texto ?? ''}
+          {!enviando && mensaje?.ayuda && (
+            <div className="pos-pin-ayuda">
+              ¿Sin PIN o te lo restablecieron?{' '}
+              <button type="button" className="pos-enlace-linea" onClick={onUsuario}>Créalo con tu usuario</button>
+            </div>
+          )}
         </div>
         <div className="pos-enlaces">
-          <button type="button" className="pos-enlace" onClick={onUsuario}>¿Primera vez? Usa tu usuario</button>
+          <button type="button" className="pos-enlace acento" onClick={onUsuario}
+            title="Primera vez en el POS, o si un administrador te restableció el PIN">Crear mi PIN con mi usuario</button>
           <button type="button" className="pos-enlace" onClick={onRehabilitar}>Habilitar este equipo de nuevo</button>
         </div>
       </div>
