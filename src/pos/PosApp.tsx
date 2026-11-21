@@ -10,6 +10,8 @@
 //   "Crear mi PIN con mi usuario" (en el PIN)
 //                                    usuario y clave de FiscalPoint: lo mismo que arriba
 //   PIN correcto ................... Venta (con bloqueo de pantalla)
+//   venta con la sesion perdida .... PIN; o, si un administrador le restablecio el PIN, "Crea tu PIN con
+//                                    tu usuario" con el aviso (sesionPerdida.ts, A5b)
 //   equipo revocado ................ Habilitar, con aviso
 //   empresa sin POS ................ aviso, sin nada que hacer en este equipo
 //
@@ -22,6 +24,7 @@ import { posApi, PosApiError, type LoginAdmin, type MiAcceso, type SesionPos } f
 import { usePosStore, type EquipoGuardado } from './store'
 import { useCarritoStore } from './carrito'
 import { destinoTrasAcceso, salidaAlFallarCrearPin, type AvisoPin } from './accesoUsuario'
+import { AVISO_PIN_RESTABLECIDO, type MotivoSesion } from './sesionPerdida'
 import { CrearPinView } from './CrearPinView'
 import { HabilitarEquipo, PasoLogin } from './HabilitarEquipo'
 import { PinView } from './PinView'
@@ -238,7 +241,15 @@ export function PosApp() {
     }
   }, [entro, equipoInvalido])
 
-  const bloqueada = useCallback(() => {
+  const bloqueada = useCallback((motivo?: MotivoSesion) => {
+    if (motivo === 'pin-restablecido') {
+      // Un administrador le restablecio el PIN: no tiene PIN que escribir, va directo a crear otro con su usuario.
+      // Primero la pantalla: con la sesion ya cerrada y la venta todavia en pantalla, el efecto de mas abajo la
+      // mandaria al PIN y el aviso se perderia.
+      setPantalla({ tipo: 'usuario', aviso: AVISO_PIN_RESTABLECIDO })
+      cerrarSesion()
+      return
+    }
     cerrarSesion()
     setPantalla({ tipo: 'pin' })
   }, [cerrarSesion])

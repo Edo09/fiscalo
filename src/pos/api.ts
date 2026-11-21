@@ -143,6 +143,11 @@ export interface EstadoPos {
   equipo: { id: number; nombre: string | null; bloqueado: boolean; bloqueo_segundos: number }
   caja: Caja | null
   empleado: Empleado | null
+  /**
+   * Solo con `empleado: null` y una sesión mandada: esa sesión ya no vale porque un administrador le restableció el
+   * PIN a ese empleado (A5b). El POS lo lleva a crear otro en vez de pedirle el viejo. Ausente con un API anterior.
+   */
+  pin_restablecido?: boolean
   turno_caja: TurnoCaja | null
 }
 

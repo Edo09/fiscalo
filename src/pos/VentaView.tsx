@@ -46,6 +46,7 @@ import { AperturaTurnoModal, ImpresoraModal, SupervisorPinModal, TurnoModal } fr
 import { CierreModal } from './CierreModal'
 import { ClienteRncModal } from './ClienteRncModal'
 import { VentasDiaModal } from './VentasDiaModal'
+import { motivoDeError, motivoDeEstado, type MotivoSesion } from './sesionPerdida'
 import { useTemaPos } from './tema'
 import { TAMANOS, useTamanoPos } from './tamano'
 import { totalesCarrito } from './montos'
@@ -60,8 +61,11 @@ const PENDIENTES_CADA_MS = 2 * 60_000
 interface Props {
   equipo: EquipoGuardado
   sesion: { token: string; empleado: Empleado }
-  /** La sesion se cerro (bloqueo, vencida o cerrada desde otro lado): volver al PIN. */
-  onBloqueada: () => void
+  /**
+   * La sesion se cerro (bloqueo, vencida o cerrada desde otro lado): volver al PIN. Con `pin-restablecido`
+   * (un administrador le restablecio el PIN) no hay PIN que escribir: directo a crear otro con su usuario.
+   */
+  onBloqueada: (motivo?: MotivoSesion) => void
   onEquipoInvalido: (motivo: string) => void
 }
 
@@ -134,7 +138,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
   /** Errores que cambian de pantalla; devuelve true si ya se atendió. */
   const errorDeSesion = useCallback((e: unknown): boolean => {
     if (!(e instanceof PosApiError)) return false
-    if (e.codigo === 'SESION_REQUERIDA') { onBloqueada(); return true }
+    if (e.codigo === 'SESION_REQUERIDA') { onBloqueada(motivoDeError(e.extra)); return true }
     if (e.codigo === 'EQUIPO_NO_HABILITADO') { onEquipoInvalido(e.message); return true }
     return false
   }, [onBloqueada, onEquipoInvalido])
@@ -149,7 +153,7 @@ export function VentaView({ equipo, sesion, onBloqueada, onEquipoInvalido }: Pro
     try {
       const r = await posApi.estado(equipo.token, sesion.token)
       if (!vivoRef.current) return
-      if (r.empleado === null) { onBloqueada(); return }
+      if (r.empleado === null) { onBloqueada(motivoDeEstado(r)); return }
       setEstado(r)
     } catch (e) {
       if (vivoRef.current) errorDeSesion(e)
