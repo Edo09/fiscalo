@@ -12,11 +12,13 @@ import { posApi, PosApiError, type EstadoPos, type SesionPos } from './api'
 import type { EquipoGuardado } from './store'
 import { soloDigitos } from './montos'
 import { usePegar } from './pegar'
-
-export const DIGITOS_PIN = 4
+import type { AvisoPin } from './accesoUsuario'
+import { DIGITOS_PIN } from './pinNuevo'
 
 interface Props {
   equipo: EquipoGuardado
+  /** Un recuadro sobre el teclado: el saludo de quien viene del botón POS, por qué no puede entrar... */
+  aviso?: AvisoPin | null
   onEntro: (s: SesionPos) => void
   /** El servidor dijo que este equipo ya no esta habilitado. */
   onEquipoInvalido: (motivo: string) => void
@@ -24,6 +26,8 @@ interface Props {
   onSinPos: (motivo: string) => void
   /** Un admin quiere habilitar este equipo de nuevo (otra caja, otra empresa). */
   onRehabilitar: () => void
+  /** Entrar con el usuario y la clave de FiscalPoint: la primera vez, para crear el PIN (A5b). */
+  onUsuario: () => void
 }
 
 function formatoCuenta(seg: number): string {
@@ -39,7 +43,7 @@ function horaCorta(fecha: string): string {
   return isNaN(d.getTime()) ? fecha : d.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })
 }
 
-export function PinView({ equipo, onEntro, onEquipoInvalido, onSinPos, onRehabilitar }: Props) {
+export function PinView({ equipo, aviso = null, onEntro, onEquipoInvalido, onSinPos, onRehabilitar, onUsuario }: Props) {
   const [pin, setPin] = useState('')
   const [estado, setEstado] = useState<EstadoPos | null>(null)
   const [mensaje, setMensaje] = useState<{ texto: string; error: boolean } | null>(null)
@@ -194,6 +198,12 @@ export function PinView({ equipo, onEntro, onEquipoInvalido, onSinPos, onRehabil
             </span>
           </div>
         )}
+        {aviso && (
+          <div className={aviso.tono === 'aviso' ? 'pos-aviso' : 'pos-info'}>
+            <Icon name={aviso.tono === 'aviso' ? 'alert-triangle' : 'info'} size={16} />
+            <span>{aviso.texto}</span>
+          </div>
+        )}
         {cajaInactiva && <div className="pos-error"><Icon name="alert-circle" size={16} /><span>{cajaInactiva}</span></div>}
 
         {bloqueado ? (
@@ -225,7 +235,8 @@ export function PinView({ equipo, onEntro, onEquipoInvalido, onSinPos, onRehabil
         <div className={'pos-mensaje-pin' + (mensaje?.error ? ' error' : '')}>
           {enviando ? 'Verificando…' : mensaje?.texto ?? ''}
         </div>
-        <div style={{ textAlign: 'center' }}>
+        <div className="pos-enlaces">
+          <button type="button" className="pos-enlace" onClick={onUsuario}>¿Primera vez? Usa tu usuario</button>
           <button type="button" className="pos-enlace" onClick={onRehabilitar}>Habilitar este equipo de nuevo</button>
         </div>
       </div>

@@ -2,8 +2,13 @@
 //
 // Dos pasos: (1) un admin entra — con usuario y clave, o ya entrado por el
 // codigo del boton POS de app.* — y (2) elige la caja. El servidor entrega el
-// token del equipo, que se guarda en este navegador; la sesion del admin se
-// cierra en el acto (POST /api/auth/signout). Los cajeros nunca ven esto.
+// token del equipo, que se guarda en este navegador. La sesion de FiscalPoint de
+// quien lo habilito NO se cierra aqui: se entrega a quien monta esto (PosApp), que
+// ve si le toca crear su PIN (A5b) y la cierra al terminar (POST /api/auth/signout).
+// Un usuario que no administra el POS puede llegar hasta aqui con el boton POS en un
+// equipo que todavia no es una caja: ve que hace falta un administrador y nada mas.
+//
+// PasoLogin tambien es la pantalla "Entra con tu usuario" del teclado del PIN.
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Btn, Icon } from '@/components/ui'
 import { posApi, PosApiError, type Caja, type LoginAdmin } from './api'
@@ -14,7 +19,8 @@ interface Props {
   adminInicial?: LoginAdmin | null
   /** Por que se llego aqui (equipo revocado, codigo vencido...). */
   aviso?: string | null
-  onListo: (equipo: EquipoGuardado) => void
+  /** El equipo quedó habilitado. `usuario` es la sesión de FiscalPoint de quien lo habilitó: quien recibe esto la cierra. */
+  onListo: (equipo: EquipoGuardado, usuario: LoginAdmin) => void
   /** Volver sin cambiar nada (solo si este equipo ya estaba habilitado). */
   onCancelar?: () => void
 }
@@ -32,7 +38,7 @@ export function HabilitarEquipo({ adminInicial = null, aviso = null, onListo, on
 
   return admin === null
     ? <PasoLogin aviso={aviso} onEntro={setAdmin} onCancelar={onCancelar} />
-    : <PasoCaja admin={admin} onListo={onListo} onCancelar={onCancelar} />
+    : <PasoCaja admin={admin} onListo={onListo} onCancelar={onCancelar} onOtroUsuario={() => setAdmin(null)} />
 }
 
 // ---------------------------------------------------------------------------
@@ -46,9 +52,16 @@ function Marca() {
   )
 }
 
-function PasoLogin({ aviso, onEntro, onCancelar }: {
+/**
+ * Usuario y clave de FiscalPoint. `habilitar` (lo normal): un administrador, para habilitar el equipo.
+ * `usuario`: cualquier usuario de la empresa, desde el teclado del PIN, para crear su PIN la primera vez.
+ * `onEntro` puede ser asíncrono: mientras responde, el botón queda en "Entrando…"; si lanza, el error se
+ * muestra aquí mismo.
+ */
+export function PasoLogin({ modo = 'habilitar', aviso, onEntro, onCancelar }: {
+  modo?: 'habilitar' | 'usuario'
   aviso: string | null
-  onEntro: (a: LoginAdmin) => void
+  onEntro: (a: LoginAdmin) => void | Promise<void>
   onCancelar?: () => void
 }) {
   const [usuario, setUsuario] = useState('')
@@ -67,7 +80,7 @@ function PasoLogin({ aviso, onEntro, onCancelar }: {
     setCargando(true)
     setError(null)
     try {
-      onEntro(await posApi.login(usuario.trim(), clave))
+      await onEntro(await posApi.login(usuario.trim(), clave))
     } catch (err) {
       setError(textoError(err))
       setCargando(false)
@@ -78,15 +91,16 @@ function PasoLogin({ aviso, onEntro, onCancelar }: {
     <div className="pos-centro">
       <form className="pos-panel" onSubmit={enviar} noValidate>
         <Marca />
-        <h1 className="pos-titulo">Habilitar este equipo</h1>
+        <h1 className="pos-titulo">{modo === 'usuario' ? 'Entra con tu usuario' : 'Habilitar este equipo'}</h1>
         <p className="pos-sub">
-          Un administrador de la empresa entra una sola vez para convertir esta computadora en una caja.
-          Después, los cajeros entran con su PIN.
+          {modo === 'usuario'
+            ? 'Usa tu usuario y contraseña de FiscalPoint. Si es tu primera vez en el POS, aquí mismo creas tu PIN; después entras solo con el PIN.'
+            : 'Un administrador de la empresa entra una sola vez para convertir esta computadora en una caja. Después, cada persona entra con su PIN.'}
         </p>
         {aviso && <div className="pos-aviso"><Icon name="alert-triangle" size={16} /><span>{aviso}</span></div>}
         {error && <div className="pos-error"><Icon name="alert-circle" size={16} /><span>{error}</span></div>}
         <div className="pos-campo">
-          <label htmlFor="pos-usuario">Usuario o correo del administrador</label>
+          <label htmlFor="pos-usuario">{modo === 'usuario' ? 'Usuario o correo' : 'Usuario o correo del administrador'}</label>
           <input id="pos-usuario" ref={ref} autoComplete="username" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
         </div>
         <div className="pos-campo">
@@ -96,19 +110,22 @@ function PasoLogin({ aviso, onEntro, onCancelar }: {
         <Btn type="submit" variant="primary" className="pos-boton-grande" disabled={cargando}>
           {cargando ? 'Entrando…' : 'Continuar'}
         </Btn>
-        {onCancelar && <div style={{ textAlign: 'center' }}><button type="button" className="pos-enlace" onClick={onCancelar}>Cancelar</button></div>}
+        {onCancelar && <div style={{ textAlign: 'center' }}><button type="button" className="pos-enlace" onClick={onCancelar}>{modo === 'usuario' ? 'Volver al PIN' : 'Cancelar'}</button></div>}
       </form>
     </div>
   )
 }
 
-function PasoCaja({ admin, onListo, onCancelar }: {
+function PasoCaja({ admin, onListo, onCancelar, onOtroUsuario }: {
   admin: LoginAdmin
-  onListo: (e: EquipoGuardado) => void
+  onListo: (e: EquipoGuardado, usuario: LoginAdmin) => void
   onCancelar?: () => void
+  onOtroUsuario: () => void
 }) {
   const [cajas, setCajas] = useState<Caja[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Este usuario no administra el POS: no puede habilitar cajas (llegó con el botón POS a un equipo que aún no es caja).
+  const [sinPermiso, setSinPermiso] = useState(false)
   const [ocupada, setOcupada] = useState<{ caja: Caja; equipo: string | null } | null>(null)
   const [nueva, setNueva] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -117,7 +134,17 @@ function PasoCaja({ admin, onListo, onCancelar }: {
     let vivo = true
     posApi.cajas(admin.token)
       .then((r) => { if (vivo) setCajas(r.cajas.filter((c) => c.activa)) })
-      .catch((e) => { if (vivo) { setError(textoError(e)); setCajas([]) } })
+      .catch((e) => {
+        if (!vivo) return
+        if (e instanceof PosApiError && e.codigo === 'SIN_PERMISO') {
+          // No puede seguir aquí: su sesión ya no hace falta.
+          posApi.cerrarAdmin(admin.token).catch(() => undefined)
+          setSinPermiso(true)
+          return
+        }
+        setError(textoError(e))
+        setCajas([])
+      })
     return () => { vivo = false }
   }, [admin.token])
 
@@ -126,9 +153,8 @@ function PasoCaja({ admin, onListo, onCancelar }: {
     setError(null)
     try {
       const r = await posApi.habilitar(admin.token, caja.id, reemplazar)
-      // La sesion del admin ya no hace falta: se cierra sin esperar.
-      posApi.cerrarAdmin(admin.token).catch(() => undefined)
-      onListo({ token: r.token, caja: r.equipo.caja, empresa: null })
+      // La sesion de FiscalPoint no se cierra aqui: quien recibe el equipo ve si a este usuario le toca crear su PIN, y la cierra.
+      onListo({ token: r.token, caja: r.equipo.caja, empresa: null }, admin)
     } catch (e) {
       if (e instanceof PosApiError && e.codigo === 'CAJA_OCUPADA') {
         const actual = e.extra.equipo_actual as { nombre?: string | null } | undefined
@@ -153,6 +179,25 @@ function PasoCaja({ admin, onListo, onCancelar }: {
       setError(textoError(err))
     }
     setOcupado(false)
+  }
+
+  if (sinPermiso) {
+    return (
+      <div className="pos-centro">
+        <div className="pos-panel">
+          <Marca />
+          <h1 className="pos-titulo">Este equipo todavía no es una caja</h1>
+          <p className="pos-sub">
+            Hola, {admin.user.name}. Para usar el POS aquí, un administrador de tu empresa tiene que habilitar esta
+            computadora como caja: entra una sola vez con su usuario. Después podrás entrar con tu PIN.
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <Btn variant="primary" className="pos-boton-grande" onClick={onOtroUsuario}>Entrar con otro usuario</Btn>
+            {onCancelar && <Btn className="pos-boton-grande" onClick={onCancelar}>Cancelar</Btn>}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (ocupada) {

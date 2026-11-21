@@ -3,7 +3,9 @@
 // vende; cajas, empleados con PIN y equipos se administran aquí.
 //
 // El PIN de un empleado llega UNA sola vez (al crearlo o al generar uno nuevo):
-// el API no lo puede volver a mostrar, solo reemplazar.
+// el API no lo puede volver a mostrar, solo reemplazar. Los usuarios de FiscalPoint
+// son empleados del POS por defecto (A5b) y eligen su propio PIN al entrar al POS: el
+// API no se lo genera ni lo muestra; el administrador solo puede restablecerlo.
 import { getJson, postJson, request } from './http'
 import type { ReporteCierre } from '@/pos/api'
 
@@ -22,8 +24,15 @@ export interface PosEmpleado {
   nombre: string
   rol: PosRol
   activo: boolean
-  /** Cuándo se generó su PIN actual. */
-  pin_generado_at: string
+  /**
+   * Id del usuario de FiscalPoint del que es empleado (se crea solo: todo usuario de la empresa lo es);
+   * null = lo creó un administrador a mano, sin usuario. Ausente con un API viejo.
+   */
+  usuario_id?: number | null
+  /** Usuario de FiscalPoint que todavía no creó su PIN: lo crea la primera vez que entra al POS. Ausente con un API viejo. */
+  pin_pendiente?: boolean
+  /** Cuándo se generó (o se creó) su PIN actual; null mientras está pendiente. */
+  pin_generado_at: string | null
   created_at: string
   updated_at: string
 }
@@ -64,6 +73,29 @@ export async function actualizarPosCaja(id: number, campos: { nombre?: string; a
 export async function listPosEmpleados(): Promise<PosEmpleado[]> {
   return (await getJson<{ empleados: PosEmpleado[] }>('/api/pos-admin/empleados')).empleados
 }
+/** Lo que cambió al poner los empleados al día con los usuarios de FiscalPoint de la empresa. */
+export interface ResumenSincronizacionPos {
+  creados: number
+  renombrados: number
+  desactivados: number
+}
+/**
+ * Todo usuario de FiscalPoint de la empresa es empleado del POS (con el PIN pendiente hasta que lo cree al
+ * entrar): crea los que faltan, sigue los cambios de nombre y desactiva a los usuarios que ya no existen.
+ * Se puede repetir sin efecto.
+ */
+export function sincronizarPosEmpleados(): Promise<ResumenSincronizacionPos> {
+  return postJson('/api/pos-admin/empleados/sincronizar', {})
+}
+/** La lista de empleados puesta al día con los usuarios. Si ponerla al día falla, se lista lo que haya. */
+export async function listPosEmpleadosAlDia(): Promise<PosEmpleado[]> {
+  try {
+    await sincronizarPosEmpleados()
+  } catch {
+    /* se lista lo que hay: la lista es lo que importa */
+  }
+  return listPosEmpleados()
+}
 /** Crea el empleado; el PIN generado se ve solo en esta respuesta. */
 export function crearPosEmpleado(nombre: string, rol: PosRol): Promise<{ empleado: PosEmpleado; pin: string }> {
   return postJson('/api/pos-admin/empleados', { nombre, rol })
@@ -74,8 +106,12 @@ export async function actualizarPosEmpleado(
 ): Promise<PosEmpleado> {
   return (await request<{ empleado: PosEmpleado }>(`/api/pos-admin/empleados/${id}`, jsonInit('PUT', campos))).empleado
 }
-/** PIN nuevo: el anterior deja de servir y sus sesiones se cierran. */
-export function regenerarPosPin(id: number): Promise<{ empleado: PosEmpleado; pin: string }> {
+/**
+ * PIN nuevo de un empleado creado a mano: el anterior deja de servir y sus sesiones se cierran.
+ * A un usuario de FiscalPoint no se le genera nada (el administrador no debe conocer su PIN): se le
+ * restablece, `pin` viene null y él crea otro la próxima vez que entra al POS.
+ */
+export function regenerarPosPin(id: number): Promise<{ empleado: PosEmpleado; pin: string | null }> {
   return postJson(`/api/pos-admin/empleados/${id}/pin`, {})
 }
 

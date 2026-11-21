@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Icon, Btn, RefreshButton, Badge, Card, PageHead, Tabs, EmptyState, LoadingState, ErrorState } from '@/components/ui'
-import { listPosCajas, listPosEmpleados, listPosEquipos } from '@/api/pos'
+import { listPosCajas, listPosEmpleadosAlDia, listPosEquipos } from '@/api/pos'
 import type { PosCaja, PosEmpleado, PosEquipo } from '@/api/pos'
 import { useApiQuery, type ApiQueryState } from '@/hooks/useApiQuery'
 import { EmpleadoModal, PinModal, CajaModal, RevocarEquipoModal } from './PosModals'
@@ -24,7 +24,8 @@ export function PuntoVentaView() {
   const [pestana, setPestana] = useState<Pestana>('empleados')
   const [modal, setModal] = useState<ModalPos | null>(null)
 
-  const empleados = useApiQuery(['pos', 'empleados'], listPosEmpleados)
+  // Los usuarios de FiscalPoint son empleados del POS: al listar se ponen al día (crea los que faltan).
+  const empleados = useApiQuery(['pos', 'empleados'], listPosEmpleadosAlDia)
   const cajas = useApiQuery(['pos', 'cajas'], listPosCajas)
   const equipos = useApiQuery(['pos', 'equipos'], listPosEquipos)
 
@@ -98,13 +99,13 @@ function EmpleadosTabla({ q, onAbrir, onNuevo }: {
       ) : filas.length === 0 ? (
         <EmptyState icon="users" title="Todavía no hay empleados"
           action={<Btn variant="primary" icon="user-plus" onClick={onNuevo}>Nuevo empleado</Btn>}>
-          Crea a tus cajeros y supervisores. El sistema le genera a cada uno un PIN de 4 dígitos para entrar al POS;
-          no necesitan usuario en FiscalPoint.
+          Los usuarios de FiscalPoint de la empresa aparecen aquí solos y crean su PIN la primera vez que entran al POS.
+          Para alguien sin usuario, crea un empleado: el sistema le genera un PIN de 4 dígitos.
         </EmptyState>
       ) : (
         <div className="tbl-wrap">
           <table className="tbl">
-            <thead><tr><th>Nombre</th><th>Rol</th><th>PIN generado</th><th>Estado</th><th style={{ width: 40 }}></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th>Estado</th><th style={{ width: 40 }}></th></tr></thead>
             <tbody>
               {filas.map((e) => (
                 <tr key={e.id} onClick={() => onAbrir(e)}>
@@ -112,10 +113,15 @@ function EmpleadosTabla({ q, onAbrir, onNuevo }: {
                     <div className="row gap-sm">
                       <span className="kpi-ic" style={{ background: 'var(--neutral-soft)', color: 'var(--text-2)', width: 30, height: 30 }}><Icon name="user" size={15} /></span>
                       <span className="cell-main">{e.nombre}</span>
+                      {e.usuario_id != null && <Badge tone="info">Usuario</Badge>}
                     </div>
                   </td>
                   <td><Badge tone={e.rol === 'supervisor' ? 'accent' : 'neutral'}>{ROL_LABEL[e.rol]}</Badge></td>
-                  <td className="text-sm muted">{fmtFecha(e.pin_generado_at)}</td>
+                  <td className="text-sm muted">
+                    {e.pin_pendiente
+                      ? <span title="Lo crea la primera vez que entra al POS"><Badge tone="warning">Pendiente</Badge></span>
+                      : fmtFecha(e.pin_generado_at)}
+                  </td>
                   <td><Badge tone={e.activo ? 'success' : 'neutral'} dot>{e.activo ? 'Activo' : 'Inactivo'}</Badge></td>
                   <td><Icon name="chevron-right" size={16} style={{ color: 'var(--text-3)' }} /></td>
                 </tr>
@@ -209,6 +215,10 @@ function CajasTabla({ cajas, equipos, equipoDe, onAbrir, onNueva, onRevocar }: {
           <li>Elige la caja. Desde ese momento esa PC es la caja y los empleados entran solo con su PIN.</li>
         </ol>
         <div className="text-sm muted mt-md">
+          Todo usuario de FiscalPoint de la empresa ya es empleado del POS: la primera vez que pulsa el botón <b>POS</b> (o
+          entra con su usuario desde la pantalla del PIN), el POS le pide crear su PIN ahí mismo.
+        </div>
+        <div className="text-sm muted mt-sm">
           Cada caja funciona en un solo equipo: habilitar otra PC en la misma caja revoca la anterior.
           Si un equipo queda bloqueado por PINs incorrectos y no puedes esperar, revócalo y habilítalo de nuevo.
         </div>

@@ -49,6 +49,8 @@ interface EmpleadoModalProps {
 export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) {
   const qc = useQueryClient()
   const editando = empleado !== null
+  // Es un usuario de FiscalPoint (no un empleado creado a mano): su nombre sale de su cuenta y su PIN lo elige él.
+  const deUsuario = empleado?.usuario_id != null
   const [nombre, setNombre] = useState(empleado?.nombre ?? '')
   const [rol, setRol] = useState<PosRol>(empleado?.rol ?? 'cajero')
   const [activo, setActivo] = useState(empleado?.activo ?? true)
@@ -96,9 +98,15 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
     try {
       const r = await regenerarPosPin(empleado.id)
       invalidarPos(qc)
-      onPin(r.empleado, r.pin, false)
+      if (r.pin === null) {
+        // Un usuario de FiscalPoint: nadie le genera el PIN, lo crea él al entrar al POS. No hay nada que mostrar.
+        toast.success(`PIN de "${empleado.nombre}" restablecido. Creará otro la próxima vez que entre al POS.`)
+        onClose()
+      } else {
+        onPin(r.empleado, r.pin, false)
+      }
     } catch (e) {
-      setError(mensaje(e, 'No se pudo generar el PIN nuevo.'))
+      setError(mensaje(e, deUsuario ? 'No se pudo restablecer el PIN.' : 'No se pudo generar el PIN nuevo.'))
       setGenerando(false)
       setConfirmPin(false)
     }
@@ -107,7 +115,7 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
   return (
     <Modal
       title={editando ? 'Editar empleado' : 'Nuevo empleado'}
-      sub={editando ? empleado?.nombre : 'El sistema le genera un PIN de 4 dígitos para entrar al POS'}
+      sub={editando ? (deUsuario ? `${empleado?.nombre} · Usuario de FiscalPoint` : empleado?.nombre) : 'El sistema le genera un PIN de 4 dígitos para entrar al POS'}
       icon="user"
       width={540}
       onClose={onClose}
@@ -126,7 +134,12 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
         <div className="field full">
           <label className="label">Nombre <span className="req">*</span></label>
           <input className="input" value={nombre} maxLength={80} onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej. María Pérez" autoFocus={!editando} />
+            placeholder="Ej. María Pérez" autoFocus={!editando} disabled={deUsuario} />
+          {deUsuario && (
+            <span className="text-sm muted" style={{ marginTop: 6 }}>
+              Es el nombre de su usuario de FiscalPoint: para cambiarlo, edita el usuario.
+            </span>
+          )}
         </div>
         <div className="field full">
           <label className="label">Rol</label>
@@ -154,29 +167,39 @@ export function EmpleadoModal({ empleado, onClose, onPin }: EmpleadoModalProps) 
           <div className="row between" style={{ alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div className="text-sm" style={{ fontWeight: 600 }}>PIN</div>
-              <div className="text-sm muted">Generado el {fmtFecha(empleado.pin_generado_at)}. No se puede consultar, solo reemplazar.</div>
+              <div className="text-sm muted">
+                {!deUsuario
+                  ? `Generado el ${fmtFecha(empleado.pin_generado_at)}. No se puede consultar, solo reemplazar.`
+                  : empleado.pin_pendiente
+                    ? 'Todavía no lo creó: lo hace la primera vez que entra al POS.'
+                    : `Creado por la propia persona el ${fmtFecha(empleado.pin_generado_at)}. Nadie más lo conoce: no se puede consultar, solo restablecer.`}
+              </div>
             </div>
-            {confirmPin ? (
+            {deUsuario && empleado.pin_pendiente ? null : confirmPin ? (
               <span className="row gap-sm" style={{ alignItems: 'center' }}>
-                <span className="text-sm muted">¿Generar otro?</span>
+                <span className="text-sm muted">{deUsuario ? '¿Restablecerlo?' : '¿Generar otro?'}</span>
                 <Btn variant="ghost" size="sm" onClick={() => setConfirmPin(false)} disabled={generando}>No</Btn>
                 <Btn variant="primary" size="sm" icon="key" onClick={generarPin} disabled={generando}>
-                  {generando ? 'Generando…' : 'Sí, generar'}
+                  {deUsuario ? (generando ? 'Restableciendo…' : 'Sí, restablecer') : (generando ? 'Generando…' : 'Sí, generar')}
                 </Btn>
               </span>
             ) : (
               <Btn variant="secondary" size="sm" icon="key" onClick={() => setConfirmPin(true)} disabled={hayCambios || guardando}>
-                Generar PIN nuevo
+                {deUsuario ? 'Restablecer PIN' : 'Generar PIN nuevo'}
               </Btn>
             )}
           </div>
-          <div style={{ marginTop: 10 }}>
-            <Nota>
-              {hayCambios
-                ? 'Guarda o descarta los cambios antes de generar un PIN nuevo.'
-                : 'Úsalo si lo olvidó o si alguien más lo sabe: el PIN actual deja de servir en el acto y, si está dentro del POS, se le cierra la sesión.'}
-            </Nota>
-          </div>
+          {!(deUsuario && empleado.pin_pendiente) && (
+            <div style={{ marginTop: 10 }}>
+              <Nota>
+                {hayCambios
+                  ? `Guarda o descarta los cambios antes de ${deUsuario ? 'restablecer el PIN' : 'generar un PIN nuevo'}.`
+                  : deUsuario
+                    ? 'Úsalo si lo olvidó o si alguien más lo sabe: su PIN deja de servir en el acto, se le cierra la sesión del POS y crea otro la próxima vez que entre.'
+                    : 'Úsalo si lo olvidó o si alguien más lo sabe: el PIN actual deja de servir en el acto y, si está dentro del POS, se le cierra la sesión.'}
+              </Nota>
+            </div>
+          )}
         </div>
       )}
     </Modal>

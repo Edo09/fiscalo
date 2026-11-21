@@ -5,7 +5,6 @@ import { getEmisor, ApiError } from '@/api'
 import { useApiQuery } from '@/hooks/useApiQuery'
 import { useSession, clearSession, setSession } from '@/stores/auth'
 import { cambiarEmpresa, logout, posHandoff, type EmpresaAcceso } from '@/api/auth'
-import { hasModule } from '@/config/permissions'
 import { usePosActivo } from '@/features/pos/usePosActivo'
 import { CambiarEmpresaModal } from '@/features/auth/CambiarEmpresaModal'
 import { enEmpresaDeCliente, iniciales, tieneAccesoGlobal } from '@/features/auth/accesoGlobal'
@@ -91,10 +90,11 @@ export function Navbar({
     confirmarSalida(() => void entrar(e, habia))
   }
 
-  // Botón POS (api-gratex docs/specs/pos.md A1): solo si la empresa tiene el
-  // POS activo y el rol tiene el módulo 'pos' (mismo criterio que el menú).
+  // Botón POS (api-gratex docs/specs/pos.md A1, A5b): para todo usuario de la empresa si tiene el
+  // POS activo. Cada usuario es empleado del POS y crea su PIN la primera vez que entra; administrar
+  // el POS (cajas, empleados, habilitar equipos) sigue pidiendo el módulo 'pos' (menú "Punto de venta").
   const posActivo = usePosActivo()
-  const puedePos = posActivo === true && hasModule(user?.permissions ?? [], 'pos')
+  const puedePos = posActivo === true
   const [abriendoPos, setAbriendoPos] = useState(false)
 
   const abrirPos = async () => {

@@ -112,6 +112,21 @@ export interface Empleado {
   nombre: string
   rol: 'cajero' | 'supervisor'
   activo: boolean
+  /** Usuario de FiscalPoint del que es empleado; null/ausente = creado a mano por un administrador. */
+  usuario_id?: number | null
+}
+
+/**
+ * Qué le toca hacer a un usuario de FiscalPoint que llegó al POS (POST /api/pos/yo):
+ * crear su PIN (elegible y sin PIN), entrar con el que ya tiene, o nada (es de otra
+ * empresa, o un administrador desactivó su acceso: `mensaje` lo explica).
+ */
+export interface MiAcceso {
+  elegible: boolean
+  motivo: 'OTRA_EMPRESA' | 'DESACTIVADO' | null
+  mensaje: string | null
+  empleado: { id: number; nombre: string; rol: 'cajero' | 'supervisor' } | null
+  tiene_pin: boolean
 }
 
 export interface TurnoCaja {
@@ -366,6 +381,12 @@ export const posApi = {
   evento: (equipo: string, sesion: string, tipo: 'cancelada' | 'quitada', montoCentavos: number,
     lineas: { product_id: number; nombre: string; cantidad: number }[]) =>
     posFetch<{ registrado: boolean }>('POST', '/pos/eventos', { equipo, sesion }, { tipo, monto_centavos: montoCentavos, lineas }),
+
+  // Usuario de FiscalPoint que llega al POS (sesion de app.* o su usuario y clave) + el equipo
+  miAcceso: (equipo: string, usuario: string) =>
+    posFetch<MiAcceso>('POST', '/pos/yo', { equipo, admin: usuario }, {}),
+  crearMiPin: (equipo: string, usuario: string, pin: string) =>
+    posFetch<{ creado: boolean }>('POST', '/pos/yo/pin', { equipo, admin: usuario }, { pin }),
 
   // Admin, solo para habilitar el equipo
   login: (usuario: string, clave: string) =>
